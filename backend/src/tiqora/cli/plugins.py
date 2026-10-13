@@ -117,9 +117,18 @@ def add_plugins_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
     isign_p.set_defaults(func=_cmd_index_sign)
 
 
+async def _activate_installed() -> None:
+    """Best effort (5 s, no writes): make installed runtime packages visible to discovery."""
+    from tiqora.config import get_settings
+    from tiqora.plugins.runtime import activate_best_effort
+
+    await activate_best_effort(get_settings(), materialize=False, status_only=True)
+
+
 async def _cmd_list(args: argparse.Namespace) -> int:
     from tiqora.plugins.compat import check_compat, release_core_version
 
+    await _activate_installed()
     core = release_core_version()
     rows = []
     for d in discover_plugins():
@@ -145,6 +154,7 @@ async def _cmd_list(args: argparse.Namespace) -> int:
 
 
 async def _cmd_verify(args: argparse.Namespace) -> int:
+    await _activate_installed()
     problems = await verify_installed_plugins(
         import_check=args.import_check, strict=args.strict, timeout=args.timeout
     )

@@ -34,6 +34,7 @@ from tiqora.plugins.loader import (
 )
 from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE, migrations_dir
 from tiqora.plugins.registrar import RegistrationRejected
+from tiqora.plugins.runtime import RuntimeActivation, activate_runtime_plugins
 from tiqora.plugins.state import (
     QUARANTINE_AFTER,
     PluginLoadResult,
@@ -120,7 +121,9 @@ async def init_registry(
         return _finish(registry)
     active_written: list[str] = []
     try:
-        results = await _load_plugins(registry, role, settings, session_factory, active_written)
+        results = await _load_plugins(
+            registry, role, settings, session_factory, active_written, status_only=_late
+        )
     except Exception as exc:  # R-BOOT-ANYERR: our own plugin path must not block startup
         log.error(
             "plugins_boot_failed",
@@ -237,14 +240,52 @@ def _requirement_problem(
     return None
 
 
+async def _activation_problem_entries(
+    factory: async_sessionmaker[AsyncSession],
+    activation: RuntimeActivation,
+    discovered: Sequence[DiscoveredPlugin],
+) -> list[DiscoveredPlugin]:
+    """Synthetic INVALID entries for runtime packages that could not be put on ``sys.path``."""
+    known = {p.plugin_id for p in discovered}
+    wanted = {pid: msg for pid, msg in activation.problems.items() if pid not in known}
+    if not wanted:
+        return []
+    async with factory() as session:
+        rows = await store.list_plugin_rows(session)
+    out: list[DiscoveredPlugin] = []
+    for pid, message in sorted(wanted.items()):
+        row = rows.get(pid)
+        out.append(
+            DiscoveredPlugin(
+                pid,
+                "",
+                row.name if row is not None else "",  # keeps the stored name on sync
+                row.version if row is not None else "",
+                None,
+                None,
+                None,
+                (),
+                message,
+            )
+        )
+    return out
+
+
 async def _load_plugins(
     registry: Registry,
     role: PluginRole,
     settings: Settings,
     factory: async_sessionmaker[AsyncSession],
     active_written: list[str],
+    *,
+    status_only: bool = False,
 ) -> list[PluginLoadResult]:
+    # runtime packages first: their site dirs must be on sys.path before discovery
+    activation = await activate_runtime_plugins(
+        settings, factory, materialize=True, status_only=status_only
+    )
     plugins: Sequence[DiscoveredPlugin] = discovered_plugins()
+    plugins = [*plugins, *await _activation_problem_entries(factory, activation, plugins)]
     if not plugins:
         return []
     try:

@@ -178,8 +178,12 @@ def _migrate_plugins() -> None:
         migrations_dir,
         run_boot_migrations,
     )
+    from tiqora.plugins.runtime import activate_best_effort
 
     settings = get_settings()
+    if not settings.plugins_safe_mode:
+        # installed runtime packages must be importable (and discoverable) before their migrations
+        asyncio.run(activate_best_effort(settings))
     candidates = [p for p in discovered_plugins() if p.manifest is not None and migrations_dir(p)]
     if not candidates:
         return

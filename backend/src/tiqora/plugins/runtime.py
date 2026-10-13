@@ -10,6 +10,7 @@ Filesystem part only. Layout below ``settings.plugins_dir``::
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import importlib
 import os
@@ -19,13 +20,19 @@ import sys
 import time
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Final
 
+import structlog
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from tiqora.config import Settings
-from tiqora.plugins.discovery import clear_discovery_cache
+from tiqora.plugins.discovery import ENTRY_POINT_GROUP, clear_discovery_cache
 from tiqora.plugins.package import PackageError, read_tqplugin, unpack_wheel
+
+log = structlog.get_logger(__name__)
 
 _STATUS_TTL: Final = 60.0
 _TMP_MAX_AGE: Final = 3600.0
@@ -197,3 +204,167 @@ def gc_runtime_dirs(settings: Settings, keep: Mapping[str, Sequence[str]]) -> in
         with contextlib.suppress(OSError):
             entry.rmdir()  # only succeeds when empty
     return removed
+
+
+# --- activation (D5, F1) --------------------------------------------------------------------
+
+MISSING_PACKAGE_TEXT: Final = "Paketdateien fehlen – bitte erneut installieren"
+NEXT_START_TEXT: Final = "Paketdateien werden beim nächsten Start bereitgestellt"
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeActivation:
+    site_dirs: dict[str, Path] = field(default_factory=dict)  # plugin_id -> active site dir
+    problems: dict[str, str] = field(default_factory=dict)  # plugin_id -> German problem
+
+
+def _is_below(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def is_runtime_entry_point(ep: EntryPoint, settings: Settings) -> bool:
+    """F1: an entry point whose distribution lives below ``plugins_dir`` is a runtime plugin."""
+    dist = ep.dist
+    if dist is None:
+        return False
+    try:
+        location = Path(str(dist.locate_file(""))).resolve()
+        root = Path(settings.plugins_dir).resolve()
+    except (OSError, ValueError):
+        return False
+    return _is_below(location, root)
+
+
+def image_plugin_ids(settings: Settings) -> set[str]:
+    """Ids of ``tiqora.plugins`` entry points shipped outside the runtime plugins directory."""
+    return {
+        ep.name
+        for ep in entry_points(group=ENTRY_POINT_GROUP)
+        if not is_runtime_entry_point(ep, settings)
+    }
+
+
+def has_active_site_dir(settings: Settings, plugin_id: str) -> bool:
+    """Whether ``sys.path`` already holds a site dir of this plugin (one id, one dir)."""
+    roots = {str(Path(settings.plugins_dir) / plugin_id)}
+    with contextlib.suppress(OSError):
+        roots.add(str(Path(settings.plugins_dir).resolve() / plugin_id))
+    return any(entry.startswith(root + os.sep) for entry in sys.path for root in roots)
+
+
+async def activate_runtime_plugins(
+    settings: Settings,
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    materialize: bool = True,
+    status_only: bool = False,
+) -> RuntimeActivation:
+    async with factory() as session:
+        return await activate_runtime_plugins_in(
+            session, settings, materialize=materialize, status_only=status_only
+        )
+
+
+async def activate_runtime_plugins_in(
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    materialize: bool = True,
+    status_only: bool = False,
+) -> RuntimeActivation:
+    """Put the site dirs of all installed runtime packages on ``sys.path`` (no plugin import).
+
+    ``materialize=False`` never unpacks (a missing dir is reported). ``status_only`` is for an
+    already booted process (admin list, boot retry, uninstall job): problems are reported,
+    nothing is written to the database and an id that already has a site dir on ``sys.path``
+    keeps it (never a second dir for one id). Missing plugin tables give an empty result.
+    """
+    from tiqora.plugins import packages_store
+    from tiqora.plugins.bootstrap import is_missing_table_error
+
+    try:
+        rows = await packages_store.installed_runtime_rows(session)
+    except Exception as exc:
+        if is_missing_table_error(exc):
+            return RuntimeActivation()
+        raise
+    if not rows:
+        return RuntimeActivation()
+    images = image_plugin_ids(settings)  # decided by location, before any path is added
+    status = plugins_dir_status(settings)
+    site_dirs: dict[str, Path] = {}
+    problems: dict[str, str] = {}
+    shadowed = False
+    for row in rows:
+        sha = row.package_sha256
+        if sha is None:
+            continue
+        if row.id in images:  # Assumption 5: the image wins
+            log.warning("plugin_runtime_package_shadowed", plugin=row.id)
+            if not status_only:
+                row.source = "image"
+                row.package_sha256 = None
+                row.repository_id = None
+                shadowed = True
+            continue
+        if status_only and has_active_site_dir(settings, row.id):
+            continue
+        try:
+            vdir = version_dir(settings, row.id, row.version, sha)
+        except PackageError as exc:
+            problems[row.id] = str(exc)
+            continue
+        if _is_complete(vdir, sha):
+            site_dirs[row.id] = vdir / "site"
+            continue
+        if not status.writable:
+            where = settings.plugins_dir
+            problems[row.id] = f"Paketdateien fehlen im Verzeichnis {where} (schreibgeschützt)"
+            continue
+        if not materialize:
+            problems[row.id] = NEXT_START_TEXT
+            continue
+        data = await packages_store.get_package_data(session, sha)
+        if data is None:
+            problems[row.id] = MISSING_PACKAGE_TEXT
+            continue
+        try:
+            site_dirs[row.id] = await asyncio.to_thread(
+                materialize_package, settings, row.id, row.version, sha, data
+            )
+        except (PackageError, OSError) as exc:
+            log.warning("plugin_runtime_materialize_failed", plugin=row.id, error=str(exc)[:300])
+            problems[row.id] = f"Paketdateien konnten nicht bereitgestellt werden: {exc}"[:500]
+    if shadowed:
+        await session.commit()
+    activate_paths(site_dirs.values())
+    return RuntimeActivation(site_dirs, problems)
+
+
+materialize_package = materialize
+
+
+async def activate_best_effort(
+    settings: Settings,
+    *,
+    timeout: float = 5.0,  # noqa: ASYNC109 - bounds the whole database round trip
+    materialize: bool = True,
+    status_only: bool = False,
+) -> RuntimeActivation:
+    """CLI helper: activate installed runtime packages; any failure means "image plugins only"."""
+    from tiqora.plugins.migrations import plugin_session_factory
+
+    async def run() -> RuntimeActivation:
+        async with plugin_session_factory(settings.database_url) as factory:
+            return await activate_runtime_plugins(
+                settings, factory, materialize=materialize, status_only=status_only
+            )
+
+    try:
+        return await asyncio.wait_for(run(), timeout)
+    except Exception:  # noqa: BLE001 - no database, no tables, timeout; CLI stdout stays clean
+        return RuntimeActivation()

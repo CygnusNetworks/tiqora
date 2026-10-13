@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginHook, TiqoraPluginRuntime
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.settings_store import set_setting
@@ -34,6 +35,7 @@ from tiqora.plugins.number_generators import (
     active_generator_in,
     build_example,
 )
+from tiqora.plugins.runtime import RuntimeActivation, activate_runtime_plugins_in
 from tiqora.plugins.state import (
     PLUGIN_ROLES,
     PluginStatus,
@@ -192,10 +194,11 @@ def _build_one(
     hooks: Sequence[TiqoraPluginHook],
     *,
     safe_mode: bool,
+    activation_problem: str | None = None,
 ) -> PluginAdminOut:
     manifest = found.manifest if found is not None else None
     registry = get_registry()
-    problem = found.problem if found is not None else GONE_MESSAGE
+    problem = found.problem if found is not None else (activation_problem or GONE_MESSAGE)
     compat_problem = (
         check_compat(manifest, core=release_core_version()) if manifest is not None else None
     )
@@ -297,7 +300,22 @@ def _build_one(
     )
 
 
-async def _build_all(session: AsyncSession, *, safe_mode: bool) -> list[PluginAdminOut]:
+async def _activate_for_list(session: AsyncSession, settings: Settings) -> RuntimeActivation:
+    """Paths only (no import, unpacking or writes); also finds a crashing plugin in safe mode."""
+    try:
+        return await activate_runtime_plugins_in(
+            session, settings, materialize=False, status_only=True
+        )
+    except Exception as exc:  # noqa: BLE001 - the list must still render
+        log.warning("plugin_runtime_activation_failed", error=f"{type(exc).__name__}: {exc}"[:300])
+        await session.rollback()
+        return RuntimeActivation()
+
+
+async def _build_all(
+    session: AsyncSession, *, safe_mode: bool, settings: Settings
+) -> list[PluginAdminOut]:
+    activation = await _activate_for_list(session, settings)
     discovered: Mapping[str, DiscoveredPlugin] = {p.plugin_id: p for p in discovered_plugins()}
     rows = await store.list_plugin_rows(session)
     runtime: dict[str, list[TiqoraPluginRuntime]] = defaultdict(list)
@@ -308,15 +326,23 @@ async def _build_all(session: AsyncSession, *, safe_mode: bool) -> list[PluginAd
         hooks[hook.plugin_id].append(hook)
     out = [
         _build_one(
-            pid, discovered.get(pid), rows.get(pid), runtime[pid], hooks[pid], safe_mode=safe_mode
+            pid,
+            discovered.get(pid),
+            rows.get(pid),
+            runtime[pid],
+            hooks[pid],
+            safe_mode=safe_mode,
+            activation_problem=activation.problems.get(pid),
         )
         for pid in sorted(set(discovered) | set(rows))
     ]
     return sorted(out, key=lambda p: (p.name.lower(), p.id))
 
 
-async def _one(session: AsyncSession, plugin_id: str, *, safe_mode: bool) -> PluginAdminOut:
-    for plugin in await _build_all(session, safe_mode=safe_mode):
+async def _one(
+    session: AsyncSession, plugin_id: str, *, safe_mode: bool, settings: Settings
+) -> PluginAdminOut:
+    for plugin in await _build_all(session, safe_mode=safe_mode, settings=settings):
         if plugin.id == plugin_id:
             return plugin
     raise HTTPException(status.HTTP_404_NOT_FOUND, "Erweiterung nicht gefunden")
@@ -412,7 +438,7 @@ async def list_plugins(
     _ = admin
     return PluginAdminListOut(
         safe_mode=settings.plugins_safe_mode,
-        plugins=await _build_all(session, safe_mode=settings.plugins_safe_mode),
+        plugins=await _build_all(session, safe_mode=settings.plugins_safe_mode, settings=settings),
     )
 
 
@@ -432,7 +458,7 @@ async def set_plugin_enabled(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Erweiterung nicht gefunden")
     await session.commit()
     log.info("plugin_enabled_changed", plugin=plugin_id, enabled=body.enabled, by=admin.id)
-    return await _one(session, plugin_id, safe_mode=settings.plugins_safe_mode)
+    return await _one(session, plugin_id, safe_mode=settings.plugins_safe_mode, settings=settings)
 
 
 @router.post("/{plugin_id}/reset", response_model=PluginAdminOut)
@@ -447,4 +473,4 @@ async def reset_plugin(
     await store.reset_plugin(session, plugin_id, now=utc_now())
     await session.commit()
     log.info("plugin_reset", plugin=plugin_id, by=admin.id)
-    return await _one(session, plugin_id, safe_mode=settings.plugins_safe_mode)
+    return await _one(session, plugin_id, safe_mode=settings.plugins_safe_mode, settings=settings)
