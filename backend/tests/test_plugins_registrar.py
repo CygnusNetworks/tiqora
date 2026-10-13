@@ -614,3 +614,19 @@ def test_gi_invoker_must_be_async_and_named(registrar: PluginRegistrar) -> None:
     assert registrar.staged == ()
     with pytest.raises(RegistrationRejected, match="core.gi.invokers"):
         _registrar(points=[]).gi_invoker("Sync", prepare)
+
+
+def test_builtin_report_key_over_120_chars_rejected() -> None:
+    from tiqora.reporting.definition import ReportDefinition
+
+    long_id = ".".join(["a" * 24] * 4)[:100]  # 100 chars, a legal plugin id
+    assert len(long_id) == 100
+    reg = _registrar(
+        plugin_id=long_id, points=["core.reporting.sources", "core.reporting.builtin_reports"]
+    )
+    definition = ReportDefinition.model_validate(
+        {"source": "tickets", "dimensions": [], "measures": [{"key": "count"}]}
+    )
+    name = "n" * 30  # key = 7 + 100 + 1 + 30 = 138
+    with pytest.raises(RegistrationRejected, match="länger als 120 Zeichen"):
+        reg.builtin_report(name, category="volume", definition=definition)

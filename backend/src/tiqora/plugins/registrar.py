@@ -1203,6 +1203,10 @@ class PluginRegistrar:
             from tiqora.reporting.sources import core_report_sources  # noqa: PLC0415
 
             self._check_name(name, "den Bericht")
+            if len(key) > REPORT_KEY_MAX:
+                raise RegistrationRejected(
+                    f"Der Schlüssel des Berichts „{key}“ ist länger als {REPORT_KEY_MAX} Zeichen"
+                )
             if category not in get_args(ReportCategory):
                 raise RegistrationRejected(f"Unbekannte Berichtskategorie „{category}“")
             if not isinstance(definition, ReportDefinition):
@@ -1235,6 +1239,9 @@ class PluginRegistrar:
         )
         self._stage(BUILTIN_REPORTS, item, check=check)
 
+
+# ReportRunIn / ScheduleItemIn / tiqora_report_schedule_item.report_key all cap at 120
+REPORT_KEY_MAX: Final = 120
 
 _NUMBER_REASONS: Final = {
     "not_a_string": "keine Zeichenkette",
