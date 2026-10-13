@@ -143,10 +143,14 @@ async def test_source_reads_cis_versions_and_links(
         assert newest is not None
         assert await p.source.count_cis_changed_since(datetime(2000, 1, 1)) >= 2
         assert await p.source.count_cis_changed_since(datetime(2999, 1, 1)) == 0
+        # link drift: both seeded links have a CI end (Assumption 9)
+        assert await p.source.count_links_changed_since(datetime(2000, 1, 1)) >= 2
+        assert await p.source.count_links_changed_since(datetime(2999, 1, 1)) == 0
         items = await p.source.catalog_items()
         assert any(i.catalog_class == "ITSM::ConfigItem::Class" and i.valid for i in items)
         defs = await p.source.class_definitions()
         assert defs and all(d.raw and d.version >= 1 for d in defs)
+        assert await p.source.class_count() == len({d.class_id for d in defs})
         # Task 11: the adapter reads virtual_fs (none seeded here); the reader has its own tests
         assert await p.source.attachments([a], with_data=False) == []
         clear_detect_cache()

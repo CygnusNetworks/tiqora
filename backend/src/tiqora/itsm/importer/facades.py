@@ -215,6 +215,10 @@ class ZnunyAdapterSource:
         await self._reader()  # same availability error as every other read
         return await source_extra.ci_count(self._s)
 
+    async def class_count(self) -> int:
+        await self._reader()
+        return await source_extra.class_count(self._s)
+
     async def ci_ids_page(self, after_id: int, limit: int) -> list[int]:
         reader = await self._reader()
         return [
@@ -291,6 +295,12 @@ class ZnunyAdapterSource:
     async def count_cis_changed_since(self, since: datetime) -> int:
         await self._reader()
         return await source_extra.count_cis_changed_since(self._s, since)
+
+    async def count_links_changed_since(self, since: datetime) -> int:
+        reader = await self._reader()
+        return await source_extra.count_links_changed_since(
+            self._s, since, ci_object=reader.profile.ci_link_object
+        )
 
 
 class CmdbServiceWriter:

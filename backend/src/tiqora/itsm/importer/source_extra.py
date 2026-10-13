@@ -78,6 +78,37 @@ async def count_cis_changed_since(session: AsyncSession, since: datetime) -> int
     )
 
 
+async def class_count(session: AsyncSession) -> int:
+    """Classes that have at least one definition (what the import can bring over)."""
+    query = text("SELECT COUNT(DISTINCT class_id) FROM configitem_definition")
+    return int((await session.execute(query)).scalar_one())
+
+
+_LINK_OBJECT_ID = text("SELECT id FROM link_object WHERE name = :obj")
+_LINKS_CREATED_SINCE = text(
+    "SELECT COUNT(*) FROM link_relation"
+    " WHERE (source_object_id = :oid OR target_object_id = :oid) AND create_time > :since"
+)
+
+
+async def count_links_changed_since(
+    session: AsyncSession, since: datetime, *, ci_object: str
+) -> int:
+    """``link_relation`` rows with a CI at one end that were created after ``since``.
+
+    Links do not touch ``configitem.change_time``, so the drift count needs them separately
+    (Assumption 9 ruling). A deleted link leaves no row behind and cannot be counted.
+    """
+    object_id = (await session.execute(_LINK_OBJECT_ID, {"obj": ci_object})).scalar_one_or_none()
+    if object_id is None:
+        return 0
+    return int(
+        (
+            await session.execute(_LINKS_CREATED_SINCE, {"oid": int(object_id), "since": since})
+        ).scalar_one()
+    )
+
+
 #: Znuny ITSMChangeManagement tables counted by :func:`count_changes`: report key -> table
 _CHANGE_TABLES = {"change": "change_item", "workorder": "change_workorder"}
 

@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.cmdb.seed import DEFAULT_CATALOG_ROWS
+from tiqora.itsm.ci_provider import CiUnavailable
 from tiqora.itsm.importer.facades import CmdbServiceReader, CmdbServiceWriter, ItsmModeFacade
 from tiqora.itsm.importer.mapstore import MapStore
 from tiqora.itsm.importer.ports import (
@@ -169,6 +170,7 @@ class FakeSource(ImportSource):
         fail_once_after_pages: int | None = None,
         on_first_page: Callable[[], None] | None = None,
         changed_since_count: int = 0,
+        links_changed_since_count: int = 0,
         cip: Sequence[CipRow] = (),
         services: Sequence[ServiceItsmRow] = (),
     ) -> None:
@@ -186,9 +188,11 @@ class FakeSource(ImportSource):
         self.fail_once_after_pages = fail_once_after_pages
         self.on_first_page = on_first_page
         self.changed_since_count = changed_since_count
+        self.links_changed_since_count = links_changed_since_count
         self.cip = list(cip)
         self.services = list(services)
         self.changed_since_args: list[datetime] = []
+        self.links_changed_since_args: list[datetime] = []
         self._page_calls = 0
         self._failed = False
         self._requested: list[int] = []
@@ -267,6 +271,11 @@ class FakeSource(ImportSource):
             dataclasses.replace(i, name=name) if i.id == item_id else i for i in self.catalog
         ]
 
+    def _require_cmdb(self) -> None:
+        """Like the adapter's reader: no CMDB tables without ITSMConfigurationManagement."""
+        if not self.cmdb_installed:
+            raise CiUnavailable("znuny_itsm_missing", "the CMDB package is not installed")
+
     def max_ids_requested_per_call(self) -> int:
         """Largest id list / page limit any reader call received so far."""
         return max(self._requested, default=0)
@@ -291,7 +300,12 @@ class FakeSource(ImportSource):
         return sorted(self.definitions, key=lambda d: (d.class_id, d.version))
 
     async def ci_count(self) -> int:
+        self._require_cmdb()
         return len(self.ci_rows)
+
+    async def class_count(self) -> int:
+        self._require_cmdb()
+        return len({d.class_id for d in self.definitions})
 
     async def ci_ids_page(self, after_id: int, limit: int) -> list[int]:
         self._requested.append(limit)
@@ -344,8 +358,14 @@ class FakeSource(ImportSource):
         return max((c.changed_at for c in self.ci_rows), default=None)
 
     async def count_cis_changed_since(self, since: datetime) -> int:
+        self._require_cmdb()
         self.changed_since_args.append(since)
         return self.changed_since_count
+
+    async def count_links_changed_since(self, since: datetime) -> int:
+        self._require_cmdb()
+        self.links_changed_since_args.append(since)
+        return self.links_changed_since_count
 
     async def cip_rows(self) -> list[CipRow]:
         return list(self.cip)

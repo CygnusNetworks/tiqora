@@ -217,11 +217,25 @@ async def test_status_without_znuny_itsm(admin: _Api, monkeypatch: pytest.Monkey
     assert body["znuny_counts"] is None and body["znuny_changes_since_switch"] is None
 
 
-async def test_status_on_a_core_only_database(admin: _Api) -> None:
+async def test_status_on_a_database_without_itsm_packages(admin: _Api) -> None:
     """No override: the real detection finds no ITSM packages in the Znuny test schema."""
     body = (await admin.client.get(f"{BASE}/status")).json()
     assert body["znuny_itsm_present"] is False and body["can_import"] is False
     assert body["blocked_reason"] == NO_ITSM
+
+
+async def test_status_on_an_itsm_core_only_site(
+    admin: _Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R6: ITSMCore without the CMDB package has a profile and imports (no CI tables to count)."""
+    await _mode_a(admin, monkeypatch)
+    monkeypatch.setattr(facades, "source_override", sample_source(cmdb_installed=False))
+    r = await admin.client.get(f"{BASE}/status")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["znuny_itsm_present"] is True and body["profile"] == "itsm-6"
+    assert body["can_import"] is True and body["blocked_reason"] is None
+    assert body["znuny_counts"] == {"cis": 0, "classes": 0, "changes": 3, "workorders": 5}
 
 
 async def test_status_in_mode_a_reports_counts_and_last_run(

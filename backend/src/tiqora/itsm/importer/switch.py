@@ -246,17 +246,27 @@ async def import_status(session: AsyncSession) -> ImportStatus:
     counts: dict[str, int] | None = None
     drift: int | None = None
     if present:
-        profile = await ports.source.profile()
+        source = ports.source
+        info = await source.info()
+        profile = info.profile if info.core_installed else None
         if profile is not None:
-            changes = await ports.source.change_counts()
+            changes = await source.change_counts()
+            # ITSMCore without the CMDB package (R6): no CI tables to count, the import still runs
+            cmdb = info.cmdb_installed
             counts = {
-                "cis": await ports.source.ci_count(),
-                "classes": len({d.class_id for d in await ports.source.class_definitions()}),
+                "cis": await source.ci_count() if cmdb else 0,
+                "classes": await source.class_count() if cmdb else 0,
                 "changes": changes.get("change", 0),
                 "workorders": changes.get("workorder", 0),
             }
             if switch is not None and switch.switched_at is not None:
-                drift = await ports.source.count_cis_changed_since(switch.switched_at)
+                # CIs changed and CI links created in Znuny since the switch (Assumption 9)
+                drift = (
+                    await source.count_cis_changed_since(switch.switched_at)
+                    + await source.count_links_changed_since(switch.switched_at)
+                    if cmdb
+                    else 0
+                )
 
     reason: str | None = None
     if switch is not None:

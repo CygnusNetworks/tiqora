@@ -369,7 +369,7 @@ async def test_staged_cis_stay_invisible_in_mode_a(
 async def test_status_reports_drift_after_switch(
     world: _World, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    src = await _mode_a(world, monkeypatch, changed_since_count=3)
+    src = await _mode_a(world, monkeypatch, changed_since_count=3, links_changed_since_count=2)
     await _put(
         world,
         SWITCH_KEY,
@@ -379,13 +379,34 @@ async def test_status_reports_drift_after_switch(
     reset_mode_cache()
     async with world.factory() as s:
         status = await import_status(s)
-    assert status.znuny_changes_since_switch == 3
+    # changed CIs plus CI links created in Znuny since the switch (Assumption 9)
+    assert status.znuny_changes_since_switch == 5
     assert src.changed_since_args == [datetime(2026, 10, 12, 8, 0)]  # type: ignore[attr-defined]
+    assert src.links_changed_since_args == [datetime(2026, 10, 12, 8, 0)]  # type: ignore[attr-defined]
     assert status.can_import is False and status.can_switch is False
     assert status.blocked_reason == ALREADY_SWITCHED
     assert status.switched is not None and status.switched.by == 56339
     assert status.mode == "tiqora"
     assert status.znuny_counts is not None and status.znuny_counts["cis"] == 10
+    assert status.znuny_counts["classes"] == 2
+
+
+async def test_status_after_switch_on_an_itsm_core_only_site(
+    world: _World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No CMDB package: no CI counts and no CI drift, and no CiUnavailable from the CI tables."""
+    await _mode_a(world, monkeypatch, cmdb_installed=False, changed_since_count=3)
+    await _put(
+        world,
+        SWITCH_KEY,
+        json.dumps({"switched_at": "2026-10-12T08:00:00", "by": 56339, "run_id": 1}),
+    )
+    await _put(world, MODE_KEY, "tiqora")
+    reset_mode_cache()
+    async with world.factory() as s:
+        status = await import_status(s)
+    assert status.profile == "itsm-6" and status.znuny_changes_since_switch == 0
+    assert status.znuny_counts == {"cis": 0, "classes": 0, "changes": 3, "workorders": 5}
 
 
 async def test_status_before_switch_and_with_stuck_flag(
