@@ -7745,6 +7745,48 @@
         "no_customer_address": "keine Kundenadresse",
         "error": "Fehler"
       }
+    },
+    "zoom": {
+      "roles": {
+        "incident": "Incident",
+        "major_incident": "Major Incident",
+        "service_request": "Service Request",
+        "problem": "Problem",
+        "change": "Change",
+        "change_task": "Change-Aufgabe"
+      },
+      "criticality": "Kritikalität: {{value}}",
+      "impact": "Auswirkung: {{value}}",
+      "matrix": "Matrix: {{priority}}",
+      "flood": "Für diesen Service gab es vor {{minutes}} Minuten bereits einen Incident: #{{tn}} - verknüpfen?",
+      "floodLink": "Verknüpfen",
+      "floodLinked": "Verknüpft.",
+      "floodError": "Das Ticket konnte nicht verknüpft werden.",
+      "cis": {
+        "title": "Betroffene CIs",
+        "add": "CI verknüpfen",
+        "empty": "Keine Konfigurationselemente verknüpft.",
+        "deployment": "Verwendungsstatus",
+        "incident": "Vorfallstatus",
+        "remove": "{{name}} entfernen",
+        "removeShort": "Entfernen",
+        "linkError": "Das CI konnte nicht verknüpft werden.",
+        "removeError": "Die Verknüpfung konnte nicht entfernt werden."
+      },
+      "picker": {
+        "title": "CI verknüpfen",
+        "search": "CIs nach Nummer oder Name suchen",
+        "class": "Klasse",
+        "allClasses": "Alle Klassen",
+        "linkType": "Verknüpfungstyp",
+        "defaultLinkType": "Standard",
+        "alreadyLinked": "bereits verknüpft",
+        "truncated": "Es gibt weitere Treffer. Bitte die Suche eingrenzen."
+      },
+      "dialogs": {
+        "itsm_fields": "ITSM-Felder",
+        "decision": "Entscheidung"
+      }
     }
   }
 }

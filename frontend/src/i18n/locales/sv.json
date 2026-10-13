@@ -7737,6 +7737,48 @@
         "no_customer_address": "no customer address",
         "error": "error"
       }
+    },
+    "zoom": {
+      "roles": {
+        "incident": "Incident",
+        "major_incident": "Major Incident",
+        "service_request": "Service request",
+        "problem": "Problem",
+        "change": "Change",
+        "change_task": "Change task"
+      },
+      "criticality": "Criticality: {{value}}",
+      "impact": "Impact: {{value}}",
+      "matrix": "Matrix: {{priority}}",
+      "flood": "This service already had an incident {{minutes}} minutes ago: #{{tn}} - link it?",
+      "floodLink": "Link",
+      "floodLinked": "Linked.",
+      "floodError": "The ticket could not be linked.",
+      "cis": {
+        "title": "Affected CIs",
+        "add": "Link CI",
+        "empty": "No configuration items linked.",
+        "deployment": "Deployment",
+        "incident": "Incident",
+        "remove": "Remove {{name}}",
+        "removeShort": "Remove",
+        "linkError": "The CI could not be linked.",
+        "removeError": "The CI could not be unlinked."
+      },
+      "picker": {
+        "title": "Link CI",
+        "search": "Search CIs by number or name",
+        "class": "Class",
+        "allClasses": "All classes",
+        "linkType": "Link type",
+        "defaultLinkType": "Default",
+        "alreadyLinked": "already linked",
+        "truncated": "More matches exist. Narrow the search."
+      },
+      "dialogs": {
+        "itsm_fields": "ITSM fields",
+        "decision": "Decision"
+      }
     }
   }
 }

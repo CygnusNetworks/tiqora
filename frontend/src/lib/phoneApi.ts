@@ -21,7 +21,11 @@ export type DynamicFieldDef = Schemas["DynamicFieldDefOut"];
 export type ActiveCall = Schemas["ActiveCall"];
 export type PhoneScreen = "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound";
 /** Screens whose Znuny dynamic-field config `/reference/dynamic-fields` serves. */
-export type DynamicFieldScreen = PhoneScreen | "AgentTicketFreeText";
+export type DynamicFieldScreen =
+  | PhoneScreen
+  | "AgentTicketFreeText"
+  | "AgentTicketAddtlITSMField"
+  | "AgentTicketDecision";
 
 /** 409 detail of an outbound call on a ticket another agent holds. */
 export type PhoneCallLockedDetail = {

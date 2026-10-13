@@ -1,4 +1,5 @@
 import type { TicketDetail } from "@/lib/api";
+import { TicketItsmChips } from "@/components/itsm/TicketItsmChips";
 import { LinkedTickets } from "./LinkedTickets";
 import { TicketDynamicFields } from "./TicketDynamicFields";
 import { TicketHeaderActions } from "./TicketHeaderActions";
@@ -61,6 +62,7 @@ export function TicketHeader({
         allowedActions={allowedActions}
       />
       <LinkedTickets ticketId={ticket.id} ticketTn={ticket.tn} />
+      <TicketItsmChips ticket={ticket} allowedActions={allowedActions} />
       <TicketDynamicFields ticket={ticket} allowedActions={allowedActions} />
     </header>
   );

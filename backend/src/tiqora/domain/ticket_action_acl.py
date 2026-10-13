@@ -33,6 +33,9 @@ ZOOM_ACTIONS: tuple[str, ...] = (
     "AgentTicketPrint",
     "AgentTicketFreeText",
     "AgentTicketProcess",
+    # Znuny ITSM screens (ITSM-Felder / Entscheidung dialogs of the zoom).
+    "AgentTicketAddtlITSMField",
+    "AgentTicketDecision",
 )
 
 

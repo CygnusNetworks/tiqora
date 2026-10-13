@@ -1635,6 +1635,7 @@ const demoZoomActions = [
   "AgentTicketMove", "AgentTicketOwner", "AgentTicketResponsible", "AgentTicketCustomer",
   "AgentTicketLock", "AgentTicketWatcher", "AgentLinkObject", "AgentTicketMerge",
   "AgentTicketPrint", "AgentTicketFreeText", "AgentTicketProcess",
+  "AgentTicketAddtlITSMField", "AgentTicketDecision",
 ];
 
 const demoDeployRevision = {
