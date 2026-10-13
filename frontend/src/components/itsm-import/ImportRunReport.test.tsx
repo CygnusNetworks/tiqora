@@ -147,6 +147,9 @@ describe("ImportRunReport", () => {
     });
     renderReport(run({ job_id: 7 }));
     await waitFor(() => expect(jobGet).toHaveBeenCalled());
-    expect(screen.queryByRole("link", { name: "Vollständiger Bericht (CSV)" })).toBeNull();
+    // give the job answer time to render: the link must not show up at all
+    await expect(
+      screen.findByRole("link", { name: "Vollständiger Bericht (CSV)" }, { timeout: 300 }),
+    ).rejects.toThrow();
   });
 });
