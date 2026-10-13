@@ -1,7 +1,7 @@
 """Import report issue codes -> German explanation shown in the UI and next to the CSV.
 
-Task 16 adds the consistency test (every code emitted in this package has an entry, every
-entry is emitted and documented in ``docs/itsm-import.md``).
+``tests/test_itsm_import_issue_codes.py`` keeps this table, the codes emitted in this package and
+the table in ``docs/itsm-import.md`` identical.
 """
 
 from __future__ import annotations
@@ -49,8 +49,8 @@ ISSUE_CODES: dict[str, str] = {
         "wurde übersprungen"
     ),
     "class_without_group": (
-        "Die Klasse hat in Znuny keine passende Gruppe; sie wurde der Standardgruppe "
-        "zugeordnet bzw. übersprungen"
+        "Die Klasse hat in Znuny keine Berechtigungsgruppe; sie wurde der Administratorgruppe "
+        "zugeordnet"
     ),
     "changed_in_tiqora": (
         "Das Konfigurationselement wurde in Tiqora geändert und wird vom Import nicht überschrieben"

@@ -571,3 +571,84 @@ Peer (`znuny-6.5-itsm` oder `znuny-7.3-itsm`, `GOLDEN=1`). Danach laufen `test_i
 und muss in diesem Dokument und in `docs/itsm.md` (Kapitel 5) nachgezogen werden. Bei einer neuen
 Znuny-ITSM-Linie: zuerst Schema vermessen (`--verify`), dann das Profil in `znuny_adapter/profiles.py`
 ergänzen, dann das Verhalten messen.
+
+## Importer: Zuordnung und Bericht
+
+Der Importer (Verwaltung, ITSM, „Import aus Znuny“) kopiert das ITSM aus der Znuny-Datenbank nach Tiqora.
+Er liest Znuny nur und schreibt ausschließlich in Tiqora-Tabellen. Gestartet wird er als Hintergrundauftrag
+(`core.itsm_import`); der Fortschritt erscheint in der Verwaltung, der Bericht steht nach dem Lauf als
+Übersicht und als CSV-Datei bereit. Die Schemata der Quelle sind oben in diesem Dokument beschrieben,
+der Wechsel in den Mode B selbst (Schreibsperre in Znuny, Umstellung, Rückweg) in `docs/itsm.md`.
+
+### Was wird wohin übernommen
+
+| Znuny | Tiqora | Bemerkung |
+|---|---|---|
+| Allgemeiner Katalog (`general_catalog`: Einsatz-, Incident-, Kritikalitäts-, Auswirkungsstufen) | Katalog der Tiqora-Stammdaten | Schlüssel und Reihenfolge bleiben erhalten, Namen werden aktualisiert |
+| CMDB-Klassen | CI-Klassen | Berechtigungsgruppe bleibt erhalten; ohne Gruppe wird die Administratorgruppe gesetzt (`class_without_group`) |
+| Klassendefinitionen (YAML oder Perl, je Version) | Klassendefinitionen (Attributschema) | Es wird kein eigener Parser verwendet, sondern der des CMDB-Moduls; nicht abbildbare Teile stehen im Bericht |
+| Konfigurationselemente (Nummer, Name, Klasse, Zustände) | CIs | Die Znuny-Nummer bleibt erhalten |
+| Versionen mit `xml_storage`-Attributen | CI-Versionen mit Attributen als Schlüssel-Wert-Struktur | Datums- und Verweiswerte werden umgerechnet; Verweise auf andere CIs und Katalogeinträge werden aufgelöst |
+| Verknüpfungen CI mit CI | CI-Verknüpfungen | Verknüpfungstypen kommen aus der Znuny-Konfiguration |
+| Verknüpfungen CI mit Ticket oder Service | CI-Verknüpfungen mit Ticket oder Service | Die Ticket- und Service-Schlüssel sind in beiden Systemen dieselben |
+| Verknüpfungen CI mit anderen Objekten (FAQ, Change, Arbeitsauftrag) | nicht übernommen | Bericht: `unsupported_object` |
+| Anhänge der Versionen | Anhänge der CI-Versionen | Nur aus der Datenbank, höchstens 50 MB je Datei |
+| Prioritätsmatrix (`cip_allocate`) | Prioritätsmatrix | Ersetzt die vorhandene Matrix als Ganzes |
+| ITSM-Angaben der Services (Typ, Kritikalität) | ITSM-Angaben des Services | Nur für Services, die es in Tiqora gibt |
+| Changes und Arbeitsaufträge | nicht übernommen | Nur gezählt (Bericht: `changes_not_imported`) |
+
+Die Reihenfolge der Schritte im Bericht ist: Katalog, Klassen, CIs (Durchgang 1: Köpfe, Durchgang 2:
+Versionen), Verknüpfungen, Anhänge, Prioritätsmatrix, Service-Angaben, Changes, in Znuny gelöschte CIs und
+abgeleitete Zustände. Ohne installiertes CMDB-Paket (nur ITSMCore) erscheinen die Klassen- und CI-Schritte
+mit Zählern von 0; Katalog, Matrix und Service-Angaben werden trotzdem übernommen.
+
+### Wiederholen und Abgleich
+
+Sie können den Import beliebig oft wiederholen. Jedes Objekt wird über seine Znuny-Kennung wiedererkannt,
+die Zuordnung steht in einer eigenen Tabelle von Tiqora. Unveränderte Objekte werden nur als
+„unverändert“ gezählt, neue Versionen werden angehängt, nichts wird doppelt angelegt. Ein Probelauf
+(„Trockenlauf“) liest und zählt alles, schreibt aber nichts und eignet sich, um den Bericht vor dem echten
+Lauf zu prüfen.
+
+Konfliktregel: Was Sie nach dem Import in Tiqora an einem CI ändern, hat Vorrang. Ein CI, dessen neueste
+Version in Tiqora entstanden ist, wird von späteren Importläufen nicht mehr überschrieben, sondern mit
+`changed_in_tiqora` gemeldet. Ein CI, das in Znuny gelöscht wurde, bleibt in Tiqora bestehen und wird mit
+`deleted_in_znuny` gemeldet. Nach dem Wechsel in den Mode B ist kein weiterer Import mehr möglich.
+
+### Meldungen im Bericht
+
+Jede Meldung hat einen Schritt, einen Code, einen Objektbezug (z. B. die CI-Nummer oder `class:<Name>`) und
+einen Text. Die Codes bedeuten:
+
+| Code | Bedeutung |
+|---|---|
+| `unsupported_object` | Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ, Change); die Verknüpfung wurde nicht übernommen |
+| `unknown_link_type` | Der Verknüpfungstyp ist in Znuny nicht konfiguriert; die Verknüpfung wurde nicht übernommen |
+| `attachment_in_filesystem` | Der Anhang liegt im Dateisystem von Znuny und konnte nicht aus der Datenbank gelesen werden; kopieren Sie ihn bei Bedarf von Hand |
+| `attachment_too_large` | Der Anhang überschreitet die zulässige Größe (50 MB) und wurde nicht übernommen |
+| `unresolved_reference` | Verweis auf ein Objekt, das in Tiqora nicht gefunden wurde (z. B. ein gelöschtes CI); bei Attributwerten bleibt der Wert als Text erhalten |
+| `unknown_attribute` | Das Attribut ist in der Klassendefinition nicht (mehr) vorhanden und wurde nicht übernommen |
+| `bad_value` | Der Wert passt nicht zum Typ des Attributs und wurde nicht übernommen |
+| `definition_unreadable` | Die Klassendefinition von Znuny konnte nicht gelesen werden; die Version wurde übersprungen |
+| `definition_converted_with_issues` | Die Klassendefinition wurde übernommen, einzelne Teile konnten aber nicht abgebildet werden (Einzelheiten in der Meldung) |
+| `definition_key_invalid` | Attribut-Schlüssel mit Leerzeichen oder Nicht-ASCII-Zeichen; das Attribut wurde nicht übernommen. Benennen Sie den Schlüssel in Znuny um und wiederholen Sie den Import |
+| `definition_attribute_key_unknown` | Ein Eintrag der Definition wird von Tiqora nicht abgebildet und wurde ausgelassen |
+| `no_definition` | Zur Version gehört keine verwendbare Klassendefinition; das Konfigurationselement wurde übersprungen |
+| `class_without_group` | Die Klasse hat in Znuny keine passende Gruppe; sie wurde der Administratorgruppe zugeordnet |
+| `changed_in_tiqora` | Das Konfigurationselement wurde in Tiqora geändert und wird vom Import nicht überschrieben |
+| `deleted_in_znuny` | Das Konfigurationselement existiert in Znuny nicht mehr; in Tiqora bleibt es unverändert bestehen |
+| `priority_matrix_invalid` | Die Prioritätsmatrix von Znuny verweist auf eine Priorität, die es nicht gibt; die Matrix wurde nicht übernommen |
+| `service_unknown` | Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden nicht übernommen |
+| `changes_not_imported` | Changes und Arbeitsaufträge von Znuny ITSM werden nicht übernommen, es wurden nur gezählt |
+
+Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issue_codes.py`; ein Test
+(`test_itsm_import_issue_codes.py`) stellt sicher, dass Code, Tabelle und Importer übereinstimmen.
+
+### Die CSV-Datei lesen
+
+Die CSV-Datei hat die Spalten `Schritt`, `Code`, `Objekt` und `Meldung`, eine Zeile je Meldung, UTF-8 mit
+Semikolon als Trenner wie die übrigen Berichte. Filtern Sie zuerst nach `Code`: Meldungen wie
+`changes_not_imported` oder `deleted_in_znuny` sind Hinweise, `bad_value`, `unresolved_reference` und
+`definition_unreadable` bedeuten, dass Daten fehlen. Die Spalte `Objekt` führt direkt zum Datensatz in
+Znuny. Texte aus Znuny können in Excel als Formel gedeutet werden; deshalb beginnt jede Zelle, die mit
+`=`, `+`, `-` oder `@` anfängt, mit einem vorangestellten Apostroph.
