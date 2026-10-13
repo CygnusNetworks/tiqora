@@ -144,6 +144,10 @@ def _make_case(tmp: Path, case: str) -> bytes:  # noqa: C901 - one branch per ca
             }
         case "egg_info":
             wheel_kw = {"extra_members": {"tq_fixture_hello.egg-info/PKG-INFO": b"x"}}
+        case "file_dir_collision":
+            wheel_kw = {
+                "extra_members": {"tq_fixture_hello/zz": b"x", "tq_fixture_hello/zz/b.py": b"y"}
+            }
         case "two_dist_info":
             wheel_kw = {"extra_members": {"other-2.0.dist-info/METADATA": b"Name: other\n"}}
         case "version_mismatch":
@@ -235,6 +239,7 @@ def test_requires_dist_is_read(tmp_path: Path) -> None:
         ("entry_mismatch", "Einstiegspunkt"),
         ("egg_info", "egg-info"),
         ("two_dist_info", "dist-info"),
+        ("file_dir_collision", "Datei und Verzeichnis"),
         ("version_mismatch", "Version"),
         ("not_a_zip", "keine gültige"),
     ],

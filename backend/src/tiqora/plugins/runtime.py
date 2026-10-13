@@ -128,6 +128,8 @@ def materialize(settings: Settings, plugin_id: str, version: str, sha256: str, d
         unpack_wheel(pkg.wheel_bytes, tmp / "site")
         (tmp / "COMPLETE").write_text(sha256)
         final.parent.mkdir(mode=0o755, exist_ok=True)
+        if _is_complete(final, sha256):  # a concurrent winner finished while we unpacked
+            return final / "site"
         if final.exists():  # incomplete leftovers (or a stale dir): move aside, then delete
             aside = root / f".tmp-{uuid.uuid4().hex}"
             try:
@@ -140,7 +142,7 @@ def materialize(settings: Settings, plugin_id: str, version: str, sha256: str, d
             os.replace(tmp, final)
         except OSError:
             if not _is_complete(final, sha256):
-                raise
+                raise PackageError("Das Paket konnte nicht installiert werden") from None
             # a concurrent installer won the race; keep its directory
     finally:
         if tmp.exists():

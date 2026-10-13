@@ -220,6 +220,12 @@ def _read_zip(
             and info.compress_type != zipfile.ZIP_STORED
         ):
             raise _member_err(name, "Kompressionsverhältnis zu groß (Zip-Bombe?)")
+    file_names = {i.filename.lower() for i in files}
+    for info in infos:
+        parts = info.filename.rstrip("/").lower().split("/")
+        for k in range(1, len(parts)):
+            if "/".join(parts[:k]) in file_names:
+                raise _member_err(info.filename, "ist Datei und Verzeichnis zugleich")
     out: dict[str, _Read] = {}
     running = 0
     for info in files:
@@ -514,7 +520,10 @@ def _entry_value(raw: bytes, manifest: PluginManifest) -> str:
 def unpack_wheel(wheel_bytes: bytes, target: Path) -> None:
     """Write a wheel's members below ``target`` (purelib layout), re-validating first.
 
-    Nothing is written unless every member passes the D4 reader rules; each file is created
+    Nothing is written unless every member passes the D4 reader rules (names, symlinks,
+    duplicates, sizes, zip bombs, file/directory collisions; RECORD hashes and
+    ``Root-Is-Purelib`` are checked by ``read_tqplugin``, not here) plus egg-info, ``.data``,
+    native and top-level non-.py files and exactly one dist-info; each file is created
     with ``open(..., "xb")`` and mode 0o644 (zip permissions are never kept), directories
     get 0o755, and a resolved path outside ``target`` raises ``PackageError``. An
     ``INSTALLER`` file with ``tiqora`` is added to the ``.dist-info``.
@@ -563,13 +572,18 @@ def unpack_wheel(wheel_bytes: bytes, target: Path) -> None:
 
     plan = [(place(name), name) for name in reads if name != installer]
     plan.append((place(installer), installer))
-    for dest, name in plan:
-        make_dirs(dest.parent)
-        content = b"tiqora\n" if name == installer else (reads[name].data or b"")
-        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(content)
-        dest.chmod(0o644)
+    try:
+        for dest, name in plan:
+            make_dirs(dest.parent)
+            content = b"tiqora\n" if name == installer else (reads[name].data or b"")
+            fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(content)
+            dest.chmod(0o644)
+    except OSError as exc:
+        raise PackageError(
+            f"Das Wheel konnte nicht entpackt werden ({type(exc).__name__})"
+        ) from None
 
 
 # --- writing -------------------------------------------------------------------------------

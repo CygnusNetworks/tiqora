@@ -157,7 +157,7 @@ def test_unpacked_files_have_fixed_modes_and_installer(tmp_path: Path) -> None:
         assert mode == (0o755 if path.is_dir() else 0o644), path
 
 
-def test_unpack_refuses_escape_even_if_reader_was_bypassed(tmp_path: Path) -> None:
+def test_unpack_refuses_escape_in_wheel_names(tmp_path: Path) -> None:
     evil = tmp_path / "evil.whl"
     with zipfile.ZipFile(evil, "w") as zf:
         zf.writestr("../evil.py", "x = 1\n")
@@ -207,3 +207,72 @@ def test_gc_does_nothing_when_not_writable(tmp_path: Path) -> None:
     (tmp_path / "plugins" / "org.example.gone" / f"1.0.0-{'d' * 12}").mkdir(parents=True)
     assert gc_runtime_dirs(s, {}) == 0
     assert (tmp_path / "plugins" / "org.example.gone").exists()
+
+
+def test_materialize_keeps_winner_that_completes_mid_unpack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.plugins import runtime
+
+    s = _settings(tmp_path)
+    data, pid, ver, sha = _package(tmp_path)
+    final = version_dir(s, pid, ver, sha)
+    real = runtime.unpack_wheel
+
+    def racing(wheel_bytes: bytes, target: Path) -> None:
+        real(wheel_bytes, target)
+        (final / "site").mkdir(parents=True)  # the other process finishes meanwhile
+        (final / "site" / "WINNER").write_text("w")
+        (final / "COMPLETE").write_text(sha)
+
+    monkeypatch.setattr(runtime, "unpack_wheel", racing)
+    assert materialize(s, pid, ver, sha, data) == final / "site"
+    assert (final / "site" / "WINNER").is_file()
+    assert not [p for p in (tmp_path / "plugins").iterdir() if p.name.startswith(".tmp-")]
+
+
+def _raw_wheel(tmp_path: Path, members: dict[str, str]) -> bytes:
+    path = tmp_path / "raw.whl"
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, content in members.items():
+            zf.writestr(name, content)
+    return path.read_bytes()
+
+
+def test_unpack_refuses_file_directory_collision_in_german(tmp_path: Path) -> None:
+    wheel = _raw_wheel(
+        tmp_path,
+        {"pkg/zz": "x", "pkg/zz/b.py": "y", "pkg-1.0.dist-info/METADATA": "Name: pkg\n"},
+    )
+    with pytest.raises(PackageError, match="Datei und Verzeichnis") as exc:
+        unpack_wheel(wheel, tmp_path / "out" / "site")
+    assert str(tmp_path) not in str(exc.value)
+    assert not (tmp_path / "out" / "site").exists()
+
+
+def test_unpack_wraps_write_errors_without_path(tmp_path: Path) -> None:
+    wheel = _raw_wheel(tmp_path, {"pkg/a.py": "x", "pkg-1.0.dist-info/METADATA": "Name: pkg\n"})
+    target = tmp_path / "out" / "site"
+    (target / "pkg").mkdir(parents=True)
+    (target / "pkg" / "a.py").write_text("exists")  # O_EXCL -> FileExistsError
+    with pytest.raises(PackageError) as exc:
+        unpack_wheel(wheel, target)
+    assert str(tmp_path) not in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ("members", "needle"),
+    [
+        (
+            {"pkg/a.py": "x", "pkg.egg-info/PKG-INFO": "x", "pkg-1.0.dist-info/M": "x"},
+            "nicht erlaubt",
+        ),
+        ({"pkg/a.py": "x", "pkg-1.0.data/x.py": "x", "pkg-1.0.dist-info/M": "x"}, "nicht erlaubt"),
+        ({"pkg/a.so": "x", "pkg-1.0.dist-info/M": "x"}, "native"),
+        ({"evil.pth": "x", "pkg-1.0.dist-info/M": "x"}, "außerhalb"),
+        ({"pkg/a.py": "x"}, "dist-info"),
+    ],
+)
+def test_unpack_wheel_own_rejections(tmp_path: Path, members: dict[str, str], needle: str) -> None:
+    with pytest.raises(PackageError, match=needle):
+        unpack_wheel(_raw_wheel(tmp_path, members), tmp_path / "out" / "site")
