@@ -15,6 +15,7 @@ import { stateLabel } from "@/lib/status";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 import { fromZonedInputValue } from "@/lib/timeZone";
 import { useAgentOptions } from "@/lib/agentOptions";
+import { itsmApi, itsmKeys, type LinkTypeOption } from "@/lib/itsmApi";
 
 
 // The ticket's customer dialog lives with the other customer components.
@@ -672,7 +673,13 @@ function ticketRefErrorMessage(err: unknown, ref: string, t: TFunction): string 
   return t("ticket.dialog.genericError");
 }
 
-const LINK_TYPES = ["Normal", "ParentChild"] as const;
+const FALLBACK_LINK_TYPES = ["Normal", "ParentChild"];
+
+/** Dropdown label of an offered link type: "Übergeordnet / Untergeordnet" for pointed ones. */
+function linkTypeLabel(o: LinkTypeOption): string {
+  if (o.pointed && o.source_label && o.target_label) return `${o.source_label} / ${o.target_label}`;
+  return o.source_label ?? o.name;
+}
 
 export function LinkDialog({
   ticketId,
@@ -684,7 +691,17 @@ export function LinkDialog({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [targetId, setTargetId] = useState("");
-  const [linkType, setLinkType] = useState<(typeof LINK_TYPES)[number]>("Normal");
+  const [linkType, setLinkType] = useState("Normal");
+  // Types come from the ITSM link-type table; without it (ITSM off) the two built-ins.
+  const typesQ = useQuery({
+    queryKey: itsmKeys.linkTypes("ticket_ticket"),
+    queryFn: ({ signal }) => itsmApi.linkTypes("ticket_ticket", signal),
+    retry: false,
+  });
+  const typeItems =
+    typesQ.data && typesQ.data.length > 0
+      ? typesQ.data.map((o) => ({ value: o.name, label: linkTypeLabel(o) }))
+      : FALLBACK_LINK_TYPES.map((n) => ({ value: n, label: n }));
 
   const linksQ = useQuery({
     queryKey: ["tickets", ticketId, "links"],
@@ -733,9 +750,9 @@ export function LinkDialog({
         <label className="block text-xs text-muted">
           {t("ticket.dialog.linkType")}
           <SelectField
-            items={LINK_TYPES.map((lt) => ({ value: lt, label: lt }))}
+            items={typeItems}
             value={linkType}
-            onChange={(v) => setLinkType(v as (typeof LINK_TYPES)[number])}
+            onChange={setLinkType}
             testId="link-type-select"
           />
         </label>

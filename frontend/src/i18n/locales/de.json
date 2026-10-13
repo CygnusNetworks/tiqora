@@ -912,7 +912,11 @@
       "label": "Verknüpfte Tickets",
       "parent": "Eltern",
       "child": "Kind",
-      "related": "Verknüpft"
+      "related": "Verknüpft",
+      "remove": "Verknüpfung entfernen",
+      "removeTitle": "Verknüpfung entfernen",
+      "removeConfirm": "Verknüpfung zwischen {{a}} und {{b}} entfernen?",
+      "removeError": "Die Verknüpfung konnte nicht entfernt werden."
     },
     "nav": {
       "copyTn": "Ticketnummer kopieren",
@@ -7717,6 +7721,30 @@
       "cmdb_not_installed": "Die Znuny-CMDB ist nicht installiert.",
       "search_too_broad": "Die Suche ist zu allgemein. Bitte schränken Sie sie ein.",
       "generic": "Die ITSM-Daten konnten nicht geladen werden."
+    },
+    "graph": {
+      "toggle": "Als Grafik",
+      "label": "Verknüpfungsgrafik",
+      "truncated": "Weitere Verknüpfungen ausgeblendet"
+    },
+    "linkedNote": {
+      "open": "Notiz an verknüpfte Tickets",
+      "title": "Notiz an verknüpfte Tickets",
+      "targets": "Verknüpfte Tickets",
+      "subject": "Betreff",
+      "text": "Text",
+      "visible": "Für Kunden sichtbar",
+      "send": "Senden",
+      "invalid": "Die Notiz konnte nicht eingereiht werden. Bitte prüfen Sie Auswahl und Text.",
+      "error": "Die Notiz konnte nicht eingereiht werden.",
+      "done": "An {{count}} Ticket(s) angehängt",
+      "skipped": "Übersprungen: {{count}} Ticket(s)",
+      "reasons": {
+        "no_rw": "keine Schreibberechtigung",
+        "not_linked": "nicht mehr verknüpft",
+        "no_customer_address": "keine Kundenadresse",
+        "error": "Fehler"
+      }
     }
   }
 }

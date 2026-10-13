@@ -912,7 +912,11 @@
       "label": "Linked tickets",
       "parent": "Parent",
       "child": "Child",
-      "related": "Related"
+      "related": "Related",
+      "remove": "Remove link",
+      "removeTitle": "Remove link",
+      "removeConfirm": "Remove the link between {{a}} and {{b}}?",
+      "removeError": "The link could not be removed."
     },
     "nav": {
       "copyTn": "Copy ticket number",
@@ -7717,6 +7721,30 @@
       "cmdb_not_installed": "The Znuny CMDB is not installed.",
       "search_too_broad": "The search is too broad. Please narrow it down.",
       "generic": "The ITSM data could not be loaded."
+    },
+    "graph": {
+      "toggle": "As graph",
+      "label": "Link graph",
+      "truncated": "Further links hidden"
+    },
+    "linkedNote": {
+      "open": "Note to linked tickets",
+      "title": "Note to linked tickets",
+      "targets": "Linked tickets",
+      "subject": "Subject",
+      "text": "Text",
+      "visible": "Visible to customer",
+      "send": "Send",
+      "invalid": "The note could not be queued. Check the selection and the text.",
+      "error": "The note could not be queued.",
+      "done": "Added to {{count}} ticket(s)",
+      "skipped": "Skipped: {{count}} ticket(s)",
+      "reasons": {
+        "no_rw": "no write access",
+        "not_linked": "no longer linked",
+        "no_customer_address": "no customer address",
+        "error": "error"
+      }
     }
   }
 }

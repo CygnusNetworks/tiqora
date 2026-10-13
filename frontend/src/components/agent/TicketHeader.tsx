@@ -60,7 +60,7 @@ export function TicketHeader({
         similar={similar}
         allowedActions={allowedActions}
       />
-      <LinkedTickets ticketId={ticket.id} />
+      <LinkedTickets ticketId={ticket.id} ticketTn={ticket.tn} />
       <TicketDynamicFields ticket={ticket} allowedActions={allowedActions} />
     </header>
   );
