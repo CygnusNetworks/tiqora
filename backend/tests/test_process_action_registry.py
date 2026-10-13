@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.extensions.core import get_registry, register_core
+from tiqora.extensions.core import get_registry, register_core, set_registry_for_tests
 from tiqora.extensions.registry import DuplicateExtensionError, Registry
 from tiqora.process.actions import (
     TRANSITION_ACTIONS,
@@ -16,6 +16,7 @@ from tiqora.process.actions import (
     core_transition_actions,
     resolve_action,
 )
+from tiqora.process.actions.registry import ActionUnsupported
 from tiqora.process.config import TransitionActionConfig
 from tiqora.process.engine import execute_transition_action
 from tiqora.znuny.sysconfig import SysConfig
@@ -80,6 +81,7 @@ IMPLEMENTED = frozenset(
         "AppointmentUpdate",
         "AppointmentRemove",
         "ExecuteInvoker",  # handler from tiqora.gi.process_action (process merge, Task 31)
+        "ConfigItemUpdate",  # tiqora.itsm.config_item_update (acts in ITSM mode tiqora only)
     }
 )
 
@@ -113,8 +115,7 @@ def test_core_list_runs_exactly_the_implemented_handlers() -> None:
     modules = core_transition_actions()
     assert len({m.name for m in modules}) == len(modules)
     assert {m.name for m in modules if m.run is not None} == IMPLEMENTED
-    unsupported = {m.name for m in modules if m.run is None}
-    assert unsupported == {"ConfigItemUpdate"}
+    assert {m.name for m in modules if m.run is None} == set()
     assert not any(m.tiqora_only for m in modules)
 
 
@@ -171,20 +172,49 @@ def test_one_of_groups_start_with_their_own_name() -> None:
 async def test_unsupported_module_is_reported_not_raised() -> None:
     # run=None module → execute_transition_action returns its short name before
     # touching the session (a bare object would raise on any attribute access).
-    result = await execute_transition_action(
-        cast(AsyncSession, object()),
-        action=TransitionActionConfig(
-            module="Kernel::System::ProcessManagement::TransitionAction::ConfigItemUpdate",
-            config={"ConfigItemID": "1"},
-        ),
-        ticket_id=1,
-        process_entity_id="P",
-        activity_entity_id="A",
-        transition_entity_id="T",
-        user_id=1,
-        sysconfig=_sysconfig(),
-    )
-    assert result == "ConfigItemUpdate"
+    registry = Registry()
+    registry.add(TRANSITION_ACTIONS, TransitionActionModule(name="TestOnlyUnrun", run=None))
+    set_registry_for_tests(registry)
+    try:
+        result = await execute_transition_action(
+            cast(AsyncSession, object()),
+            action=TransitionActionConfig(
+                module="Kernel::System::ProcessManagement::TransitionAction::TestOnlyUnrun",
+                config={"ConfigItemID": "1"},
+            ),
+            ticket_id=1,
+            process_entity_id="P",
+            activity_entity_id="A",
+            transition_entity_id="T",
+            user_id=1,
+            sysconfig=_sysconfig(),
+        )
+    finally:
+        set_registry_for_tests(None)
+    assert result == "TestOnlyUnrun"
+
+
+async def test_action_unsupported_from_a_handler_is_reported_not_raised() -> None:
+    async def _inactive(*_a: Any) -> None:
+        raise ActionUnsupported("not here")
+
+    registry = Registry()
+    registry.add(TRANSITION_ACTIONS, TransitionActionModule(name="TestInactive", run=_inactive))
+    set_registry_for_tests(registry)
+    try:
+        result = await execute_transition_action(
+            cast(AsyncSession, object()),
+            action=TransitionActionConfig(module="TestInactive", config={}),
+            ticket_id=1,
+            process_entity_id="P",
+            activity_entity_id="A",
+            transition_entity_id="T",
+            user_id=1,
+            sysconfig=_sysconfig(),
+        )
+    finally:
+        set_registry_for_tests(None)
+    assert result == "TestInactive"
 
 
 async def test_unknown_module_is_reported_not_raised() -> None:

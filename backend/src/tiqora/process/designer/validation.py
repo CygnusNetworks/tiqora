@@ -454,11 +454,16 @@ def _check_reference_value(
                 )
 
 
+#: modules that act only in ITSM mode ``tiqora`` (a warning elsewhere: they are inert)
+_ITSM_MODE_MODULES = frozenset({"ConfigItemUpdate"})
+
+
 def _check_action(
     action: DesignerEntityOut,
     refs: ReferenceData,
     modules: Mapping[str, TransitionActionModule],
     parallel_operation: bool,
+    itsm_mode: str | None,
     out: _Issues,
 ) -> None:
     module_name = _short_module(_s(action.config.get("Module")))
@@ -467,6 +472,15 @@ def _check_action(
         out.add("action_module_unsupported", "warning", action, "Module", module=module_name)
     if module is None:
         return
+    if module_name in _ITSM_MODE_MODULES and itsm_mode is not None and itsm_mode != "tiqora":
+        out.add(
+            "action_module_inactive_in_mode",
+            "warning",
+            action,
+            "Module",
+            module=module_name,
+            mode=itsm_mode,
+        )
     if module.tiqora_only and parallel_operation:
         out.add("tiqora_only_module_parallel", "warning", action, "Module", module=module_name)
     config = _map(action.config.get("Config"))
@@ -503,9 +517,16 @@ def _check_action(
 
 
 def validate_process(
-    draft: ProcessDraftOut, refs: ReferenceData, *, parallel_operation: bool
+    draft: ProcessDraftOut,
+    refs: ReferenceData,
+    *,
+    parallel_operation: bool,
+    itsm_mode: str | None = None,
 ) -> list[ValidationIssue]:
-    """All issues of one process draft; errors first, then warnings, each in discovery order."""
+    """All issues of one process draft; errors first, then warnings, each in discovery order.
+
+    ``itsm_mode`` is the effective ``itsm.mode``; ``None`` (unknown) skips the mode warnings.
+    """
     out = _Issues()
     _check_process(draft, out)
     for dialog in draft.activity_dialogs:
@@ -514,7 +535,7 @@ def validate_process(
         _check_transition(transition, refs, out)
     modules = {m.name: m for m in get_registry().items(TRANSITION_ACTIONS)}
     for action in draft.transition_actions:
-        _check_action(action, refs, modules, parallel_operation, out)
+        _check_action(action, refs, modules, parallel_operation, itsm_mode, out)
     return sorted(out.items, key=lambda i: 0 if i.severity == "error" else 1)
 
 

@@ -352,7 +352,7 @@ async def test_catalog_contains_registry_actions_and_modules(env: Env) -> None:
     assert params["State"].required is True and params["State"].one_of == ["State", "StateID"]
     assert params["UserID"].kind == "user" and params["UserID"].required is False
     assert [p.name for p in state_set.params].count("UserID") == 1
-    assert actions["ConfigItemUpdate"].supported is False
+    assert actions["ConfigItemUpdate"].supported is True
     assert "AppointmentCreate" in actions
     assert [a.name for a in catalog.actions] == sorted(actions)
 

@@ -44,10 +44,12 @@ Deferred/unsupported scope (documented, not silently missing)
   ``TransitionValidation::Base``.
 - TransitionAction modules are dispatched through the registry
   ``tiqora.process.actions.TRANSITION_ACTIONS`` (:func:`resolve_action`); every
-  Znuny module is listed there. Only ``ConfigItemUpdate`` has no Tiqora handler
-  (``run is None``, it needs the CMDB). ``ExecuteInvoker`` runs the GenericInterface
-  requester's handler (``tiqora.gi.process_action``), which always queues the call as
-  a background job. Unsupported and
+  Znuny module is listed there. ``ConfigItemUpdate`` acts on the Tiqora CMDB and only in
+  ITSM mode ``tiqora``: elsewhere its handler raises
+  :class:`~tiqora.process.actions.registry.ActionUnsupported` and the action is reported as
+  unsupported (the designer warns, ``action_module_inactive_in_mode``). ``ExecuteInvoker``
+  runs the GenericInterface requester's handler (``tiqora.gi.process_action``), which always
+  queues the call as a background job. Unsupported and
   unknown modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
 - Activity Dialog ``PendingTimeDiff`` is not a dialog field (a transition action's own
@@ -101,7 +103,11 @@ from tiqora.domain.ticket_write_service import (
     update_dynamic_field,
     watch_ticket,
 )
-from tiqora.process.actions.registry import module_short_name, resolve_action
+from tiqora.process.actions.registry import (
+    ActionUnsupported,
+    module_short_name,
+    resolve_action,
+)
 from tiqora.process.actor import ProcessActor
 from tiqora.process.attachments_field import (
     ATTACHMENTS_FIELD,
@@ -1403,7 +1409,11 @@ async def execute_transition_action(
     config = await replace_action_config(
         action.config, session=session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
     )
-    await entry.run(session, config, ticket_id, user_id, sysconfig)
+    try:
+        await entry.run(session, config, ticket_id, user_id, sysconfig)
+    except ActionUnsupported:
+        logger.warning("ProcessManagement TransitionAction not active here: %s", action.module)
+        return module_short_name(action.module)
     return None
 
 

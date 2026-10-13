@@ -3058,6 +3058,7 @@
           "condition_module_unknown": "Das Bedingungsmodul {{module}} ist unbekannt.",
           "action_reference_missing": "{{key}}: {{value}} existiert nicht.",
           "action_module_unsupported": "Das Modul {{module}} wird von Tiqora nicht unterstützt.",
+          "action_module_inactive_in_mode": "Das Modul {{module}} bleibt wirkungslos, solange das ITSM im Modus {{mode}} läuft; es wirkt nur, wenn Tiqora das ITSM führt.",
           "tiqora_only_module_parallel": "Das Modul {{module}} gibt es nur in Tiqora; Znuny überspringt es.",
           "action_required_param_missing": "Der Parameter {{param}} fehlt."
         },

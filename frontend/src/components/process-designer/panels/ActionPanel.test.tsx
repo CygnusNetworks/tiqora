@@ -47,7 +47,8 @@ const catalog = {
         { name: "UserID", kind: "user", required: false, one_of: [], list_value: false },
       ],
     },
-    { name: "ConfigItemUpdate", module: MOD + "ConfigItemUpdate", supported: false, tiqora_only: false, params: [] },
+    { name: "ConfigItemUpdate", module: MOD + "ConfigItemUpdate", supported: true, tiqora_only: false, params: [] },
+    { name: "SomeZnunyOnlyModule", module: MOD + "SomeZnunyOnlyModule", supported: false, tiqora_only: false, params: [] },
     { name: "AppointmentCreate", module: MOD + "AppointmentCreate", supported: true, tiqora_only: false, params: [] },
   ],
   fields: [{ name: "State", label: "State", kind: "select", dialog: true, condition: true, options: [{ value: "open", label: "open" }] }],
@@ -140,8 +141,13 @@ describe("ActionPanel", () => {
   });
 
   it("badges modules Znuny-only", () => {
-    renderPanel(entity("TA-3", "CMDB", { Module: MOD + "ConfigItemUpdate", Config: {} }));
+    renderPanel(entity("TA-3", "Other", { Module: MOD + "SomeZnunyOnlyModule", Config: {} }));
     expect(screen.getByTestId("action-panel-badge")).toHaveTextContent("nur in Znuny wirksam");
+  });
+
+  it("does not badge ConfigItemUpdate, which Tiqora runs on its CMDB", () => {
+    renderPanel(entity("TA-5", "CMDB", { Module: MOD + "ConfigItemUpdate", Config: {} }));
+    expect(screen.queryByTestId("action-panel-badge")).toBeNull();
   });
 
   it("runs ExecuteInvoker and notes that Asynchronous is always background", () => {

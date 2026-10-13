@@ -306,8 +306,9 @@ Spalten von `tiqora_cmdb_ci`, `tiqora_cmdb_class`, `tiqora_cmdb_catalog` oder `t
   zusätzlich `tickets:ro`.
 - Die OpenAPI-Beschreibung steht in `docs/api/openapi.json`.
 - Die Prozess-Aktion `ConfigItemUpdate` gehört zum Znuny-Import
-  (siehe [itsm.md](itsm.md), Kapitel 7); die CMDB liefert dafür die Schnittstelle
-  `tiqora.cmdb.importer_api`.
+  (siehe [itsm.md](itsm.md), Kapitel 7); sie ändert CIs über `CiService` (als handelnder
+  Benutzer, ohne Klassenrechte-Prüfung) und wirkt nur im Modus `tiqora`. Für den Import
+  liefert die CMDB die Schnittstelle `tiqora.cmdb.importer_api`.
 
 ## Nicht enthalten (Welle 5)
 

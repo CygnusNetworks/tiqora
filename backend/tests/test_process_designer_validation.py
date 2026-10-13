@@ -354,16 +354,46 @@ def test_condition_type_unknown_but_array_hash_accepted() -> None:
 
 
 def test_action_module_unsupported() -> None:
+    from tiqora.extensions.core import get_registry, set_registry_for_tests
+    from tiqora.extensions.registry import Registry
+    from tiqora.process.actions.registry import TRANSITION_ACTIONS, TransitionActionModule
+
+    registry = Registry()
+    registry.add(TRANSITION_ACTIONS, TransitionActionModule(name="TestOnlyUnrun", run=None))
+    previous = get_registry()
+    set_registry_for_tests(registry)
+    try:
+        # registered but with run=None, or unknown to the registry: both warn
+        d = with_action("TestOnlyUnrun", {})
+        unsupported = [
+            i
+            for i in validate_process(d, REFS, parallel_operation=False)
+            if i.code == "action_module_unsupported"
+        ]
+        assert [i.params["module"] for i in unsupported] == ["TestOnlyUnrun"]
+        unknown = with_action("TotallyMadeUp", {})
+        assert issue(unknown, "action_module_unsupported").params["module"] == "TotallyMadeUp"
+        assert all(i.severity == "warning" for i in unsupported)
+    finally:
+        set_registry_for_tests(previous)
+
+
+def test_config_item_update_is_supported_but_inactive_outside_mode_tiqora() -> None:
     d = with_action("ConfigItemUpdate", {"ConfigItemID": "1"})
-    unsupported = [
-        i
-        for i in validate_process(d, REFS, parallel_operation=False)
-        if i.code == "action_module_unsupported"
-    ]
-    # registered but with run=None, or unknown to the registry: both warn
-    unknown = with_action("TotallyMadeUp", {})
-    assert issue(unknown, "action_module_unsupported").params["module"] == "TotallyMadeUp"
-    assert all(i.severity == "warning" for i in unsupported)
+
+    def found(mode: str | None) -> list[ValidationIssue]:
+        return [
+            i
+            for i in validate_process(d, REFS, parallel_operation=False, itsm_mode=mode)
+            if i.code in ("action_module_unsupported", "action_module_inactive_in_mode")
+        ]
+
+    assert found("tiqora") == [] and found(None) == []
+    for mode in ("znuny_readthrough", "off"):
+        (i,) = found(mode)
+        assert i.code == "action_module_inactive_in_mode" and i.severity == "warning"
+        assert i.entity_id == X1 and i.field == "Module"
+        assert (i.params["module"], i.params["mode"]) == ("ConfigItemUpdate", mode)
 
 
 def test_tiqora_only_module_parallel_only_when_parallel() -> None:

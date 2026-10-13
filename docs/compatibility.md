@@ -987,7 +987,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | `Module` conditions | partial | Python re-implementations registered by Perl module path (`ValidateDemo`); unknown modules never match and the designer warns |
 | Appointment actions (`AppointmentCreate/Update/Remove`) | yes | `Custom*` recurrence, `RecurrenceFrequency`, `RecurrenceExclude`, notification keys and `TicketAppointmentRuleID` are ignored |
 | `ExecuteInvoker` action | yes | Always queued as a background job; `Asynchronous` is accepted and ignored (see [Requester](#requester-and-invokers-tiqora-calls-external-systems), deviation 8) |
-| `ConfigItemUpdate` action | missing | Logged as unsupported (needs the CMDB) |
+| `ConfigItemUpdate` action | partial | Runs on the Tiqora CMDB in ITSM mode `tiqora` (`ConfigItemID`/`ConfigItemNumber` comma lists, `Name`, `DeplState*`, `InciState*`, stringified attribute keys, `Separator`, `UserID`); in Mode A it is logged as unsupported and the designer warns |
 | Dialog attachments and time units | yes | Article uploads, `TimeUnits`, Znuny's existing-attachment selection (`Attachments` field, `AttachmentsReuse`), option refresh when a field changes |
 | Transitions after every ticket change | missing | Evaluated after process dialogs and new process tickets only |
 | Znuny 7.x process YAML | verified | Same format as 6.5 (no renamed keys); `pm_process_preferences` (7.2+) is snapshotted. Golden tests passed on Znuny 6.5 and on 7.3.5 |

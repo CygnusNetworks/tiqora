@@ -44,6 +44,13 @@ from tiqora.znuny.sysconfig import SysConfig
 
 ZNUNY_MODULE_PREFIX = "Kernel::System::ProcessManagement::TransitionAction::"
 
+
+class ActionUnsupported(Exception):  # noqa: N818 - the engine's signal, not an error class
+    """Raised by a handler that cannot act in the current setup (e.g. ``ConfigItemUpdate``
+    outside ITSM mode ``tiqora``); :func:`tiqora.process.engine.execute_transition_action`
+    reports the module as unsupported instead of failing the transition."""
+
+
 ActionHandler = Callable[[AsyncSession, dict[str, Any], int, int, SysConfig], Awaitable[None]]
 """``(session, config, ticket_id, user_id, sysconfig)``; ``config`` has smart tags replaced."""
 
@@ -311,12 +318,17 @@ _CONFIG_ITEM_UPDATE = (
         one_of=("ConfigItemID", "ConfigItemNumber"),
         list_value=True,
     ),
+    ActionParam("Name", "text"),
+    ActionParam("DeplStateName", "text"),
+    ActionParam("InciStateName", "text"),
+    ActionParam("Separator", "text"),
 )
 
 
 def core_transition_actions() -> list[TransitionActionModule]:
     """Every Znuny transition action module, with Tiqora's handler where one exists."""
     from tiqora.gi.process_action import execute_invoker_action
+    from tiqora.itsm import config_item_update
     from tiqora.process import engine
     from tiqora.process.actions import appointments
 
@@ -369,7 +381,9 @@ def core_transition_actions() -> list[TransitionActionModule]:
         # imported lazily above: it must not import tiqora.process, ruling H1). It queues the
         # invoker call as a job in the caller's transaction; no own implementation here.
         m("ExecuteInvoker", execute_invoker_action, _EXECUTE_INVOKER),
-        m("ConfigItemUpdate", None, _CONFIG_ITEM_UPDATE),
+        # ConfigItemUpdate acts on the Tiqora CMDB (mode ``tiqora`` only; elsewhere it raises
+        # ``ActionUnsupported``). Lazy import: the itsm package imports this module.
+        m("ConfigItemUpdate", config_item_update.action_config_item_update, _CONFIG_ITEM_UPDATE),
     ]
 
 
