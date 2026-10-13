@@ -1,0 +1,9 @@
+{
+  "_comment": "hand-written from tests/fixtures/cmdb/znuny65_computer_definition.pl: path -> expected mapping (count_min left out where the source has no CountMin)",
+  "Vendor": {"type": "text", "searchable": true, "required": false, "count_max": 1, "max_length": 50},
+  "Type": {"type": "catalog", "searchable": false, "required": true, "count_max": 1, "catalog_class": "ITSM::ConfigItem::Computer::Type"},
+  "CPU": {"type": "text", "searchable": false, "required": false, "count_min": 0, "count_max": 16, "max_length": 100},
+  "NIC": {"type": "text", "searchable": false, "required": false, "count_min": 0, "count_max": 10, "max_length": 100},
+  "NIC.IPAddress": {"type": "text", "searchable": true, "required": false, "count_min": 0, "count_max": 20, "max_length": 40},
+  "Location": {"type": "ci_ref", "searchable": false, "required": false, "count_max": 1, "class_keys": ["location"]}
+}

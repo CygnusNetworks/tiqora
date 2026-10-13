@@ -124,7 +124,7 @@ async def test_mapping_failure_is_fault_500() -> None:
 
 
 async def test_unknown_operation_and_unsupported_type() -> None:
-    ws = _ws({"Cfg": {"Type": "ConfigItem::ConfigItemGet"}})
+    ws = _ws({"Cfg": {"Type": "FAQ::PublicFAQGet"}})
     runner = _Runner({"TicketID": 1})
     missing = await run_provider(ws, "Nope", {}, run_operation=runner)
     assert missing.status_code == 500

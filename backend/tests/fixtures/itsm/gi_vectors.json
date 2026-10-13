@@ -1,0 +1,3645 @@
+[
+ {
+  "name": "text_scalar",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Vendor": "Dell"
+  },
+  "xml_data": {
+   "Vendor": [
+    {
+     "Content": "Dell"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "text_array",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "CPU": [
+    "Xeon",
+    "Epyc"
+   ]
+  },
+  "xml_data": {
+   "CPU": [
+    {
+     "Content": "Xeon"
+    },
+    {
+     "Content": "Epyc"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "hash_with_sub",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "NIC": {
+    "NIC": "eth0",
+    "IPAddress": "10.0.0.1"
+   }
+  },
+  "xml_data": {
+   "NIC": [
+    {
+     "Content": "eth0",
+     "IPAddress": [
+      {
+       "Content": "10.0.0.1"
+      }
+     ]
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "array_of_hashes",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "NIC": [
+    {
+     "NIC": "eth0",
+     "IPAddress": "10.0.0.1"
+    },
+    {
+     "NIC": "eth1",
+     "IPAddress": "10.0.0.9"
+    }
+   ]
+  },
+  "xml_data": {
+   "NIC": [
+    {
+     "Content": "eth0",
+     "IPAddress": [
+      {
+       "Content": "10.0.0.1"
+      }
+     ]
+    },
+    {
+     "Content": "eth1",
+     "IPAddress": [
+      {
+       "Content": "10.0.0.9"
+      }
+     ]
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "array_mixes_hash_and_scalar_on_the_way_back",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "NIC": [
+    {
+     "NIC": "eth0",
+     "IPAddress": [
+      "10.0.0.1",
+      "10.0.0.2"
+     ]
+    },
+    "eth1"
+   ]
+  },
+  "xml_data": {
+   "NIC": [
+    {
+     "Content": "eth0",
+     "IPAddress": [
+      {
+       "Content": "10.0.0.1"
+      },
+      {
+       "Content": "10.0.0.2"
+      }
+     ]
+    },
+    {
+     "Content": "eth1"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "NIC": [
+    {
+     "NIC": "eth0",
+     "IPAddress": "10.0.0.2"
+    },
+    "eth1"
+   ]
+  }
+ },
+ {
+  "name": "catalog_name_to_id",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Type": "Laptop"
+  },
+  "xml_data": {
+   "Type": [
+    {
+     "Content": "7"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "date_iso",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Purchased": "2024-03-05"
+  },
+  "xml_data": {
+   "Purchased": [
+    {
+     "Content": "2024-03-05"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "date_us_format",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Purchased": "03/05/2024"
+  },
+  "xml_data": {
+   "Purchased": [
+    {
+     "Content": "2024-03-05"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "Purchased": "2024-03-05"
+  }
+ },
+ {
+  "name": "date_with_zero_time_loses_it",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Purchased": "2024-03-05 00:00:00"
+  },
+  "xml_data": {
+   "Purchased": [
+    {
+     "Content": "2024-03-05"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "Purchased": "2024-03-05"
+  }
+ },
+ {
+  "name": "datetime",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "LastSeen": "2024-03-05 14:30:00"
+  },
+  "xml_data": {
+   "LastSeen": [
+    {
+     "Content": "2024-03-05 14:30:00"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "datetime_from_date_only",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "LastSeen": "2024-03-05"
+  },
+  "xml_data": {
+   "LastSeen": [
+    {
+     "Content": "2024-03-05 00:00:00"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "LastSeen": "2024-03-05 00:00:00"
+  }
+ },
+ {
+  "name": "integer_number_becomes_string",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Slots": 16
+  },
+  "xml_data": {
+   "Slots": [
+    {
+     "Content": "16"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "Slots": "16"
+  }
+ },
+ {
+  "name": "integer_zero_comes_back_empty",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Slots": "0"
+  },
+  "xml_data": {
+   "Slots": [
+    {
+     "Content": "0"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "Slots": ""
+  }
+ },
+ {
+  "name": "customer_and_company",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Owner": "jdoe",
+   "Company": "example.org"
+  },
+  "xml_data": {
+   "Owner": [
+    {
+     "Content": "jdoe"
+    }
+   ],
+   "Company": [
+    {
+     "Content": "example.org"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "unknown_key_passes_through",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Vendor": "Dell",
+   "Foo": "bar"
+  },
+  "xml_data": {
+   "Vendor": [
+    {
+     "Content": "Dell"
+    }
+   ],
+   "Foo": [
+    {
+     "Content": "bar"
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "scalar_for_key_with_sub_is_emptied",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "NIC": "eth0"
+  },
+  "xml_data": {
+   "NIC": [
+    {
+     "Content": null
+    }
+   ]
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {
+   "NIC": ""
+  }
+ },
+ {
+  "name": "empty_cixml",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {},
+  "xml_data": {},
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "cixml_back": {}
+ },
+ {
+  "name": "missing_required",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "Required": "1"
+    },
+    "CountMin": 1,
+    "CountMax": 1
+   }
+  ],
+  "cixml": {},
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Vendor parameter is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "empty_required",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "Required": "1"
+    },
+    "CountMin": 1,
+    "CountMax": 1
+   }
+  ],
+  "cixml": {
+   "Vendor": ""
+  },
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Vendor parameter is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "zero_string_required",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "Required": "1"
+    },
+    "CountMin": 1,
+    "CountMax": 1
+   }
+  ],
+  "cixml": {
+   "Vendor": "0"
+  },
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Vendor parameter is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "missing_required_names_the_operation",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "Required": "1"
+    },
+    "CountMin": 1,
+    "CountMax": 1
+   }
+  ],
+  "cixml": {},
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemUpdate: ConfigItem->CIXMLData->Vendor parameter is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "operation": "ConfigItemUpdate"
+ },
+ {
+  "name": "required_value_empty_in_array",
+  "definition": [
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "Required": "1"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   }
+  ],
+  "cixml": {
+   "CPU": [
+    "Xeon",
+    ""
+   ]
+  },
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->CPU parameter value is required and is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "text_too_long",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Vendor": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Vendor parameter value excedes the maxium length!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "date_not_a_date",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Purchased": "yesterday"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Purchased parameter value is not a valid Date format!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "date_impossible_day",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Purchased": "2024-02-30"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Purchased parameter value is not a valid Date format!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "datetime_garbage",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "LastSeen": "yesterday"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->LastSeen parameter value is not a valid DateTime format!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "integer_range_attributes_not_enforced",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Slots": "100"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ],
+  "xml_data": {
+   "Slots": [
+    {
+     "Content": "100"
+    }
+   ]
+  },
+  "cixml_back": {
+   "Slots": "100"
+  }
+ },
+ {
+  "name": "integer_not_a_number",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Slots": "12abc"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Slots parameter value is not a valid Integer or out of range!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "catalog_unknown_name",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Type": "Toaster"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Type parameter value is not a valid for General Catalog 'ITSM::ConfigItem::Computer::Type'!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "customer_unknown",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Owner": "nobody"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Owner parameter value is not a valid customer!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "company_unknown",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "Company": "nowhere.test"
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Company parameter value is not a valid customer company!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "count_max_exceeded",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "CPU": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e"
+   ]
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->CPU parameter repetitions is higher than the maxium value!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "array_entry_is_an_array",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "CPU": [
+    [
+     "a"
+    ]
+   ]
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->CPU parameter is invalid!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "sub_value_too_long_in_hash",
+  "definition": [
+   {
+    "Key": "Vendor",
+    "Name": "Vendor",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "50"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "Type",
+    "Name": "Type",
+    "Input": {
+     "Type": "GeneralCatalog",
+     "Class": "ITSM::ConfigItem::Computer::Type"
+    },
+    "CountMax": 1
+   },
+   {
+    "Key": "CPU",
+    "Name": "CPU",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 4
+   },
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text",
+     "MaxLength": "100"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "MaxLength": "15"
+      },
+      "CountMin": 0,
+      "CountMax": 2
+     }
+    ]
+   },
+   {
+    "Key": "Slots",
+    "Name": "Slots",
+    "Input": {
+     "Type": "Integer",
+     "ValueMin": "0",
+     "ValueMax": "64"
+    }
+   },
+   {
+    "Key": "Purchased",
+    "Name": "Purchased",
+    "Input": {
+     "Type": "Date"
+    }
+   },
+   {
+    "Key": "LastSeen",
+    "Name": "LastSeen",
+    "Input": {
+     "Type": "DateTime"
+    }
+   },
+   {
+    "Key": "Owner",
+    "Name": "Owner",
+    "Input": {
+     "Type": "Customer"
+    }
+   },
+   {
+    "Key": "Company",
+    "Name": "Company",
+    "Input": {
+     "Type": "CustomerCompany"
+    }
+   }
+  ],
+  "cixml": {
+   "NIC": {
+    "NIC": "eth0",
+    "IPAddress": "10.0.0.1.2.3.4.5.6"
+   }
+  },
+  "error": {
+   "code": "InvalidParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->NIC->IPAddress parameter value excedes the maxium length!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "sub_required_missing_in_second_array_entry",
+  "definition": [
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "Required": "1"
+      },
+      "CountMin": 1,
+      "CountMax": 2
+     }
+    ]
+   }
+  ],
+  "cixml": {
+   "NIC": [
+    {
+     "NIC": "eth0",
+     "IPAddress": "10.0.0.1"
+    },
+    {
+     "NIC": "eth1"
+    }
+   ]
+  },
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->NIC[1]->IPAddress parameter is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ },
+ {
+  "name": "sub_required_missing_under_absent_parent",
+  "definition": [
+   {
+    "Key": "NIC",
+    "Name": "NIC",
+    "Input": {
+     "Type": "Text"
+    },
+    "CountMin": 0,
+    "CountMax": 3,
+    "Sub": [
+     {
+      "Key": "IPAddress",
+      "Name": "IPAddress",
+      "Input": {
+       "Type": "Text",
+       "Required": "1"
+      },
+      "CountMin": 1,
+      "CountMax": 2
+     }
+    ]
+   }
+  ],
+  "cixml": {},
+  "error": {
+   "code": "MissingParameter",
+   "message": "ConfigItemCreate: ConfigItem->CIXMLData->NIC->IPAddress parameter is missing!"
+  },
+  "catalog": {
+   "ITSM::ConfigItem::Computer::Type": {
+    "Laptop": 7,
+    "Server": 8
+   }
+  },
+  "customers": [
+   "jdoe"
+  ],
+  "companies": [
+   "example.org"
+  ]
+ }
+]

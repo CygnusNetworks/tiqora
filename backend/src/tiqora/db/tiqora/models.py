@@ -2548,3 +2548,40 @@ class TiqoraCmdbSavedSearch(TiqoraBase):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraItsmImportRun(TiqoraBase):
+    """One dry run, import, switch or rollback of the Znuny ITSM importer (naive UTC)."""
+
+    __tablename__ = "tiqora_itsm_import_run"
+    __table_args__ = (Index("ix_tiqora_itsm_import_run_started", "started_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # dry_run|import|switch|rollback
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # running|done|failed|cancelled
+    job_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # no FK, jobs are purged
+    started_by: Mapped[int] = mapped_column(Integer, nullable=False)  # Znuny users.id, no FK
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    profile: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    summary: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class TiqoraItsmImportMap(TiqoraBase):
+    """Idempotency map: which Tiqora row a Znuny ITSM record was imported as."""
+
+    __tablename__ = "tiqora_itsm_import_map"
+    __table_args__ = (
+        UniqueConstraint("source_kind", "source_id", name="uq_tiqora_itsm_import_map_src"),
+        Index("ix_tiqora_itsm_import_map_target", "source_kind", "target_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # catalog|class|definition|ci|version|link|attachment|priority_matrix|service_meta|finish
+    source_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # links: 0
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

@@ -17,6 +17,8 @@ container from a release tree listed in `peers.yaml`.
 
 `test_process_deploy.py` proves Tiqora's process/ACL dumps equal Znuny's `ProcessDump`/deployed ACL file, the deploy watcher snapshots Znuny deploys, and a new process ticket writes Znuny's history and dynamic field values (znuny-6.5: passed; 7.3: passed (cached peer image `tiqora-golden-peer-znuny-7.3`, built 2026-07-27, Znuny 7.3.5), 2026-10-09).
 
+`test_tiqoraitsm_addon.py` (znuny-6.5, znuny-7.3), `test_itsm_import.py` and `test_gi_config_items.py` (the ITSM peers `znuny-6.5-itsm`, `znuny-7.3-itsm`) cover the ITSM importer, the `ConfigItem*` GI operations and the TiqoraITSM add-on; last recorded run 2026-10-13 (Task 28): 35 + 35 cases passed on the two ITSM peers with CMDB-PM-I1 applied. Not re-run for the docs commit (docs only).
+
 `test_process_designer.py` covers the wave-3 process designer against the peer: a Znuny export
 (`ProcessImport` of every sample in `scripts/test/sample/ProcessManagement/`, then `_GetProcessData`
 and `YAML->Dump`) imported and exported again by Tiqora is equal modulo ids/times/list order; a
@@ -200,6 +202,63 @@ cd backend && GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm uv run python -m pytest -q -m 
   (`znuny-6.5-itsm` is no profile id). Results (2026-10-13): all cases passed on `znuny-6.5-itsm`
   and `znuny-7.3-itsm` (13 cases, 11 run on an ITSM peer), the two plain cases on `znuny-6.5` and
   `znuny-7.3`; differences between Tiqora and Znuny are listed in `docs/itsm-import.md`.
+
+- `test_tiqoraitsm_addon.py` (wave-4 import Task 26): the `TiqoraITSM` add-on (ticket zoom widget
+  "Betroffene CIs (Tiqora)", `Kernel::System::TiqoraITSM`) copied into the peer, SysConfig rebuilt,
+  widget driven with a real `Kernel::Output::HTML::Layout`. The module creates the CMDB rows, an
+  agent without access to the secret class group and (if absent) the tables/views, and removes
+  all of it again. Results (2026-10-13): 11 passed on `znuny-6.5` (plain, fresh DB: tables and
+  views created by the module) and on `znuny-7.3-itsm` (7.3 framework; the add-on does not read
+  `configitem`, so a plain `znuny-7.3` behaves the same; not run separately).
+  Task 27 extends it (29 cases): the read-only guard (`PreApplicationModule###TiqoraITSMReadOnly`,
+  incl. `AgentLinkObject` towards CIs), the customer page and the optional linking
+  (`AgentTiqoraITSMLink` posts cmdb's `LinkIn` with the bearer key to the recording sink
+  `gisink`; refuses GET, a missing challenge token, agents without ticket `rw`, bad ids). The
+  module creates and deletes one ticket and one `customer_user_customer` row. Results
+  (2026-10-13): 29 passed on `znuny-6.5` (plain) and on `znuny-7.3-itsm`.
+
+- `test_itsm_import.py` and `test_gi_config_items.py` (wave-4 import Task 28; shared helpers in
+  `_itsm_import_support.py`): the Znuny ITSM importer and the GenericInterface `ConfigItem*`
+  operations against the real data of an ITSM peer. The data is created through
+  `Kernel::System::ITSMConfigItem` in the peer (so the XML storage is what Znuny writes): the
+  custom class `GoldImpAppliance` (nested `Sub` attribute, `CI` reference, `GeneralCatalog`,
+  `Integer`, `Date`, `DateTime`) next to the default class `Computer`, five CIs with 1-3 versions,
+  CI<->CI (`DependsOn`, `RelevantTo`) and ticket->CI links and one binary attachment.
+  `test_itsm_import.py` runs `run_import` (page size 2) and compares Tiqora's rows with Znuny's
+  `VersionList` / `VersionGet(XMLDataGet => 1)` / `link_relation` + `LinkList` / attachment bytes:
+  dry run writes nothing, version counts, names, states, times, authors and attributes
+  (`xmldata_to_attributes`, plus literal checks of the converted CI reference, catalog id, nested
+  attribute, integer, date, datetime), links (a type with equal source and target name, like
+  `RelevantTo`, has no direction in Znuny; Tiqora stores it CI first), second run only
+  `unchanged`, a new Znuny `VersionAdd` adds exactly one version, nothing is written to Znuny.
+  `test_gi_config_items.py` imports a REST webservice (`webservices/GoldenConfigItemREST.yml`,
+  the five `ConfigItem::*` operations) into the peer, imports and switches the site to Mode B
+  (`switch_to_tiqora`) and compares Znuny's answers with Tiqora's on the same webservice row and on
+  the canonical `/znuny-compat/ConfigItem...` routes: `ConfigItemGet` of all five CIs (also a
+  comma list with `Attachments`), `ConfigItemSearch` (class, name, states, `CIXMLData`, order,
+  limit), error bodies of missing parameters, `ConfigItemUpdate` (one new version on each side, equal
+  result) and the `ConfigItemUpdate` process action (scenario 2 of Znuny's
+  `TransitionAction/ConfigItemUpdate.t`, `Run()` against `execute_transition_action`, smart tag
+  `<OTRS_TICKET_Title>` included). Both modules snapshot the `tiqora_*` tables the importer writes
+  and the `itsm.*` settings and restore them, delete their Znuny CIs, ticket and webservice. What
+  stays in the peer: the general catalog item of the class `GoldImpAppliance` (Znuny cannot delete
+  one) and the agent `goldimp.agent` (needs `itsm-configitem` rights; users cannot be deleted).
+  The modules run on a peer that holds other CIs (the counters are checked against what the peer
+  holds; content only for the module's own CIs). Results (2026-10-13): 35 cases (6 + 29) passed on
+  `znuny-6.5-itsm` (image `tiqora-golden-peer-znuny-6.5`, ITSM bundle 6.5.3) and on
+  `znuny-7.3-itsm` (image `tiqora-golden-peer-znuny-7.3`, ITSM 7.3.x); both runs with commit
+  `cbc7c960e` of `wave4-cmdb-postfix` (CMDB-PM-I1: optional imported attributes are not mandatory)
+  applied, without it `ConfigItemUpdate` and the process action fail on the imported `Computer`
+  class. Differences found, fixed in the owning modules (with unit vectors there):
+  `virtual_fs.backend_key` of Znuny's DB backend is `Compress=0;Crypt=0;FileID=3;Mode=binary;`
+  (the importer read it as a bare number and reported every attachment as "in the file system"),
+  a link seen from both CIs' pages was counted twice in the report, and `ConfigItemGet`
+  `Attachment.Preferences` carry `ContentID`/`UserID` (no human-readable `Filesize`). Differences
+  that remain, documented: Znuny answers an error with HTTP 200 and Tiqora with 4xx; Tiqora
+  expands the `$Self->{OperationName}.AuthFail` code Znuny sends unexpanded and answers
+  `<Op>.AuthFail` where Znuny's Search/Create/Update check `UserLogin`/`Password` themselves
+  (`MissingParameter`); Znuny keeps an empty text value after `Vendor::1 = ''`, Tiqora removes the
+  value (the comparison hides empty values in `CIXMLData`).
 
 Package sources (`https://download.znuny.org/releases/itsm/`):
 

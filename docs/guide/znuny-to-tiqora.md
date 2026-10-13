@@ -252,6 +252,11 @@ function's own "Rollback" subsection in `parallel-operation.md` for
 function-specific caveats (e.g. mail left on the server, notification
 watermark preservation).
 
+**ITSM (only if the site runs Znuny ITSM):** *ITSM übernehmen und umstellen* is an
+independent track that can run at any point after Stage 1, as long as Znuny is still in use. It is
+described in [`../itsm.md`](../itsm.md#koexistenz-mit-znuny): dry run, import (repeatable), install
+the TiqoraITSM add-on, repoint `ConfigItem*` webservices, then "Auf Tiqora umstellen".
+
 ---
 
 ## Stage 4 — Cutover

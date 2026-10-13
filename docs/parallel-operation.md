@@ -1027,6 +1027,12 @@ ticket links through the existing link service; what Znuny sees of that and what
 in [itsm.md](itsm.md) chapter 5. The switch to Tiqora-led ITSM (Mode B) happens only through the
 importer; the runbook is chapter 7 of [itsm.md](itsm.md) and [itsm-import.md](itsm-import.md).
 
+### ITSM: Modus A und B
+
+Which side maintains the CIs, what agents and customers see in each mode, the switch runbook, the
+rollback and the known gaps (Generic Interface, console and ImportExport of Znuny are not blocked) are
+described in [itsm.md](itsm.md#koexistenz-mit-znuny).
+
 ## Schema ownership
 
 When parallel operation ends:

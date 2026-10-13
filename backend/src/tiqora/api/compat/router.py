@@ -11,6 +11,11 @@ Canonical routes (always available, no webservice, no mapping):
   GET    /znuny-compat/Ticket/History/:id   -> TicketHistoryGet
   GET    /znuny-compat/TimeAccountingGet    -> TimeAccountingGet
   POST   /znuny-compat/OutOfOffice          -> OutOfOffice
+  POST   /znuny-compat/ConfigItem           -> ConfigItemCreate
+  GET    /znuny-compat/ConfigItem/:ID       -> ConfigItemGet
+  PATCH  /znuny-compat/ConfigItem/:ID       -> ConfigItemUpdate
+  DELETE /znuny-compat/ConfigItem/:ID       -> ConfigItemDelete
+  GET|POST /znuny-compat/ConfigItemSearch   -> ConfigItemSearch
   POST   /znuny-compat/soap/{webservice}    -> SOAP, dispatched via Body wrapper
 
 Webservice routes are resolved per request from the in-memory
@@ -32,6 +37,13 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.config_items import (
+    op_config_item_create,
+    op_config_item_delete,
+    op_config_item_get,
+    op_config_item_search,
+    op_config_item_update,
+)
 from tiqora.api.compat.operations import (
     op_out_of_office,
     op_session_create,
@@ -255,6 +267,18 @@ async def _dispatch_operation(
             data, session, session_store, request=request, settings=settings
         )
 
+    config_item_ops = {
+        "ConfigItemGet": op_config_item_get,
+        "ConfigItemSearch": op_config_item_search,
+        "ConfigItemCreate": op_config_item_create,
+        "ConfigItemUpdate": op_config_item_update,
+        "ConfigItemDelete": op_config_item_delete,
+    }
+    if operation in config_item_ops:
+        return await config_item_ops[operation](
+            data, session, session_store, request=request, settings=settings
+        )
+
     return {
         "Error": {
             "ErrorCode": "Operation.NotImplemented",
@@ -407,6 +431,78 @@ async def canonical_out_of_office(
         result = await _dispatch_operation("OutOfOffice", data, session, session_store, request)
     except OperationFault as exc:
         return _fault_response(exc.message, status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return _json_or_501(result)
+
+
+@compat_router.post("/ConfigItem")
+async def canonical_config_item_create(
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    result = await _dispatch_operation("ConfigItemCreate", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.get("/ConfigItem/{config_item_id}")
+async def canonical_config_item_get(
+    config_item_id: str,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    data["ConfigItemID"] = config_item_id
+    result = await _dispatch_operation("ConfigItemGet", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.patch("/ConfigItem/{config_item_id}")
+async def canonical_config_item_update(
+    config_item_id: str,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    data["ConfigItemID"] = config_item_id
+    result = await _dispatch_operation("ConfigItemUpdate", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.delete("/ConfigItem/{config_item_id}")
+async def canonical_config_item_delete(
+    config_item_id: str,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    data["ConfigItemID"] = config_item_id
+    result = await _dispatch_operation("ConfigItemDelete", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.get("/ConfigItemSearch")
+async def canonical_config_item_search(
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    result = await _dispatch_operation("ConfigItemSearch", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.post("/ConfigItemSearch")
+async def canonical_config_item_search_post(
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    result = await _dispatch_operation("ConfigItemSearch", data, session, session_store, request)
     return _json_or_501(result)
 
 

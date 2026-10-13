@@ -40,9 +40,12 @@ MCP_TOOLS: Final[ExtensionPoint[McpTool]] = ExtensionPoint(
     sdk_stable=True,
 )
 
-# Every ``@mcp.tool`` name in tiqora/mcp_server/server.py (Task 9 asserts equality with the server).
+# Every ``@mcp.tool`` name in tiqora/mcp_server/ (server.py, cmdb_tools.py); a test checks it.
 CORE_MCP_TOOL_NAMES: Final = frozenset(
     {
+        "cmdb_get",
+        "cmdb_impact",
+        "cmdb_search",
         "customer_lookup",
         "get_attachment_meta",
         "kb_get_article",

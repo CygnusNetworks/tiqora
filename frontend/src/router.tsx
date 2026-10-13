@@ -128,6 +128,7 @@ import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { WebservicesPage } from "@/routes/admin/WebservicesPage";
 import { ItsmPage } from "@/routes/admin/ItsmPage";
 import { LinkTypesPage } from "@/routes/admin/LinkTypesPage";
+import { ItsmImportPage } from "@/routes/admin/ItsmImportPage";
 import { CiListPage } from "@/routes/agent/CiListPage";
 import { CiDetailPage } from "@/routes/agent/CiDetailPage";
 import { WebserviceDetailPage } from "@/routes/admin/WebserviceDetailPage";
@@ -1101,6 +1102,12 @@ const adminItsmLinkTypesRoute = createRoute({
   component: LinkTypesPage,
 });
 
+const adminItsmImportRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm-import",
+  component: ItsmImportPage,
+});
+
 const adminApiKeysRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/api-keys",
@@ -1525,6 +1532,7 @@ const routeTree = rootRoute.addChildren([
     adminWebservicesRoute,
     adminItsmRoute,
     adminItsmLinkTypesRoute,
+    adminItsmImportRoute,
     adminWebserviceDetailRoute,
     adminApiKeysRoute,
     adminMailOutboundRoute,

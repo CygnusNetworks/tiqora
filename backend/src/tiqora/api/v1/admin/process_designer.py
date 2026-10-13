@@ -20,6 +20,7 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.db.legacy.process_management import PmActivity, PmProcess
 from tiqora.deployed.store import list_revisions, previous_revision_id
 from tiqora.domain.ownership import get_ownership_state
+from tiqora.itsm.mode import get_itsm_mode
 from tiqora.process.designer.catalog import build_designer_catalog
 from tiqora.process.designer.draft import (
     list_entities,
@@ -146,7 +147,8 @@ async def get_validation(
         draft = await load_process_draft(session, process_entity_id)
     refs = await load_reference_data(session)
     parallel = not (await get_ownership_state(session, settings)).active
-    issues = validate_process(draft, refs, parallel_operation=parallel)
+    mode = (await get_itsm_mode(session)).mode
+    issues = validate_process(draft, refs, parallel_operation=parallel, itsm_mode=mode)
     return [ValidationIssueOut.of(i) for i in issues]
 
 

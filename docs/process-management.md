@@ -526,7 +526,7 @@ with its Znuny source lines.
 
 | Supported | Deferred (logged, no-op — collected into `unsupported_actions`) |
 |---|---|
-| `TicketStateSet` | `ConfigItemUpdate` (needs the CMDB) |
+| `TicketStateSet` | |
 | `TicketQueueSet` | |
 | `TicketOwnerSet` | |
 | `TicketPrioritySet` | |
@@ -543,11 +543,14 @@ with its Znuny source lines.
 | `TicketTypeSet` | |
 | `TicketServiceSet` | |
 | `TicketSLASet` | |
+| `ConfigItemUpdate` (Tiqora CMDB; see the note below) | |
 | `TicketWatchSet` | |
 | `LinkAdd` | |
 | `AppointmentCreate` / `AppointmentUpdate` / `AppointmentRemove` | |
 | `TicketCreate` | (Title/Queue/State/Priority/…; optional `LinkAs` to parent) |
 | `ExecuteInvoker` | Handler of the GenericInterface requester (`tiqora/gi/process_action.py`): queues the invoker call as a background job in the dialog submit's transaction. `Webservice` is the webservice **name**; `Asynchronous` is accepted and ignored (the designer notes "läuft immer im Hintergrund"). Works without the requester takeover flag; see [compatibility.md](compatibility.md#deviations-from-znuny), deviation 8 |
+
+`ConfigItemUpdate` changes CIs of the Tiqora CMDB as the acting user (`UserID` overrides), without a class permission check, like Znuny. It acts only in ITSM mode `tiqora`; in any other mode it is logged, collected into `unsupported_actions`, and the designer warns (`action_module_inactive_in_mode`). A CI that cannot be updated (unknown number or state, invalid value) is logged and skipped; the transition always fires.
 
 An unsupported action does not abort the submission: the transition still
 fires and the activity still advances, but that one action is skipped and

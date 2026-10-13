@@ -392,6 +392,7 @@ test("ITSM screenshots", async ({ page }) => {
   await shot(page, "/agent/tickets/103", "itsm-ticket-zoom");
   await shot(page, "/agent/itsm/cis/znuny/201", "itsm-ci-detail");
   await shot(page, "/admin/itsm", "admin-itsm");
+  await shot(page, "/admin/itsm-import", "admin-itsm-import");
 });
 
 // CMDB (Mode B) on the demo store of the mock API: list, CI detail, impact graph, class editor.

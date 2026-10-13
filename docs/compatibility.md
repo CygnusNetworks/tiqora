@@ -21,6 +21,16 @@ can migrate gradually.
 | `TicketHistoryGet` | Agent-only ticket history dump |
 | `TimeAccountingGet` | Accounted time rows (`time_accounting`) for a user/date range |
 | `OutOfOffice` | Set agent out-of-office preferences (admin group) |
+| `ConfigItemGet` | CI with its current version (ITSM mode `tiqora`: implemented on the Tiqora CMDB; Mode A: read from Znuny's tables; `off`: `Operation.NotImplemented`) |
+| `ConfigItemSearch` | Search CIs of one class (Tiqora CMDB / Mode A read-through; `off`: not implemented). `PreviousVersionSearch` and bounds: [ConfigItemSearch](#configitemsearch) |
+| `ConfigItemCreate` | Create a CI (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
+| `ConfigItemUpdate` | New CI version (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
+| `ConfigItemDelete` | Delete CIs (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
+
+The five `ConfigItem*` operations follow ITSMConfigurationManagement 6.5.4 and 7.3.5, which are identical
+for these operations, so the answer shape does not depend on the Znuny version you migrate from. Notes per
+operation below ([ConfigItemSearch](#configitemsearch), [ConfigItemCreate / ConfigItemUpdate](#configitemcreate--configitemupdate),
+[ConfigItemDelete](#configitemdelete)); transports are the same two as for tickets, SOAP included.
 
 Both transports Znuny documents for these operations are supported:
 the REST-style `HTTP::REST` connector, and `HTTP::SOAP` (see
@@ -181,6 +191,11 @@ core operations including the gotchas above with seeded MariaDB data.
 | GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
 | GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
 | POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
+| POST | `/znuny-compat/ConfigItem` | ConfigItemCreate |
+| GET | `/znuny-compat/ConfigItem/{id}` | ConfigItemGet |
+| PATCH | `/znuny-compat/ConfigItem/{id}` | ConfigItemUpdate |
+| DELETE | `/znuny-compat/ConfigItem/{id}` | ConfigItemDelete |
+| GET, POST | `/znuny-compat/ConfigItemSearch` | ConfigItemSearch |
 | POST | `/znuny-compat/admin/reload` | Refresh the webservice registry now (admin only) |
 
 ### Dynamic routes (from `gi_webservice_config`)
@@ -527,9 +542,63 @@ Items below are intentionally incomplete or out of scope.
 
 | Gap | Why deferred |
 |-----|----------------|
-| Custom OPM operations (e.g. CMDB `ConfigItem*`) | Installation-specific; no stable core wire contract |
+| Custom OPM operations | Installation-specific; no stable core wire contract (the ITSM `ConfigItem*` operations are implemented, see [ConfigItemSearch](#configitemsearch)) |
 | Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
 | WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
+
+### ConfigItemSearch
+
+`ConfigItemSearch` (ITSMConfigurationManagement 6.5.4 and 7.3.5, identical) answers on the Tiqora CMDB
+in ITSM mode `tiqora` and on Znuny's own tables in Mode A (`znuny_readthrough`); mode `off` answers
+`Operation.NotImplemented`. Parameter checks, their order and the error texts follow
+`ConfigItemSearch.pm`; the answer is `{"ConfigItemIDs": [..]}` or `{"ConfigItemIDs": ""}` when nothing
+matches (Znuny). `Class` is required (one class per call); the agent needs `ro` on the class' group
+(Znuny: `GenericInterface::Operation::ConfigItemSearch###Permission`), otherwise `AccessDenied`.
+
+| Topic | Behaviour |
+|-------|-----------|
+| `Name`, `Number` | Case-insensitive, `*` is a wildcard anywhere, no wildcard means equality; `Number` may be a list (exact) |
+| `DeplStates`, `InciStates` | Names (array or comma separated string); the *current* state of the CI; unknown name: `InvalidParameter` |
+| `ConfigItem{Create,Change}Time{Newer,Older}Date` | `>=` / `<=`; only `YYYY-MM-DD HH:MM:SS` finds anything (like Znuny's SQL layer), other valid date forms answer empty |
+| `OrderBy`, `OrderByDirection` | Znuny's columns (`ConfigItemID`, `Number`, `ClassID`, `DeplStateID`, `InciStateID`, `CreateTime`, `CreateBy`, `ChangeTime`, `ChangeBy`, `Name`); default `ConfigItemID` ascending, a listed column without direction goes `Down`; invalid or repeated values answer empty |
+| `Limit` | Applied after sorting; `0` or negative: none |
+| `CIXMLData` | `Key` and `Key::Sub` (nested hash) values, an array is a list of alternatives, several keys must all match. Tiqora mode: only **searchable** attributes of the class (the CMDB attribute index; text types with `*` at the ends, catalog by name, integer exact); an inner `*` in a text value matches as "contains the longest literal piece" (can return more than Znuny); a key outside the definition finds nothing, a non-searchable one is `InvalidParameter`. Mode A: every attribute, compared in memory (dates are not normalised) |
+| `PreviousVersionSearch` | `Name` is matched against every version (hot and archived). Combined with `CIXMLData` the attributes are matched on the current version only (logged as `gi_previous_version_search_unsupported`) |
+| Bounds (Tiqora-only, a GI call cannot become a job) | Tiqora mode loads at most 10 000 candidates before sorting. Mode A: at most **1 000** ids (the first 1 000 matches in id order are sorted and limited) and a 30 s budget (also as database statement time); running out answers `ConfigItemSearch.Timeout` ("the search took too long"), nothing partial |
+
+### ConfigItemCreate / ConfigItemUpdate
+
+`ConfigItemCreate` and `ConfigItemUpdate` (ITSMConfigurationManagement 6.5.4 and 7.3.5, identical but for
+whitespace) write to the Tiqora CMDB in ITSM mode `tiqora`; Mode A answers `<Op>.NotAvailable`
+("Die CMDB wird in Znuny geführt (Modus A)"), mode `off` `Operation.NotImplemented`. Check order, codes
+and texts follow the Perl `Run()`: parameters, header (`Class`, `Name`, `DeplState`, `InciState`), `CIXMLData`
+against the class' current definition, `rw` on the class' group (Znuny:
+`GenericInterface::Operation::<Op>###Permission`), attachments. The answer is `{"ConfigItemID", "Number"}`
+for both operations (Znuny gives no version id).
+
+| Topic | Behaviour |
+|-------|-----------|
+| `Number` (create) | Ignored: the number comes from the class' own generator, the answer carries it |
+| `CIXMLData` (update) | Merged over the current data at top level (a key you send replaces the whole entry); `ReplaceExistingData: 1` takes it as given and replaces the attachments instead of adding to them (attachments an older version still references stay) |
+| Unchanged update | No new version; the answer is the normal success answer (Znuny's `VersionAdd` returns the current version id) |
+| `Class` (update) | Must be the class of the item (Znuny does not check and would write a version with a foreign definition) |
+| Keys outside the definition | Dropped (Znuny stores them in XML) |
+| `Attachment` | One hash or a list; `Content` is base64, at most **50 MB** decoded per file (`InvalidParameter`), `ContentType` kept; every file is checked before anything is written, a write error rolls the whole call back |
+| Permission on update | Decided by the class of the item; a caller without any `rw` class learns nothing about ids |
+
+### ConfigItemDelete
+
+`ConfigItemDelete` (ITSMConfigurationManagement 6.5.4 and 7.3.5, identical) deletes the Tiqora CMDB items
+named by `ConfigItemID`, a comma separated string, a list or a single number (at most 500). Mode A answers
+`ConfigItemDelete.NotAvailable` ("Die CMDB wird in Znuny geführt (Modus A)"), mode `off`
+`Operation.NotImplemented`. The answer is `{"ConfigItemID": [..]}` with the ids as the caller sent them.
+
+| Topic | Behaviour |
+|-------|-----------|
+| Permission | `rw` on the group of the item's class (Znuny: `GenericInterface::Operation::ConfigItemDelete###Permission`); an unknown id and a missing right both answer `AccessDenied` ("Can not delete configuration item!") |
+| Partial failure (verbatim from `ConfigItemDelete.pm`) | The ids are processed in order, each in its own transaction. The first `AccessDenied` or `DeleteError` ends the call with that error; ids deleted before it **stay deleted**, later ids are not touched. There is no all-or-nothing mode |
+| Links, history, attachments | Removed with the item (CMDB semantics); neighbours' derived incident states are recomputed |
+| Import map | The importer's id map (`tiqora_itsm_import_map`) is not touched: running the Znuny import again would recreate a deleted item. After the switch the importer refuses to run, so this only matters before it |
 
 ### TicketCreate / TicketUpdate
 
@@ -987,7 +1056,9 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | `Module` conditions | partial | Python re-implementations registered by Perl module path (`ValidateDemo`); unknown modules never match and the designer warns |
 | Appointment actions (`AppointmentCreate/Update/Remove`) | yes | `Custom*` recurrence, `RecurrenceFrequency`, `RecurrenceExclude`, notification keys and `TicketAppointmentRuleID` are ignored |
 | `ExecuteInvoker` action | yes | Always queued as a background job; `Asynchronous` is accepted and ignored (see [Requester](#requester-and-invokers-tiqora-calls-external-systems), deviation 8) |
-| `ConfigItemUpdate` action | missing | Logged as unsupported (needs the CMDB) |
+| `ConfigItemUpdate` action | partial | Implemented (it was unsupported before the ITSM importer). Runs on the Tiqora CMDB in ITSM mode `tiqora` (`ConfigItemID`/`ConfigItemNumber` comma lists, `Name`, `DeplState*`, `InciState*`, stringified attribute keys, `Separator`, `UserID`); in Mode A it is logged as unsupported and the designer warns |
+| ITSM importer (Znuny CMDB to Tiqora) | partial | Admin "ITSM" > "Import aus Znuny" and `tiqora itsm import`: catalog, classes and definitions, CIs with all versions, links, attachments (database storage only), priority matrix, service ITSM data; repeatable, dry run, then the explicit switch to Mode B (and back). Changes and work orders are only counted; filesystem attachments are reported. See [ITSM](itsm.md) chapter 7 and [importer report](itsm-import.md) |
+| `TiqoraITSM` add-on (Znuny OPM package) | yes | "Betroffene CIs (Tiqora)" in the Znuny ticket zoom, read-only guard for the Znuny CI screens after the switch (GenericInterface, console and ImportExport are not blocked), optional customer page and optional ticket-to-CI linking through the Tiqora API. See [ITSM](itsm.md#znuny-erweiterung-tiqoraitsm) |
 | Dialog attachments and time units | yes | Article uploads, `TimeUnits`, Znuny's existing-attachment selection (`Attachments` field, `AttachmentsReuse`), option refresh when a field changes |
 | Transitions after every ticket change | missing | Evaluated after process dialogs and new process tickets only |
 | Znuny 7.x process YAML | verified | Same format as 6.5 (no renamed keys); `pm_process_preferences` (7.2+) is snapshotted. Golden tests passed on Znuny 6.5 and on 7.3.5 |

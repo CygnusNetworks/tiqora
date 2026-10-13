@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<otrs_config version="2.0" init="Application">
+    <Setting Name="TiqoraITSM::BaseURL" Required="1" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Address of the Tiqora installation, without a trailing path (for example https://tiqora.example.org). Links from Znuny to Tiqora are built from it.</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="String" ValueRegex="^https?://\S+$">https://tiqora.example.org</Item>
+        </Value>
+    </Setting>
+    <Setting Name="TiqoraITSM::AgentCIPath" Required="1" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Path of a configuration item in the Tiqora agent interface; the CI id is appended.</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="String" ValueRegex="^/\S*$">/agent/cmdb/</Item>
+        </Value>
+    </Setting>
+    <Setting Name="TiqoraITSM::CustomerCIPath" Required="1" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Path of a configuration item in the Tiqora customer portal; the CI id is appended.</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="String" ValueRegex="^/\S*$">/portal/config-items/</Item>
+        </Value>
+    </Setting>
+    <Setting Name="TiqoraITSM::ReadOnly::Force" Required="1" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Treat the CMDB as read-only in Znuny even when Tiqora has not set the flag.</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="Checkbox">0</Item>
+        </Value>
+    </Setting>
+    <Setting Name="TiqoraITSM::ReadOnly::Actions" Required="0" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Znuny screens for configuration items that are refused while the CMDB is read-only. An entry is an action name (the whole screen) or Action::Subaction (one subaction). Read screens (zoom, search, history, print, attachment download) are not listed. AgentLinkObject is guarded by the module itself: it refuses to link to or from configuration items.</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Array>
+                <Item>AgentITSMConfigItemAdd</Item>
+                <Item>AgentITSMConfigItemEdit</Item>
+                <Item>AgentITSMConfigItemDelete</Item>
+                <Item>AgentITSMConfigItemBulk</Item>
+                <Item>AdminITSMConfigItem::DefinitionChange</Item>
+                <Item>AdminITSMConfigItem::DefinitionSave</Item>
+            </Array>
+        </Value>
+    </Setting>
+    <Setting Name="PreApplicationModule###TiqoraITSMReadOnly" Required="0" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Refuses the Znuny screens that change configuration items once the CMDB is read-only because Tiqora holds it (TiqoraITSM::ReadOnly::Actions).</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="String" ValueRegex="">Kernel::Modules::TiqoraITSMReadOnly</Item>
+        </Value>
+    </Setting>
+    <Setting Name="TiqoraITSM::Linking::Enabled" Required="1" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Allow agents to link tickets to CIs of Tiqora from the ticket zoom (needs TiqoraITSM::APIKey).</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="Checkbox">0</Item>
+        </Value>
+    </Setting>
+    <Setting Name="TiqoraITSM::APIKey" Required="0" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">API key of a dedicated Tiqora user with the area cmdb:rw. The key is visible to everyone who can read the system configuration or a support bundle.</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="String" ValueRegex=""></Item>
+        </Value>
+    </Setting>
+    <Setting Name="Ticket::Frontend::AgentTicketZoom###Widgets###0350-TiqoraITSM" Required="0" Valid="1">
+        <Description Translatable="1">Show the widget with the CIs Tiqora links to the ticket in the ticket zoom of the agent interface.</Description>
+        <Navigation>Frontend::Agent::View::TicketZoom</Navigation>
+        <Value>
+            <Hash>
+                <Item Key="Module">Kernel::Output::HTML::TicketZoom::TiqoraITSM</Item>
+                <Item Key="Location">Sidebar</Item>
+                <Item Key="Async">1</Item>
+            </Hash>
+        </Value>
+    </Setting>
+    <Setting Name="Frontend::Module###AgentTiqoraITSMLink" Required="0" Valid="1">
+        <Description Translatable="1">Frontend module registration for linking a ticket to a configuration item of Tiqora (AJAX). Does nothing unless TiqoraITSM::Linking::Enabled is on.</Description>
+        <Navigation>Frontend::Agent::ModuleRegistration</Navigation>
+        <Value>
+            <Item ValueType="FrontendRegistration">
+                <Hash>
+                    <Item Key="GroupRo">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="Group">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="Description">Link a ticket to a configuration item of Tiqora.</Item>
+                    <Item Key="Title" Translatable="1">Link CI (Tiqora)</Item>
+                    <Item Key="NavBarName"></Item>
+                </Hash>
+            </Item>
+        </Value>
+    </Setting>
+    <Setting Name="CustomerFrontend::Module###CustomerTiqoraITSM" Required="0" Valid="0">
+        <Description Translatable="1">Frontend module registration for the customer page with the configuration items of Tiqora.</Description>
+        <Navigation>Frontend::Customer::ModuleRegistration</Navigation>
+        <Value>
+            <Item ValueType="FrontendRegistration">
+                <Hash>
+                    <Item Key="Group">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="GroupRo">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="Description" Translatable="1">Configuration items of the customer (from Tiqora).</Item>
+                    <Item Key="NavBarName">TiqoraITSM</Item>
+                    <Item Key="Title" Translatable="1">Configuration items</Item>
+                </Hash>
+            </Item>
+        </Value>
+    </Setting>
+    <Setting Name="CustomerFrontend::Navigation###CustomerTiqoraITSM###002-TiqoraITSM" Required="0" Valid="0">
+        <Description Translatable="1">Main menu item registration for the customer page with the configuration items of Tiqora.</Description>
+        <Navigation>Frontend::Customer::ModuleRegistration::MainMenu</Navigation>
+        <Value>
+            <Array>
+                <DefaultItem ValueType="FrontendNavigation">
+                    <Hash>
+                    </Hash>
+                </DefaultItem>
+                <Item>
+                    <Hash>
+                        <Item Key="Group">
+                            <Array>
+                            </Array>
+                        </Item>
+                        <Item Key="GroupRo">
+                            <Array>
+                            </Array>
+                        </Item>
+                        <Item Key="Description" Translatable="1">Configuration items.</Item>
+                        <Item Key="Name" Translatable="1">Configuration items</Item>
+                        <Item Key="Link">Action=CustomerTiqoraITSM</Item>
+                        <Item Key="LinkOption"></Item>
+                        <Item Key="NavBar">TiqoraITSM</Item>
+                        <Item Key="Type">Menu</Item>
+                        <Item Key="Block"></Item>
+                        <Item Key="AccessKey">c</Item>
+                        <Item Key="Prio">400</Item>
+                    </Hash>
+                </Item>
+            </Array>
+        </Value>
+    </Setting>
+</otrs_config>

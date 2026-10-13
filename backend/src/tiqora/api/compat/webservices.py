@@ -46,6 +46,11 @@ OPERATION_TYPES: dict[str, str] = {  # Znuny operation Type -> op handler key
     "Ticket::TicketHistoryGet": "TicketHistoryGet",
     "Ticket::TimeAccountingGet": "TimeAccountingGet",
     "User::OutOfOffice": "OutOfOffice",
+    "ConfigItem::ConfigItemCreate": "ConfigItemCreate",
+    "ConfigItem::ConfigItemGet": "ConfigItemGet",
+    "ConfigItem::ConfigItemSearch": "ConfigItemSearch",
+    "ConfigItem::ConfigItemUpdate": "ConfigItemUpdate",
+    "ConfigItem::ConfigItemDelete": "ConfigItemDelete",
 }
 
 _ROUTE_VAR = re.compile(r":([^/]+)")

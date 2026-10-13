@@ -1,0 +1,70 @@
+---
+Debugger:
+  DebugThreshold: error
+  TestMode: '0'
+Description: Golden ConfigItem webservice (the five ConfigItem operations of ITSMConfigurationManagement over REST)
+FrameworkVersion: 6.5
+Provider:
+  Operation:
+    ConfigItemCreate:
+      Description: Creates new Configuration Items from ITSMConfigurationManagement
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: ConfigItem::ConfigItemCreate
+    ConfigItemDelete:
+      Description: Deletes Configuration Items from ITSMConfigurationManagement
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: ConfigItem::ConfigItemDelete
+    ConfigItemGet:
+      Description: Get the details for Configuration Items from ITSMConfigurationManagement
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: ConfigItem::ConfigItemGet
+    ConfigItemSearch:
+      Description: Search Configuration Items from ITSMConfigurationManagement
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: ConfigItem::ConfigItemSearch
+    ConfigItemUpdate:
+      Description: Updates Configuration Items from ITSMConfigurationManagement
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: ConfigItem::ConfigItemUpdate
+  Transport:
+    Config:
+      AdditionalHeaders: ~
+      KeepAlive: '1'
+      MaxLength: '100000000'
+      RouteOperationMapping:
+        ConfigItemCreate:
+          ParserBackend: JSON
+          RequestMethod:
+            - POST
+          Route: /ConfigItem
+        ConfigItemDelete:
+          ParserBackend: JSON
+          RequestMethod:
+            - DELETE
+          Route: /ConfigItem/:ConfigItemID
+        ConfigItemGet:
+          ParserBackend: JSON
+          RequestMethod:
+            - GET
+          Route: /ConfigItem/:ConfigItemID
+        ConfigItemSearch:
+          ParserBackend: JSON
+          RequestMethod:
+            - GET
+            - POST
+          Route: /ConfigItemSearch
+        ConfigItemUpdate:
+          ParserBackend: JSON
+          RequestMethod:
+            - PATCH
+          Route: /ConfigItem/:ConfigItemID
+    Type: HTTP::REST
+RemoteSystem: ''
+Requester:
+  Transport:
+    Type: ''

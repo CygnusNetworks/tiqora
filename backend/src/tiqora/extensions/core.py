@@ -50,6 +50,7 @@ def register_core(registry: Registry) -> None:
     from tiqora.cmdb.transfer.export_job import CMDB_EXPORT_JOB
     from tiqora.cmdb.transfer.import_job import CMDB_IMPORT_JOB
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
+    from tiqora.itsm.importer.jobs import ITSM_IMPORT_JOB, ITSM_SWITCH_JOB
     from tiqora.itsm.linked_articles import LINKED_ARTICLES_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
@@ -73,6 +74,8 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, CMDB_BULK_JOB)
     registry.add(JOB_HANDLERS, CMDB_ARCHIVE_JOB)
     registry.add(JOB_HANDLERS, CMDB_REINDEX_JOB)
+    registry.add(JOB_HANDLERS, ITSM_IMPORT_JOB)
+    registry.add(JOB_HANDLERS, ITSM_SWITCH_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources

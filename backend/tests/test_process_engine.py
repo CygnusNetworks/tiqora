@@ -639,12 +639,12 @@ Permission: ''
 
 UNSUP_TRANSITION_CONFIG_YAML = _TITLE_NONEMPTY_CONDITION
 
-# ConfigItemUpdate stays unsupported (it needs the CMDB) — used here to assert
+# A test-only module registered with ``run=None`` (see the test) — used here to assert
 # skip-and-report behaviour for modules without a Tiqora handler.
 UNSUP_TRANSITION_ACTION_CONFIG_YAML = """
 Config:
   ConfigItemID: '1'
-Module: Kernel::System::ProcessManagement::TransitionAction::ConfigItemUpdate
+Module: Kernel::System::ProcessManagement::TransitionAction::TestOnlyUnrun
 """
 
 
@@ -714,11 +714,27 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
     mariadb_znuny_url: str,
 ) -> None:
     """A TransitionAction whose Module is not one of the implemented handlers
-    (e.g. ConfigItemUpdate) is skipped — logged, not applied, and its short
+    (a test-only ``run=None`` module) is skipped — logged, not applied, and its short
     module name is collected into ``unsupported_actions`` — while the
     transition itself still fires and the activity still advances (an
     unsupported action does not abort the whole submission).
     """
+    from tiqora.extensions.core import get_registry, register_core, set_registry_for_tests
+    from tiqora.extensions.registry import Registry
+    from tiqora.process.actions.registry import TRANSITION_ACTIONS, TransitionActionModule
+
+    registry = Registry()
+    register_core(registry)
+    registry.add(TRANSITION_ACTIONS, TransitionActionModule(name="TestOnlyUnrun", run=None))
+    previous = get_registry()
+    set_registry_for_tests(registry)
+    try:
+        await _check_unsupported_action_is_reported(mariadb_znuny_url)
+    finally:
+        set_registry_for_tests(previous)
+
+
+async def _check_unsupported_action_is_reported(mariadb_znuny_url: str) -> None:
     url = _mysql_async(mariadb_znuny_url)
     engine = _track_engine(create_async_engine(url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -751,7 +767,7 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
 
     assert result.activity_changed is True
     assert result.new_activity_entity_id == UNSUP_ACTIVITY_B
-    assert result.unsupported_actions == ["ConfigItemUpdate"]
+    assert result.unsupported_actions == ["TestOnlyUnrun"]
 
 
 # ---------------------------------------------------------------------------

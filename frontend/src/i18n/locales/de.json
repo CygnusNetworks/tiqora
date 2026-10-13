@@ -2240,7 +2240,8 @@
       "cmdbClasses": "CMDB-Klassen",
       "cmdbCatalog": "CMDB-Auswahllisten",
       "itsm": "ITSM",
-      "itsmLinkTypes": "Verknüpfungstypen"
+      "itsmLinkTypes": "Verknüpfungstypen",
+      "itsmImport": "ITSM-Import"
     },
     "table": {
       "id": "ID",
@@ -3079,6 +3080,7 @@
           "condition_module_unknown": "Das Bedingungsmodul {{module}} ist unbekannt.",
           "action_reference_missing": "{{key}}: {{value}} existiert nicht.",
           "action_module_unsupported": "Das Modul {{module}} wird von Tiqora nicht unterstützt.",
+          "action_module_inactive_in_mode": "Das Modul {{module}} bleibt wirkungslos, solange das ITSM im Modus {{mode}} läuft; es wirkt nur, wenn Tiqora das ITSM führt.",
           "tiqora_only_module_parallel": "Das Modul {{module}} gibt es nur in Tiqora; Znuny überspringt es.",
           "action_required_param_missing": "Der Parameter {{param}} fehlt."
         },
@@ -3896,7 +3898,8 @@
       "cmdbCatalog": "Auswahllisten (Allgemeiner Katalog) für CMDB-Attribute pflegen.",
       "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
       "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
-      "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM"
+      "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM",
+      "itsmImport": "ITSM-Daten aus Znuny in die CMDB von Tiqora übernehmen und auf Tiqora umstellen."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -5711,6 +5714,116 @@
           "generic": "Die ITSM-Daten konnten nicht gespeichert werden."
         }
       }
+    },
+    "itsmImport": {
+      "title": "ITSM-Daten aus Znuny übernehmen",
+      "intro": "Hier übernehmen Sie CIs, Klassen und Verknüpfungen aus Znuny ITSM in die CMDB von Tiqora. Sie können den Import beliebig oft wiederholen, bis Sie auf Tiqora umstellen.",
+      "loadError": "Der Stand des Imports konnte nicht geladen werden.",
+      "startError": "Der Import konnte nicht gestartet werden.",
+      "blockedFallback": "Der Import ist derzeit nicht möglich.",
+      "modeLabel": "Modus",
+      "mode": {
+        "znuny": "Znuny führt das ITSM",
+        "tiqora": "Tiqora führt das ITSM",
+        "off": "ITSM ausgeschaltet"
+      },
+      "znunyFound": "Znuny ITSM gefunden: {{profile}}",
+      "znunyMissing": "Znuny ITSM wurde nicht gefunden.",
+      "counts": {
+        "cis": "CIs",
+        "classes": "Klassen",
+        "changes": "Changes",
+        "workorders": "Arbeitsaufträge"
+      },
+      "lastRun": "Letzter Lauf: {{kind}}, {{time}}, {{status}}",
+      "noRun": "Es gab noch keinen Lauf.",
+      "dryRun": "Probelauf",
+      "import": "Übernehmen",
+      "confirmTitle": "ITSM-Daten übernehmen",
+      "confirmMessage": "Die Daten werden in die CMDB von Tiqora geschrieben. Solange Znuny das ITSM führt, sehen Ihre Agenten weiter die Daten aus Znuny.",
+      "releaseLock": "Sperre aufheben",
+      "releaseLockError": "Die Sperre konnte nicht aufgehoben werden.",
+      "switch": {
+        "open": "Auf Tiqora umstellen",
+        "blockedFallback": "Die Umstellung ist erst nach einer erfolgreichen Übernahme möglich.",
+        "title": "Auf Tiqora umstellen",
+        "intro": "Die Umstellung läuft in dieser Reihenfolge:",
+        "step1": "Znuny-Bildschirme zum Bearbeiten von CIs werden gesperrt (mit der Erweiterung TiqoraITSM).",
+        "step2": "Tiqora übernimmt ein letztes Mal alle Änderungen aus Znuny.",
+        "step3": "Ab dann pflegen Sie CIs nur noch in Tiqora.",
+        "addonLegend": "Erweiterung in Znuny",
+        "addonInstalled": "Die Erweiterung TiqoraITSM ist in Znuny installiert",
+        "addonMissing": "Die Erweiterung TiqoraITSM ist in Znuny nicht installiert",
+        "editsStopped": "In Znuny werden keine CIs mehr bearbeitet",
+        "noCiDataWarning": "Diese Znuny-ITSM-Version kann Tiqora nicht lesen. Es werden keine CIs übernommen.",
+        "noCiDataConfirm": "Ich bestätige, dass die CI-Daten aus Znuny nicht übernommen werden.",
+        "typeToConfirm": "Geben Sie {{word}} ein, um zu bestätigen",
+        "submit": "Umstellen",
+        "error": "Die Umstellung konnte nicht gestartet werden.",
+        "jobTitle": "Umstellung auf Tiqora"
+      },
+      "switched": {
+        "banner": "Tiqora führt das ITSM seit {{date}}.",
+        "bannerBy": "Tiqora führt das ITSM seit {{date}} (umgestellt von {{name}}).",
+        "bannerNoDate": "Tiqora führt das ITSM.",
+        "drift_one": "Seit der Umstellung wurde in Znuny {{count}} CI oder CI-Verknüpfung geändert. Diese Änderung ist in Tiqora nicht enthalten.",
+        "drift_other": "Seit der Umstellung wurden in Znuny {{count}} CIs oder CI-Verknüpfungen geändert. Diese Änderungen sind in Tiqora nicht enthalten.",
+        "driftDocs": "Was jetzt?"
+      },
+      "rollback": {
+        "open": "Zurück zu Znuny (Modus A)",
+        "title": "Zurück zu Znuny (Modus A)",
+        "message": "Tiqora zeigt dann wieder die CIs aus Znuny. Änderungen, die Sie seit der Umstellung in Tiqora gemacht haben, sind in Znuny nicht sichtbar.",
+        "typeToConfirm": "Geben Sie {{word}} ein, um zu bestätigen",
+        "submit": "Zurück zu Znuny",
+        "error": "Der Wechsel zurück konnte nicht durchgeführt werden."
+      },
+      "runs": "Läufe",
+      "col": {
+        "kind": "Art",
+        "started": "Gestartet",
+        "by": "von",
+        "status": "Status",
+        "report": "Bericht"
+      },
+      "kind": {
+        "dry_run": "Probelauf",
+        "import": "Übernahme",
+        "switch": "Umstellung",
+        "rollback": "Zurück"
+      },
+      "status": {
+        "running": "Läuft",
+        "done": "Fertig",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      },
+      "steps": {
+        "catalog": "Auswahllisten",
+        "classes": "Klassen",
+        "definitions": "Klassendefinitionen",
+        "cis_pass1": "CIs (Grunddaten)",
+        "cis_pass2": "CI-Versionen",
+        "links": "Verknüpfungen",
+        "attachments": "Anhänge",
+        "priority_matrix": "Prioritätsmatrix",
+        "service_meta": "Service-Angaben",
+        "changes": "Changes (nur gezählt)",
+        "deleted_in_znuny": "In Znuny gelöscht",
+        "incident_states": "Vorfallstatus"
+      },
+      "report": {
+        "step": "Schritt",
+        "created": "Neu",
+        "updated": "Aktualisiert",
+        "unchanged": "Unverändert",
+        "skipped": "Übersprungen",
+        "problems": "Probleme",
+        "noIssues": "Keine Auffälligkeiten",
+        "issues": "Auffälligkeiten ({{count}})",
+        "truncated": "Es werden die ersten {{shown}} von {{count}} Auffälligkeiten angezeigt.",
+        "csv": "Vollständiger Bericht (CSV)"
+      }
     }
   },
   "kb": {
@@ -6342,7 +6455,9 @@
         "cmdb_bulk": "CMDB-Sammelbearbeitung",
         "cmdb_archive": "Alte CMDB-Versionen archivieren",
         "cmdb_reindex": "CMDB-Suche neu aufbauen",
-        "itsm_linked_articles": "Notiz an verknüpfte Tickets"
+        "itsm_linked_articles": "Notiz an verknüpfte Tickets",
+        "itsm_import": "Znuny-ITSM-Daten importieren",
+        "itsm_switch": "ITSM auf Tiqora umstellen"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

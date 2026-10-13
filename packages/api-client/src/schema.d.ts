@@ -4146,6 +4146,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/import/release-lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release Lock
+         * @description "Sperre aufheben": clear a read-only flag that stayed set without a switch (F10).
+         */
+        post: operations["release_lock_api_v1_admin_itsm_import_release_lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/import/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rollback Switch
+         * @description Back to Znuny (Mode A): two setting writes and a run row, so no job.
+         */
+        post: operations["rollback_switch_api_v1_admin_itsm_import_rollback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/import/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_api_v1_admin_itsm_import_runs_get"];
+        put?: never;
+        /**
+         * Start Import
+         * @description Queue a dry run or the import; 409 when blocked (after the switch, busy, no Znuny ITSM).
+         */
+        post: operations["start_import_api_v1_admin_itsm_import_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/import/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_api_v1_admin_itsm_import_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/import/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import Status */
+        get: operations["get_import_status_api_v1_admin_itsm_import_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/import/switch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Switch
+         * @description Queue the switch to Tiqora (final import under the read-only flag, then itsm1's switch).
+         */
+        post: operations["start_switch_api_v1_admin_itsm_import_switch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/itsm/link-types": {
         parameters: {
             query?: never;
@@ -12903,6 +13018,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/znuny-compat/ConfigItem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Canonical Config Item Create */
+        post: operations["canonical_config_item_create_znuny_compat_ConfigItem_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/ConfigItem/{config_item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canonical Config Item Get */
+        get: operations["canonical_config_item_get_znuny_compat_ConfigItem__config_item_id__get"];
+        put?: never;
+        post?: never;
+        /** Canonical Config Item Delete */
+        delete: operations["canonical_config_item_delete_znuny_compat_ConfigItem__config_item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Canonical Config Item Update */
+        patch: operations["canonical_config_item_update_znuny_compat_ConfigItem__config_item_id__patch"];
+        trace?: never;
+    };
+    "/znuny-compat/ConfigItemSearch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canonical Config Item Search */
+        get: operations["canonical_config_item_search_znuny_compat_ConfigItemSearch_get"];
+        put?: never;
+        /** Canonical Config Item Search Post */
+        post: operations["canonical_config_item_search_post_znuny_compat_ConfigItemSearch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/znuny-compat/OutOfOffice": {
         parameters: {
             query?: never;
@@ -20500,6 +20669,156 @@ export interface components {
             profile: string | null;
             /** Unsupported Reason */
             unsupported_reason: string | null;
+        };
+        /** ItsmImportIssueOut */
+        ItsmImportIssueOut: {
+            /** Code */
+            code: string;
+            /** Explanation */
+            explanation: string;
+            /** Message */
+            message: string;
+            /** Object Ref */
+            object_ref: string;
+            /** Step */
+            step: string;
+        };
+        /** ItsmImportRollbackIn */
+        ItsmImportRollbackIn: {
+            /** Confirm */
+            confirm: string;
+        };
+        /** ItsmImportRunOut */
+        ItsmImportRunOut: {
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Issue Count */
+            issue_count: number;
+            /** Issues */
+            issues: components["schemas"]["ItsmImportIssueOut"][];
+            /** Job Id */
+            job_id: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "dry_run" | "import" | "switch" | "rollback";
+            /** Message */
+            message: string | null;
+            /** Profile */
+            profile: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Started By Name */
+            started_by_name: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "done" | "failed" | "cancelled";
+            /** Steps */
+            steps: {
+                [key: string]: components["schemas"]["ItsmImportStepCountsOut"];
+            };
+        };
+        /** ItsmImportStartIn */
+        ItsmImportStartIn: {
+            /** Dry Run */
+            dry_run: boolean;
+        };
+        /** ItsmImportStatusOut */
+        ItsmImportStatusOut: {
+            /** Active Job Id */
+            active_job_id: number | null;
+            /** Blocked Reason */
+            blocked_reason: string | null;
+            /** Can Import */
+            can_import: boolean;
+            /** Can Switch */
+            can_switch: boolean;
+            last_run: components["schemas"]["ItsmImportRunOut"] | null;
+            /** Mode */
+            mode: string;
+            /** Profile */
+            profile: string | null;
+            /** Readonly Flag */
+            readonly_flag: boolean;
+            switched: components["schemas"]["ItsmImportSwitchInfoOut"] | null;
+            /** Znuny Changes Since Switch */
+            znuny_changes_since_switch: number | null;
+            znuny_counts: components["schemas"]["ItsmImportZnunyCountsOut"] | null;
+            /** Znuny Itsm Present */
+            znuny_itsm_present: boolean;
+        };
+        /** ItsmImportStepCountsOut */
+        ItsmImportStepCountsOut: {
+            /**
+             * Created
+             * @default 0
+             */
+            created: number;
+            /**
+             * Problems
+             * @default 0
+             */
+            problems: number;
+            /**
+             * Skipped
+             * @default 0
+             */
+            skipped: number;
+            /**
+             * Unchanged
+             * @default 0
+             */
+            unchanged: number;
+            /**
+             * Updated
+             * @default 0
+             */
+            updated: number;
+        };
+        /** ItsmImportSwitchIn */
+        ItsmImportSwitchIn: {
+            /** Addon Installed */
+            addon_installed: boolean;
+            /** Confirm */
+            confirm: string;
+            /**
+             * Edits Stopped
+             * @default false
+             */
+            edits_stopped: boolean;
+            /**
+             * Without Ci Data
+             * @default false
+             */
+            without_ci_data: boolean;
+        };
+        /** ItsmImportSwitchInfoOut */
+        ItsmImportSwitchInfoOut: {
+            /** By */
+            by: number | null;
+            /** Run Id */
+            run_id: number | null;
+            /** Switched At */
+            switched_at: string | null;
+        };
+        /** ItsmImportZnunyCountsOut */
+        ItsmImportZnunyCountsOut: {
+            /** Changes */
+            changes: number;
+            /** Cis */
+            cis: number;
+            /** Classes */
+            classes: number;
+            /** Workorders */
+            workorders: number;
         };
         /** ItsmModeIn */
         ItsmModeIn: {
@@ -39618,6 +39937,253 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItsmAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_lock_api_v1_admin_itsm_import_release_lock_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmImportStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rollback_switch_api_v1_admin_itsm_import_rollback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItsmImportRollbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmImportStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_admin_itsm_import_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmImportRunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_import_api_v1_admin_itsm_import_runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItsmImportStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_api_v1_admin_itsm_import_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmImportRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_import_status_api_v1_admin_itsm_import_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmImportStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_switch_api_v1_admin_itsm_import_switch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItsmImportSwitchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */
@@ -60430,6 +60996,159 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    canonical_config_item_create_znuny_compat_ConfigItem_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_config_item_get_znuny_compat_ConfigItem__config_item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_config_item_delete_znuny_compat_ConfigItem__config_item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_config_item_update_znuny_compat_ConfigItem__config_item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_config_item_search_znuny_compat_ConfigItemSearch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_config_item_search_post_znuny_compat_ConfigItemSearch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

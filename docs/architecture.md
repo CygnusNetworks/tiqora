@@ -1133,6 +1133,15 @@ The ITSM core lives in `tiqora.itsm` (user-facing description: [itsm.md](itsm.md
 - **API**: `/api/v1/itsm/*` (API-key area `cmdb`), ticket routes under `/api/v1/tickets/{id}/...`
   (area `tickets`), admin under `/api/v1/admin/itsm/*`.
 
+- **Importer** (`itsm/importer/`): the one-way copy of Znuny's ITSM into Tiqora and the only path
+  from Mode A to Mode B. Steps run against ports (`ports.py`: source, CMDB write, mode) with
+  facades onto the itsm1 adapter and the CMDB importer API (`facades.py`); the id map
+  (`mapstore.py`) makes runs repeatable; `jobs.py` registers `core.itsm_import` and `core.itsm_switch`
+  (dry run, import, switch with a read-only flag for Znuny, rollback). The views
+  `tiqora_v1_itsm_ci` and `tiqora_v1_itsm_ci_links` (`addon_views.py` lists their columns) are the
+  contract with the Znuny add-on `TiqoraITSM`, which only reads them and the stored `itsm.mode`.
+  Details: [itsm.md](itsm.md) chapter 7 and [itsm-import.md](itsm-import.md).
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).

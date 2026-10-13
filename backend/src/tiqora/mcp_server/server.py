@@ -2284,3 +2284,5 @@ __all__ = [
     "mcp",
     "run_mcp_server",
 ]
+
+from tiqora.mcp_server import cmdb_tools  # noqa: E402,F401  — registers the CMDB tools
