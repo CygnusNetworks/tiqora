@@ -11,8 +11,14 @@ cancelling Request``. Write to Znuny tables only through ``ctx.plugin.tickets``.
 
 A mapping type (``Plugin_<short_id>_<Name>``) is built by ``factory(config)`` and must return an
 object with ``map(data, data_include=None)``. Mappers are pure, fast and synchronous; raise
-``MappingError`` to fail the call. Invoker types (``InvokerContext`` ...) are used by the
-requester side.
+``MappingError`` to fail the call.
+
+An invoker (``registry.gi_invoker``, ``Plugin_<short_id>::<Name>``) is the outgoing side:
+``prepare(ctx, data)`` receives a copy of the event data (``TicketID``, ``Event`` ...) and returns
+the dict to send, or ``None`` to skip the call (no error, no retry). It then passes the outbound
+mapping and the transport. ``handle_response(ctx, response)`` is optional and receives an
+``InvokerResponse`` with the mapped answer or the error. An exception or timeout (at most 120
+seconds) in ``prepare`` runs the webservice's error handling (retries) like a core invoker.
 """
 
 from __future__ import annotations

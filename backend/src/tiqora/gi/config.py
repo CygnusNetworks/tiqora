@@ -16,6 +16,7 @@ import structlog
 from tiqora.api.compat.mapping import Mapper, MappingError, build_mapper
 from tiqora.api.compat.mapping.perl import perl_str, perl_truthy
 from tiqora.plugins.events import HISTORY_EVENT_MAP
+from tiqora.plugins.gi_points import plugin_invoker
 
 logger = structlog.get_logger(__name__)
 
@@ -172,7 +173,7 @@ def _parse_invoker(
     return InvokerConfig(
         name=name,
         type=type_text,
-        supported=type_text in SUPPORTED_INVOKER_TYPES,
+        supported=type_text in SUPPORTED_INVOKER_TYPES or plugin_invoker(type_text) is not None,
         events=_parse_events(name, config.get("Events"), unsupported),
         mapping_outbound=outbound,
         mapping_inbound=inbound,

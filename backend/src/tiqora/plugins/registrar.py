@@ -52,12 +52,17 @@ from tiqora.plugins.df_types import (
 )
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
 from tiqora.plugins.gi_points import (
+    GI_INVOKERS,
     GI_MAPPINGS,
     GI_OPERATIONS,
+    MAX_INVOKER_TIMEOUT,
     MAX_OPERATION_TIMEOUT,
+    GiInvoker,
     GiMapping,
     GiOperation,
     GiOperationRun,
+    InvokerHandle,
+    InvokerPrepare,
 )
 from tiqora.plugins.mail_filters import (
     INBOUND_MAIL_FILTERS,
@@ -1083,6 +1088,54 @@ class PluginRegistrar:
             type=qname, plugin_id=self.plugin_id, factory=factory, context=self._context
         )
         self._stage(GI_MAPPINGS, item, check=check)
+        return qname
+
+    def gi_invoker(
+        self,
+        name: str,
+        prepare: InvokerPrepare,
+        handle_response: InvokerHandle | None = None,
+        *,
+        timeout_seconds: int = 30,
+    ) -> str:
+        """Stage the GenericInterface invoker ``Plugin_<short_id>::<name>`` (D14); returns it.
+
+        Admins select it as the ``Type`` of a webservice invoker. ``prepare(ctx, data)`` gets a
+        copy of the event data and returns the dict to send (it then passes the outbound mapping
+        and the transport), or ``None`` to skip the call. ``handle_response(ctx, response)`` is
+        optional and gets the mapped answer (or the error). A failing or hanging ``prepare`` goes
+        through the webservice's error handling (retries) like a core invoker.
+        """
+        qname = f"{PLUGIN_PREFIX}{self._manifest.short_id}::{name}"
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für den Invoker: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            _require_async(prepare, f"Die Vorbereitung des Invokers „{name}“")
+            if handle_response is not None:
+                _require_async(handle_response, f"Die Antwortbehandlung des Invokers „{name}“")
+            if (
+                isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, int)
+                or not 1 <= timeout_seconds <= MAX_INVOKER_TIMEOUT
+            ):
+                raise RegistrationRejected(
+                    f"Das Zeitlimit des Invokers „{name}“ muss zwischen 1 und "
+                    f"{MAX_INVOKER_TIMEOUT} Sekunden liegen"
+                )
+
+        item = GiInvoker(
+            type=qname,
+            plugin_id=self.plugin_id,
+            prepare=prepare,
+            handle_response=handle_response,
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(GI_INVOKERS, item, check=check)
         return qname
 
 

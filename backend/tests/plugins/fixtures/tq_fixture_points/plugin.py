@@ -23,7 +23,7 @@ from tiqora_sdk.channels import (
 )
 from tiqora_sdk.customers import CustomerSourceContext, ExternalCompany, ExternalCustomer
 from tiqora_sdk.fields import DfBaseType
-from tiqora_sdk.gi import GiOperationContext, GiPrincipal
+from tiqora_sdk.gi import GiOperationContext, GiPrincipal, InvokerContext, InvokerResponse
 from tiqora_sdk.hooks import (
     HookContext,
     OperationVetoed,
@@ -554,9 +554,32 @@ def _upper_factory(config: dict[str, Any] | None) -> _UpperMapper:
     return _UpperMapper()
 
 
+async def _contract_sync_prepare(
+    ctx: InvokerContext, data: dict[str, Any]
+) -> dict[str, Any] | None:
+    behaviour.CALLS.append(("gi.inv.prepare", (ctx.invoker, ctx.ticket_id, dict(data))))
+    mode = behaviour.MODE.get("gi.inv", "ok")
+    if mode == "skip":
+        return None
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        await asyncio.sleep(30)
+    return {"TicketID": data["TicketID"], "Hello": "Welt"}
+
+
+async def _contract_sync_response(ctx: InvokerContext, response: InvokerResponse) -> None:
+    behaviour.CALLS.append(("gi.inv.response", (response.success, response.data)))
+    if behaviour.MODE.get("gi.inv.response") == "raise":
+        raise RuntimeError("kaputt")
+
+
 def _register_gi(registry: PluginRegistry) -> None:
     registry.gi_operation("ContractGet", _contract_get, timeout_seconds=1)
     registry.gi_mapping("Upper", _upper_factory)
+    registry.gi_invoker(
+        "ContractSync", _contract_sync_prepare, _contract_sync_response, timeout_seconds=1
+    )
 
 
 class PointsPlugin:

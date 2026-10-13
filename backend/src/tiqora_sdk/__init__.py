@@ -38,7 +38,7 @@ if _t.TYPE_CHECKING:
     from tiqora.plugins.channels import ChannelCapabilities, ChannelSend
     from tiqora.plugins.customer_sources import CustomerLookup, CustomerSearch
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
-    from tiqora.plugins.gi_points import GiOperationRun
+    from tiqora.plugins.gi_points import GiOperationRun, InvokerHandle, InvokerPrepare
     from tiqora.plugins.mail_filters import MailFilterStage
     from tiqora.plugins.notification_transports import TransportSend
     from tiqora.plugins.number_generators import NumberBuild
@@ -219,6 +219,15 @@ class PluginRegistry(_t.Protocol):
 
     def gi_mapping(
         self, name: str, factory: _abc.Callable[[dict[str, _t.Any] | None], Mapper]
+    ) -> str: ...
+
+    def gi_invoker(
+        self,
+        name: str,
+        prepare: InvokerPrepare,
+        handle_response: InvokerHandle | None = None,
+        *,
+        timeout_seconds: int = 30,
     ) -> str: ...
 
 

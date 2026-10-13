@@ -46,10 +46,13 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 __all__ = [
+    "GI_INVOKERS",
     "GI_MAPPINGS",
     "GI_OPERATIONS",
+    "MAX_INVOKER_TIMEOUT",
     "MAX_OPERATION_TIMEOUT",
     "PLUGIN_HANDLER_PREFIX",
+    "GiInvoker",
     "GiMapping",
     "GiOperation",
     "GiOperationContext",
@@ -60,6 +63,7 @@ __all__ = [
     "InvokerPrepare",
     "InvokerResponse",
     "is_registered_operation",
+    "plugin_invoker",
     "plugin_mapper_factory",
     "run_plugin_operation",
 ]
@@ -67,6 +71,8 @@ __all__ = [
 PLUGIN_HANDLER_PREFIX: Final = "plugin:"
 #: request budget (F6): operation plus mapping must stay below nginx's 60 s
 MAX_OPERATION_TIMEOUT: Final = 45
+#: invokers run from jobs (no nginx limit), but a hanging plugin must not hold a worker lane
+MAX_INVOKER_TIMEOUT: Final = 120
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +147,24 @@ class InvokerResponse:
 
 InvokerPrepare = Callable[[InvokerContext, dict[str, Any]], Awaitable[dict[str, Any] | None]]
 InvokerHandle = Callable[[InvokerContext, InvokerResponse], Awaitable[None]]
+
+
+@dataclass(frozen=True, slots=True)
+class GiInvoker:
+    type: str  # "Plugin_<sid>::<Name>"
+    plugin_id: str
+    prepare: InvokerPrepare
+    handle_response: InvokerHandle | None
+    timeout_seconds: int  # 1..120
+    context: PluginContext | None = None
+
+
+GI_INVOKERS: Final[ExtensionPoint[GiInvoker]] = ExtensionPoint(
+    key="core.gi.invokers",
+    item_key=lambda i: i.type,
+    description="GenericInterface invokers (outgoing calls) a plugin offers.",
+    sdk_stable=True,
+)
 
 
 # -- operations -----------------------------------------------------------------------------
@@ -297,3 +321,25 @@ def plugin_mapper_factory(mapping_type: str) -> MapperFactory | None:
         return _PluginMapper(found, inner)
 
     return factory
+
+
+# -- invokers -------------------------------------------------------------------------------
+
+
+def plugin_invoker(invoker_type: str) -> GiInvoker | None:
+    """The invoker a loaded, active plugin registered for *invoker_type*, else ``None``."""
+    for item in get_registry().items(GI_INVOKERS):
+        if item.type == invoker_type and is_active(item.plugin_id):
+            return item
+    return None
+
+
+def invoker_context(
+    item: GiInvoker, *, webservice_id: int, invoker: str, ticket_id: int | None
+) -> InvokerContext:
+    return InvokerContext(
+        plugin=item.context or minimal_context(item.plugin_id),
+        webservice_id=webservice_id,
+        invoker=invoker,
+        ticket_id=ticket_id,
+    )

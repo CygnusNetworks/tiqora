@@ -29,6 +29,7 @@ extension_points = [
   "core.customers.sources",
   "core.gi.operations",
   "core.gi.mappings",
+  "core.gi.invokers",
   "core.http.routes",
   "core.http.public_routes",
 ]

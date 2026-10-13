@@ -10,7 +10,7 @@ from tiqora.plugins.channels import CHANNEL_DRIVERS
 from tiqora.plugins.customer_sources import CUSTOMER_SOURCES
 from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
-from tiqora.plugins.gi_points import GI_MAPPINGS, GI_OPERATIONS
+from tiqora.plugins.gi_points import GI_INVOKERS, GI_MAPPINGS, GI_OPERATIONS
 from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
 from tiqora.plugins.mcp import MCP_TOOLS
 from tiqora.plugins.number_generators import TICKET_NUMBER_GENERATORS
@@ -172,6 +172,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "customer_source",
             "gi_operation",
             "gi_mapping",
+            "gi_invoker",
         }
     )
 
@@ -205,6 +206,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             CUSTOMER_SOURCES,
             GI_OPERATIONS,
             GI_MAPPINGS,
+            GI_INVOKERS,
         )
     )
     assert CHANNELS.sdk_stable is False

@@ -59,6 +59,7 @@ ALL_POINTS = [
     "core.customers.sources",
     "core.gi.operations",
     "core.gi.mappings",
+    "core.gi.invokers",
 ]
 
 
@@ -566,3 +567,50 @@ def test_gi_points_need_manifest_declaration() -> None:
         _registrar(points=[]).gi_operation("Echo", run)
     with pytest.raises(RegistrationRejected, match="core.gi.mappings"):
         _registrar(points=[]).gi_mapping("Echo", lambda config: object())  # type: ignore[arg-type,return-value]
+
+
+def test_gi_invoker_registers_qualified_type(registrar: PluginRegistrar) -> None:
+    async def prepare(ctx: Any, data: dict[str, Any]) -> dict[str, Any] | None:
+        return data
+
+    async def handle(ctx: Any, response: Any) -> None:
+        return None
+
+    assert (
+        registrar.gi_invoker("Sync", prepare, handle, timeout_seconds=120) == "Plugin_hello::Sync"
+    )
+    ((point, item),) = registrar.staged
+    assert point.key == "core.gi.invokers"
+    assert (item.type, item.timeout_seconds, item.handle_response) == (
+        "Plugin_hello::Sync",
+        120,
+        handle,
+    )
+
+
+@pytest.mark.parametrize("timeout", [0, 121, True, 1.5])
+def test_gi_invoker_timeout_bounds(registrar: PluginRegistrar, timeout: Any) -> None:
+    async def prepare(ctx: Any, data: dict[str, Any]) -> dict[str, Any] | None:
+        return data
+
+    with pytest.raises(RegistrationRejected, match="Zeitlimit"):
+        registrar.gi_invoker("Sync", prepare, timeout_seconds=timeout)
+    assert registrar.staged == ()
+
+
+def test_gi_invoker_must_be_async_and_named(registrar: PluginRegistrar) -> None:
+    async def prepare(ctx: Any, data: dict[str, Any]) -> dict[str, Any] | None:
+        return data
+
+    def sync_fn(*args: Any) -> Any:
+        return None
+
+    with pytest.raises(RegistrationRejected, match="async"):
+        registrar.gi_invoker("Sync", sync_fn)  # type: ignore[arg-type]
+    with pytest.raises(RegistrationRejected, match="async"):
+        registrar.gi_invoker("Sync", prepare, sync_fn)  # type: ignore[arg-type]
+    with pytest.raises(RegistrationRejected, match="Ungültiger Name"):
+        registrar.gi_invoker("Ticket::Generic", prepare)
+    assert registrar.staged == ()
+    with pytest.raises(RegistrationRejected, match="core.gi.invokers"):
+        _registrar(points=[]).gi_invoker("Sync", prepare)
