@@ -160,6 +160,46 @@ async def test_per_request_password_refuses_sso_managed_account(env: Env, kind: 
     assert (_agent_pw(env.url) if kind == "agent" else _customer_pw(env.url)) == LEGACY
 
 
+_CI_OPERATIONS = [
+    ("ConfigItemGet", "GET", "/znuny-compat/ConfigItem/1", None),
+    ("ConfigItemSearch", "POST", "/znuny-compat/ConfigItemSearch", {"Class": "Computer"}),
+    ("ConfigItemCreate", "POST", "/znuny-compat/ConfigItem", {"Class": "Computer"}),
+    ("ConfigItemUpdate", "PATCH", "/znuny-compat/ConfigItem/1", {"Name": "pp55-ci"}),
+    ("ConfigItemDelete", "DELETE", "/znuny-compat/ConfigItem/1", None),
+]
+
+
+@pytest.mark.parametrize(
+    ("op", "method", "path", "item"), _CI_OPERATIONS, ids=[o[0] for o in _CI_OPERATIONS]
+)
+async def test_config_item_operations_refuse_sso_managed_agent(
+    env: Env, op: str, method: str, path: str, item: dict[str, Any] | None
+) -> None:
+    """The ITSM import's ``ConfigItem*`` operations authenticate through the same gated
+    ``_auth_from_params``: an SSO-managed agent's right password gets the wrong-password answer
+    (``<Op>.AuthFail``) before any mode or parameter check, and is not rehashed."""
+    _legacy_hash(env.url, agent_id=LOCAL)
+    _scim_map(env.url, user_kind="agent", login="pp55-local", require_mfa=True)
+
+    async def call(client: httpx.AsyncClient, password: str) -> httpx.Response:
+        body: dict[str, Any] = {"UserLogin": "pp55-local", "Password": password}
+        if item is not None:
+            body["ConfigItem"] = item
+        if method in ("GET", "DELETE"):
+            return await client.request(method, path, params=body)
+        return await client.request(method, path, json=body)
+
+    with capture_logs() as logs:
+        async with env.client() as client:
+            refused = await call(client, LOCAL_PASSWORD)
+            wrong = await call(client, WRONG)
+    assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+    assert refused.status_code == 401, refused.text
+    assert refused.json()["Error"]["ErrorCode"] == f"{op}.AuthFail"
+    assert _compat_refusals(logs) == [("compat", "agent", "pp55-local")]
+    assert _agent_pw(env.url) == LEGACY
+
+
 @pytest.mark.parametrize(
     ("enabled", "deleted"), [(False, False), (True, True)], ids=["provider_off", "deprovisioned"]
 )
