@@ -395,15 +395,22 @@ async def test_admin_examples_are_built_in_parallel(
 
     from tiqora.api.v1.admin import plugins as admin_plugins
 
+    in_flight = 0
+    peak = 0
+
     async def slow_example(gen: Any, **kwargs: Any) -> str:
-        await asyncio.sleep(0.4)
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.2)
+        in_flight -= 1
         return "EX-1"
 
     _znuny_generator(monkeypatch, ZNUNY_AUTO)
     monkeypatch.setattr(admin_plugins, "build_example", slow_example)
-    started = time.monotonic()
     body = (await admin.get(BASE)).json()
-    assert time.monotonic() - started < 0.9  # three generators: 1.2 s one after the other
+    # all three wait together (deterministic, unlike a wall-clock bound under CI load)
+    assert peak == 3
     assert [a["example"] for a in body["available"]] == ["EX-1", "EX-1", "EX-1"]
 
 
