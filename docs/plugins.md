@@ -2,7 +2,7 @@
 
 > Teil 1 richtet sich an Administratoren und ist auf Deutsch. Teil 2
 > ("Developer guide") richtet sich an Entwickler von Erweiterungen und ist auf
-> Englisch. Teil 3 beschreibt die Grenzen der Ausbaustufen 1 und 2a.
+> Englisch. Teil 3 beschreibt die Grenzen der Ausbaustufen 1, 2a und 2b.
 > Hintergrund und Entscheidungen: [Design](superpowers/specs/2026-10-08-plugin-system-design.md),
 > Aufbau im Code: [architecture.md](architecture.md), Abschnitt "Plugins", Betrieb:
 > [deployment.md](deployment.md#erweiterungen-einbauen-plugins).
@@ -32,13 +32,16 @@ Wichtig für die Einschätzung:
   Erweiterungscode trotzdem alles ändern; seit 0.2.0 darf er außerdem bei der
   Anmeldung mitwirken (Abschnitt 6). Schalten Sie nur Erweiterungen ein, deren Quelltext Sie
   kennen.
-- **Nur eigene Repositories.** Erweiterungen kommen aus Ihren eigenen
-  Paketquellen. Es gibt keinen Marktplatz und keine Signaturprüfung; ein
-  Marktplatz ist für später vorgesehen.
-- **Nur mit dem Image.** Erweiterungen werden beim Bauen des Images
-  eingebaut (siehe unten). Zur Laufzeit wird nichts nachinstalliert; in der
-  Verwaltung können Sie sie nur ein- und ausschalten und Einstellungen
-  pflegen.
+- **Nur Ihre eigenen Paketquellen.** Es gibt keinen Marktplatz und keine
+  vorbelegte Paketquelle; Tiqora meldet nichts nach außen, bis Sie eine
+  einrichten (Abschnitt 8). Pakete lassen sich signieren (Abschnitt 9). Die
+  Signatur sagt, **wer** ein Paket herausgegeben hat, nicht, dass es sicher
+  ist.
+- **Zwei Wege zur Installation.** Entweder Sie bauen Erweiterungen ins Image
+  (Abschnitt 2), oder ein Administrator installiert ein Paket (`.tqplugin`) in
+  der Verwaltung (Abschnitt 7). Der zweite Weg braucht ein beschreibbares
+  Verzeichnis oder Volume und Container, die nach einem Neustart automatisch
+  wieder anlaufen.
 
 ## 2. Erweiterungen einbauen
 
@@ -240,8 +243,10 @@ Eine kaputte Erweiterung soll weder den Start noch die Anmeldung verhindern.
   Schreiben); die Vorlagen "nur lesen" und die alten Rechte `read`/`write`
   enthalten ihn nicht. Schlüssel ohne Einschränkung und Sitzungen dürfen
   alles, was die Erweiterung ihnen erlaubt.
-- **Aktualisieren:** Neues Image mit der neuen Version bauen, Image
-  umstellen, neu starten. Geöffnete Browserfenster behalten Kacheln und
+- **Aktualisieren:** Bei Erweiterungen aus dem Image: neues Image mit der neuen
+  Version bauen, Image umstellen, neu starten. Bei Erweiterungen, die über die
+  Verwaltung installiert wurden: neues Paket hochladen oder die Aktualisierung
+  aus der Paketquelle wählen (Abschnitte 7 und 8). Geöffnete Browserfenster behalten Kacheln und
   Stile der alten Version bis zum Neuladen der Seite.
 
 ### Dateien im Wheel
@@ -373,6 +378,206 @@ Webservice kennt. Lassen Sie solche Erweiterungen vor dem Einschalten prüfen.
 Znuny meldet unbekannte Webservice-Typen, Prozessaktionen und Versandwege einer
 Erweiterung als unbekannt; die übrigen Teile laufen weiter. Berichte von
 Erweiterungen erscheinen im Berichtskatalog mit eigenen Titeln.
+
+## 7. Erweiterungen über die Oberfläche installieren
+
+Seit Ausbaustufe 2b müssen Sie für eine neue Erweiterung kein Image mehr
+bauen. Unter **Verwaltung → Erweiterungen** laden Sie ein Paket mit der
+Endung `.tqplugin` hoch (Schaltfläche "Paket hochladen") oder holen es aus
+einer Paketquelle (Abschnitt 8). Das Paket liegt danach in der **Datenbank**;
+jeder Dienst (`api`, `worker`, `mcp`, `ai-worker`) packt es beim Start selbst
+aus. Das Verzeichnis `TIQORA_PLUGINS_DIR` ist nur eine Arbeitskopie und darf
+verloren gehen.
+
+**Ablauf.**
+
+1. **Hochladen und prüfen.** Tiqora prüft das Paket, ohne Code der Erweiterung
+   auszuführen: Aufbau, Prüfsummen, Signatur, Verträglichkeit mit dieser
+   Tiqora- und SDK-Version, benötigte Python-Pakete (es werden keine
+   nachgeladen, sie müssen schon im Image sein), Namenskonflikte und die
+   Tabellen, die die Erweiterung anlegen will.
+2. **Dialog "Erweiterung installieren".** Er zeigt Name, Version, Herausgeber,
+   Vertrauensstufe (unten), die Änderungen gegenüber der installierten Version,
+   "Was diese Erweiterung angibt" (Erweiterungspunkte, aufgerufene Hosts,
+   Oberflächenstellen, neue Tabellen) sowie **Hinweise** und **Gründe, die die
+   Installation verhindern**. Die Angaben beschreiben, was die Erweiterung von
+   sich sagt. Sie sind keine Absicherung: Es gibt keine Sandbox (Abschnitt 1).
+3. **Installieren.** Ein Hintergrund-Job speichert das Paket, passt die
+   Datenbank an (Migrationen der Erweiterung, siehe unten) und schaltet die
+   Erweiterung auf Wunsch ein. Das Häkchen "Tiqora danach automatisch neu
+   starten" löst danach den abgestimmten Neustart aus.
+4. **Neustart.** Die Dienste beenden sich nacheinander mit dem Exit-Code 75
+   und werden vom Container-System neu gestartet: zuerst `worker`, dann
+   `ai-worker` und `mcp`, zuletzt `api`. Die Folge hält an, wenn ein Dienst nicht
+   zurückkommt, und die Seite nennt ihn. Solange ein Installations- oder
+   Entfernen-Job läuft, wartet der Neustart. Voraussetzungen für den Betrieb
+   (Neustart-Richtlinie, Start-Reihenfolge, Volume) stehen in
+   [deployment.md](deployment.md#erweiterungen-zur-laufzeit-installieren).
+
+**Was nicht geht.**
+
+- **Erweiterungen aus dem Image** (mit `tiqora plugins bake` eingebaut) werden
+  nicht überschrieben. Sie erscheinen mit "Im Image eingebaut"; eine neue
+  Version braucht ein neues Image. Entfernen können Sie sie nur, indem Sie das
+  Image neu bauen.
+- **Ältere Versionen** werden abgelehnt ("Zurückstufen"). Wenn Sie zurück
+  müssen, installieren Sie die ältere Version als neu gebautes Paket mit
+  höherer Versionsnummer.
+- **Schreibgeschütztes Wurzel-Dateisystem.** Ist `TIQORA_PLUGINS_DIR` nicht
+  beschreibbar oder `TIQORA_PLUGINS_RUNTIME_INSTALL=0` gesetzt, meldet die
+  Seite "Installation über die Oberfläche ist hier nicht möglich: …" und
+  alle Installationswege antworten mit einem Fehler. Eingebaute Erweiterungen
+  laufen weiter wie bisher; neue kommen dann nur über ein Image.
+- **Installieren mit einem API-Schlüssel.** Hochladen, Installieren, Entfernen
+  und das Ändern von Paketquellen gehen nur in der Weboberfläche mit
+  Anmeldung (Antwort 403 "Nur in der Weboberfläche möglich", auch mit
+  Schlüsseln, die Schreibrechte für die Verwaltung haben). Lesen darf ein
+  Schlüssel mit `admin:ro`. So kann ein abgeflossener Integrations-Schlüssel
+  keinen Code einspielen.
+- **Zwei Vorgänge gleichzeitig.** Läuft für dieselbe Erweiterung schon eine
+  Installation oder Entfernung, antwortet Tiqora mit 409.
+
+### Vertrauensstufen
+
+Jedes Paket trägt eine der folgenden Stufen. Sie sagt, **wer** das Paket
+herausgegeben hat, nicht, dass sein Code sicher ist.
+
+| Stufe | Bedeutung | Installierbar |
+|---|---|---|
+| Offiziell | Signiert mit einem Tiqora-Schlüssel. Diese Version von Tiqora liefert noch keine offiziellen Schlüssel aus. | ja |
+| Verifizierter Herausgeber | Signiert mit einem Schlüssel, den eine **signierte** Paketliste für diesen Herausgeber nennt, und die Kennung der Erweiterung beginnt mit der Herausgeber-Kennung (`org.example` → `org.example.hello`). | ja |
+| Lokal signiert | Signiert mit einem Schlüssel aus `TIQORA_PLUGINS_TRUSTED_KEYS` (Abschnitt 9). | ja |
+| Unsigniert | Keine Signatur, ein unbekannter Schlüssel, oder ein Schlüssel, der nicht zum Herausgeber gehört. | nur mit `TIQORA_PLUGINS_ALLOW_UNSIGNED=1`; der Dialog verlangt dann zusätzlich "Ich vertraue diesem Paket" |
+| Signatur ungültig | Die Signatur passt nicht zum Inhalt, ist beschädigt, oder der Schlüssel wurde vom Herausgeber zurückgezogen. | nie |
+
+`TIQORA_PLUGINS_ALLOW_UNSIGNED` ist eine Sicherung gegen Versehen. Sie ist kein
+Schutz gegen Administratoren: Wer Verwaltungsrechte hat, kann ein Paket mit
+einem eigenen Schlüssel signieren und in `TIQORA_PLUGINS_TRUSTED_KEYS` eintragen
+lassen oder die Variable selbst setzen.
+
+### Datenbank-Tabellen der Erweiterungen
+
+Eine Erweiterung kann eigene Tabellen mit dem Präfix `tqp_<Kurzname>_` anlegen.
+Der Kurzname (`short_id`) steht im Manifest und wird im Dialog genannt. Er ist
+die gesamte Trennung zwischen Erweiterungen: Tiqora verweigert eine Erweiterung,
+deren Kurzname schon von einer anderen Kennung benutzt wird oder deren
+Tabellen („Daten behalten") einer anderen Kennung gehören.
+
+- Die Änderungen laufen beim Installieren in einem eigenen Prozess (mit
+  Zeitlimit, `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS`) und beim Start von `api`
+  (`tiqora migrate upgrade`). Ein Fehler hält den Start nie auf: Die
+  Erweiterung erscheint als "Fehler" mit "Fehler bei der Datenbank-Anpassung"
+  und wird nicht geladen. Einen Fehler für dieselbe Version versucht Tiqora
+  beim Start nicht noch einmal; "Erneut versuchen" oder eine neue Version tut es.
+- Im abgesicherten Modus und für Kennungen in `TIQORA_PLUGINS_DISABLED` werden
+  Datenbank-Änderungen übersprungen.
+- **MariaDB:** DDL wird sofort festgeschrieben. Bricht eine Änderung ab, können
+  halbe Tabellen zurückbleiben; Tiqora schreibt aber nach jeder erfolgreichen
+  Revision deren Stand fest, sodass ein Neuversuch dort weitermacht.
+  **PostgreSQL:** alles oder nichts.
+- Eine Schutzprüfung vor jeder Anweisung lässt nur Tabellen mit dem eigenen
+  Präfix zu und verbietet Fremdschlüssel auf Znuny- oder `tiqora_*`-Tabellen.
+  Das ist ein **Schutz vor versehentlichen Änderungen**, keine Sicherheitsgrenze:
+  Erweiterungscode läuft ohnehin mit vollen Rechten (Abschnitt 1).
+
+### Entfernen
+
+"Entfernen" fragt, was mit den Daten geschehen soll:
+
+- **Daten behalten:** Tabellen und Einstellungen bleiben. Installieren Sie
+  dieselbe Erweiterung später wieder (in derselben oder einer neueren
+  Version), sind die Daten wieder da. Eine *andere* Erweiterung mit demselben Kurznamen wird abgewiesen.
+- **Daten löschen:** Tiqora legt zuerst eine **Sicherung** (gepackte
+  JSON-Zeilen aller Tabellen der Erweiterung, `…-daten-<Datum>.jsonl.gz`) an
+  und löscht danach die Tabellen mit dem Präfix und nichts sonst. Ist die
+  Sicherung (unkomprimiert) größer als 200 MB, bricht der Job ab und löscht nichts. **Die Sicherung wird N Tage
+  aufbewahrt** (Einstellung "Aufbewahrung" der Jobs, Standard 14 Tage) und ist
+  im Ergebnis des Jobs herunterladbar. Danach ist sie weg: Laden Sie sie
+  herunter, wenn die Daten noch gebraucht werden könnten.
+
+Image-Erweiterungen, die nicht mehr im Image sind, können ebenfalls mit
+"Daten löschen" aufgeräumt werden.
+
+## 8. Paketquellen
+
+Eine Paketquelle ist eine Liste (`index.json`) von Erweiterungen mit Versionen,
+Prüfsummen und Herausgeber-Schlüsseln (Format: Developer guide, "Repository
+index format v1"). Tiqora liefert **keine** Paketquelle voreingestellt aus und
+meldet nichts nach außen, bis Sie eine einrichten.
+
+- **In der Oberfläche** (Tab "Paketquellen"): Name, Adresse (`https://…`) und
+  optional der öffentliche Schlüssel der Paketquelle.
+- **Per Umgebung** für abgeschottete Umgebungen: `TIQORA_PLUGIN_REPOSITORIES`
+  (JSON-Liste, Beispiel in [deployment.md](deployment.md#erweiterungen-zur-laufzeit-installieren)).
+  Nur hier sind `file://`-Adressen erlaubt, und nur unterhalb von
+  `TIQORA_PLUGIN_REPOSITORY_FILE_ROOT`. Solche Einträge sind in der Oberfläche
+  schreibgeschützt.
+- **Schlüssel.** Mit dem Schlüssel der Paketquelle prüft Tiqora die Signatur
+  der Liste (`index.json.sig`). Nur *signierte* Listen machen ihre Herausgeber
+  zu "Verifizierten Herausgebern". Ohne Schlüssel gilt die Liste als nicht
+  signiert (Anzeige "Paketliste nicht signiert"): Sie können daraus
+  installieren, aber nur mit `TIQORA_PLUGINS_ALLOW_UNSIGNED`; Pakete einer
+  nicht signierten Liste dürfen nur auf dieselbe Adresse (Schema, Host, Port)
+  verweisen wie die Liste. Ein Schlüssel, aber fehlende oder falsche Signatur:
+  Die Liste wird abgelehnt.
+- **Prüfen.** Der Dienst "Paketquellen prüfen" (Seite "Dienste") holt die
+  Listen alle `TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS` (Standard 6 Stunden);
+  "Jetzt prüfen" tut es sofort. Bei einem Fehler bleibt die letzte gute Liste.
+  Eine Liste mit **älterem Stand** (`generated_at`) als zuletzt wird abgewiesen
+  (Schutz vor dem Wiedereinspielen alter Listen). Weiterleitungen (HTTP 3xx)
+  werden nicht verfolgt; Adressen im lokalen Netz sind erlaubt, Loopback und
+  Link-Local nicht.
+- **Herunterladen** prüft die Prüfsumme (`sha256`) und die Größe aus der Liste
+  und danach alles wie bei einem Upload. Ein Download wird nur anhand der
+  Schlüssel *seiner* Paketquelle bewertet.
+- **Aktualisierungs-Hinweise** ("Aktualisierung verfügbar") erscheinen für die
+  höchste verträgliche, nicht zurückgezogene (`yanked`) Version. Sie kommen nur
+  aus der Paketquelle, aus der die Erweiterung installiert wurde, oder aus einer
+  anderen, wenn die Version mit demselben Schlüssel signiert ist wie die
+  installierte. Behaupten zwei signierte Listen dieselbe Herausgeber-Kennung
+  mit verschiedenen Schlüsseln, gilt der Herausgeber in beiden als nicht
+  verifiziert. Für Image-Erweiterungen zeigt Tiqora nur den Hinweis "bitte das
+  Image neu bauen".
+- **Tab "Verfügbar"** durchsucht die gespeicherten Listen nach Name, Kennung,
+  Beschreibung und Herausgeber und filtert nach Kategorie und Paketquelle.
+  Symbole und Bildschirmfotos aus Listen werden in dieser Version nicht
+  geladen; Links öffnen mit `rel="noopener noreferrer"`.
+
+## 9. Schlüssel und Signaturen
+
+Signiert wird mit Ed25519. Der private Schlüssel bleibt bei Ihnen; Tiqora
+kennt nur öffentliche Schlüssel (`ed25519:AAAA…`, Base64).
+
+```bash
+# Schlüsselpaar erzeugen (private Datei mit Modus 0600; nie ins Image, nie in Git)
+tiqora plugins keygen --out hersteller.pem
+#   public_key: ed25519:AAAA…
+#   key_id:     1a2b3c4d5e6f7a8b
+
+# Paket bauen, signieren, prüfen
+tiqora plugins pack dist/example_hello-1.1.0-py3-none-any.whl \
+    --changelog CHANGELOG.md --output org.example.hello-1.1.0.tqplugin
+tiqora plugins sign org.example.hello-1.1.0.tqplugin --key hersteller.pem --force   # ersetzt die Datei
+tiqora plugins inspect org.example.hello-1.1.0.tqplugin
+```
+
+Damit Tiqora einem Schlüssel für **hochgeladene** Pakete vertraut, tragen Sie
+den öffentlichen Schlüssel ein (kommagetrennt, mehrere erlaubt):
+
+```bash
+TIQORA_PLUGINS_TRUSTED_KEYS=ed25519:AAAA…,ed25519:BBBB…
+```
+
+Dann erscheint das Paket als "Lokal signiert". Pakete, die mit dem Schlüssel
+einer signierten Paketquelle unterschrieben sind, gelten als "Verifizierter
+Herausgeber" und brauchen keinen Eintrag. Ein Upload darf die Schlüssel jeder
+verifizierten Paketquelle nutzen; die Anzeige lautet dann "… (über Paketquelle
+<Name>)". `TIQORA_PLUGINS_ALLOW_UNSIGNED=1` erlaubt Pakete ohne vertrauten
+Schlüssel; lassen Sie es aus, wenn Sie es nicht brauchen.
+
+**Eine Signatur sagt, wer ein Paket herausgegeben hat, nicht, dass es sicher
+ist.** Auch ein offiziell oder verifiziert signiertes Paket läuft mit vollem
+Vertrauen in Ihrem Tiqora.
 
 # Part 2: Developer guide
 
@@ -1501,8 +1706,215 @@ Plugins are full-trust Python (Part 1). Specific consequences of 0.2.0:
   it creates. There are no title/subject builders.
 - Outbound filters cannot change mail content.
 - No CMDB extension point.
-- Plugins still cannot create tables or migrations (`tqp_<short_id>_*` comes
-  with runtime install in a later release).
+- Tables are limited to the plugin's own prefix `tqp_<short_id>_*`; no foreign
+  keys into Znuny or `tiqora_*` tables.
+- Only pure-Python packages with dependencies that are already in the image can
+  be installed at runtime; anything else needs a baked image.
+
+## Database tables and migrations
+
+A plugin may create its own tables. Everything it creates must live inside its
+own prefix, so that Tiqora can export and drop exactly those tables when an
+admin removes the plugin with "Daten löschen".
+
+**Naming.** `short_id` is the manifest field (a letter, then lowercase letters
+and digits, 2 to 16 characters in total). Tables are `tqp_<short_id>_<name>` (at most 63 characters, the
+PostgreSQL limit). Indexes, constraints, PostgreSQL types and sequences carry
+the same prefix too (PostgreSQL names them per schema, not per table). The
+version table is `tqp_<short_id>_alembic_version`, managed by Tiqora. Use a
+naming convention on your `MetaData` so that generated names stay inside the
+prefix:
+
+```python
+from sqlalchemy import MetaData
+
+metadata = MetaData(naming_convention={
+    "ix": "tqp_hello_ix_%(table_name)s_%(column_0_N_name)s",
+    "uq": "tqp_hello_uq_%(table_name)s_%(column_0_N_name)s",
+    "fk": "tqp_hello_fk_%(table_name)s_%(column_0_N_name)s_%(referred_table_name)s",
+    "pk": "tqp_hello_pk_%(table_name)s",
+})
+```
+
+**Layout.** Put normal Alembic revision files in `<package>/migrations/*.py`
+(`from alembic import op`, `import sqlalchemy as sa`). The first revision has
+`down_revision = None`; revision ids are free strings of at most 32
+characters. There is no `env.py`: Tiqora's shared environment runs them, one
+Alembic environment per plugin. This is deliberately *not* a branch in
+Tiqora's own migration graph, so removing or losing a plugin can never break
+`tiqora migrate upgrade`. Compatibility with the core schema is expressed by
+the manifest ranges `tiqora` and `sdk`; there is no cross-graph
+`down_revision`.
+
+```python
+# example_hello/migrations/0001_create_greeting.py
+import sqlalchemy as sa
+from alembic import op
+
+revision = "0001"
+down_revision = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "tqp_hello_greeting",
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("text", sa.String(200), nullable=False),
+    )
+```
+
+**What is allowed.** Before each statement a guard checks that every table,
+index, type and sequence it touches starts with `tqp_<short_id>_` and that no
+`references` points anywhere else (no foreign key into Znuny or `tiqora_*`
+tables). `select`/`show` and a short list of session settings (`set names`,
+`sql_mode`, `time_zone`, `foreign_key_checks`, `search_path`, `lock_timeout`,
+`statement_timeout`) are allowed. `select ... into`, `with ... insert|update|delete`,
+and `set role|global|session_replication_role` are refused. For both
+dialects the guard also refuses statements whose lexing differs between MariaDB
+and PostgreSQL: `;`, `--`, `#`, `/* */`, backslashes, dollar quotes and
+non-ASCII characters outside single-quoted literals. Do not write raw SQL
+with comments; use `op.*` and SQLAlchemy constructs. After the run, every new
+table must carry the prefix. The refusal text is
+"Anweisung in Datenbank-Änderung der Erweiterung nicht erlaubt: …". The guard is
+protection against accidents, not a security boundary: plugin code runs in-process
+with full trust.
+
+**When migrations run.** At the start of `api` (`tiqora migrate upgrade`, after
+the core upgrade) for every compatible plugin whose recorded
+`migrated_version` differs from its version, and in a subprocess of the install
+job (`python -m tiqora.main plugins migrate <id>`). Each runs in its own
+process with a timeout; a crash, `SystemExit` or hang is recorded as the
+plugin's `migration_error` and the command still exits 0. A plugin with
+migrations is loaded only if `migrated_version == manifest version` and there is
+no error, so `worker`, `mcp` and `ai-worker` must start after `api` is healthy.
+Safe mode and `TIQORA_PLUGINS_DISABLED` skip migrations. Run one yourself with
+`tiqora plugins migrate <id> [--path SITE_DIR]`.
+
+**Transactions.** PostgreSQL runs a plugin's upgrade in one transaction (all
+or nothing). On MariaDB DDL commits implicitly; Tiqora commits after each
+applied revision, so with revisions 0001, 0002, 0003 where 0003 fails, the
+version table stays at 0002 and the tables of 0001 and 0002 exist. Within a
+single revision, a failure can still leave half of its tables behind on
+MariaDB: keep each revision small, and preferably idempotent
+(`if_not_exists` where available).
+
+**Write backward-compatible migrations.** Old and new code run side by side
+during a coordinated restart (and an older version cannot be reinstalled over
+newer tables). Add nullable columns or tables first, ship the code that
+reads them, and remove old columns in a later version.
+
+**Hatch (and other build backends) drop ignored files.** The wheel must contain
+`migrations/*.py`. If `.gitignore` matches them, list them under `artifacts`, and check the
+wheel with `tiqora plugins inspect` before you ship it:
+
+```toml
+[tool.hatch.build.targets.wheel]
+packages = ["src/example_hello"]
+artifacts = ["src/example_hello/web/**", "src/example_hello/i18n/**",
+             "src/example_hello/migrations/*.py"]
+```
+
+## Packaging and signing
+
+A `.tqplugin` file is a zip with these members; other members are allowed
+only if listed in `CHECKSUMS` and are ignored.
+
+| Member | Required | Content |
+|---|---|---|
+| `tiqora-plugin.toml` | yes | byte-identical copy of the manifest inside the wheel |
+| `python/<dist>-<ver>-py3-none-any.whl` | yes, exactly one | the plugin wheel; `web/`, `i18n/` and `migrations/` stay inside it |
+| `CHANGELOG.md` | no | shown in the install dialog (at most 64 KB, plain text) |
+| `CHECKSUMS` | yes | `tqplugin-checksums 1`, then `<sha256 hex>  <member>` per other member, sorted, two spaces |
+| `SIGNATURE` | no | JSON `{"format": 1, "alg": "ed25519", "key_id": "<16 hex>", "signature": "<base64>"}` |
+
+The signature covers the exact bytes of `CHECKSUMS` (zip bytes differ between
+tools; the checksum file does not). `key_id` is the first 16 hex characters of
+the SHA-256 of the raw public key. Public keys are written
+`ed25519:<base64 of the 32 raw bytes>`.
+
+Wheel rules: pure Python only (`py3-none-any`, `Root-Is-Purelib: true`), no
+`.so`/`.pyd`/`.dll`/`.dylib`/`.exe`, no `.data/` directory, no top-level `.pth`
+file, `RECORD` hashes must match, exactly one `*.dist-info` and no `*.egg-info`,
+exactly one `tiqora.plugins` entry point whose name equals the manifest `id`
+(and whose value equals `manifest.entry`), and the manifest version equals the
+wheel version. Runtime dependencies (`Requires-Dist`) must already be installed
+in Tiqora's image; Tiqora does not run pip. A top-level module name that Tiqora
+or the standard library already uses is refused. The static checks also warn
+(never block) about raw SQL against Znuny tables and monkeypatching; only a
+migration that creates a table outside the prefix blocks.
+
+Limits: file size `TIQORA_PLUGINS_MAX_PACKAGE_MB` (default 15, maximum 25; must
+fit the MariaDB `max_allowed_packet`), at most 64 envelope members, 5000 wheel
+members, 200 MiB uncompressed in total, 50 MiB per member, compression ratio 200.
+
+Manifest: `publisher_id` (the reverse-DNS prefix of `id`, for example
+`org.example`) is what ties a plugin to a publisher key in a repository; declare `sdk = ">=0.2,<0.3"`. Commands:
+
+```bash
+tiqora plugins keygen --out hersteller.pem
+tiqora plugins pack WHEEL [--changelog CHANGELOG.md] --output FILE.tqplugin
+tiqora plugins sign FILE.tqplugin --key hersteller.pem [--output OUT] [--force]
+tiqora plugins inspect FILE.tqplugin [--json]     # exit 1 if not installable
+tiqora plugins migrate <plugin id> [--path SITE_DIR]
+tiqora plugins verify [--path SITE_DIR --only <plugin id>]
+```
+
+Never ship the private key in an image or a package.
+
+## Repository index format v1
+
+A repository is an `index.json` at an `https://` URL (or `file://` from the
+environment). Optionally `index.json.sig` sits next to it, in the same format as
+`SIGNATURE`, signing the exact bytes of `index.json` with the repository key.
+Package URLs are relative to the index or absolute `https://` (only relative for
+`file://`). Unknown fields are ignored. The index is at most 5 MiB; URLs
+must be `https://` (for `support` also a plain e-mail address, which becomes a `mailto:` link) and at most 500 characters or
+the value is dropped with a warning.
+
+```json
+{
+  "index_version": 1,
+  "repository": {"id": "org.example.plugins", "name": "Example Plugins",
+                 "homepage": "https://plugins.example.org",
+                 "generated_at": "2026-10-12T08:00:00Z"},
+  "publishers": [
+    {"id": "org.example", "name": "Example GmbH", "homepage": "https://example.org",
+     "support": "support@example.org",
+     "keys": [{"key_id": "1a2b3c4d5e6f7a8b", "public_key": "ed25519:AAAA…", "revoked": false}]}
+  ],
+  "plugins": [
+    {"id": "org.example.hello", "short_id": "hello", "name": "Hello", "publisher_id": "org.example",
+     "description": "Shows a greeting in the ticket view.", "categories": ["tickets"],
+     "license": "MIT", "homepage": "https://example.org/hello",
+     "support": "support@example.org", "icon_url": null, "screenshots": [],
+     "versions": [
+       {"version": "1.1.0", "url": "packages/org.example.hello-1.1.0.tqplugin",
+        "sha256": "<64 hex>", "size": 48213, "sdk": ">=0.2,<0.3", "tiqora": ">=0.19",
+        "requires": {}, "released_at": "2026-10-01T00:00:00Z",
+        "changelog": "New: ...", "yanked": false}
+     ]}
+  ]
+}
+```
+
+Rules: `index_version` must be `1`; plugin ids are reverse-DNS, `short_id` follows
+the manifest rule; `key_id` must equal the key's id; every `publisher_id` must
+exist; no duplicate plugin ids or versions; `sha256` is the hash of the whole
+`.tqplugin` file and is checked after the download. `generated_at` must never
+go backwards (older indexes are rejected). A yanked version is not offered.
+A key with `"revoked": true` makes its signatures invalid. The marketplace fields
+(`categories`, `license`, `homepage`, `support`, `icon_url`, `screenshots`,
+per-version `changelog` and compatibility) may be empty. `icon_url` and
+`screenshots` are not loaded by this version.
+
+Build one with the CLI:
+
+```bash
+tiqora plugins index build ./packages --repository-id org.example.plugins \
+    --name "Example Plugins" --publisher-id org.example --publisher-name "Example GmbH" \
+    --publisher-key ed25519:AAAA… --output ./packages/index.json
+tiqora plugins index sign ./packages/index.json --key repository.pem
+```
 
 ## SDK stability
 
@@ -1518,18 +1930,29 @@ shows as "Nicht kompatibel" and is not loaded.
 
 Was die Ausbaustufen 1 und 2a bewusst nicht können (auf Deutsch, in einfachen Worten):
 
-- **Kein Nachinstallieren im Betrieb.** Neue Erweiterungen und neue Versionen
-  gibt es nur durch ein neues Image (siehe oben). Die Verwaltung schaltet nur
-  ein, aus und pflegt Einstellungen.
-- **Kein Marktplatz, keine Signaturen.** Es gibt keine Prüfung, von wem ein
-  Paket stammt, außer Ihrer eigenen Paketquelle und den Hashes in `plugins.txt`.
+- **Nachinstallieren im Betrieb hat Grenzen.** Pakete (`.tqplugin`) lassen sich
+  in der Verwaltung installieren, aktualisieren und entfernen (Abschnitt 7).
+  Erlaubt sind nur reine Python-Pakete, deren Abhängigkeiten schon im Image
+  sind; alles andere und alles, was im Image steckt, ändern Sie nur mit einem
+  neuen Image. Die Installation braucht ein beschreibbares Verzeichnis oder
+  Volume, eine Datenbank mit ausreichendem `max_allowed_packet` und Container,
+  die sich nach Exit-Code 75 selbst neu starten. Nur Mitarbeitende mit
+  Anmeldung in der Weboberfläche dürfen installieren, keine API-Schlüssel.
+- **Kein Marktplatz; Signaturen sagen nur, wer.** Es gibt keine vorbelegte
+  Paketquelle und keinen öffentlichen Marktplatz. Pakete und Paketlisten lassen
+  sich mit Ed25519 signieren (Abschnitte 8 und 9). Eine Signatur belegt den
+  Herausgeber, nicht die Unbedenklichkeit des Codes; Administratoren können
+  eigene Schlüssel eintragen. Eine Prüfung von Quelltext oder Verhalten gibt es nicht.
 - **Keine Sandbox.** Siehe oben: volles Vertrauen im Prozess. Eine Erweiterung
   kann Tiqora anhalten (blockierender Code, Endlosschleife in C), und ein
   abgebrochener Import läuft im Hintergrund weiter.
-- **Keine eigenen Datenbanktabellen.** Migrationen für Erweiterungen (eigene
-  Alembic-Zweige, Tabellen mit dem Präfix `tqp_<Kurzname>_`) kommen in der
-  nächsten Stufe. Bis dahin legen Erweiterungen ihre Daten in ihren
-  Einstellungen oder in ihrem eigenen externen Speicher ab.
+- **Eigene Tabellen nur mit Präfix.** Erweiterungen können Tabellen
+  `tqp_<Kurzname>_…` per Migration anlegen, aber keine Znuny- oder
+  `tiqora_*`-Tabellen ändern und keine Fremdschlüssel darauf anlegen. Die
+  Schutzprüfung verhindert Versehen, sie ist keine Sicherheitsgrenze. Unter
+  MariaDB können abgebrochene Änderungen halbe Tabellen hinterlassen. Beim
+  Entfernen mit "Daten löschen" liegt die einzige Kopie in der Sicherung, und
+  die wird nur N Tage aufbewahrt (Standard 14).
 - **Der KI-Hintergrunddienst lädt Erweiterungen,** führt aber keine
   Abonnements, Aufgaben, Schnittstellen oder Prüfungen vor dem Speichern aus:
   KI-Antworten werden von solchen Prüfungen nicht abgelehnt. Es gibt keine eigenen
@@ -1555,3 +1978,6 @@ Was die Ausbaustufen 1 und 2a bewusst nicht können (auf Deutsch, in einfachen W
 - **Ein Schreiber für Ereignisse.** Siehe Galera-Hinweis oben; Ereignisse
   kommen aus `ticket_history`, nicht aus einem Ereignisbus.
 - **Ausschalten wirkt nach Neustart,** und der Zustand "Aktiv" gilt pro Prozess.
+  Nach Installieren, Aktualisieren oder Entfernen starten die Dienste einer nach
+  dem anderen neu (Abschnitt 7); währenddessen sind einzelne Dienste kurz nicht
+  erreichbar, und ein Neustart wartet, solange ein Installations-Job läuft.

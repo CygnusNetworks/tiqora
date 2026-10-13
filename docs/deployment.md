@@ -77,10 +77,11 @@ for OIDC and Kerberos/SPNEGO-specific variables.
 
 ## Erweiterungen einbauen (Plugins)
 
-Plugins (see [plugins.md](plugins.md)) are installed **only by baking them into
-the image**: there is no runtime `pip install`, and the baked image ships
-without `pip`. Admins can switch plugins on and off and edit their settings;
-nothing else.
+Plugins (see [plugins.md](plugins.md)) are either **baked into the image**
+(this section) or installed as `.tqplugin` packages in the web UI (next
+section, "Erweiterungen zur Laufzeit installieren"). There is no runtime
+`pip install`, and the baked image ships without `pip`; runtime packages must
+be pure Python with dependencies already in the image.
 
 ### Bake workflow
 
