@@ -9,11 +9,14 @@ class, and attribute keys the Tiqora model does not carry are listed instead of 
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final, Literal
 
 import yaml
 
+from tiqora.cmdb.definition import dump_definition_json
 from tiqora.cmdb.znuny_definition import (
     DefinitionImportResult,
     DefinitionParseError,
@@ -123,7 +126,88 @@ def parse_definition_with_issues(text: str, fmt: Literal["yaml", "perl"]) -> Def
     return DefinitionWithIssues(parse_znuny_definition(dumped, "yaml"), issues)
 
 
+#: Tiqora attribute type -> Znuny ``Input.Type`` (the inverse of cmdb's map; types Znuny has no
+#: module for are written as ``Text``)
+REVERSE_TYPE_MAP: Final[dict[str, str]] = {
+    "text": "Text",
+    "textarea": "TextArea",
+    "integer": "Integer",
+    "decimal": "Text",
+    "date": "Date",
+    "datetime": "DateTime",
+    "catalog": "GeneralCatalog",
+    "ci_ref": "CI",
+    "customer_user": "Customer",
+    "customer_company": "CustomerCompany",
+    "agent": "User",
+    "service": "Service",
+    "sla": "SLA",
+    "queue": "Queue",
+    "priority": "Priority",
+    "ticket_type": "Type",
+    "state": "State",
+    "url": "TextLink",
+    "email": "Text",
+    "ip": "Text",
+    "mac": "Text",
+    "money": "Text",
+    "attachment": "Attachment",
+    "group": "Dummy",
+}
+
+
+def to_tiqora_schema(znuny_definition: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
+    """A parsed Znuny attribute list -> ``({"attributes": [AttributeDef JSON]}, warnings)``.
+
+    Goes through cmdb's parser (R8), so the result is exactly the class schema cmdb stores.
+    The list is re-read as bounded YAML text; nothing is evaluated.
+    """
+    text = "---\n" + yaml.safe_dump(znuny_definition, allow_unicode=True, sort_keys=False)
+    parsed = parse_znuny_definition(text, "yaml")
+    attrs = [json.loads(dump_definition_json([a]))[0] for a in parsed.attributes]
+    return {"attributes": attrs}, list(parsed.warnings)
+
+
+def to_znuny_definition(schema: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Class schema -> Znuny attribute list (``Key``, ``Name``, counts, ``Input``, ``Sub``)."""
+    return [_to_znuny(a) for a in schema.get("attributes", [])]
+
+
+def _to_znuny(attr: Mapping[str, Any]) -> dict[str, Any]:
+    kind = str(attr.get("type", "text"))
+    opts = attr.get("options") or {}
+    inp: dict[str, Any] = {"Type": REVERSE_TYPE_MAP.get(kind, "Text")}
+    if attr.get("required"):
+        inp["Required"] = 1
+    if kind == "catalog" and opts.get("catalog_class"):
+        inp["Class"] = opts["catalog_class"]
+    if kind == "ci_ref" and opts.get("class_keys"):
+        inp["ReferencedCIClassName"] = list(opts["class_keys"])
+    if opts.get("max_length"):
+        inp["MaxLength"] = opts["max_length"]
+    if kind in ("integer", "decimal"):
+        if opts.get("min") is not None:
+            inp["ValueMin"] = opts["min"]
+        if opts.get("max") is not None:
+            inp["ValueMax"] = opts["max"]
+    out: dict[str, Any] = {
+        "Key": attr["key"],
+        "Name": attr.get("name", attr["key"]),
+        "Searchable": 1 if attr.get("searchable") else 0,
+        "CountMin": attr.get("count_min", 0),
+        "CountMax": attr.get("count_max", 1),
+        "CountDefault": attr.get("count_default", 1),
+        "Input": inp,
+    }
+    if attr.get("sub"):
+        out["Sub"] = [_to_znuny(s) for s in attr["sub"]]
+    return out
+
+
 __all__ = [
+    "REVERSE_TYPE_MAP",
+    "to_tiqora_schema",
+    "to_znuny_definition",
     "ISSUE_KEY_INVALID",
     "ISSUE_KEY_UNKNOWN",
     "DefinitionError",
