@@ -465,10 +465,16 @@ Kennwort-Anbieter aus einer Erweiterung, auf der Anmeldeseite wie über die Gene
 (`SessionCreate` und `UserLogin`/`CustomerUserLogin` mit `Password` bei jedem Aufruf). Die Antwort ist
 dieselbe wie bei einem falschen Kennwort (auf der Anmeldeseite 401, im Webservice dessen `AuthFail`; zählt
 als Fehlversuch für die Sperre); im Protokoll steht `password_login_rejected` mit `reason=sso_managed`
-und `path=local`, `ldap`, `plugin` oder `compat`. Das Kennwort eines solchen Kontos erreicht keine
-Erweiterung, und eine abgewiesene LDAP-Anmeldung schreibt nichts (keine Verknüpfung, kein Abgleich von
+und `path=local`, `ldap`, `plugin` oder `compat`. Das Kennwort eines solchen Kontos erreicht keinen Kennwort-Anbieter einer Erweiterung. Eine
+GenericInterface-Operation aus einer Erweiterung erhält die Anfrage dagegen so, wie sie gesendet wurde
+(laut SDK-Vertrag, samt `Password`), und muss `ctx.authenticate` aufrufen; diese Prüfung weist das Konto ab.
+Eine abgewiesene LDAP-Anmeldung schreibt nichts (keine Verknüpfung, kein Abgleich von
 Profil oder Rollen). Tiqora ändert das Kennwort in Znuny dabei nicht: ein übernommenes Konto behält sein
-altes Kennwort, kann sich damit aber nicht anmelden, solange die Regel greift.
+altes Kennwort, kann sich damit aber über die Schnittstellen von Tiqora nicht anmelden, solange die Regel
+greift. Die Regel gilt nur für Tiqora. Läuft ein Znuny parallel weiter (Parallelbetrieb), akzeptiert es das
+alte Kennwort weiterhin, auf `index.pl` wie in `nph-genericinterface.pl`. Setzen Sie dann das Kennwort auf
+der Znuny-Seite zurück oder schalten Sie die Agenten-Anmeldung in Znuny während des Parallelbetriebs ab.
+Im Produktivbetrieb mit gestopptem Znuny betrifft das nicht.
 
 Die Regel greift nur, wenn beides zutrifft:
 

@@ -123,12 +123,13 @@ async def test_session_create_refuses_sso_managed_agent(env: Env, write_znuny: b
     assert _agent_pw(env.url) == LEGACY  # no rehash on a refusal
 
 
-async def test_session_create_refuses_sso_managed_customer(env: Env) -> None:
+@pytest.mark.parametrize("write_znuny", [True, False], ids=["znuny_sessions", "store_token"])
+async def test_session_create_refuses_sso_managed_customer(env: Env, write_znuny: bool) -> None:
     _legacy_hash(env.url, customer="pp55-portal")
     _scim_map(env.url, user_kind="customer", login="pp55-portal", require_mfa=True)
     before = _session_rows(env.url)
     with capture_logs() as logs:
-        async with env.client() as client:
+        async with env.client(compat_session_write_znuny=write_znuny) as client:
             refused = await _session_create(client, "customer", LOCAL_PASSWORD)
             wrong = await _session_create(client, "customer", WRONG)
     assert "SessionID" not in refused.json(), refused.text
@@ -158,6 +159,55 @@ async def test_per_request_password_refuses_sso_managed_account(env: Env, kind: 
     assert refused.json()["Error"]["ErrorCode"] == "TicketSearch.AuthFail"
     assert _compat_refusals(logs) == [("compat", kind, login)]
     assert (_agent_pw(env.url) if kind == "agent" else _customer_pw(env.url)) == LEGACY
+
+
+_PLUGIN_WS_ID = 55438
+_PLUGIN_WS = "PP55SsoContracts"
+_PLUGIN_PATH = f"/znuny-compat/Webservice/{_PLUGIN_WS}/Contract/1"
+
+
+@pytest.mark.parametrize("kind", ["agent", "customer"])
+async def test_plugin_gi_operation_refuses_sso_managed_account(env: Env, kind: str) -> None:
+    """A plugin GI operation authenticates through ``ctx.authenticate`` (``_auth_from_params``,
+    the gated function): the right password of an SSO-managed account is answered with the
+    operation's AuthFail exactly like a wrong one, while an unmanaged account passes."""
+    from tests._gi_fixtures import insert_webservice
+    from tests.test_plugins_gi_provider_db import CONFIG
+
+    login = "pp55-local" if kind == "agent" else "pp55-portal"
+    key = "UserLogin" if kind == "agent" else "CustomerUserLogin"
+    from tests._row_cleanup import delete_above_marks, snapshot_marks
+
+    marks = snapshot_marks(env.url, ("tiqora_gi_debug_content", "tiqora_gi_debug_entry"))
+    engine = create_engine(env.url)
+    try:
+        with engine.begin() as conn:
+            insert_webservice(conn, ws_id=_PLUGIN_WS_ID, name=_PLUGIN_WS, config=CONFIG)
+        async with env.client() as client:
+            unmanaged = await client.post(
+                _PLUGIN_PATH, json={key: login, "Password": LOCAL_PASSWORD}
+            )
+        assert unmanaged.status_code == 200, unmanaged.text
+        assert unmanaged.json()["Contract"] == "V-1"
+        _scim_map(env.url, user_kind=kind, login=login, require_mfa=True)
+        with capture_logs() as logs:
+            async with env.client() as client:
+                refused = await client.post(
+                    _PLUGIN_PATH, json={key: login, "Password": LOCAL_PASSWORD}
+                )
+                wrong = await client.post(_PLUGIN_PATH, json={key: login, "Password": WRONG})
+        assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+        assert refused.status_code == 401
+        assert refused.json()["Error"]["ErrorCode"].endswith("AuthFail")
+        assert "Contract" not in refused.text
+        assert _compat_refusals(logs) == [("compat", kind, login)]
+    finally:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM gi_webservice_config WHERE id = :i"), {"i": _PLUGIN_WS_ID}
+            )
+        engine.dispose()
+        delete_above_marks(env.url, marks)
 
 
 _CI_OPERATIONS = [
@@ -366,3 +416,58 @@ async def test_ldap_refusal_writes_nothing(
     assert directory.applied == []  # refused before apply_login
     assert [(e["path"], e["user_kind"]) for e in _refusals(logs)] == [("ldap", kind)]
     assert points_behaviour().CALLS == []
+
+
+@pytest.mark.parametrize("managed", [True, False], ids=["managed", "unmanaged"])
+async def test_apply_login_race_replan_asks_the_gate_before_writing(
+    env: Env, monkeypatch: pytest.MonkeyPatch, managed: bool
+) -> None:
+    """m-i: a ``create`` plan that loses the JIT race re-plans to ``login`` on an existing
+    account. When that account is SSO-managed, the refuse check runs on the re-plan and ends the
+    login before the profile sync (nothing written); an unmanaged account is synced."""
+    import dataclasses
+
+    from tiqora.config import Settings
+    from tiqora.identity import login as login_mod
+    from tiqora.identity.login import LoginRejected, apply_login, plan_login
+    from tiqora.identity.sso_managed import SsoManagedGate
+
+    directory = _FakeDirectory("pp55-local", "agent")
+    found = await directory.login(None, None, password="ldap-geheim")
+    record, identity = found
+    settings = Settings(environment="test")
+    synced: list[int] = []
+
+    async def lost_race(*_a: Any, **_kw: Any) -> Any:
+        raise login_mod._RaceLost
+
+    async def sync(_session: Any, _plan: Any, user_id: int) -> None:
+        synced.append(user_id)
+
+    monkeypatch.setattr(login_mod, "_create_account", lost_race)
+    monkeypatch.setattr(login_mod, "_sync_existing", sync)
+    monkeypatch.setattr(login_mod, "_stores_links", lambda _provider: False)  # no stored provider
+    if managed:
+        _scim_map(env.url, user_kind="agent", login="pp55-local", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.maker() as session:
+            real = await plan_login(session, record, identity, user_kind="agent", settings=settings)
+            assert (real.decision, real.user_id) == ("login", LOCAL)
+            create_plan = dataclasses.replace(real, decision="create", user_id=None, login=None)
+            gate = SsoManagedGate(session, "agent", "pp55-local")
+            if managed:
+                with pytest.raises(LoginRejected):
+                    await apply_login(
+                        session, record, identity, create_plan, settings=settings, refuse=gate.ldap
+                    )
+            else:
+                await apply_login(
+                    session, record, identity, create_plan, settings=settings, refuse=gate.ldap
+                )
+    if managed:
+        assert synced == []
+        assert gate.refused
+        assert [(e["path"], e["user_kind"]) for e in _refusals(logs)] == [("ldap", "agent")]
+    else:
+        assert synced == [LOCAL]
+        assert not gate.refused
