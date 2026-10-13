@@ -158,6 +158,9 @@ def test_verify_signature_function_rejects_wrong_key() -> None:
         b"\xff\xfe",
         b"[]",
         _raw_sig(format=2),
+        _raw_sig(format=True),
+        _raw_sig(format="1"),
+        _raw_sig(key_id="A" * 16),
         _raw_sig(alg="rsa"),
         _raw_sig(signature=base64.b64encode(b"s" * 63).decode()),
         _raw_sig(key_id="XYZ"),
@@ -295,6 +298,73 @@ def test_two_repositories_claiming_one_publisher_id_are_both_unverified() -> Non
     )
     assert r.level is TrustLevel.UNSIGNED
     assert r.problem is not None and "unterschiedlichen Schlüsseln" in r.problem
+
+
+def _resolve(priv, ring, publisher_id="org.example"):
+    return resolve_trust(
+        sign_bytes(priv, CHECKSUMS),
+        CHECKSUMS,
+        plugin_id=PLUGIN,
+        manifest_publisher_id=publisher_id,
+        ring=ring,
+    )
+
+
+def test_rotation_two_active_keys_in_one_repository_stays_verified() -> None:
+    priv1, pub1, kid1 = make_keypair()
+    priv2, pub2, kid2 = make_keypair()
+    ring = _ring(
+        publishers=[
+            _publisher(pub1, kid1, repository_id=1),
+            _publisher(pub2, kid2, repository_id=1),
+        ]
+    )
+    assert _resolve(priv1, ring).level is TrustLevel.VERIFIED_PUBLISHER
+    assert _resolve(priv2, ring).level is TrustLevel.VERIFIED_PUBLISHER
+
+
+def test_two_repositories_mirroring_the_same_two_keys_stay_verified() -> None:
+    priv1, pub1, kid1 = make_keypair()
+    priv2, pub2, kid2 = make_keypair()
+    ring = _ring(
+        publishers=[
+            _publisher(pub1, kid1, repository_id=1),
+            _publisher(pub2, kid2, repository_id=1),
+            _publisher(pub1, kid1, repository_id=2),
+            _publisher(pub2, kid2, repository_id=2),
+        ]
+    )
+    assert _resolve(priv1, ring).level is TrustLevel.VERIFIED_PUBLISHER
+    assert _resolve(priv2, ring).level is TrustLevel.VERIFIED_PUBLISHER
+
+
+def test_other_repository_lacking_the_signing_key_is_unsigned() -> None:
+    priv1, pub1, kid1 = make_keypair()
+    _priv2, pub2, kid2 = make_keypair()
+    ring = _ring(
+        publishers=[
+            _publisher(pub1, kid1, repository_id=1),
+            _publisher(pub2, kid2, repository_id=1),
+            _publisher(pub2, kid2, repository_id=2),
+        ]
+    )
+    r = _resolve(priv1, ring)
+    assert r.level is TrustLevel.UNSIGNED
+    assert r.problem is not None and "unterschiedlichen Schlüsseln" in r.problem
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_one_key_claimed_for_different_publishers_is_order_independent(reverse) -> None:
+    priv, pub, kid = make_keypair()
+    entries = [
+        _publisher(pub, kid, repository_id=1),
+        _publisher(pub, kid, repository_id=2, publisher_id="org.other", publisher_name="Other"),
+    ]
+    if reverse:
+        entries.reverse()
+    r = _resolve(priv, _ring(publishers=entries))
+    assert r.level is TrustLevel.UNSIGNED
+    assert r.problem is not None and "verschiedene Herausgeber" in r.problem
 
 
 def test_same_key_in_two_repositories_stays_verified() -> None:

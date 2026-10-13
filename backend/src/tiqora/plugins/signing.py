@@ -219,18 +219,33 @@ def resolve_trust(
         return TrustResult(
             TrustLevel.UNSIGNED, kid, None, "Signiert mit einem unbekannten Schlüssel"
         )
-    entry = matches[0]
+    # The outcome must not depend on ring order: one key claimed for different
+    # publishers is a conflict, never "first entry wins".
+    claims = {(p.publisher_id, p.publisher_name) for p in matches}
+    entry = min(matches, key=lambda p: (p.publisher_id, p.publisher_name, p.repository_id))
     err = verified(entry.public_key)
     if err:
         return _invalid(kid, err)
     if any(p.revoked for p in matches):
         return _invalid(kid, "Schlüssel des Herausgebers wurde zurückgezogen")
-    # F10: two repositories claiming one publisher id with different keys
-    # make that id unverified in both.
-    if any(
-        p.publisher_id == entry.publisher_id and p.key_id != kid and not p.revoked
+    if len(claims) > 1:
+        return TrustResult(
+            TrustLevel.UNSIGNED,
+            kid,
+            None,
+            "Schlüssel wird für verschiedene Herausgeber beansprucht",
+        )
+    # F10: per repository. Every repository that claims this publisher id must
+    # list the signing key; a repository that claims the id but not the key
+    # makes the id unverified. Several keys inside one repository (rotation)
+    # are fine.
+    claiming = {
+        p.repository_id
         for p in ring.publishers
-    ):
+        if p.publisher_id == entry.publisher_id and not p.revoked
+    }
+    listing = {p.repository_id for p in matches if not p.revoked}
+    if claiming - listing:
         return TrustResult(
             TrustLevel.UNSIGNED,
             kid,
