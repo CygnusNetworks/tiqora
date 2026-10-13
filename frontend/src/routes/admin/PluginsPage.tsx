@@ -23,7 +23,6 @@ import { UninstallDialog } from "./plugins/UninstallDialog";
 
 const QUERY_KEY = ["admin", "plugins"] as const;
 
-
 type Status = PluginAdmin["status"];
 
 /** Chip colour per status (R-SOFTCHIP): green = running, danger = needs attention, muted = nothing to do. */
@@ -421,9 +420,12 @@ export function PluginsPage() {
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   const clearFocus = useCallback(() => setFocusTarget(null), []);
   const run = (target: FocusTarget, start: () => void) => {
-    // A new action clears the previous error.
+    // A new action clears the previous error, including a stale download error.
     toggleM.reset();
     retryM.reset();
+    downloadM.reset();
+    setDownloadError(null);
+    setDownloadMessage(null);
     setFocusTarget(target);
     start();
   };
@@ -497,11 +499,11 @@ export function PluginsPage() {
   };
 
   const search = useSearch({ strict: false }) as { tab?: unknown };
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/admin/plugins" });
   const tab = parsePluginTab(search.tab);
   const setTab = (next: string) => {
     const value = parsePluginTab(next);
-    void navigate({ to: ".", search: { tab: value === "installed" ? undefined : value }, replace: true } as never);
+    void navigate({ to: ".", search: { tab: value === "installed" ? undefined : value }, replace: true });
   };
 
   const busy = toggleM.isPending || retryM.isPending;
@@ -609,7 +611,12 @@ export function PluginsPage() {
         <p role="alert" className="text-sm text-danger" data-testid="admin-plugins-action-error">
           {actionError === downloadError && downloadMessage
             ? downloadMessage
-            : apiErrorMessage(actionError, downloadError ? t("admin.plugins.update.failed") : t("admin.plugins.actionError"))}
+            : apiErrorMessage(
+                actionError,
+                actionError === downloadError || actionError === downloadM.error
+                  ? t("admin.plugins.update.failed")
+                  : t("admin.plugins.actionError"),
+              )}
         </p>
       )}
 

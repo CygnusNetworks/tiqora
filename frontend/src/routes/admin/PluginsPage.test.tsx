@@ -442,6 +442,48 @@ describe("PluginsPage installed tab", () => {
     expect(getPackage).not.toHaveBeenCalled();
   });
 
+  it("a later switch error after a failed download shows the switch's own text", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    setEnabled.mockRejectedValue(new Error("x"));
+    jobState = job({ status: "failed", error: null });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Das Paket konnte nicht heruntergeladen werden.",
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Hallo-Erweiterung" }));
+    await waitFor(() => expect(setEnabled).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-plugins-action-error")).toHaveTextContent(
+        "Die Änderung konnte nicht gespeichert werden.",
+      ),
+    );
+  });
+
+  it("a successful switch clears a stale download error", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    setEnabled.mockResolvedValue({ ...withUpdate, enabled: false });
+    jobState = job({ status: "failed", error: "Die Signatur des Pakets ist ungültig." });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Die Signatur des Pakets ist ungültig.",
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Hallo-Erweiterung" }));
+    await waitFor(() => expect(setEnabled).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId("admin-plugins-action-error")).toBeNull());
+  });
+
   it("shows only a hint for image plugin updates", async () => {
     const imageUpdate = adminPlugin({
       update: { version: "2.0.0", image_plugin: true, repository_id: 3, repository_name: "Quelle" },

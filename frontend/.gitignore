@@ -6,3 +6,6 @@ dist-ssr
 
 # Machine-translation cache
 scripts/.mt-cache.json
+
+# TypeScript incremental build info (generated)
+*.tsbuildinfo
