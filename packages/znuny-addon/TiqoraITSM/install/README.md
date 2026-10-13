@@ -68,8 +68,9 @@ Not listed, so still usable: `AgentITSMConfigItem` (overview),
 `AgentITSMConfigItemAttachment` (download only),
 `AgentITSMConfigItemCustomerCIsWidget`, `AJAXDynamicFieldConfigItem`.
 `AgentLinkObject` is not in the setting: the module refuses it when the source,
-the target or the target identifier is an `ITSMConfigItem`, and lets ticket,
-service and other links through. Note: `AdminImportExport` is not blocked (it
+the target, the target identifier or one of the links to delete
+(`LinkDeleteIdentifier`) is an `ITSMConfigItem`, and lets ticket, service and
+other links through. Note: `AdminImportExport` is not blocked (it
 also serves other object types); do not import CIs in Znuny after the switch.
 An entry is an action name or `Action::Subaction`.
 

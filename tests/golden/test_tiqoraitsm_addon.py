@@ -227,12 +227,18 @@ else {
 
 
 def _prerun(
-    action: str, user_login: str = "root@localhost", subaction: str | None = None, **extra: str
+    action: str,
+    user_login: str = "root@localhost",
+    subaction: str | None = None,
+    **extra: str | list[str],
 ) -> str:
     parts = []
     if subaction is not None:
         parts.append(f"Subaction => '{subaction}'")
-    parts += [f"{k} => '{v}'" for k, v in extra.items()]
+    parts += [
+        f"{k} => [{', '.join(repr(i) for i in v)}]" if isinstance(v, list) else f"{k} => '{v}'"
+        for k, v in extra.items()
+    ]
     code = (
         _PRERUN.replace("__LOGIN__", user_login)
         .replace("__TOKEN__", CHALLENGE_TOKEN)
@@ -790,6 +796,29 @@ def test_readonly_blocks_linking_to_cis_only(addon: dict[str, int], _engine: Eng
     )
     assert _prerun("AgentLinkObject", SourceObject="Ticket", TargetIdentifier="Ticket") == ""
     assert _prerun("AgentLinkObject", SourceObject="Ticket", TargetIdentifier="Service") == ""
+
+
+def test_readonly_blocks_deleting_ci_links(addon: dict[str, int], _engine: Engine) -> None:
+    """LinkDelete names the links in the array LinkDeleteIdentifier ("Object::Key::Type")."""
+    _set_setting(_engine, "itsm.znuny_readonly", "1")
+    blocked = "Die CMDB wird jetzt in Tiqora gepflegt"
+    assert blocked in _prerun(
+        "AgentLinkObject",
+        subaction="LinkDelete",
+        SourceObject="Ticket",
+        SourceKey="1",
+        LinkDeleteIdentifier=["Ticket::2::Normal", "ITSMConfigItem::3::RelevantTo"],
+    )
+    assert (
+        _prerun(
+            "AgentLinkObject",
+            subaction="LinkDelete",
+            SourceObject="Ticket",
+            SourceKey="1",
+            LinkDeleteIdentifier=["Ticket::2::Normal"],
+        )
+        == ""
+    )
 
 
 def test_customer_page_lists_own_and_company_cis(addon: dict[str, int]) -> None:

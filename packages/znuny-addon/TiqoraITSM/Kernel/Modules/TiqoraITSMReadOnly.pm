@@ -70,6 +70,13 @@ sub _Guard {
             my $Value = $Self->{$Name} // $ParamObject->GetParam( Param => $Name );
             push @LinkedObjects, $Value if defined $Value;
         }
+
+        # Subaction LinkDelete names the links to remove as "Object::Key::Type" values of the
+        # array parameter LinkDeleteIdentifier; a CI among them is refused like a CI target.
+        my @DeleteIdentifiers = ref $Self->{LinkDeleteIdentifier} eq 'ARRAY'
+            ? @{ $Self->{LinkDeleteIdentifier} }
+            : $ParamObject->GetArray( Param => 'LinkDeleteIdentifier' );
+        push @LinkedObjects, grep { defined $_ } @DeleteIdentifiers;
     }
 
     return if !$AddonObject->ActionBlocked(
