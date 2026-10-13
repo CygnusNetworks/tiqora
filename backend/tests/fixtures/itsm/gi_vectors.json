@@ -2640,7 +2640,7 @@
   ]
  },
  {
-  "name": "integer_out_of_range",
+  "name": "integer_range_attributes_not_enforced",
   "definition": [
    {
     "Key": "Vendor",
@@ -2733,10 +2733,6 @@
   "cixml": {
    "Slots": "100"
   },
-  "error": {
-   "code": "InvalidParameter",
-   "message": "ConfigItemCreate: ConfigItem->CIXMLData->Slots parameter value is not a valid Integer or out of range!"
-  },
   "catalog": {
    "ITSM::ConfigItem::Computer::Type": {
     "Laptop": 7,
@@ -2748,7 +2744,17 @@
   ],
   "companies": [
    "example.org"
-  ]
+  ],
+  "xml_data": {
+   "Slots": [
+    {
+     "Content": "100"
+    }
+   ]
+  },
+  "cixml_back": {
+   "Slots": "100"
+  }
  },
  {
   "name": "integer_not_a_number",

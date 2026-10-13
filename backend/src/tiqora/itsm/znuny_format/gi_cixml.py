@@ -210,12 +210,10 @@ def _check_value(
         if not perl_truthy(value) or not lookups.customer_company_exists(text):
             bad = "parameter value is not a valid customer company!"
     elif kind == "Integer":
-        low, high = _int_attr(inp, "ValueMin"), _int_attr(inp, "ValueMax")
-        if (
-            not _INTEGER.fullmatch(text)
-            or (low is not None and int(text) < low)
-            or (high is not None and int(text) > high)
-        ):
+        # ValueMin/ValueMax are deliberately NOT enforced: Znuny's _CheckValue
+        # calls ValidateInputInteger with only Value/Input/ItemKey/Parent, so
+        # the range attributes never reach it (Common.pm:314). Only IsInteger.
+        if not _INTEGER.fullmatch(text):
             bad = "parameter value is not a valid Integer or out of range!"
     elif kind == "GeneralCatalog":
         found = lookups.catalog_id(_str(inp.get("Class")), text)
