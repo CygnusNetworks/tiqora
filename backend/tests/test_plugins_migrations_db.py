@@ -88,7 +88,6 @@ def _drop_test_tables(engine: Engine) -> None:
                 conn.execute(text(f"DROP TABLE IF EXISTS {name}"))
         if engine.dialect.name == "mysql":
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-        conn.execute(text("UPDATE ticket SET title = title WHERE 1 = 0"))
 
 
 @pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])

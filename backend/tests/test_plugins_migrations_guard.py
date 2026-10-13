@@ -85,6 +85,11 @@ def test_guard_allows(sql: str) -> None:
         "SELECT $$ x $$",
         "REPLACE INTO ticket (id) VALUES (1)",
         "SELECT 'unterminated",
+        "SELECT 1 # '\n; CREATE TABLE zz_hash (id INT); -- '",
+        "SELECT 1 --'\n; DROP TABLE ticket; --'",
+        "DELETE tqp_tables_note FROM ticket AS tqp_tables_note",
+        "SET NAMES utf8mb4, GLOBAL sql_mode = ''",
+        "SELECT nextval('ticket_id_seq')",
     ],
 )
 def test_guard_rejects(sql: str) -> None:

@@ -66,5 +66,5 @@ async def _run_async() -> None:
 
 
 if context.is_offline_mode():
-    raise PluginMigrationError("Plugin-Migrationen laufen nicht im Offline-Modus")
+    raise PluginMigrationError("Erweiterungs-Migrationen laufen nicht im Offline-Modus")
 asyncio.run(_run_async())

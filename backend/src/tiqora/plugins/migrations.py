@@ -48,7 +48,7 @@ _SET_VARS = frozenset(
     }
 )
 _SELECT_DENY = re.compile(
-    r"\binto\b|\b(?:setval|set_config|lo_import|lo_export|lo_unlink|load_file|"
+    r"\binto\b|\b(?:setval|nextval|get_lock|set_config|lo_import|lo_export|lo_unlink|load_file|"
     r"pg_terminate_backend|pg_cancel_backend)\b|\bdblink\w*"
 )
 _WITH_DENY = re.compile(r"\b(?:insert|update|delete|merge)\b")
@@ -115,7 +115,11 @@ def _normalise(sql: str, *, backslash_escapes: bool) -> str | None:
                 return None
             out.append(" ")
             i = end + 2
-        elif sql.startswith("--", i) and (i + 2 >= n or sql[i + 2].isspace()):
+        elif ch == "#":  # MariaDB comment, plain character elsewhere: ambiguous
+            return None
+        elif sql.startswith("--", i):
+            if i + 2 < n and not sql[i + 2].isspace():
+                return None  # a comment on PostgreSQL, not on MariaDB: ambiguous
             end = sql.find("\n", i)
             out.append(" ")
             i = n if end < 0 else end + 1
@@ -221,7 +225,7 @@ class StatementGuard:
         return True
 
     def _set_allowed(self, s: str) -> bool:
-        if re.match(r"set names\b", s):
+        if re.fullmatch(r"set names [a-z0-9_]+(?: collate [a-z0-9_]+)?", s):
             return True
         if re.match(r"set (?:session |local )?time zone\b", s):
             return True
@@ -308,7 +312,8 @@ class StatementGuard:
         targets, rest = m.group(1).strip(), m.group(2)
         if targets:  # MariaDB multi-table form: ``delete t1, t2 from …``
             names = self._name_list(re.sub(r"\.\*", "", targets))
-            return names is not None and self._all_ok(names)
+            if names is None or not self._all_ok(names):
+                return False  # targets may be aliases, so the FROM list is checked too
         head = re.split(r"\s+(?:using|where|returning|order by|limit)\b", rest)[0]
         tables = self._table_list(head)
         return tables is not None and self._all_ok(tables)
