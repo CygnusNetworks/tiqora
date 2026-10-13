@@ -4864,7 +4864,9 @@
           "ticket_sidebar": "Zeigt ein Feld in der Ticketansicht",
           "widget": "Zeigt eine Kachel im Dashboard",
           "other": "Erweitert die Oberfläche ({{value}})"
-        }
+        },
+        "table": "Legt die Tabelle {{name}} an",
+        "tables": "Legt {{count}} Tabellen an"
       },
       "numberGenerator": {
         "title": "Ticketnummer-Schema",
@@ -4874,6 +4876,57 @@
         "znunyNote": "Tickets, die Znuny parallel anlegt, bekommen weiter Nummern nach dem Znuny-Schema ({{generator}}). Antworten auf beide Arten von Nummern werden erkannt.",
         "reset": "Znuny-Schema verwenden",
         "loadError": "Die Ticketnummer-Schemata dieser Erweiterung konnten nicht geladen werden."
+      },
+      "upload": "Paket hochladen",
+      "uploadHint": "Datei mit der Endung .tqplugin",
+      "uploadFailed": "Das Paket konnte nicht geprüft werden.",
+      "runtimeInstallOff": "Installation über die Oberfläche ist hier nicht möglich: {{reason}} Erweiterungen kommen über ein eigenes Image (tiqora plugins bake).",
+      "source": {
+        "image": "Im Image eingebaut",
+        "upload": "Hochgeladen",
+        "repository": "Aus Paketquelle",
+        "repositoryNamed": "Aus Paketquelle {{name}}"
+      },
+      "trust": {
+        "official": "Offiziell",
+        "verified_publisher": "Verifizierter Herausgeber",
+        "local": "Lokal signiert",
+        "unsigned": "Unsigniert",
+        "invalid": "Signatur ungültig",
+        "signedBy": "Signiert von {{signer}}"
+      },
+      "install": {
+        "title": "Erweiterung installieren",
+        "actionInstall": "Neu installieren",
+        "actionUpdate": "Aktualisieren von {{from}} auf {{to}}",
+        "actionDowngrade": "Zurückstufen von {{from}} auf {{to}}",
+        "actionReinstall": "Erneut installieren",
+        "changelog": "Änderungen",
+        "problems": "Kann nicht installiert werden",
+        "warnings": "Hinweise",
+        "enable": "Nach der Installation einschalten",
+        "restart": "Tiqora danach automatisch neu starten",
+        "trustUnsigned": "Ich vertraue diesem Paket",
+        "trustNote": "Erweiterungen laufen mit vollen Rechten in Tiqora. Die Angaben oben beschreiben, was die Erweiterung von sich sagt – sie sind keine Absicherung.",
+        "submit": "Installieren",
+        "running": "Erweiterung wird installiert …",
+        "done": "Installiert."
+      },
+      "restart": {
+        "title": "Neustart",
+        "now": "Jetzt neu starten",
+        "running": "Tiqora wird neu gestartet …",
+        "apiDown": "Weboberfläche startet neu …",
+        "apiTimeout": "Die Weboberfläche ist nach dem Neustart nicht zurückgekommen.",
+        "done": "Tiqora wurde neu gestartet.",
+        "reload": "Seite neu laden",
+        "manual": "Bitte starten Sie Tiqora neu, damit die Änderung wirksam wird.",
+        "state": {
+          "waiting": "Wartet",
+          "restarting": "Startet neu",
+          "done": "Neu gestartet",
+          "timeout": "Nicht zurückgekommen"
+        }
       }
     },
     "dashboardTemplates": {
@@ -5696,7 +5749,11 @@
         "report_backfill": "Berichtsdaten aufbauen",
         "gi_invoke": "Webservice-Aufruf",
         "gi_invoke_sync": "Webservice-Aufruf",
-        "report_delivery": "Berichtsversand"
+        "report_delivery": "Berichtsversand",
+        "plugin_install": "Erweiterung installieren",
+        "plugin_uninstall": "Erweiterung deinstallieren",
+        "plugin_fetch": "Erweiterung herunterladen",
+        "plugin_repository_refresh": "Paketquelle prüfen"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

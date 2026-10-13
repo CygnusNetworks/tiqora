@@ -4856,7 +4856,9 @@
           "ticket_sidebar": "Shows a panel in the ticket view",
           "widget": "Shows a tile on the dashboard",
           "other": "Extends the interface ({{value}})"
-        }
+        },
+        "table": "Creates the table {{name}}",
+        "tables": "Creates {{count}} tables"
       },
       "numberGenerator": {
         "title": "Ticket number scheme",
@@ -4866,6 +4868,57 @@
         "znunyNote": "Tickets that Znuny creates in parallel keep getting numbers in the Znuny scheme ({{generator}}). Replies to both kinds of numbers are recognised.",
         "reset": "Use Znuny scheme",
         "loadError": "The ticket number schemes of this extension could not be loaded."
+      },
+      "upload": "Upload package",
+      "uploadHint": "File ending in .tqplugin",
+      "uploadFailed": "The package could not be checked.",
+      "runtimeInstallOff": "Installing from the interface is not possible here: {{reason}} Extensions come with your own image (tiqora plugins bake).",
+      "source": {
+        "image": "Built into the image",
+        "upload": "Uploaded",
+        "repository": "From a package source",
+        "repositoryNamed": "From package source {{name}}"
+      },
+      "trust": {
+        "official": "Official",
+        "verified_publisher": "Verified publisher",
+        "local": "Signed locally",
+        "unsigned": "Unsigned",
+        "invalid": "Invalid signature",
+        "signedBy": "Signed by {{signer}}"
+      },
+      "install": {
+        "title": "Install extension",
+        "actionInstall": "Install new",
+        "actionUpdate": "Update from {{from}} to {{to}}",
+        "actionDowngrade": "Downgrade from {{from}} to {{to}}",
+        "actionReinstall": "Reinstall",
+        "changelog": "Changes",
+        "problems": "Cannot be installed",
+        "warnings": "Notes",
+        "enable": "Switch on after installing",
+        "restart": "Restart Tiqora automatically afterwards",
+        "trustUnsigned": "I trust this package",
+        "trustNote": "Extensions run inside Tiqora with full access. The information above shows what the extension claims to do - it is not a safeguard.",
+        "submit": "Install",
+        "running": "Installing the extension …",
+        "done": "Installed."
+      },
+      "restart": {
+        "title": "Restart",
+        "now": "Restart now",
+        "running": "Tiqora is restarting …",
+        "apiDown": "The web interface is restarting …",
+        "apiTimeout": "The web interface did not come back after the restart.",
+        "done": "Tiqora has been restarted.",
+        "reload": "Reload page",
+        "manual": "Please restart Tiqora for the change to take effect.",
+        "state": {
+          "waiting": "Waiting",
+          "restarting": "Restarting",
+          "done": "Restarted",
+          "timeout": "Did not come back"
+        }
       }
     },
     "dashboardTemplates": {
@@ -5688,7 +5741,11 @@
         "report_backfill": "Build report data",
         "gi_invoke": "Web service call",
         "gi_invoke_sync": "Web service call",
-        "report_delivery": "Report delivery"
+        "report_delivery": "Report delivery",
+        "plugin_install": "Install extension",
+        "plugin_uninstall": "Uninstall extension",
+        "plugin_fetch": "Download extension",
+        "plugin_repository_refresh": "Check package source"
       },
       "gi_mail": "Send email from a web service request"
     },

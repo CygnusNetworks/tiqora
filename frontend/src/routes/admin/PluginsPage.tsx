@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/Button";
 import { SoftChip } from "@/components/ui/StatusChip";
 import { Spinner } from "@/components/ui/Spinner";
@@ -11,8 +10,11 @@ import { toBcp47 } from "@/i18n";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { formatDateTime } from "@/lib/format";
 import { pluginPointsApi } from "@/lib/pluginPointsApi";
-import { pluginsApi, type PluginAdmin } from "@/lib/pluginsApi";
+import { pluginsApi, type PluginAdmin, type PluginPackage } from "@/lib/pluginsApi";
 import { isPluginSafeMode } from "@/plugins/safeMode";
+import { capabilityText } from "./plugins/capabilities";
+import { InstallDialog } from "./plugins/InstallDialog";
+import { RestartPanel } from "./plugins/RestartPanel";
 
 const QUERY_KEY = ["admin", "plugins"] as const;
 
@@ -30,54 +32,8 @@ const STATUS_COLOR: Record<Status, string> = {
   incompatible: "var(--color-danger)",
 };
 
-const POINT_KEYS: Record<string, string> = {
-  "core.events.subscribers": "events",
-  "core.http.routes": "routes",
-  "core.http.public_routes": "public_routes",
-  "core.mcp.tools": "mcp_tools",
-  "core.worker.scheduled_tasks": "scheduled_tasks",
-  "core.reporting.builtin_reports": "builtin_reports",
-  "core.reporting.sources": "report_sources",
-  "core.events.sync_hooks": "sync_hooks",
-  "core.process.transition_actions": "transition_actions",
-  "core.process.condition_modules": "condition_modules",
-  "core.templates.placeholders": "placeholders",
-  "core.tickets.number_generators": "number_generators",
-  "core.dynamic_fields.types": "df_types",
-  "core.mail.inbound_filters": "inbound_mail_filters",
-  "core.mail.outbound_filters": "outbound_mail_filters",
-  "core.notifications.transports": "notification_transports",
-  "core.channels.drivers": "channel_drivers",
-  "core.auth.password_providers": "password_providers",
-  "core.customers.sources": "customer_sources",
-  "core.gi.operations": "gi_operations",
-  "core.gi.invokers": "gi_invokers",
-  "core.gi.mappings": "gi_mappings",
-};
-
 const NUMBER_GENERATORS_POINT = "core.tickets.number_generators";
 const NUMBER_GENERATORS_KEY = ["admin", "plugins", "number-generators"] as const;
-
-const SLOT_KEYS: Record<string, string> = {
-  "agent.nav": "nav",
-  "agent.route": "route",
-  "ticket.sidebar": "ticket_sidebar",
-  "dashboard.widget": "widget",
-};
-
-function capabilityText(t: TFunction, cap: PluginAdmin["capabilities"][number]): string {
-  if (cap.kind === "outbound_host") return t("admin.plugins.capabilities.host", { host: cap.value });
-  if (cap.kind === "extension_point") {
-    const key = POINT_KEYS[cap.value];
-    return key
-      ? t(`admin.plugins.capabilities.point.${key}`)
-      : t("admin.plugins.capabilities.point.other", { value: cap.value });
-  }
-  const key = SLOT_KEYS[cap.value];
-  return key
-    ? t(`admin.plugins.capabilities.slot.${key}`)
-    : t("admin.plugins.capabilities.slot.other", { value: cap.value });
-}
 
 function needsRetry(plugin: PluginAdmin): boolean {
   return (
@@ -404,8 +360,32 @@ export function PluginsPage() {
     setFocusTarget(target);
     start();
   };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pkg, setPkg] = useState<PluginPackage | null>(null);
+  const uploadM = useMutation({
+    mutationFn: (file: File) => pluginsApi.uploadPackage(file),
+    onSuccess: setPkg,
+  });
+  const onFile = (file: File | undefined) => {
+    if (fileRef.current) fileRef.current.value = "";
+    if (file) uploadM.mutate(file);
+  };
+  const [restartHint, setRestartHint] = useState<number | null>(null);
+  const restartM = useMutation({
+    mutationFn: async () => {
+      let before = 0;
+      try {
+        before = (await pluginsApi.restartStatus())?.generation ?? 0;
+      } catch {
+        before = 0;
+      }
+      await pluginsApi.requestRestart();
+      return before;
+    },
+    onSuccess: setRestartHint,
+  });
   const busy = toggleM.isPending || retryM.isPending;
-  const actionError = toggleM.error ?? retryM.error;
+  const actionError = toggleM.error ?? retryM.error ?? restartM.error;
 
   if (listQ.isLoading) {
     return (
@@ -422,11 +402,42 @@ export function PluginsPage() {
     );
   }
 
-  const { plugins, safe_mode: safeMode } = listQ.data;
+  const { plugins, safe_mode: safeMode, runtime_install: runtimeInstall } = listQ.data;
+  const coordinated = listQ.data.coordinated_restart;
+  const restartPending = plugins.some((p) => p.status === "restart_required");
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4" data-testid="admin-plugins-page">
       <div>
-        <h1 className="font-display text-xl font-semibold text-ink">{t("admin.nav.plugins")}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-display text-xl font-semibold text-ink">{t("admin.nav.plugins")}</h1>
+          {runtimeInstall && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".tqplugin"
+                className="hidden"
+                data-testid="plugin-upload-input"
+                aria-label={t("admin.plugins.upload")}
+                onChange={(e) => onFile(e.target.files?.[0])}
+              />
+              <Button
+                variant="primary"
+                disabled={uploadM.isPending}
+                onClick={() => fileRef.current?.click()}
+                title={t("admin.plugins.uploadHint")}
+                data-testid="plugin-upload"
+              >
+                {t("admin.plugins.upload")}
+              </Button>
+            </>
+          )}
+        </div>
+        {!runtimeInstall && (
+          <p className="mt-1 text-sm text-muted" data-testid="plugin-runtime-install-off">
+            {t("admin.plugins.runtimeInstallOff", { reason: listQ.data.runtime_install_reason ?? "" })}
+          </p>
+        )}
         <p className="mt-1 text-sm text-muted">{t("admin.plugins.description")}</p>
         <p
           className="mt-2 rounded-lg border border-hairline bg-surface-subtle px-3 py-2 text-sm text-ink"
@@ -452,6 +463,24 @@ export function PluginsPage() {
           data-testid="admin-plugins-browser-off"
         >
           {t("admin.plugins.browserOff")}
+        </div>
+      )}
+      {uploadM.isError && (
+        <p role="alert" className="text-sm text-danger" data-testid="plugin-upload-error">
+          {apiErrorMessage(uploadM.error, t("admin.plugins.uploadFailed"))}
+        </p>
+      )}
+      {restartPending && (
+        <div className="space-y-2 rounded-lg border border-hairline bg-surface p-3" data-testid="plugin-restart-box">
+          {restartHint != null ? (
+            <RestartPanel generationHint={restartHint} />
+          ) : coordinated ? (
+            <Button variant="secondary" disabled={restartM.isPending} onClick={() => restartM.mutate()} data-testid="plugin-restart-now">
+              {t("admin.plugins.restart.now")}
+            </Button>
+          ) : (
+            <p className="text-sm text-ink">{t("admin.plugins.restart.manual")}</p>
+          )}
         </div>
       )}
       {actionError && (
@@ -480,6 +509,15 @@ export function PluginsPage() {
             />
           ))}
         </ul>
+      )}
+      {pkg && (
+        <InstallDialog
+          key={pkg.sha256}
+          pkg={pkg}
+          open
+          onClose={() => setPkg(null)}
+          coordinatedRestart={coordinated}
+        />
       )}
     </div>
   );

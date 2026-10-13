@@ -7,7 +7,7 @@ import i18n from "@/i18n";
 import type { PluginAdmin } from "@/lib/pluginsApi";
 import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
 import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
-import { adminListFields, aiWorkerRuntime, syncHookRow } from "@/test/pluginFixtures";
+import { adminListFields, aiWorkerRuntime, packageReport, syncHookRow } from "@/test/pluginFixtures";
 import { PluginsPage } from "./PluginsPage";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -21,8 +21,10 @@ vi.mock("@tanstack/react-router", () => ({
 const adminList = vi.fn();
 const setEnabled = vi.fn();
 const reset = vi.fn();
+const uploadPackage = vi.fn();
 vi.mock("@/lib/pluginsApi", () => ({
   pluginsApi: {
+    uploadPackage: (...a: unknown[]) => uploadPackage(...a),
     adminList: (...a: unknown[]) => adminList(...a),
     setEnabled: (...a: unknown[]) => setEnabled(...a),
     reset: (...a: unknown[]) => reset(...a),
@@ -121,6 +123,7 @@ beforeEach(async () => {
   adminList.mockReset();
   setEnabled.mockReset();
   reset.mockReset();
+  uploadPackage.mockReset();
   numberGenerators.mockReset();
   setNumberGenerator.mockReset();
   sessionStorage.clear();
@@ -247,6 +250,56 @@ describe("PluginsPage", () => {
     expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
       "Die Änderung konnte nicht gespeichert werden.",
     );
+  });
+});
+
+describe("PluginsPage upload", () => {
+  it("uploads a file and opens the install dialog", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    uploadPackage.mockResolvedValue(packageReport());
+    renderPage();
+    const input = await screen.findByTestId("plugin-upload-input");
+    expect(input).toHaveAttribute("accept", ".tqplugin");
+    const file = new File(["zip"], "tables-1.0.0.tqplugin", { type: "application/octet-stream" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(uploadPackage).toHaveBeenCalledWith(file));
+    expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
+    expect(screen.getByText("Tabellen-Beispiel")).toBeInTheDocument();
+  });
+
+  it("shows the server's message when the package is rejected", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    uploadPackage.mockRejectedValue(new Error("x"));
+    renderPage();
+    fireEvent.change(await screen.findByTestId("plugin-upload-input"), {
+      target: { files: [new File(["x"], "x.tqplugin")] },
+    });
+    expect(await screen.findByTestId("plugin-upload-error")).toHaveTextContent("Das Paket konnte nicht geprüft werden.");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows the reason instead of the upload button when runtime install is off", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields({ runtime_install: false, runtime_install_reason: "Das Paketverzeichnis ist schreibgeschützt." }),
+      safe_mode: false,
+      plugins: [ACTIVE],
+    });
+    renderPage();
+    expect(await screen.findByTestId("plugin-runtime-install-off")).toHaveTextContent(
+      "Das Paketverzeichnis ist schreibgeschützt.",
+    );
+    expect(screen.queryByTestId("plugin-upload")).toBeNull();
+    expect(screen.queryByTestId("plugin-upload-input")).toBeNull();
+  });
+
+  it("offers a restart button while a plugin waits for a restart", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields(),
+      safe_mode: false,
+      plugins: [adminPlugin({ status: "restart_required" })],
+    });
+    renderPage();
+    expect(await screen.findByRole("button", { name: "Jetzt neu starten" })).toBeInTheDocument();
   });
 });
 
