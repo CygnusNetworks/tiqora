@@ -6,6 +6,7 @@ import { TicketTable, type SortKey } from "@/components/agent/TicketTable";
 import { SelectField } from "@/components/ui/SelectField";
 import type { SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
+import { ServiceItsmPanel } from "@/components/itsm/ServiceItsmPanel";
 
 export type ServiceViewSearch = {
   service_id?: number;
@@ -80,6 +81,8 @@ export function ServiceViewPage() {
           />
         </div>
       </div>
+
+      {serviceId != null && <ServiceItsmPanel serviceId={serviceId} />}
 
       {serviceId == null ? (
         <p className="rounded-lg border border-hairline bg-surface px-4 py-8 text-center text-sm text-muted">

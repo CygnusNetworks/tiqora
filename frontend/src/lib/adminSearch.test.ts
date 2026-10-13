@@ -36,4 +36,15 @@ describe("ADMIN_PAGES", () => {
       expect(rankAdminPages(ADMIN_PAGES, query, t).map((p) => p.slug), query).toContain("dashboard-templates");
     }
   });
+
+  it("finds the ITSM pages by their German names", async () => {
+    await i18n.changeLanguage("de");
+    const t = (key: string) => i18n.t(key);
+    const slugs = (q: string) => rankAdminPages(ADMIN_PAGES, q, t).map((p) => p.slug);
+    expect(slugs("ITSM")).toEqual(expect.arrayContaining(["itsm", "itsm-link-types", "settings-itsm"]));
+    expect(slugs("Verknüpfungstypen")).toContain("itsm-link-types");
+    expect(slugs("Prioritätsmatrix")).toContain("itsm");
+    expect(ADMIN_PAGES.find((p) => p.slug === "itsm")?.route).toBe("/admin/itsm");
+    expect(ADMIN_PAGES.find((p) => p.slug === "itsm-link-types")?.route).toBe("/admin/itsm/link-types");
+  });
 });

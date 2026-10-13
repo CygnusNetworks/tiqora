@@ -459,6 +459,9 @@ def run_worker() -> None:
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
         loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
+        from tiqora.itsm.mode import init_itsm_mode_at_startup
+
+        loop.run_until_complete(init_itsm_mode_at_startup(get_session_factory()))
         loop.run_until_complete(_run_all_loops(stop))
     finally:
         plugin_retry.cancel()

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { api, type ServiceOut, type ServiceCreate, type ServiceUpdate } from "@/lib/api";
@@ -5,10 +6,13 @@ import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { formatDateTime } from "@/lib/format";
+import { MenuItem } from "@/components/ui/Menu";
+import { ServiceItsmDialog } from "@/components/itsm/ServiceItsmDialog";
 
 export function ServicesPage() {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
+  const [itsmFor, setItsmFor] = useState<ServiceOut | null>(null);
 
   const columns: DataTableColumn<ServiceOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
@@ -40,8 +44,14 @@ export function ServicesPage() {
   ];
 
   return (
+    <>
     <AdminResourcePage
       resourceKey="services"
+      rowActions={(row) => (
+        <MenuItem testId={`admin-service-itsm-${row.id}`} onSelect={() => setItsmFor(row)}>
+          {t("admin.itsm.service.menu")}
+        </MenuItem>
+      )}
       title={t("admin.services.title_plural")}
       newLabel={t("admin.services.new")}
       api={api.adminServices}
@@ -65,5 +75,9 @@ export function ServicesPage() {
         valid_id: Number(v.valid_id) || 1,
       })}
     />
+    {itsmFor && (
+      <ServiceItsmDialog serviceId={itsmFor.id} serviceName={itsmFor.name} onClose={() => setItsmFor(null)} />
+    )}
+    </>
   );
 }

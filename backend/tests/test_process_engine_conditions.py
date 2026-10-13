@@ -9,6 +9,7 @@ Also hosts a mocked ``TicketCreate`` transition-action unit test (no DB).
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -352,6 +353,65 @@ async def test_action_ticket_create_builds_ticket_in_and_links() -> None:
     assert link_calls == [
         {"source": 99, "target": 42, "type": "ParentChild", "user_id": 1},
     ]
+
+
+@pytest.mark.asyncio
+async def test_action_ticket_create_link_conflict_is_logged_not_raised(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A refused LinkAs (e.g. the admin removed the ParentChild PossibleLink) keeps the new
+    ticket and the process going, like Znuny's TicketCreate (final review M6)."""
+    from tiqora.domain.ticket_write_service import LinkConflict
+
+    sysconfig = MagicMock()
+    sysconfig.get_str = AsyncMock(side_effect=lambda name, default="": default)
+    resolved = AsyncMock(side_effect=lambda _s, _name, id_: id_)
+    with (
+        patch("tiqora.process.engine.create_ticket", new_callable=AsyncMock, return_value=99),
+        patch(
+            "tiqora.process.engine.link_tickets",
+            new_callable=AsyncMock,
+            side_effect=LinkConflict("not_possible"),
+        ) as link,
+        patch("tiqora.process.engine._resolve_queue_id", side_effect=resolved),
+        patch("tiqora.process.engine._resolve_state_id", side_effect=resolved),
+        patch("tiqora.process.engine._resolve_priority_id", side_effect=resolved),
+        patch("tiqora.process.engine._resolve_user_id", side_effect=resolved),
+        patch("tiqora.process.engine._resolve_type_id", new_callable=AsyncMock, return_value=None),
+        patch(
+            "tiqora.process.engine._resolve_service_id", new_callable=AsyncMock, return_value=None
+        ),
+        patch("tiqora.process.engine._resolve_sla_id", new_callable=AsyncMock, return_value=None),
+        patch(
+            "tiqora.process.engine._resolve_link_as",
+            new_callable=AsyncMock,
+            return_value=("ParentChild", "Source"),
+        ),
+        patch("tiqora.process.engine._session_factory_from", return_value=MagicMock()),
+        caplog.at_level(logging.WARNING, logger="tiqora.process.engine"),
+    ):
+        await _action_ticket_create(
+            MagicMock(),
+            {
+                "Title": "Child ticket",
+                "QueueID": 7,
+                "StateID": 4,
+                "PriorityID": 3,
+                "OwnerID": 5,
+                "CustomerID": "ACME",
+                "CustomerUserID": "bob@example.com",
+                "Body": "Hello",
+                "Subject": "Subj",
+                "LinkAs": "Parent",
+            },
+            ticket_id=42,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+    link.assert_awaited_once()
+    assert any(
+        "LinkAs" in r.getMessage() and "not_possible" in r.getMessage() for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio

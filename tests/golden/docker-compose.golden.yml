@@ -36,7 +36,8 @@ services:
       dockerfile: tests/golden/Dockerfile.znuny
       args:
         SOURCE_DIR: ${GOLDEN_SOURCE_DIR:-znuny-6.5.22}
-    image: tiqora-golden-peer-${GOLDEN_PEER:-znuny-6.5}
+    # ITSM variants reuse the base peer image; their state lives in the project's own DB volume.
+    image: tiqora-golden-peer-${GOLDEN_IMAGE_PEER:-${GOLDEN_PEER:-znuny-6.5}}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -50,6 +51,12 @@ services:
       ZNUNY_FQDN: znuny.golden.local
       ZNUNY_SYSTEM_ID: "10"
       GOLDEN_PEER: ${GOLDEN_PEER:-znuny-6.5}
+      GOLDEN_ITSM: ${GOLDEN_ITSM:-0}
+    volumes:
+      # Mounted so a cached peer image picks up entrypoint changes without a rebuild.
+      - ./znuny-entrypoint.sh:/usr/local/bin/znuny-entrypoint.sh:ro
+      # ITSM peers only: .opm files + install-order.txt (fetch_itsm_packages.py); /dev/null otherwise.
+      - ${GOLDEN_ITSM_DIR:-/dev/null}:/opt/itsm-packages:ro
     ports:
       - "8180:80"
     # Accept either classic /otrs/ or /znuny/ ScriptAlias depending on peer tree.
@@ -62,7 +69,8 @@ services:
       interval: 10s
       timeout: 10s
       retries: 36
-      start_period: 90s
+      # ITSM peers install their packages before Apache starts (minutes, not seconds).
+      start_period: ${GOLDEN_START_PERIOD:-90s}
 
   # Recording HTTP sink for the GenericInterface requester golden tests (host port 8199).
   gisink:

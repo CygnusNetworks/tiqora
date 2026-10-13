@@ -10,6 +10,10 @@ import { TicketHeader } from "@/components/agent/TicketHeader";
 import { ArticleMasterDetail } from "@/components/agent/ArticleMasterDetail";
 import { HistoryTable } from "@/components/agent/HistoryTable";
 import { PluginTicketPanels } from "@/plugins/slots";
+import { MajorIncidentBanner } from "@/components/itsm/MajorIncidentBanner";
+import { MajorIncidentPanel } from "@/components/itsm/MajorIncidentPanel";
+import { ProblemPanel } from "@/components/itsm/ProblemPanel";
+import { TicketCisPanel } from "@/components/itsm/TicketCisPanel";
 import { PresenceBar } from "@/components/agent/PresenceBar";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
 import { AiPanel } from "@/components/agent/AiPanel";
@@ -182,6 +186,10 @@ export function TicketZoomPage() {
           />
         )}
       </AiPanel>
+      <MajorIncidentBanner ticketId={ticketId} />
+      <TicketCisPanel ticket={ticketQ.data} />
+      <ProblemPanel ticket={ticketQ.data} />
+      <MajorIncidentPanel ticket={ticketQ.data} />
       <ProcessWidget
         ticketId={ticketId}
         hideInactiveStart

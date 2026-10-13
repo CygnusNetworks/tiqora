@@ -19,15 +19,28 @@ def register_core(registry: Registry) -> None:
 
     from tiqora.avatars.settings import AVATARS_SECTION
     from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION
+    from tiqora.itsm.settings import ITSM_SECTION
     from tiqora.jobs.settings import JOBS_SECTION
     from tiqora.reporting.settings import REPORTING_SECTION
     from tiqora.settings_sections.section import SETTINGS_SECTIONS, validate_section_schema
 
-    for section in (JOBS_SECTION, AVATARS_SECTION, PROCESS_DEPLOY_SECTION, REPORTING_SECTION):
+    for section in (
+        JOBS_SECTION,
+        AVATARS_SECTION,
+        PROCESS_DEPLOY_SECTION,
+        REPORTING_SECTION,
+        ITSM_SECTION,
+    ):
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
+    from tiqora.itsm.znuny_adapter.provider import ZnunyCiProvider
+
+    registry.add(CI_PROVIDERS, CiProviderFactory(mode="znuny_readthrough", create=ZnunyCiProvider))
+
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
+    from tiqora.itsm.linked_articles import LINKED_ARTICLES_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
@@ -37,6 +50,7 @@ def register_core(registry: Registry) -> None:
 
     registry.add(JOB_HANDLERS, TICKET_EXPORT_JOB)
     registry.add(JOB_HANDLERS, GI_MAIL_JOB)
+    registry.add(JOB_HANDLERS, LINKED_ARTICLES_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_SYNC_JOB)
     registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)

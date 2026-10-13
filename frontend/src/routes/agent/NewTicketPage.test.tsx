@@ -25,6 +25,10 @@ const {
   defaultQueue,
   screenDynamicFields,
   fieldOptionsFetch,
+  listReferenceServices,
+  itsmStatus,
+  itsmSuggestion,
+  itsmRecent,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
@@ -44,7 +48,19 @@ const {
   defaultQueue: vi.fn(),
   screenDynamicFields: vi.fn(),
   fieldOptionsFetch: vi.fn(),
+  listReferenceServices: vi.fn(),
+  itsmStatus: vi.fn(),
+  itsmSuggestion: vi.fn(),
+  itsmRecent: vi.fn(),
 }));
+
+vi.mock("@/lib/itsmApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/itsmApi")>("@/lib/itsmApi");
+  return {
+    ...actual,
+    itsmApi: { ...actual.itsmApi, status: itsmStatus, prioritySuggestion: itsmSuggestion, recentIncident: itsmRecent },
+  };
+});
 
 vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
 
@@ -119,7 +135,7 @@ vi.mock("@/lib/api", async () => {
       createTicketTimeAccounting,
       getCustomer,
       listReferenceTypes: vi.fn().mockResolvedValue([]),
-      listReferenceServices: vi.fn().mockResolvedValue([]),
+      listReferenceServices,
       listReferenceSlas: vi.fn().mockResolvedValue([]),
     },
   };
@@ -134,6 +150,26 @@ function wrap(ui: React.ReactElement) {
       <I18nextProvider i18n={i18n}>{ui}</I18nextProvider>
     </QueryClientProvider>,
   );
+}
+
+function itsmStatusOf(
+  mode: "off" | "znuny_readthrough",
+  fields: { criticality_field: string; impact_field: string } = {
+    criticality_field: "ITSMCriticality",
+    impact_field: "ITSMImpact",
+  },
+) {
+  return {
+    ...fields,
+    mode,
+    source: mode === "off" ? "none" : "znuny",
+    ci_available: mode !== "off",
+    ci_read_only: true,
+    ci_source: mode === "off" ? null : "znuny",
+    unavailable_code: null,
+    znuny: { core_installed: true, cmdb_installed: true, profile: null, packages: [] },
+    setup_complete: true,
+  };
 }
 
 const queue = { id: 1, name: "Support", group_id: 1, valid: true };
@@ -181,6 +217,10 @@ async function pickCustomer() {
 }
 
 beforeEach(() => {
+    listReferenceServices.mockReset().mockResolvedValue([]);
+    itsmStatus.mockReset().mockResolvedValue(itsmStatusOf("off"));
+    itsmSuggestion.mockReset().mockResolvedValue({ priority_id: null });
+    itsmRecent.mockReset().mockResolvedValue(null);
     // The server scopes owner/responsible to the queue; without one the list is empty.
     fieldOptionsFetch.mockReset().mockImplementation(
       async (body: { fields: string[]; context?: { queue_id?: number } }) => ({
@@ -1147,5 +1187,129 @@ describe("NewTicketPage refine", () => {
     fireEvent.click(screen.getByTestId("new-ticket-submit"));
     await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
     expect(createArticle.mock.calls[0][1].body).toBe("eins zwei DREI");
+  });
+});
+
+describe("NewTicketPage ITSM", () => {
+  const matrixFields = [
+    { name: "ITSMCriticality", label: "Criticality", field_type: "Text", required: true, possible_values: null },
+    { name: "ITSMImpact", label: "Impact", field_type: "Text", required: true, possible_values: null },
+  ];
+
+  beforeEach(() => {
+    navigate.mockReset();
+    listQueues.mockReset().mockResolvedValue([queue]);
+    listReferencePriorities.mockReset().mockResolvedValue([
+      { id: 3, name: "3 normal" },
+      { id: 1, name: "1 very low" },
+    ]);
+    listReferenceStates.mockReset().mockResolvedValue(states);
+    searchReferenceCustomers.mockReset().mockResolvedValue([customer]);
+    getComposeContext.mockReset().mockResolvedValue(composeContext);
+    createTicket.mockReset().mockResolvedValue({ ticket_id: 42 });
+    callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
+    defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
+    suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
+    screenDynamicFields.mockReset().mockResolvedValue(matrixFields);
+    listReferenceServices.mockReset().mockResolvedValue([{ id: 8, name: "Kundenportal" }]);
+    itsmStatus.mockReset().mockResolvedValue(itsmStatusOf("znuny_readthrough"));
+    itsmSuggestion.mockReset().mockResolvedValue({ priority_id: 1 });
+    itsmRecent.mockReset().mockResolvedValue(null);
+    searchParams.current = { type: "phone" };
+    window.localStorage.clear();
+  });
+
+  async function openPhone() {
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    await screen.findByTestId("new-ticket-df-required-ITSMCriticality");
+  }
+
+  function fillMatrix(criticality: string, impact: string) {
+    fireEvent.change(screen.getByTestId("new-ticket-df-required-ITSMCriticality"), { target: { value: criticality } });
+    fireEvent.change(screen.getByTestId("new-ticket-df-required-ITSMImpact"), { target: { value: impact } });
+  }
+
+  it("sets the priority from the matrix once criticality and impact are filled", async () => {
+    await openPhone();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("normal"));
+    expect(itsmSuggestion).not.toHaveBeenCalled();
+    fillMatrix("5 very high", "5 very high");
+    await waitFor(() => expect(itsmSuggestion).toHaveBeenCalledWith("5 very high", "5 very high", expect.anything()));
+    await waitFor(() => expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("very low"));
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), { target: { value: "Portal down" } });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "500er" } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() => expect(createTicket).toHaveBeenCalledTimes(1));
+    expect(createTicket.mock.calls[0][0].priority_id).toBe(1);
+  });
+
+  it("keeps a priority the agent picked by hand", async () => {
+    await openPhone();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("normal"));
+    fireEvent.click(screen.getByTestId("new-ticket-priority"));
+    fireEvent.click(await screen.findByTestId("new-ticket-priority-panel-option-3"));
+    fillMatrix("5 very high", "5 very high");
+    await waitFor(() => expect(itsmSuggestion).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("normal");
+  });
+
+  it("reads the matrix fields the admin configured", async () => {
+    screenDynamicFields.mockResolvedValue([
+      { name: "SiteCriticality", label: "Criticality", field_type: "Text", required: true, possible_values: null },
+      { name: "SiteImpact", label: "Impact", field_type: "Text", required: true, possible_values: null },
+    ]);
+    itsmStatus.mockResolvedValue(
+      itsmStatusOf("znuny_readthrough", { criticality_field: "SiteCriticality", impact_field: "SiteImpact" }),
+    );
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    const crit = await screen.findByTestId("new-ticket-df-required-SiteCriticality");
+    fireEvent.change(crit, { target: { value: "5 very high" } });
+    fireEvent.change(screen.getByTestId("new-ticket-df-required-SiteImpact"), { target: { value: "4 high" } });
+    await waitFor(() => expect(itsmSuggestion).toHaveBeenCalledWith("5 very high", "4 high", expect.anything()));
+    await waitFor(() => expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("very low"));
+  });
+
+  it("does not ask the matrix while the ITSM is off", async () => {
+    itsmStatus.mockResolvedValue(itsmStatusOf("off"));
+    await openPhone();
+    fillMatrix("5 very high", "5 very high");
+    await new Promise((r) => setTimeout(r, 30));
+    expect(itsmSuggestion).not.toHaveBeenCalled();
+    expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("normal");
+  });
+
+  it("warns about a recent incident once a service is picked", async () => {
+    itsmRecent.mockResolvedValue({
+      ticket_id: 55,
+      tn: "20261001000055",
+      title: "Portal langsam",
+      type_name: "Incident",
+      created_at: "2026-10-12T08:00:00Z",
+      minutes_ago: 12,
+      window_minutes: 30,
+    });
+    await openPhone();
+    expect(screen.queryByTestId("new-ticket-recent-incident")).toBeNull();
+    fireEvent.click(await screen.findByTestId("new-ticket-more-toggle"));
+    fireEvent.click(await screen.findByTestId("new-ticket-service"));
+    fireEvent.click(await screen.findByTestId("new-ticket-service-panel-option-8"));
+    const warning = await screen.findByTestId("new-ticket-recent-incident");
+    expect(itsmRecent).toHaveBeenCalledWith(8, null, expect.anything());
+    expect(warning).toHaveTextContent("12 minutes ago");
+    expect(warning).toHaveTextContent("#20261001000055");
+    expect(within(warning).getByRole("link")).toHaveAttribute("href", "/agent/tickets/55");
+  });
+
+  it("shows no warning when the service is quiet", async () => {
+    await openPhone();
+    fireEvent.click(await screen.findByTestId("new-ticket-more-toggle"));
+    fireEvent.click(await screen.findByTestId("new-ticket-service"));
+    fireEvent.click(await screen.findByTestId("new-ticket-service-panel-option-8"));
+    await waitFor(() => expect(itsmRecent).toHaveBeenCalled());
+    expect(screen.queryByTestId("new-ticket-recent-incident")).toBeNull();
   });
 });

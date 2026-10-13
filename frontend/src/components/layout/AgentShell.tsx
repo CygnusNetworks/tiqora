@@ -3,6 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type QueueNode } from "@/lib/api";
+import { cmdbNavVisible, itsmApi, itsmKeys } from "@/lib/itsmApi";
 import { logoUrl } from "@/lib/assets";
 import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
@@ -285,6 +286,13 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     queryKey: ["queues"],
     queryFn: () => api.listQueues(),
   });
+  // Not gated: the status route answers in every mode. A failure just hides the entry.
+  const itsmStatusQ = useQuery({
+    queryKey: itsmKeys.status(),
+    queryFn: ({ signal }) => itsmApi.status(signal),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
   const flat = flattenQueues(queuesQ.data ?? []);
   const totalOpen = flat.reduce((sum, q) => sum + (q.counts?.open ?? 0), 0);
 
@@ -495,6 +503,15 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-time-accounting"
             onNavigate={onNavigate}
           />
+          {cmdbNavVisible(itsmStatusQ.data) && (
+            <NavItem
+              to="/agent/itsm/cis"
+              label={t("sidebar.cmdb")}
+              icon={<ServerIcon />}
+              testId="agent-nav-cmdb"
+              onNavigate={onNavigate}
+            />
+          )}
           <PluginNavItems group="insights" onNavigate={onNavigate} />
         </NavGroup>
 

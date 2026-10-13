@@ -57,6 +57,9 @@ import {
 } from "@/lib/phoneCall";
 import { EmailSecurityControl } from "@/components/agent/EmailSecurityControl";
 import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
+import { RecentIncidentWarning } from "@/components/itsm/RecentIncidentWarning";
+import { itsmApi, itsmKeys } from "@/lib/itsmApi";
+
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -212,6 +215,8 @@ export function NewTicketPage() {
   const [queuePinned, setQueuePinned] = useState(queueId !== undefined);
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState<number | "">("");
+  // The ITSM matrix only fills the priority until the agent picks one by hand.
+  const [priorityTouched, setPriorityTouched] = useState(false);
   const [state, setState] = useState<number | "">("");
   const [body, setBody] = useState("");
   const refineReview = useRefineReview(setBody);
@@ -240,6 +245,30 @@ export function NewTicketPage() {
   // go into "Weitere Felder".
   const requiredDfs = useMemo(() => phoneDfs.filter((f) => f.required), [phoneDfs]);
   const optionalDfs = useMemo(() => phoneDfs.filter((f) => !f.required), [phoneDfs]);
+  // ITSM (matrix priority, incident flood hint): only while the ITSM is switched on.
+  const itsmStatusQ = useQuery({
+    queryKey: itsmKeys.status(),
+    queryFn: ({ signal }) => itsmApi.status(signal),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const itsmOn = !!itsmStatusQ.data && itsmStatusQ.data.mode !== "off";
+  // The dynamic fields the matrix reads are an admin setting (default ITSMCriticality/ITSMImpact).
+  const criticalityField = itsmStatusQ.data?.criticality_field ?? "";
+  const impactField = itsmStatusQ.data?.impact_field ?? "";
+  const hasMatrixFields =
+    !!criticalityField &&
+    !!impactField &&
+    phoneDfs.some((f) => f.name === criticalityField) &&
+    phoneDfs.some((f) => f.name === impactField);
+  const criticality = phoneFields.dfValues[criticalityField]?.[0] ?? null;
+  const impact = phoneFields.dfValues[impactField]?.[0] ?? null;
+  const matrixQ = useQuery({
+    queryKey: itsmKeys.prioritySuggestion(criticality, impact),
+    queryFn: ({ signal }) => itsmApi.prioritySuggestion(criticality, impact, signal),
+    retry: false,
+    enabled: ticketType === "phone" && itsmOn && hasMatrixFields && !!criticality && !!impact,
+  });
   // Customer preselected by login (click-to-call from the customer page).
   const presetCustomerQ = useQuery({
     queryKey: ["customers", search.customer],
@@ -336,6 +365,13 @@ export function NewTicketPage() {
       setPriority(defaultId(priorities, ["normal", "3"]) ?? priorities[0].id);
     }
   }, [priorities, priority]);
+  // Matrix suggestion for criticality x impact; never overrides a priority the agent picked.
+  const matrixPriority = matrixQ.data?.priority_id ?? null;
+  useEffect(() => {
+    if (priorityTouched || matrixPriority === null) return;
+    if (!priorities.some((p) => p.id === matrixPriority)) return;
+    setPriority(matrixPriority);
+  }, [matrixPriority, priorityTouched, priorities]);
   // Also re-seeds when the ticket type changes and the chosen state is not
   // offered for the other type (e.g. "closed" is phone-only).
   // Answered and hung up; a missed call (ended, never answered) keeps open.
@@ -930,7 +966,10 @@ export function NewTicketPage() {
               }
               priorities={priorities}
               priorityId={priority === "" ? null : priority}
-              onPriorityChange={setPriority}
+              onPriorityChange={(id) => {
+                setPriorityTouched(true);
+                setPriority(id);
+              }}
               states={states}
               stateId={state === "" ? null : state}
               onStateChange={setState}
@@ -966,6 +1005,11 @@ export function NewTicketPage() {
                 queueId={queue === "" ? null : queue}
               />
             )}
+
+            <RecentIncidentWarning
+              serviceId={ticketType === "phone" ? phoneFields.serviceId : null}
+              enabled={itsmOn}
+            />
 
             {ticketType === "phone" ? (
               <div className="block">

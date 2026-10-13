@@ -1,0 +1,264 @@
+"""Znuny databases *with* the ITSM packages, for both dialects and both schema profiles.
+
+``itsm_db_url`` is a session fixture that hands out a factory. ``itsm_db_url("mysql", "itsm-6")``
+creates a second database ``tq_itsm_itsm_6`` inside the MariaDB container the suite already
+runs (PostgreSQL: the same inside its container) and loads, in Znuny's installer order:
+
+1. core schema, core initial insert, core schema-post (``fixtures/legacy-schema/`` of the
+   Znuny line: 6.5 for ``itsm-6``, 7.3 for ``itsm-7``)
+2. ITSM schema, ITSM initial insert, ITSM schema-post (``fixtures/znuny-itsm/<profile>/``)
+3. the ITSM related ``sysconfig_default`` rows (``sysconfig.json``)
+4. the Tiqora tables (``TiqoraBase.metadata.create_all``)
+
+The database is then registered for the per-module restore of ``conftest.py``, so a module that
+leaves rows behind is reported (and repaired) exactly like for the plain Znuny databases. The
+main test databases stay free of ITSM tables: auto-mode tests elsewhere rely on that.
+
+Credentials: ``CREATE DATABASE`` needs more than the test user has on MariaDB. The container
+fixtures do not expose the container, so this module connects as ``root`` with
+``MYSQL_ROOT_PASSWORD`` (default ``test``, the testcontainers default the container was started
+with). PostgreSQL's ``test`` user is a superuser.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import tempfile
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Literal
+from urllib.parse import urlparse, urlunparse
+
+import pytest
+from sqlalchemy import create_engine, text
+
+from tiqora.bootstrap.schema_loader import (
+    legacy_schema_dir,
+    load_sql_mysql,
+    load_sql_postgres,
+)
+
+Dialect = Literal["mysql", "postgresql"]
+
+ITSM_PARAMS: list[tuple[str, str]] = [
+    ("mysql", "itsm-6"),
+    ("mysql", "itsm-7"),
+    ("postgresql", "itsm-6"),
+    ("postgresql", "itsm-7"),
+]
+
+ITSM_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "znuny-itsm"
+_URL_FIXTURE: dict[str, str] = {"mysql": "mariadb_znuny_url", "postgresql": "postgres_znuny_url"}
+# The Znuny core schema each ITSM profile sits on (the ITSM 7.3 seed writes ``group_user.id`` and
+# ``ticket_state.color``, which only the 7.x core has).
+CORE_SCHEMA = {"itsm-6": "znuny-6.5", "itsm-7": "znuny-7.3"}
+# Row id range the ITSM sysconfig rows use; far above anything the Znuny seed or a test writes.
+_SYSCONFIG_BASE_ID = 900_000
+
+
+def itsm_db_name(profile: str) -> str:
+    """``tq_itsm_<profile>`` with the dash replaced (an unquoted identifier must not have one)."""
+    return "tq_itsm_" + profile.replace("-", "_")
+
+
+def snapshot_name(dialect: str, profile: str) -> str:
+    """Key of the database in ``conftest._SNAPSHOTS``."""
+    return f"{dialect}:{profile}"
+
+
+def with_database(url: str, name: str) -> str:
+    """The same server and credentials, another database."""
+    parsed = urlparse(url)
+    return urlunparse(parsed._replace(path="/" + name))
+
+
+def to_async_url(url: str) -> str:
+    return (
+        url.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+        .replace("mysql+pymysql://", "mysql+aiomysql://")
+        .replace("postgresql://", "postgresql+asyncpg://")
+    )
+
+
+def _create_database(dialect: str, base_url: str, name: str) -> str:
+    """(Re)create the database ``name`` next to the one ``base_url`` points at."""
+    if dialect == "mysql":
+        parsed = urlparse(base_url)
+        root_url = urlunparse(
+            parsed._replace(
+                netloc=f"root:{os.environ.get('MYSQL_ROOT_PASSWORD', 'test')}@{parsed.hostname}"
+                f":{parsed.port or 3306}"
+            )
+        )
+        engine = create_engine(with_database(root_url, "mysql"), isolation_level="AUTOCOMMIT")
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f"DROP DATABASE IF EXISTS `{name}`"))
+                conn.execute(
+                    text(
+                        f"CREATE DATABASE `{name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
+                    )
+                )
+                user = parsed.username or "test"
+                conn.execute(text(f"GRANT ALL PRIVILEGES ON `{name}`.* TO '{user}'@'%'"))
+                conn.execute(text("FLUSH PRIVILEGES"))
+        finally:
+            engine.dispose()
+    else:
+        engine = create_engine(base_url, isolation_level="AUTOCOMMIT")
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+                conn.execute(text(f'CREATE DATABASE "{name}"'))
+        finally:
+            engine.dispose()
+    return with_database(base_url, name)
+
+
+# Comment lines the survey writes between the statements of ``initial_insert.sql``. The shared
+# statement splitter cuts at the ``;`` inside the header line, so they are dropped before loading.
+_SURVEY_COMMENT = re.compile(r"^-- (?:generated by .*|\w+)\n", re.M)
+
+
+def _load(dialect: str, url: str, path: Path) -> None:
+    loader = load_sql_mysql if dialect == "mysql" else load_sql_postgres
+    if path.name != "initial_insert.sql":
+        loader(url, path)
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        cleaned = Path(tmp) / "initial_insert.sql"
+        cleaned.write_text(_SURVEY_COMMENT.sub("", path.read_text(encoding="utf-8")))
+        loader(url, cleaned)
+
+
+def _load_znuny_and_itsm(dialect: str, url: str, profile: str) -> None:
+    core = legacy_schema_dir(CORE_SCHEMA[profile])
+    itsm = ITSM_FIXTURES / profile
+    if dialect == "mysql":
+        order = [
+            core / "schema.mysql.sql",
+            core / "initial_insert.mysql.sql",
+            core / "schema-post.mysql.sql",
+            itsm / "schema.mysql.sql",
+            itsm / "initial_insert.sql",
+            itsm / "schema-post.mysql.sql",
+        ]
+    else:
+        order = [
+            core / "schema.postgresql.sql",
+            core / "initial_insert.postgresql.sql",
+            core / "schema-post.postgresql.sql",
+            itsm / "schema.postgresql.sql",
+            itsm / "initial_insert.sql",
+            itsm / "schema-post.postgresql.sql",
+        ]
+    for path in order:
+        _load(dialect, url, path)
+
+
+def _advance_postgres_sequences(url: str) -> None:
+    """The ITSM ``initial_insert`` writes explicit ids and, like Znuny's, leaves the sequences."""
+    engine = create_engine(url, isolation_level="AUTOCOMMIT")
+    try:
+        with engine.connect() as conn:
+            serials = conn.execute(
+                text(
+                    "SELECT table_name, pg_get_serial_sequence(format('%I', table_name), 'id')"
+                    " FROM information_schema.columns"
+                    " WHERE table_schema = 'public' AND column_name = 'id'"
+                )
+            ).all()
+            for table, sequence in serials:
+                if sequence is None:
+                    continue
+                conn.execute(
+                    text(
+                        f"SELECT setval(:seq, COALESCE(MAX(id), 1), MAX(id) IS NOT NULL)"
+                        f' FROM "{table}"'
+                    ),
+                    {"seq": sequence},
+                )
+    finally:
+        engine.dispose()
+
+
+def _load_itsm_sysconfig(dialect: str, url: str, profile: str) -> None:
+    """One ``sysconfig_default`` row per ITSM setting of the profile (effective value in YAML)."""
+    from tiqora.znuny.sysconfig import yaml_encode_effective
+
+    values: dict[str, Any] = json.loads((ITSM_FIXTURES / profile / "sysconfig.json").read_text())
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            known = set(conn.execute(text("SELECT name FROM sysconfig_default")).scalars())
+            rows = []
+            for index, (name, value) in enumerate(values.items()):
+                if name in known:
+                    continue
+                enc: bytes | str = yaml_encode_effective(value)
+                if dialect == "postgresql":
+                    enc = enc.decode("utf-8")  # a bytes bind would be stored as a hex string
+                rows.append({"id": _SYSCONFIG_BASE_ID + index, "n": name, "e": enc})
+            if rows:
+                conn.execute(
+                    text(
+                        "INSERT INTO sysconfig_default (id, name, description, navigation,"
+                        " is_invisible, is_readonly, is_required, is_valid, has_configlevel,"
+                        " user_modification_possible, user_modification_active,"
+                        " xml_content_raw, xml_content_parsed, xml_filename, effective_value,"
+                        " is_dirty, exclusive_lock_guid, create_time, create_by, change_time,"
+                        " change_by) VALUES (:id, :n, 'x', 'x', 0, 0, 0, 1, 0, 0, 0, 'x', 'x',"
+                        " 'ITSM.xml', :e, 0, '0', current_timestamp, 1, current_timestamp, 1)"
+                    ),
+                    rows,
+                )
+    finally:
+        engine.dispose()
+
+
+def _create_tiqora_tables(url: str) -> None:
+    # Importing the package registers every tiqora_* model on the metadata.
+    import tiqora.db.tiqora  # noqa: F401
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    engine = create_engine(url)
+    try:
+        TiqoraBase.metadata.create_all(engine)
+    finally:
+        engine.dispose()
+
+
+def build_itsm_database(dialect: str, base_url: str, profile: str) -> str:
+    """Create and fill the ITSM database next to ``base_url``; returns its sync URL."""
+    url = _create_database(dialect, base_url, itsm_db_name(profile))
+    _load_znuny_and_itsm(dialect, url, profile)
+    if dialect == "postgresql":
+        _advance_postgres_sequences(url)
+    _load_itsm_sysconfig(dialect, url, profile)
+    _create_tiqora_tables(url)
+    return url
+
+
+@pytest.fixture(scope="session")
+def itsm_db_url(request: pytest.FixtureRequest) -> Callable[[str, str], str]:
+    """``itsm_db_url(dialect, profile) -> sync URL`` of the ITSM database (built on first use)."""
+    from tests.conftest import register_snapshot
+
+    cache: dict[tuple[str, str], str] = {}
+
+    def get(dialect: str, profile: str) -> str:
+        if dialect not in _URL_FIXTURE:
+            raise ValueError(f"unknown dialect {dialect!r}")
+        if profile not in ("itsm-6", "itsm-7"):
+            raise ValueError(f"unknown ITSM profile {profile!r}")
+        key = (dialect, profile)
+        if key not in cache:
+            base_url = request.getfixturevalue(_URL_FIXTURE[dialect])
+            url = build_itsm_database(dialect, base_url, profile)
+            register_snapshot(snapshot_name(dialect, profile), url, dialect)
+            cache[key] = url
+        return cache[key]
+
+    return get

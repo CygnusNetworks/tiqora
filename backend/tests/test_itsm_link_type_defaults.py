@@ -51,12 +51,23 @@ def test_defaults_shape() -> None:
     by_name = {d.name: d for d in DEFAULT_LINK_TYPES}
     assert set(by_name) == {"DependsOn", "Includes", "ConnectedTo", "AlternativeTo", "RelevantTo"}
     assert len(by_name) == len(DEFAULT_LINK_TYPES)
-    assert by_name["DependsOn"].propagation == "source"
+    assert by_name["DependsOn"].propagation == "both"
     assert {d.name for d in DEFAULT_LINK_TYPES if d.propagation != "none"} == {"DependsOn"}
     # Tiqora-origin types are never offered for ticket <-> ticket (Znuny cannot store them)
     assert not any(d.offer_ticket_ticket for d in DEFAULT_LINK_TYPES)
-    assert by_name["RelevantTo"].offer_ticket_ci
-    assert by_name["DependsOn"].offer_ci_service
+    # Znuny ITSM PossibleLink pairs (behaviour vector 6): ticket-CI and CI-service three types
+    assert {d.name for d in DEFAULT_LINK_TYPES if d.offer_ticket_ci} == {
+        "AlternativeTo",
+        "DependsOn",
+        "RelevantTo",
+    }
+    assert {d.name for d in DEFAULT_LINK_TYPES if d.offer_ci_service} == {
+        "AlternativeTo",
+        "DependsOn",
+        "RelevantTo",
+    }
+    assert {d.name for d in DEFAULT_LINK_TYPES if d.offer_ci_ci} == set(_NAMES)
+    assert {d.name for d in DEFAULT_LINK_TYPES if d.pointed} == {"DependsOn", "Includes"}
     assert [d.position for d in DEFAULT_LINK_TYPES] == sorted(
         {d.position for d in DEFAULT_LINK_TYPES}
     )
@@ -88,7 +99,7 @@ async def test_inserts_missing_then_nothing(
             )
         assert [r.name for r in rows if r.name in _NAMES] == list(_NAMES)
         dep = next(r for r in rows if r.name == "DependsOn")
-        assert (dep.origin, dep.propagation, dep.valid) == ("tiqora", "source", True)
+        assert (dep.origin, dep.propagation, dep.valid) == ("tiqora", "both", True)
         assert (dep.create_by, dep.change_by) == (7, 7)
         assert isinstance(dep.create_time, datetime) and dep.change_time == dep.create_time
         assert dep.source_label is None and dep.target_label is None

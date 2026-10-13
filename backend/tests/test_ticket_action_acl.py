@@ -317,6 +317,8 @@ async def test_acl_actions_without_acls_lists_all(
         resp = await client.get(f"/api/v1/tickets/{T_BILLING}/acl-actions")
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"allowed": list(ZOOM_ACTIONS)}
+    # The zoom's ITSM dialogs ask the ACL for these two screens.
+    assert {"AgentTicketAddtlITSMField", "AgentTicketDecision"} <= set(resp.json()["allowed"])
 
 
 @pytest.mark.asyncio

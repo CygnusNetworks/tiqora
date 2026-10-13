@@ -493,7 +493,8 @@
       "saved": "Gespeichert",
       "saveError": "Die Felder konnten nicht gespeichert werden.",
       "yes": "Ja",
-      "no": "Nein"
+      "no": "Nein",
+      "noFields": "In dieser Maske gibt es keine Felder, die Sie bearbeiten können."
     },
     "noTitle": "(kein Titel)",
     "articles": "Artikel",
@@ -917,7 +918,11 @@
       "label": "Verknüpfte Tickets",
       "parent": "Eltern",
       "child": "Kind",
-      "related": "Verknüpft"
+      "related": "Verknüpft",
+      "remove": "Verknüpfung entfernen",
+      "removeTitle": "Verknüpfung entfernen",
+      "removeConfirm": "Verknüpfung zwischen {{a}} und {{b}} entfernen?",
+      "removeError": "Die Verknüpfung konnte nicht entfernt werden."
     },
     "nav": {
       "copyTn": "Ticketnummer kopieren",
@@ -2194,7 +2199,9 @@
       "plugins": "Erweiterungen",
       "dashboardTemplates": "Dashboard-Vorlagen",
       "webservices": "Webservices",
-      "dashboardKioskLinks": "Wallboard-Links"
+      "dashboardKioskLinks": "Wallboard-Links",
+      "itsm": "ITSM",
+      "itsmLinkTypes": "Verknüpfungstypen"
     },
     "table": {
       "id": "ID",
@@ -3835,7 +3842,10 @@
       "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
       "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich.",
       "webservices": "Webservices (GenericInterface) einsehen, ausgehende Aufrufe prüfen und Zielfreigaben verwalten.",
-      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen."
+      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen.",
+      "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
+      "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
+      "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM"
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4295,6 +4305,79 @@
           "deploy_from_tiqora": {
             "label": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)",
             "help": "Nur einschalten, wenn Znuny nicht mehr parallel läuft. Sonst zeigt Znuny weiter den alten Stand an."
+          }
+        }
+      },
+      "itsm": {
+        "title": "ITSM",
+        "fields": {
+          "incident_type": {
+            "label": "Ticket-Typ Störung",
+            "help": "Ticket-Typ von Störungen (Incidents)."
+          },
+          "major_incident_type": {
+            "label": "Ticket-Typ Großstörung",
+            "help": "Ticket-Typ, der eine Großstörung kennzeichnet."
+          },
+          "service_request_type": {
+            "label": "Ticket-Typ Serviceanfrage",
+            "help": "Ticket-Typ von Serviceanfragen."
+          },
+          "problem_type": {
+            "label": "Ticket-Typ Problem",
+            "help": "Ticket-Typ von Problem-Tickets."
+          },
+          "change_type": {
+            "label": "Ticket-Typ Änderung",
+            "help": "Ticket-Typ von Änderungen."
+          },
+          "change_task_type": {
+            "label": "Ticket-Typ Änderungsaufgabe",
+            "help": "Ticket-Typ von Änderungsaufgaben."
+          },
+          "workaround_state": {
+            "label": "Status „Geschlossen mit Workaround“",
+            "help": "Ticket-Status, der beim Schließen von Störungen mit Workaround gesetzt wird."
+          },
+          "criticality_field": {
+            "label": "Feld Kritikalität",
+            "help": "Name des Dynamischen Felds mit der Kritikalität."
+          },
+          "impact_field": {
+            "label": "Feld Auswirkung",
+            "help": "Name des Dynamischen Felds mit der Auswirkung."
+          },
+          "priority_matrix_enabled": {
+            "label": "Prioritätsmatrix",
+            "help": "Priorität aus Kritikalität und Auswirkung setzen, sobald sich eines von beiden ändert."
+          },
+          "ci_ticket_link_type": {
+            "label": "Verknüpfungstyp für betroffene CIs",
+            "help": "Verknüpfungstyp, wenn ein Konfigurationselement mit einem Ticket verknüpft wird."
+          },
+          "problem_link_type": {
+            "label": "Verknüpfungstyp für Probleme",
+            "help": "Verknüpfungstyp zwischen einem Problem und seinen Störungen."
+          },
+          "known_error_kb_category_id": {
+            "label": "Wissensdatenbank-Kategorie für bekannte Fehler",
+            "help": "Kategorie-ID für Artikel zu bekannten Fehlern. 0 schaltet die Schaltfläche aus."
+          },
+          "min_minutes_between_incidents": {
+            "label": "Minuten zwischen Störungen",
+            "help": "Vorgabe für Services ohne eigenen Wert. 0 schaltet die Warnung aus."
+          },
+          "linked_articles_max_tickets": {
+            "label": "Höchstzahl Tickets pro Notiz",
+            "help": "Obergrenze für Notizen an verknüpfte Tickets."
+          },
+          "major_incident_customer_reply": {
+            "label": "Kundenantwort bei Großstörungen",
+            "help": "Erlaubt, Großstörungs-Aktualisierungen per E-Mail an die Kunden verknüpfter Tickets zu senden."
+          },
+          "znuny_agent_url": {
+            "label": "Znuny-Agentenadresse",
+            "help": "Adresse der Znuny-Agentenoberfläche für „In Znuny bearbeiten“. Leer: aus der Znuny-Konfiguration ableiten. Muss mit http:// oder https:// beginnen."
           }
         }
       }
@@ -5175,6 +5258,142 @@
       "deleteTitle": "Link „{{name}}“ löschen?",
       "deleteMessage": "Der widerrufene Link wird aus der Liste entfernt.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut."
+    },
+    "itsm": {
+      "title": "ITSM",
+      "settingsLink": "ITSM-Einstellungen",
+      "linkTypes": {
+        "title": "Verknüpfungstypen",
+        "editTitle": "Verknüpfungstyp {{name}}",
+        "sourceLabel": "Bezeichnung (Quelle)",
+        "targetLabel": "Bezeichnung (Ziel)",
+        "offer": "Angeboten für",
+        "flags": {
+          "offer_ticket_ticket": "Ticket zu Ticket",
+          "offer_ticket_ci": "Ticket zu Konfigurationselement",
+          "offer_ci_ci": "Konfigurationselement zu Konfigurationselement",
+          "offer_ci_service": "Konfigurationselement zu Service"
+        },
+        "flagsShort": {
+          "offer_ticket_ticket": "Ticket-Ticket",
+          "offer_ticket_ci": "Ticket-CI",
+          "offer_ci_ci": "CI-CI",
+          "offer_ci_service": "CI-Service"
+        },
+        "propagation": "Weitergabe des Incident-Status",
+        "propagations": {
+          "none": "keine",
+          "source": "von der Quelle",
+          "target": "vom Ziel",
+          "both": "in beide Richtungen"
+        },
+        "valid": "Angeboten (gültig)",
+        "name": "Name",
+        "origin": "Herkunft",
+        "labels": "Bezeichnungen",
+        "hidden": "ausgeblendet",
+        "origins": {
+          "znuny": "aus Znuny",
+          "tiqora": "Tiqora"
+        },
+        "sync": "Aus Znuny aktualisieren",
+        "synced": "{{count}} Zeilen aktualisiert.",
+        "missing": "Aus Znuny angeboten, noch ohne Zeile: {{names}}. „Aus Znuny aktualisieren“ legt die Zeilen an.",
+        "errors": {
+          "generic": "Der Verknüpfungstyp konnte nicht gespeichert werden.",
+          "znuny_link_type_read_only": "Bei einem Znuny-Verknüpfungstyp lassen sich nur Bezeichnungen, Angebot und Gültigkeit ändern.",
+          "link_type_name_immutable": "Der Name lässt sich nicht ändern.",
+          "invalid_propagation": "Diese Weitergabe ist nicht gültig.",
+          "offer_ticket_ticket_not_allowed": "Die Weitergabe braucht einen Typ, der für Ticket-Verknüpfungen angeboten wird."
+        }
+      },
+      "error": "Die ITSM-Einstellungen konnten nicht geladen oder gespeichert werden.",
+      "mode": {
+        "title": "ITSM-Modus",
+        "names": {
+          "off": "Aus",
+          "znuny_readthrough": "Znuny führt das ITSM (nur lesen)",
+          "tiqora": "Tiqora führt das ITSM"
+        },
+        "sources": {
+          "auto": "automatisch erkannt",
+          "admin": "vom Administrator",
+          "importer": "durch den Import"
+        },
+        "descriptions": {
+          "off": "Das ITSM ist ausgeschaltet: keine Konfigurationselemente, keine ITSM-Dialoge.",
+          "znuny_readthrough": "Konfigurationselemente werden aus Znuny gelesen und hier nicht geändert. Änderungen erfolgen in Znuny.",
+          "tiqora": "Tiqora hält die ITSM-Daten selbst."
+        },
+        "detected": "In Znuny installiert",
+        "detectedCore": "ITSM-Kern",
+        "detectedNone": "kein Znuny-ITSM gefunden",
+        "unsupported": "Diese Znuny-ITSM-Version wird nicht unterstützt ({{reason}}). Der ITSM-Import bietet ein Umstellen ohne CI-Daten an.",
+        "importHint": "Der Wechsel zu „Tiqora führt das ITSM“ erfolgt über den ITSM-Import.",
+        "importLink": "ITSM-Import öffnen",
+        "switchTo": {
+          "off": "ITSM ausschalten",
+          "znuny_readthrough": "Znuny führen lassen (nur lesen)",
+          "tiqora": "Tiqora führen lassen"
+        },
+        "transitionRefused": "Dieser Wechsel ist nicht möglich: {{reason}}",
+        "reasons": {
+          "unknown": "im aktuellen Zustand nicht erlaubt",
+          "already_in_mode": "dieser Modus ist bereits aktiv",
+          "off_returns_to_tiqora_while_switched": "nach dem Import kann nur Tiqora wieder übernehmen",
+          "off_returns_to_previous_mode": "das ITSM kehrt in den vorherigen Modus zurück",
+          "znuny_to_tiqora_importer_only": "der Wechsel zu Tiqora erfolgt über den ITSM-Import",
+          "tiqora_to_znuny_importer_only": "der Weg zurück zu Znuny erfolgt über den ITSM-Import",
+          "znuny_itsm_not_detected": "es wurde kein Znuny-ITSM erkannt",
+          "tiqora_cmdb_not_empty": "die Tiqora-CMDB enthält bereits Konfigurationselemente"
+        }
+      },
+      "setup": {
+        "title": "Einrichtung",
+        "intro": "Ticket-Typen, Status und Felder, die die ITSM-Dialoge brauchen. Fehlende Teile werden so angelegt, wie Znuny sie anlegt.",
+        "groups": {
+          "incident_problem": "Incident- und Problem-Management",
+          "change": "Change-Management (optional)"
+        },
+        "kinds": {
+          "ticket_type": "Ticket-Typ",
+          "ticket_state": "Ticket-Status",
+          "dynamic_field": "Dynamisches Feld"
+        },
+        "status": {
+          "present": "vorhanden",
+          "missing": "fehlt",
+          "conflict": "Konflikt",
+          "invalid": "ungültig"
+        },
+        "apply": "Einrichten",
+        "complete": "Alles für Incident- und Problem-Management ist vorhanden."
+      },
+      "matrix": {
+        "title": "Prioritätsmatrix",
+        "empty": "Es sind noch keine Kritikalitäts- oder Auswirkungswerte definiert.",
+        "criticality": "Kritikalität",
+        "impact": "Auswirkung",
+        "save": "Matrix speichern",
+        "readOnly": "Diese Matrix gehört Znuny. In Znuny bearbeiten."
+      },
+      "service": {
+        "menu": "ITSM-Daten",
+        "title": "ITSM-Daten von {{name}}",
+        "znunyOwned": "Typ und Kritikalität stammen aus Znuny und sind hier schreibgeschützt.",
+        "type": "Service-Typ",
+        "criticality": "Kritikalität",
+        "description": "Beschreibung",
+        "owner": "Verantwortlich: {{name}}",
+        "portalVisible": "Im Portal sichtbar",
+        "minMinutes": "Minuten zwischen Incidents",
+        "minMinutesHelp": "Leer nutzt den Standard aus den ITSM-Einstellungen; 0 schaltet die Prüfung aus.",
+        "errors": {
+          "read_only": "Typ und Kritikalität werden in Znuny gepflegt.",
+          "service_not_found": "Der Service wurde nicht gefunden.",
+          "generic": "Die ITSM-Daten konnten nicht gespeichert werden."
+        }
+      }
     }
   },
   "kb": {
@@ -5799,7 +6018,8 @@
         "report_backfill": "Berichtsdaten aufbauen",
         "gi_invoke": "Webservice-Aufruf",
         "gi_invoke_sync": "Webservice-Aufruf",
-        "report_delivery": "Berichtsversand"
+        "report_delivery": "Berichtsversand",
+        "itsm_linked_articles": "Notiz an verknüpfte Tickets"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },
@@ -7649,6 +7869,217 @@
       "skipped_other": "{{count}} übersprungen",
       "nothingDone": "Es wurde nichts übernommen.",
       "whereToFind": "Sie finden die Suchen unter „Alle gespeicherten Suchen…“ in der Seitenleiste."
+    }
+  },
+  "itsm": {
+    "ci": {
+      "title": "Konfigurationselemente",
+      "detailTitle": "Konfigurationselement",
+      "attributes": "Attribute",
+      "noAttributes": "Dieses Konfigurationselement hat keine Attribute.",
+      "empty": "Keine Konfigurationselemente gefunden.",
+      "openInZnuny": "In Znuny bearbeiten",
+      "searchLabel": "Konfigurationselemente suchen",
+      "searchPlaceholder": "Nummer, Name oder Attributwert",
+      "searchHint": "Attributwerte werden ab 3 Zeichen durchsucht; kürzere Eingaben treffen nur Nummer und Name.",
+      "classLabel": "Klasse",
+      "allClasses": "Alle Klassen",
+      "deploymentLabel": "Verwendungsstatus",
+      "allDeployment": "Alle Verwendungsstatus",
+      "incidentLabel": "Vorfallstatus",
+      "allIncident": "Alle Vorfallstatus",
+      "colNumber": "Nummer",
+      "colName": "Name",
+      "colClass": "Klasse",
+      "colDeployment": "Verwendung",
+      "colIncident": "Vorfall",
+      "total": "{{count}} Konfigurationselement(e)",
+      "range": "{{from}}–{{to}} von {{total}}",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "truncated": "Es gibt weitere Treffer. Bitte die Suche eingrenzen.",
+      "loadError": "Die Konfigurationselemente konnten nicht geladen werden.",
+      "notFound": "Dieses Konfigurationselement existiert nicht oder ist für Sie nicht sichtbar.",
+      "back": "Alle Konfigurationselemente",
+      "readOnly": "Nur-Lese-Ansicht der Znuny-CMDB",
+      "deployment": "Verwendung",
+      "incident": "Vorfall",
+      "versions": "Versionen",
+      "noVersions": "Keine Versionen.",
+      "versionCurrent": "Aktuelle Version",
+      "viewVersion": "Version ansehen",
+      "viewingVersion": "Version {{seq}} vom {{date}} wird angezeigt",
+      "showCurrent": "Aktuelle Version anzeigen",
+      "versionShown": "Angezeigt",
+      "versionBy": "von {{name}}",
+      "tickets": "Verknüpfte Tickets",
+      "noTickets": "Keine Tickets verknüpft."
+    },
+    "errors": {
+      "itsm_off": "Das ITSM ist ausgeschaltet.",
+      "unsupported_znuny_itsm_version": "Die installierte Znuny-ITSM-Version wird nicht unterstützt.",
+      "znuny_itsm_missing": "Die Znuny-ITSM-Tabellen wurden nicht gefunden.",
+      "cmdb_not_installed": "Die Znuny-CMDB ist nicht installiert.",
+      "search_too_broad": "Die Suche ist zu allgemein. Bitte schränken Sie sie ein.",
+      "generic": "Die ITSM-Daten konnten nicht geladen werden."
+    },
+    "graph": {
+      "toggle": "Als Grafik",
+      "label": "Verknüpfungsgrafik",
+      "truncated": "Weitere Verknüpfungen ausgeblendet"
+    },
+    "linkedNote": {
+      "open": "Notiz an verknüpfte Tickets",
+      "title": "Notiz an verknüpfte Tickets",
+      "targets": "Verknüpfte Tickets",
+      "subject": "Betreff",
+      "text": "Text",
+      "visible": "Für Kunden sichtbar",
+      "send": "Senden",
+      "invalid": "Die Notiz konnte nicht eingereiht werden. Bitte prüfen Sie Auswahl und Text.",
+      "error": "Die Notiz konnte nicht eingereiht werden.",
+      "done": "An {{count}} Ticket(s) angehängt",
+      "skipped": "Übersprungen: {{count}} Ticket(s)",
+      "reasons": {
+        "no_rw": "keine Schreibberechtigung",
+        "not_linked": "nicht mehr verknüpft",
+        "no_customer_address": "keine Kundenadresse",
+        "error": "Fehler"
+      }
+    },
+    "zoom": {
+      "roles": {
+        "incident": "Incident",
+        "major_incident": "Major Incident",
+        "service_request": "Service Request",
+        "problem": "Problem",
+        "change": "Change",
+        "change_task": "Change-Aufgabe"
+      },
+      "criticality": "Kritikalität: {{value}}",
+      "impact": "Auswirkung: {{value}}",
+      "matrix": "Matrix: {{priority}}",
+      "flood": "Für diesen Service gab es vor {{minutes}} Minuten bereits einen Incident: #{{tn}} - verknüpfen?",
+      "floodLink": "Verknüpfen",
+      "floodLinked": "Verknüpft.",
+      "floodError": "Das Ticket konnte nicht verknüpft werden.",
+      "cis": {
+        "title": "Betroffene CIs",
+        "add": "CI verknüpfen",
+        "empty": "Keine Konfigurationselemente verknüpft.",
+        "deployment": "Verwendungsstatus",
+        "incident": "Vorfallstatus",
+        "remove": "{{name}} entfernen",
+        "removeShort": "Entfernen",
+        "linkError": "Das CI konnte nicht verknüpft werden.",
+        "removeError": "Die Verknüpfung konnte nicht entfernt werden."
+      },
+      "picker": {
+        "title": "CI verknüpfen",
+        "search": "CIs nach Nummer oder Name suchen",
+        "class": "Klasse",
+        "allClasses": "Alle Klassen",
+        "linkType": "Verknüpfungstyp",
+        "defaultLinkType": "Standard",
+        "alreadyLinked": "bereits verknüpft",
+        "truncated": "Es gibt weitere Treffer. Bitte die Suche eingrenzen."
+      },
+      "dialogs": {
+        "itsm_fields": "ITSM-Felder",
+        "decision": "Entscheidung"
+      }
+    },
+    "problem": {
+      "title": "Problem",
+      "unavailable": "Der Problemdatensatz ist nicht verfügbar.",
+      "rootCause": "Ursache",
+      "workaround": "Workaround",
+      "saveError": "Das Problem konnte nicht gespeichert werden.",
+      "incidents": "Verknüpfte Incidents",
+      "noIncidents": "Keine Incidents verknüpft.",
+      "link": {
+        "open": "Incidents verknüpfen",
+        "title": "Incidents verknüpfen",
+        "search": "Tickets nach Nummer oder Titel suchen",
+        "already": "bereits verknüpft",
+        "submit": "{{count}} Ticket(s) verknüpfen",
+        "error": "Die Incidents konnten nicht verknüpft werden."
+      },
+      "knownError": {
+        "publish": "Als bekannten Fehler veröffentlichen",
+        "badge": "Bekannter Fehler",
+        "article": "Known-Error-Artikel",
+        "noCategory": "Es ist keine Wissensdatenbank-Kategorie für bekannte Fehler konfiguriert (ITSM-Einstellungen).",
+        "error": "Der Known-Error-Artikel konnte nicht erstellt werden.",
+        "states": {
+          "draft": "Entwurf",
+          "review": "Zur Prüfung",
+          "published": "Veröffentlicht",
+          "archived": "Archiviert"
+        }
+      },
+      "close": {
+        "open": "Verknüpfte Incidents mit Workaround schließen",
+        "title": "Incidents mit Workaround schließen",
+        "confirm": "{{count}} offene(r) Incident(s) erhalten den Workaround als Notiz und werden geschlossen. Fortfahren?",
+        "submit": "Incidents schließen",
+        "error": "Der Auftrag konnte nicht gestartet werden.",
+        "done": "{{count}} Ticket(s) geschlossen",
+        "skipped": "Übersprungen: {{count}} Ticket(s)"
+      }
+    },
+    "major": {
+      "title": "Major Incident",
+      "banner": "Mit einem aktiven Major Incident verknüpft:",
+      "none": "Dieses Ticket ist kein ausgerufener Major Incident.",
+      "active": "Aktiv",
+      "ended": "Beendet",
+      "declare": {
+        "open": "Major Incident ausrufen",
+        "title": "Major Incident ausrufen",
+        "summary": "Zusammenfassung (optional)",
+        "submit": "Ausrufen",
+        "error": "Der Major Incident konnte nicht ausgerufen werden."
+      },
+      "end": {
+        "open": "Major Incident beenden",
+        "title": "Major Incident beenden",
+        "confirm": "Der Major Incident wird als beendet markiert. Der Tickettyp bleibt unverändert.",
+        "error": "Der Major Incident konnte nicht beendet werden."
+      },
+      "update": {
+        "title": "Update an alle Betroffenen",
+        "mode": "Zustellung",
+        "modes": {
+          "internal": "Nur intern",
+          "note": "Notiz an verknüpfte Tickets",
+          "reply": "Antwort an Kunden"
+        },
+        "send": "Update senden",
+        "error": "Das Update konnte nicht gesendet werden."
+      },
+      "timeline": {
+        "declared": "Ausgerufen",
+        "update": "Update",
+        "ended": "Beendet",
+        "targets": "{{count}} Ticket(s)"
+      }
+    },
+    "service": {
+      "title": "ITSM",
+      "incidentState": "Vorfallstatus",
+      "owner": "Verantwortlich",
+      "type": "Typ",
+      "criticality": "Kritikalität",
+      "description": "Beschreibung",
+      "cis": "Konfigurationselemente",
+      "noCis": "Keine Konfigurationselemente zugeordnet.",
+      "loadError": "Die ITSM-Daten dieses Services konnten nicht geladen werden.",
+      "noOwner": "Kein Verantwortlicher"
+    },
+    "newTicket": {
+      "recentIncident": "Für diesen Service gab es bereits vor {{minutes}} Minuten einen Vorfall: #{{tn}} {{title}}. Handelt es sich um dasselbe Problem?",
+      "openTicket": "Ticket öffnen"
     }
   }
 }

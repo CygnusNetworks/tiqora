@@ -3,15 +3,18 @@
 Both the ITSM core (``sync_link_type_rows``) and the Tiqora CMDB (``seed_defaults``) call
 :func:`ensure_default_link_types`, so there is one set of defaults and one seeder.
 
-Provisional values (the ITSM core's Znuny behaviour survey, plan Task 3, corrects them):
+Values pinned by the ITSM core's Znuny behaviour survey (vectors 2 and 6, see
+``docs/itsm-import.md`` "Behaviour"; ``backend/tests/fixtures/znuny-itsm/behaviour/``):
 
-* ``pointed`` — ``DependsOn`` and ``Includes`` directed; ``ConnectedTo``, ``AlternativeTo`` and
-  ``RelevantTo`` not (Znuny ITSM defines ``RelevantTo`` with equal source/target names).
-* offer flags — Tiqora-origin types are never offered for ticket ↔ ticket (Znuny cannot store
-  them); ticket ↔ CI only ``RelevantTo`` (Znuny's ticket ↔ CI type); CI ↔ CI the four structural
-  types; CI ↔ service ``DependsOn``.
-* propagation — only ``DependsOn`` (``source``: the source end gets the warning when the target is
-  in incident; Znuny ``ITSM::Core::IncidentLinkTypeDirection`` default).
+* ``pointed`` -- Znuny: ``SourceName ne TargetName`` (``LinkObject::TypeGet``). ``DependsOn``
+  ("Depends on"/"Required for") and ``Includes`` ("Includes"/"Part of") are directed;
+  ``ConnectedTo``, ``AlternativeTo`` and ``RelevantTo`` have equal names and are not.
+* offer flags -- the Znuny ITSM ``LinkObject::PossibleLink`` pairs: ticket <-> CI
+  ``AlternativeTo``, ``DependsOn``, ``RelevantTo``; CI <-> CI all five; CI <-> service
+  ``AlternativeTo``, ``DependsOn``, ``RelevantTo``. Tiqora-origin types are never offered for
+  ticket <-> ticket (Znuny's own ticket types ``Normal`` and ``ParentChild`` stay Znuny's).
+* propagation -- only ``DependsOn``, ``both``: ``ITSM::Core::IncidentLinkTypeDirection`` ships as
+  ``{DependsOn: Both}`` (the incident warning follows the link in either direction).
 """
 
 from __future__ import annotations
@@ -39,11 +42,11 @@ class DefaultLinkType:
 
 
 DEFAULT_LINK_TYPES: Final[tuple[DefaultLinkType, ...]] = (
-    DefaultLinkType("DependsOn", True, "source", False, False, True, True, 10),
+    DefaultLinkType("DependsOn", True, "both", False, True, True, True, 10),
     DefaultLinkType("Includes", True, "none", False, False, True, False, 20),
     DefaultLinkType("ConnectedTo", False, "none", False, False, True, False, 30),
-    DefaultLinkType("AlternativeTo", False, "none", False, False, True, False, 40),
-    DefaultLinkType("RelevantTo", False, "none", False, True, False, False, 50),
+    DefaultLinkType("AlternativeTo", False, "none", False, True, True, True, 40),
+    DefaultLinkType("RelevantTo", False, "none", False, True, True, True, 50),
 )
 
 

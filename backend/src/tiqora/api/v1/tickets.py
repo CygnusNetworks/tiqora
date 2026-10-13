@@ -78,6 +78,7 @@ from tiqora.domain.ticket_write_service import (
     ArticleIn,
     ArticleNotDeletable,
     InvalidInput,
+    LinkConflict,
     TelegramSendOptions,
     TicketIn,
     TicketWriteService,
@@ -92,6 +93,13 @@ from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.filters import Filter, FilterError
 from tiqora.filters.ticket_params import TicketListParams, filter_from_list_params
 from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
+from tiqora.itsm.link_types import ticket_ticket_link_types
+from tiqora.itsm.priority import (
+    apply_matrix_after_write,
+    changed_matrix_fields,
+    snapshot_matrix_fields,
+)
+from tiqora.itsm.settings import load_itsm_settings
 from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB, TicketExportPayload
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import (
@@ -290,6 +298,8 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     if isinstance(exc, (TicketAccessDenied, WriteAccessDenied)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if isinstance(exc, LinkConflict):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, InvalidInput):
         return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     if isinstance(exc, ArticleNotDeletable):
@@ -1875,6 +1885,34 @@ async def acquire_ticket_lock(
     )
 
 
+async def _apply_itsm_matrix(
+    session: Any,
+    settings: Any,
+    *,
+    ticket_id: int,
+    user_id: int,
+    submitted: dict[str, list[str]],
+    before: dict[str, list[str]],
+    explicit_priority: bool,
+) -> None:
+    """ITSM priority matrix after a PATCH that changed the criticality or impact field.
+
+    Runs inside the PATCH transaction (its reads are fine: ``session.begin()`` is open).
+    """
+    changed = changed_matrix_fields(before, submitted)
+    if not changed:
+        return
+    await apply_matrix_after_write(
+        session,
+        ticket_id=ticket_id,
+        changed_fields=changed,
+        explicit_priority=explicit_priority,
+        user_id=user_id,
+        sysconfig=SysConfig(session),
+        itsm_settings=await load_itsm_settings(session, settings),
+    )
+
+
 @router.patch("/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def patch_ticket(
     ticket_id: int,
@@ -1890,6 +1928,11 @@ async def patch_ticket(
     ``move_into``, ``rw``, …). Personal watch/unwatch stays ungated.
     """
     svc = _write_service(session, settings)
+    # Dynamic fields this request writes (the criticality / impact fields drive the ITSM matrix).
+    df_submitted: dict[str, list[str]] = dict(body.dynamic_fields or {})
+    if body.field_name is not None and body.field_values is not None:
+        df_submitted[body.field_name] = list(body.field_values)
+    df_before: dict[str, list[str]] = {}
     try:
         async with session.begin():
             if body.queue_id is not None:
@@ -1940,6 +1983,13 @@ async def patch_ticket(
                     await svc.unlock_ticket(user.id, ticket_id)
             if body.archive is not None:
                 await svc.archive_ticket(user.id, ticket_id, body.archive)
+            if df_submitted:
+                df_before = await snapshot_matrix_fields(
+                    session,
+                    ticket_id=ticket_id,
+                    submitted=df_submitted,
+                    settings=await load_itsm_settings(session, settings),
+                )
             if body.field_name is not None and body.field_values is not None:
                 await svc.update_dynamic_field(
                     user.id,
@@ -1949,6 +1999,16 @@ async def patch_ticket(
                 )
             if body.dynamic_fields:
                 await svc.update_dynamic_fields(user.id, ticket_id, body.dynamic_fields)
+            if df_submitted:
+                await _apply_itsm_matrix(
+                    session,
+                    settings,
+                    ticket_id=ticket_id,
+                    user_id=user.id,
+                    submitted=df_submitted,
+                    before=df_before,
+                    explicit_priority=body.priority_id is not None,
+                )
             # Watch/unwatch are personal preferences — no permission gate.
             if body.watcher_user_id is not None:
                 from tiqora.domain.ticket_write_service import watch_ticket
@@ -2163,12 +2223,47 @@ async def create_ticket_link(
     svc = _write_service(session, settings)
     try:
         async with session.begin():
+            # Inside the transaction block: the read must not autobegin before it (F11).
+            offered = await ticket_ticket_link_types(session)
+            if body.link_type not in {o.name for o in offered}:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={"code": "link_type_not_offered", "link_type": body.link_type},
+                )
             await svc.link_tickets(
                 user.id, ticket_id, body.target_ticket_id, link_type=body.link_type
             )
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
     return Response(status_code=status.HTTP_201_CREATED)
+
+
+@router.delete(
+    "/{ticket_id}/links/{target_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def delete_ticket_link(
+    ticket_id: int,
+    target_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    link_type: str | None = Query(
+        None, description="Only remove this link type (default: every type between the two)"
+    ),
+) -> Response:
+    """Remove the link(s) between this ticket and another. Requires ``rw`` on both.
+
+    Idempotent like Znuny's ``LinkDelete``: 204 also when no such link existed.
+    """
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            await svc.unlink_tickets(user.id, ticket_id, target_id, link_type)
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

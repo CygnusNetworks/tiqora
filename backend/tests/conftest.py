@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import Connection, create_engine, inspect, text
 
+from tests._itsm_db import itsm_db_url  # noqa: F401
 from tests.plugins.helpers import fixture_plugins  # noqa: F401
 
 # Single source of truth: shipped package data under tiqora.bootstrap.schema.
@@ -96,6 +97,16 @@ def _create_revision_tables(sync_url: str) -> None:
 
 def _take_snapshot(sync_url: str, dialect: str) -> None:
     """Record every row of every table right after the Znuny seed load."""
+    register_snapshot(dialect, sync_url, dialect)
+
+
+def register_snapshot(name: str, sync_url: str, dialect: str) -> None:
+    """Snapshot the database at ``sync_url`` under ``name`` for the per-module restore.
+
+    The two Znuny containers register as ``"mysql"`` / ``"postgresql"``; extra databases (the
+    ITSM test databases of ``tests/_itsm_db.py``) pick their own name, so one container can
+    carry several restorable databases. Registering a name again replaces the snapshot.
+    """
     engine = create_engine(sync_url)
     try:
         rows: dict[str, list[dict[str, object]]] = {}
@@ -110,7 +121,7 @@ def _take_snapshot(sync_url: str, dialect: str) -> None:
                     )
                 )
                 rows[table] = [dict(r) for r in result.mappings()]
-        _SNAPSHOTS[dialect] = _Snapshot(sync_url=sync_url, dialect=dialect, rows=rows)
+        _SNAPSHOTS[name] = _Snapshot(sync_url=sync_url, dialect=dialect, rows=rows)
     finally:
         engine.dispose()
 
@@ -205,12 +216,12 @@ def _restore_db_between_modules(request: pytest.FixtureRequest) -> Generator[Non
     yield
     strict = os.environ.get("TIQORA_STRICT_DB_LEAKS") == "1"
     module = request.node.name
-    for snap in _SNAPSHOTS.values():
+    for name, snap in list(_SNAPSHOTS.items()):
         leaked = _restore(snap)
         if leaked is None:
             continue
         msg = (
-            f"{module} left rows behind in {snap.dialect} ({leaked}). The "
+            f"{module} left rows behind in {name} ({leaked}). The "
             f"restore cleaned them up, but the module should delete what it "
             f"commits so it also passes when run on its own."
         )

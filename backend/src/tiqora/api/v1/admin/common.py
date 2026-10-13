@@ -20,6 +20,15 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.domain.znuny_admin_writes import (
+    DYNAMIC_FIELD_CACHE_TYPES as DYNAMIC_FIELD_CACHE_TYPES,
+)
+from tiqora.domain.znuny_admin_writes import (
+    STATE_CACHE_TYPES as STATE_CACHE_TYPES,
+)
+from tiqora.domain.znuny_admin_writes import (
+    TYPE_CACHE_TYPES as TYPE_CACHE_TYPES,
+)
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 
 # ---------------------------------------------------------------------------
@@ -33,13 +42,11 @@ from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ti
 QUEUE_CACHE_TYPES: tuple[str, ...] = ("Queue",)
 
 # State.pm: $Self->{CacheType} = 'State'
-STATE_CACHE_TYPES: tuple[str, ...] = ("State",)
 
 # Priority.pm: $Self->{CacheType} = 'Priority'
 PRIORITY_CACHE_TYPES: tuple[str, ...] = ("Priority",)
 
 # Type.pm: $Self->{CacheType} = 'Type'
-TYPE_CACHE_TYPES: tuple[str, ...] = ("Type",)
 
 # Service.pm: $Self->{CacheType} = 'Service'
 SERVICE_CACHE_TYPES: tuple[str, ...] = ("Service",)
@@ -125,10 +132,6 @@ CUSTOMER_COMPANY_CACHE_TYPES: tuple[str, ...] = (
 CUSTOMER_USER_GROUP_CACHE_TYPES: tuple[str, ...] = ("CustomerGroup",)
 
 # DynamicField.pm Add/Update/Delete: CleanUp DynamicField + DynamicFieldValue.
-DYNAMIC_FIELD_CACHE_TYPES: tuple[str, ...] = (
-    "DynamicField",
-    "DynamicFieldValue",
-)
 
 # Salutation.pm: $Self->{CacheType} = 'Salutation'
 SALUTATION_CACHE_TYPES: tuple[str, ...] = ("Salutation",)

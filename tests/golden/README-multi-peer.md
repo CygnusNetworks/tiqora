@@ -141,3 +141,83 @@ check. Local `just golden-all-peers` is the usual full-matrix path.
   Console (`znuny.Console.pl` / `otrs.Console.pl`).
 - `_helpers.py` / `seed.sh` honour `GOLDEN_COMPOSE_PROJECT` so multi-peer
   stacks do not cross-talk.
+
+## ITSM peers
+
+`znuny-6.5-itsm` and `znuny-7.3-itsm` (`base:` + `itsm: true` in `peers.yaml`) are the plain 6.5 /
+7.3 peers plus the official Znuny ITSM packages. They reuse the base peer image
+(`tiqora-golden-peer-<base>`), run in their own compose project and DB volume, so the plain peers
+stay ITSM-free. Same host ports as every peer: one peer per session.
+
+```sh
+just golden-itsm-fetch znuny-6.5-itsm              # download + sha256 verify + unpack (once)
+GOLDEN_PEER=znuny-6.5-itsm just golden-up          # installs the packages on first start
+GOLDEN_PEER=znuny-6.5-itsm just golden-seed
+GOLDEN_PEER=znuny-6.5-itsm just golden-test        # whole suite; ITSM tests only:
+cd backend && GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm uv run python -m pytest -q -m golden ../tests/golden -k itsm_peer_smoke
+```
+
+- `itsm-packages.yaml` lists the packages per base peer with version, URL and sha256 (first
+  fetch: `just golden-itsm-fetch <peer> --record`; later fetches fail on a mismatch).
+  `fetch_itsm_packages.py` writes `tests/golden/itsm-packages/<base>/` (the `.opm` files plus
+  `install-order.txt` / `provides.txt`, mounted read-only at `/opt/itsm-packages`) and unpacks
+  every `.opm` into `tests/golden/itsm-packages/src/<Package>-<version>/` for reading. The
+  directory is gitignored; the sources are never executed by Tiqora.
+- `znuny-entrypoint.sh` (bind-mounted by compose, so a cached image needs no rebuild) installs the
+  packages with `Admin::Package::Install` in `install-order.txt` order when `GOLDEN_ITSM=1`, then
+  `Maint::Config::Rebuild` and `Maint::Cache::Delete`. It is idempotent: a restart installs
+  nothing. The package files live in the container, the repository rows in the DB volume; a
+  recreated container on a kept volume therefore runs `Admin::Package::ReinstallAll` instead.
+- `just golden-up` falls back to the cached image (`--no-build`) when the release tree is absent,
+  as in a worktree.
+- Plain and ITSM tests cannot share a session: tests carry the marker `itsm_peer` or `plain_peer`
+  and are skipped on the other kind (`conftest.py`); the fixture `golden_peer_id` returns
+  `GOLDEN_PEER`. Plain-peer assertions run in a `GOLDEN_PEER=znuny-6.5` session.
+- `itsm_seed.pl` (copy in with `znuny_copy_in`, run with `znuny_perl_eval`) creates service
+  `itsm94-svc-web` (criticality `4 high`), SLA `itsm94-sla-web` (`MinTimeBetweenIncidents` 120),
+  `Computer` CIs `web01.example.org` (2 versions) and `db01.example.org` (3 versions), a `Network`
+  CI `net01.example.org` in incident state, service->CI, CI->CI (`DependsOn`) and ticket->CI
+  (`RelevantTo`) links, all addresses from 192.0.2.0/24. Re-running changes nothing and prints
+  the ids as JSON between `GOLDEN_ITSM_SEED_BEGIN` / `_END`.
+- `test_itsm_peer_smoke.py`: packages installed (`Admin::Package::List`), the six core ITSM tables
+  exist, seed results (`ConfigItemSearchExtended`, `LinkList`), seed idempotence, and on a plain
+  peer no ITSM tables or packages.
+
+- `test_itsm_mode_a.py` (Task 28): Mode A parity on `znuny-6.5-itsm` and `znuny-7.3-itsm`
+  (detection, CI search / detail / versions vs `ConfigItemSearchExtended` / `ConfigItemGet` /
+  `VersionGet`, ticket-CI links both ways, link and ticket-history parity with `LinkAdd` /
+  `LinkDelete`, the documented `configitem_history` difference, the 25 matrix cells, service
+  incident state, "Mode A writes no ITSM table") plus the setup cases. The "ITSM peer + plain
+  peer" case is split in two (the toolkit runs one peer per session):
+  `test_setup_on_itsm_peer_is_noop` runs on an ITSM peer, `test_setup_on_plain_peer_equals_itsm_packages`
+  and `test_znuny_reads_tiqora_seeded_dynamic_fields` on a plain peer (`GOLDEN_PEER=znuny-6.5` or
+  `znuny-7.3`); each is skipped on the other kind. Tiqora's writes reach Znuny's cached reads only
+  through the TiqoraSync add-on, so the module copies `TiqoraSync.pm` into the peer for its run and
+  calls `Run()` after Tiqora writes (as the daemon cron task does). The module's own data is the
+  service `itsm28-svc` (child `itsm28-kid`) and the CIs `itsm28-a|b|c.example.org`; every ticket
+  and link a test creates is removed again, the plain-peer cases delete the rows setup created.
+  `conftest.py` resolves the schema profile of an ITSM peer through its base peer
+  (`znuny-6.5-itsm` is no profile id). Results (2026-10-13): all cases passed on `znuny-6.5-itsm`
+  and `znuny-7.3-itsm` (13 cases, 11 run on an ITSM peer), the two plain cases on `znuny-6.5` and
+  `znuny-7.3`; differences between Tiqora and Znuny are listed in `docs/itsm-import.md`.
+
+Package sources (`https://download.znuny.org/releases/itsm/`):
+
+| Peer | Packages | Source |
+|------|----------|--------|
+| `znuny-6.5-itsm` | `ITSM` bundle 6.5.3 (embeds GeneralCatalog 6.5.3, ITSMCore 6.5.5, ITSMIncidentProblemManagement 6.5.2, ITSMConfigurationManagement 6.5.4, ImportExport 6.5.4, ITSMChangeManagement 6.5.2, ITSMServiceLevelManagement 6.5.1) | `bundle6x/ITSM-6.5.3.opm` (newest 6.5 bundle; Znuny publishes no single 6.5 packages) |
+| `znuny-7.3-itsm` | GeneralCatalog 7.3.1, ITSMCore 7.3.3, ITSMIncidentProblemManagement 7.3.2, ITSMConfigurationManagement 7.3.5, ImportExport 7.3.3, ITSMChangeManagement 7.3.4, ITSMServiceLevelManagement 7.3.1 | `latest/<Package>-<version>.opm` |
+
+Measured 2026-10-12 (cached base images, so no image build; `golden-up` includes package install
+and `--wait` for the healthy peer): `znuny-6.5-itsm` 43 s, `znuny-7.3-itsm` 57 s, a plain peer
+12 s. Smoke test: 4 passed on each ITSM peer, 1 passed (3 skipped) on `znuny-6.5`.
+
+Fallback if a download disappears: build the `.opm` from the `github.com/znuny/<Package>` tag
+inside the base peer (`Dev::Package::Build <Package>.sopm <dir>` with the checked-out tree),
+put it into `tests/golden/itsm-packages/<base>/` and record its sha256 in `itsm-packages.yaml`.
+Not needed so far.
+
+Things worth knowing for the survey (Tasks 2 and 3): with ITSMCore installed the core
+`Kernel::System::Service` / `SLA` modules switch on `IsITSMInstalled` and require `TypeID` (and
+`Criticality` for services); in 6.5+ criticality and impact of a *ticket* are dynamic fields
+(`ITSMCriticality`, `ITSMImpact`), the general catalog class `ITSM::Core::Criticality` is empty.

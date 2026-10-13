@@ -176,6 +176,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         app.state.legacy_schema_profile = None
 
+    from tiqora.itsm.mode import init_itsm_mode_at_startup
+
+    await init_itsm_mode_at_startup(app.state.session_factory)
+
     try:
         async with app.state.session_factory() as _identity_session:
             await ensure_env_providers(_identity_session, settings)

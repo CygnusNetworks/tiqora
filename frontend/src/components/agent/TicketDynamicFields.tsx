@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { TicketDetail } from "@/lib/api";
-import { phoneApi, type DynamicFieldDef } from "@/lib/phoneApi";
+import { phoneApi, type DynamicFieldDef, type DynamicFieldScreen } from "@/lib/phoneApi";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { usePatchTicket, ticketPerms } from "@/lib/ticket";
 import { displayTimeZone } from "@/lib/timeZone";
@@ -23,7 +23,7 @@ import { useFieldOptions } from "@/components/fields/useFieldOptions";
 
 type TicketDf = NonNullable<TicketDetail["dynamic_fields"]>[number];
 
-const SCREEN = "AgentTicketFreeText";
+const DEFAULT_SCREEN: DynamicFieldScreen = "AgentTicketFreeText";
 
 /** One value of a dynamic field as plain text (Date / DateTime / Checkbox / Dropdown labels). */
 function displayValue(df: TicketDf, def: DynamicFieldDef | undefined, t: TFunction, zone: string): string {
@@ -49,11 +49,24 @@ function displayValue(df: TicketDf, def: DynamicFieldDef | undefined, t: TFuncti
 export function TicketDynamicFields({
   ticket,
   allowedActions = null,
+  screen = DEFAULT_SCREEN,
+  embedded = false,
+  onSaved,
+  onCancel,
 }: {
   ticket: TicketDetail;
-  /** Action ACL result: editing needs `AgentTicketFreeText` (`null` = unknown, allowed). */
+  /** Action ACL result: editing needs the screen's action (`null` = unknown, allowed). */
   allowedActions?: AllowedActions;
+  /** Znuny screen whose `###DynamicField` config picks the editable fields (default `AgentTicketFreeText`). */
+  screen?: DynamicFieldScreen;
+  /** Dialog body: no collapsible shell, opens straight in edit mode (the ITSM field dialogs). */
+  embedded?: boolean;
+  /** After a successful save or a no-change save in `embedded` mode. */
+  onSaved?: () => void;
+  /** Cancel pressed in `embedded` mode (closes the dialog). */
+  onCancel?: () => void;
 }) {
+  const SCREEN = screen;
   const { t } = useTranslation();
   const zone = displayTimeZone();
   const canEdit = ticketPerms(ticket).rw && actionAllowed(allowedActions, SCREEN);
@@ -104,6 +117,7 @@ export function TicketDynamicFields({
   const patch = usePatchTicket(ticket.id, () => {
     setEditing(false);
     setSaved(true);
+    onSaved?.();
   });
 
   useEffect(() => {
@@ -136,6 +150,7 @@ export function TicketDynamicFields({
     }
     if (Object.keys(changed).length === 0) {
       setEditing(false);
+      onSaved?.();
       return;
     }
     patch.mutate(
@@ -144,18 +159,53 @@ export function TicketDynamicFields({
     );
   };
 
+  // Dialog mode: go straight into the edit form as soon as the screen's fields are known.
+  const autoStarted = useRef(false);
+  const readyToEdit = embedded && canEdit && defs.length > 0;
+  useEffect(() => {
+    if (!readyToEdit || autoStarted.current) return;
+    autoStarted.current = true;
+    startEdit();
+    // startEdit only reads the memoised baseline; running once per dialog is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readyToEdit]);
+
+  // Dialog mode before the form opens: say what is going on instead of an empty body.
+  if (embedded && !editing) {
+    // nothing to edit: no rw/ACL, the screen lookup failed, or the screen has no fields;
+    // otherwise the definitions are loading or the form opens with the next render
+    const nothing = !canEdit || defsQ.isError || (defsQ.isSuccess && defs.length === 0);
+    return (
+      <div className="space-y-3 text-sm" data-testid="ticket-df">
+        {!nothing ? (
+          <p role="status" className="text-muted" data-testid="ticket-df-loading">
+            {t("common.loading")}
+          </p>
+        ) : (
+          <>
+            <p className="text-muted" data-testid="ticket-df-empty">
+              {t("ticket.dynamicFieldsEdit.noFields")}
+            </p>
+            <button
+              type="button"
+              data-testid="ticket-df-cancel"
+              onClick={() => onCancel?.()}
+              className="rounded border border-hairline px-3 py-1 text-xs"
+            >
+              {t("ticket.dynamicFieldsEdit.cancel")}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   const shown = ticket.dynamic_fields ?? [];
   const showEdit = canEdit && defs.length > 0 && !editing;
   if (shown.length === 0 && !showEdit && !editing) return null;
 
-  return (
-    <details
-      className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm"
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-      data-testid="ticket-df"
-    >
-      <summary className="cursor-pointer font-medium text-muted">{t("ticket.dynamicFields")}</summary>
+  const content = (
+    <>
       {editing ? (
         <div className="mt-2 space-y-3">
           <DynamicFieldsForm
@@ -189,6 +239,7 @@ export function TicketDynamicFields({
               onClick={() => {
                 setEditing(false);
                 setSaved(false);
+                onCancel?.();
               }}
               className="rounded border border-hairline px-3 py-1 text-xs"
             >
@@ -227,6 +278,26 @@ export function TicketDynamicFields({
           </div>
         </>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="text-sm" data-testid="ticket-df">
+        {editing ? content : null}
+      </div>
+    );
+  }
+
+  return (
+    <details
+      className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm"
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      data-testid="ticket-df"
+    >
+      <summary className="cursor-pointer font-medium text-muted">{t("ticket.dynamicFields")}</summary>
+      {content}
     </details>
   );
 }

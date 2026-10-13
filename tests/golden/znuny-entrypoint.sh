@@ -99,6 +99,42 @@ chmod -R ug+rwX "${INSTALL}/var/tmp" "${INSTALL}/var/log"
 echo "[znuny-entrypoint] rebuild config cache"
 su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Maint::Config::Rebuild" || true
 
+# ITSM peers (GOLDEN_ITSM=1): install the official ITSM packages once, in install-order.txt
+# order (written by tests/golden/fetch_itsm_packages.py). Idempotent: when every name in
+# provides.txt is already installed, nothing is installed (a restart changes nothing).
+# Skipped for `console` calls, which run inside an already provisioned container.
+ITSM_DIR=/opt/itsm-packages
+if [ "${GOLDEN_ITSM:-0}" = "1" ] && [ "${1:-}" != "console" ]; then
+    if [ ! -f "${ITSM_DIR}/install-order.txt" ] || [ ! -f "${ITSM_DIR}/provides.txt" ]; then
+        echo "[znuny-entrypoint] ERROR: GOLDEN_ITSM=1 but ${ITSM_DIR}/install-order.txt is missing;" \
+             "run 'just golden-itsm-fetch ${GOLDEN_PEER}' first" >&2
+        exit 1
+    fi
+    INSTALLED=$(su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Admin::Package::List" 2>/dev/null || true)
+    MISSING=0
+    while IFS= read -r PKG; do
+        [ -z "$PKG" ] && continue
+        echo "$INSTALLED" | grep -Eq "^\| Name: +${PKG}\$" || MISSING=1
+    done < "${ITSM_DIR}/provides.txt"
+    if [ "$MISSING" -eq 1 ]; then
+        while IFS= read -r OPM; do
+            [ -z "$OPM" ] && continue
+            echo "[znuny-entrypoint] installing ITSM package ${OPM}"
+            su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Admin::Package::Install ${ITSM_DIR}/${OPM}"
+        done < "${ITSM_DIR}/install-order.txt"
+        su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Maint::Config::Rebuild"
+        su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Maint::Cache::Delete"
+    elif [ ! -f "${INSTALL}/Kernel/System/GeneralCatalog.pm" ]; then
+        # Container recreated on a kept DB volume: the repository rows survive, the files do not.
+        echo "[znuny-entrypoint] ITSM packages registered but files missing; reinstalling from the package repository"
+        su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Admin::Package::ReinstallAll"
+        su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Maint::Config::Rebuild"
+        su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Maint::Cache::Delete"
+    else
+        echo "[znuny-entrypoint] ITSM packages already installed"
+    fi
+fi
+
 if [ "${1:-}" = "console" ]; then
     shift
     chown -R otrs:otrs "${INSTALL}/var/tmp" 2>/dev/null || true

@@ -8,8 +8,10 @@ methods with defaults); a rename needs every implementing plan updated.
 Rules every implementation follows:
 
 * ``ref.source != provider.source`` → :class:`CiNotFound`.
-* Methods never commit; ``link_ticket``/``unlink_ticket`` assume the caller checked ``rw`` on the
-  ticket and check ``ro`` on the CI themselves.
+* Methods never commit; ``link_ticket``/``unlink_ticket`` check themselves (R12, before any write)
+  ``rw`` on the ticket's queue group and ``ro`` on the CI; a missing ticket is :class:`CiNotFound`,
+  missing ``rw`` on the ticket :class:`CiPermissionDenied`. Callers still filter by ticket ``ro``
+  when listing.
 * ``link_ticket`` is idempotent (``False`` when the link exists); ``unlink_ticket`` returns the
   number of removed links (0 = nothing).
 * ``search`` returns ``total`` exactly; ``limit`` > 100 is clamped to 100.
@@ -132,7 +134,9 @@ class CiQuery:
 @dataclass(frozen=True, slots=True)
 class CiPage:
     items: tuple[CiSummary, ...]
+    # exact unless ``truncated`` (Mode A: an attribute search hit its candidate cap)
     total: int
+    truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +178,10 @@ class CiPermissionDenied(CiError):
 
 class CiReadOnly(CiError):
     """Write attempted on read-only data (never raised for links)."""
+
+
+class CiSearchTooBroad(CiError):
+    """The query would scan too much (statement time limit hit); the caller narrows it."""
 
 
 class CiUnavailable(CiError):
@@ -270,6 +278,7 @@ __all__ = [
     "CiQuery",
     "CiReadOnly",
     "CiRef",
+    "CiSearchTooBroad",
     "CiSource",
     "CiSummary",
     "CiTicketLink",

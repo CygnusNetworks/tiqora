@@ -1,9 +1,11 @@
 import type { TicketDetail } from "@/lib/api";
+import { TicketItsmChips } from "@/components/itsm/TicketItsmChips";
 import { LinkedTickets } from "./LinkedTickets";
 import { TicketDynamicFields } from "./TicketDynamicFields";
 import { TicketHeaderActions } from "./TicketHeaderActions";
 import type { TicketAiSlots } from "./AiPanel";
 import type { AllowedActions } from "@/lib/aclActions";
+import { ticketPerms } from "@/lib/ticket";
 import { combinedEscalationLevel, spineClassName, stateColorVar } from "@/lib/status";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -60,7 +62,8 @@ export function TicketHeader({
         similar={similar}
         allowedActions={allowedActions}
       />
-      <LinkedTickets ticketId={ticket.id} />
+      <LinkedTickets ticketId={ticket.id} ticketTn={ticket.tn} canWrite={ticketPerms(ticket).rw} />
+      <TicketItsmChips ticket={ticket} allowedActions={allowedActions} />
       <TicketDynamicFields ticket={ticket} allowedActions={allowedActions} />
     </header>
   );

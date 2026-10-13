@@ -1,0 +1,2768 @@
+{
+ "Frontend::Module###AgentITSMCABMemberSearch": {
+  "Description": "Lookup of CAB members for autocompletion.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "",
+  "Title": "CAB Member Search"
+ },
+ "Frontend::Module###AgentITSMChange": {
+  "Description": "Overview over all Changes.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Changes"
+ },
+ "Frontend::Module###AgentITSMChangeAdd": {
+  "Description": "Add a change.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-manager"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Add"
+ },
+ "Frontend::Module###AgentITSMChangeAddFromTemplate": {
+  "Description": "Add a change from template.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Add from template"
+ },
+ "Frontend::Module###AgentITSMChangeCABTemplate": {
+  "Description": "ITSM Change CAB Templates.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Change CAB Templates"
+ },
+ "Frontend::Module###AgentITSMChangeCondition": {
+  "Description": "ITSM Change Condition Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Condition Overview"
+ },
+ "Frontend::Module###AgentITSMChangeConditionEdit": {
+  "Description": "ITSM Change Condition Edit.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Condition Edit"
+ },
+ "Frontend::Module###AgentITSMChangeDelete": {
+  "Description": "Delete a change.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-manager"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Delete"
+ },
+ "Frontend::Module###AgentITSMChangeEdit": {
+  "Description": "Edit a change.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Edit"
+ },
+ "Frontend::Module###AgentITSMChangeHistory": {
+  "Description": "Change History.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "History"
+ },
+ "Frontend::Module###AgentITSMChangeHistoryZoom": {
+  "Description": "Details of a change history entry.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "History Zoom"
+ },
+ "Frontend::Module###AgentITSMChangeInvolvedPersons": {
+  "Description": "Change Involved Persons.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Involved Persons"
+ },
+ "Frontend::Module###AgentITSMChangeManager": {
+  "Description": "ITSM Change Manager Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-manager"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMChangeMyCAB": {
+  "Description": "ITSM MyCAB Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMChangeMyChanges": {
+  "Description": "ITSM MyChanges Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMChangeMyWorkOrders": {
+  "Description": "ITSM MyWorkorders Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMChangePIR": {
+  "Description": "ITSM Change PIR Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMChangePSA": {
+  "Description": "Projected Service Availability (PSA) of changes. Overview of approved changes and their services.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "PSA"
+ },
+ "Frontend::Module###AgentITSMChangePrint": {
+  "Description": "Change Print.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Print"
+ },
+ "Frontend::Module###AgentITSMChangeReset": {
+  "Description": "Reset a change and its workorders.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Reset"
+ },
+ "Frontend::Module###AgentITSMChangeSchedule": {
+  "Description": "Forward schedule of changes. Overview over approved changes.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Change Schedule"
+ },
+ "Frontend::Module###AgentITSMChangeSearch": {
+  "Description": "Search Changes.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Search"
+ },
+ "Frontend::Module###AgentITSMChangeTemplate": {
+  "Description": "Template.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Template"
+ },
+ "Frontend::Module###AgentITSMChangeTimeSlot": {
+  "Description": "Move Time Slot.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Time Slot"
+ },
+ "Frontend::Module###AgentITSMChangeZoom": {
+  "Description": "Change Zoom.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Zoom"
+ },
+ "Frontend::Module###AgentITSMConfigItem": {
+  "Description": "ITSM config item overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-configitem"
+  ],
+  "NavBarName": "Config Item",
+  "Title": "Config Item"
+ },
+ "Frontend::Module###AgentITSMConfigItemAdd": {
+  "Description": "Config item add.",
+  "Group": [
+   "itsm-configitem"
+  ],
+  "GroupRo": [],
+  "NavBarName": "Config Item",
+  "Title": "Add"
+ },
+ "Frontend::Module###AgentITSMConfigItemAttachment": {
+  "Description": "Returns CIAttachments",
+  "Group": [],
+  "GroupRo": [],
+  "NavBarName": "",
+  "Title": "CIAttachment"
+ },
+ "Frontend::Module###AgentITSMConfigItemBulk": {
+  "Description": "Configuration item bulk module.",
+  "Group": [],
+  "GroupRo": [],
+  "NavBarName": "CMDB",
+  "Title": "Bulk Action"
+ },
+ "Frontend::Module###AgentITSMConfigItemCustomerCIsWidget": {
+  "Description": "AJAX interface for CustomerCIsWidget.",
+  "Group": [],
+  "GroupRo": [],
+  "NavBarName": "AgentITSMConfigItemCustomerCIsWidget",
+  "Title": "CustomerCIsWidget AJAX interface"
+ },
+ "Frontend::Module###AgentITSMConfigItemDelete": {
+  "Description": "Delete a configuration item",
+  "Group": [
+   "itsm-configitem"
+  ],
+  "GroupRo": [],
+  "NavBarName": "ITSM ConfigItem",
+  "Title": "Delete"
+ },
+ "Frontend::Module###AgentITSMConfigItemEdit": {
+  "Description": "Config item edit.",
+  "Group": [
+   "itsm-configitem"
+  ],
+  "GroupRo": [],
+  "NavBarName": "Config Item",
+  "Title": "Edit"
+ },
+ "Frontend::Module###AgentITSMConfigItemHistory": {
+  "Description": "Config item history.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-configitem"
+  ],
+  "NavBarName": "Config Item",
+  "Title": "History"
+ },
+ "Frontend::Module###AgentITSMConfigItemPrint": {
+  "Description": "Config item print.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-configitem"
+  ],
+  "NavBarName": "Config Item",
+  "Title": "Print"
+ },
+ "Frontend::Module###AgentITSMConfigItemSearch": {
+  "Description": "Search config items.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-configitem"
+  ],
+  "NavBarName": "Config Item",
+  "Title": "Search"
+ },
+ "Frontend::Module###AgentITSMConfigItemZoom": {
+  "Description": "Config item zoom.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-configitem"
+  ],
+  "NavBarName": "Config Item",
+  "Title": "Zoom"
+ },
+ "Frontend::Module###AgentITSMIncidentProblemManagement": {
+  "Description": "Module to dynamically show the service incident state and to calculate the priority.",
+  "Group": [],
+  "GroupRo": [],
+  "NavBarName": "Ticket",
+  "Title": "Service Incident State and Priority Calculation"
+ },
+ "Frontend::Module###AgentITSMSLA": {
+  "Description": "ITSM SLA Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-service"
+  ],
+  "NavBarName": "Service",
+  "Title": "SLA"
+ },
+ "Frontend::Module###AgentITSMSLAPrint": {
+  "Description": "SLA Print.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-service"
+  ],
+  "NavBarName": "Service",
+  "Title": "Print"
+ },
+ "Frontend::Module###AgentITSMSLAZoom": {
+  "Description": "SLA Zoom.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-service"
+  ],
+  "NavBarName": "Service",
+  "Title": "Zoom"
+ },
+ "Frontend::Module###AgentITSMService": {
+  "Description": "ITSM Service Overview.",
+  "Group": [
+   "itsm-service"
+  ],
+  "GroupRo": [
+   "itsm-service"
+  ],
+  "NavBarName": "Service",
+  "Title": "Service"
+ },
+ "Frontend::Module###AgentITSMServicePrint": {
+  "Description": "Service Print.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-service"
+  ],
+  "NavBarName": "Service",
+  "Title": "Print"
+ },
+ "Frontend::Module###AgentITSMServiceZoom": {
+  "Description": "Service Zoom.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-service"
+  ],
+  "NavBarName": "Service",
+  "Title": "Zoom"
+ },
+ "Frontend::Module###AgentITSMTemplateDelete": {
+  "Description": "ITSM Template Delete.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMTemplateEdit": {
+  "Description": "ITSM Template Edit.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMTemplateEditCAB": {
+  "Description": "ITSM Template Edit CAB.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMTemplateEditContent": {
+  "Description": "ITSM Template Edit Content.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMTemplateOverview": {
+  "Description": "ITSM Template Overview.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change-builder",
+   "itsm-change-manager"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "ITSM Change"
+ },
+ "Frontend::Module###AgentITSMUserSearch": {
+  "Description": "Lookup of agents, used for autocompletion.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "User Search"
+ },
+ "Frontend::Module###AgentITSMWorkOrderAdd": {
+  "Description": "Workorder Add.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Add"
+ },
+ "Frontend::Module###AgentITSMWorkOrderAddFromTemplate": {
+  "Description": "Workorder Add (from template).",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Add"
+ },
+ "Frontend::Module###AgentITSMWorkOrderAgent": {
+  "Description": "Workorder Agent.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Agent"
+ },
+ "Frontend::Module###AgentITSMWorkOrderDelete": {
+  "Description": "Workorder Delete.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Delete"
+ },
+ "Frontend::Module###AgentITSMWorkOrderEdit": {
+  "Description": "Workorder Edit.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Edit"
+ },
+ "Frontend::Module###AgentITSMWorkOrderHistory": {
+  "Description": "Workorder History.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "History"
+ },
+ "Frontend::Module###AgentITSMWorkOrderHistoryZoom": {
+  "Description": "Workorder History Zoom.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "History Zoom"
+ },
+ "Frontend::Module###AgentITSMWorkOrderReport": {
+  "Description": "Workorder Report.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Report"
+ },
+ "Frontend::Module###AgentITSMWorkOrderTake": {
+  "Description": "Take Workorder.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Take Workorder"
+ },
+ "Frontend::Module###AgentITSMWorkOrderTemplate": {
+  "Description": "Template.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Template"
+ },
+ "Frontend::Module###AgentITSMWorkOrderZoom": {
+  "Description": "Workorder Zoom.",
+  "Group": [],
+  "GroupRo": [
+   "itsm-change"
+  ],
+  "NavBarName": "ITSM Change",
+  "Title": "Zoom"
+ },
+ "ITSM::Core::IncidentLinkTypeDirection": {
+  "DependsOn": "Both"
+ },
+ "ITSM::Frontend::TextArea": "78",
+ "ITSMChange::AddChangeLinkTicketTypes": [
+  "RfC"
+ ],
+ "ITSMChange::Attribute::CompareValue::FieldType": {
+  "AccountedTime": "Text",
+  "ActualEndTime": "Date",
+  "ActualStartTime": "Date",
+  "CategoryID": "Selection",
+  "ChangeBuilderID": "Selection",
+  "ChangeManagerID": "Selection",
+  "ChangeStateID": "Selection",
+  "ChangeTitle": "Text",
+  "DynamicField": "Text",
+  "ImpactID": "Selection",
+  "PlannedEffort": "Text",
+  "PlannedEndTime": "Date",
+  "PlannedStartTime": "Date",
+  "PriorityID": "Selection",
+  "RequestedTime": "Date"
+ },
+ "ITSMChange::CacheTTL": "7200",
+ "ITSMChange::Category::Default": "3 normal",
+ "ITSMChange::ChangeSearch::MirrorDB": "0",
+ "ITSMChange::EventModule###01-HistoryAdd": {
+  "Event": "(ChangeAddPost|ChangeUpdatePost|ChangeCABUpdatePost|ChangeCABDeletePost|ChangeLinkAddPost|ChangeLinkDeletePost|ChangeAttachmentAddPost|ChangeAttachmentDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::HistoryAdd",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###02-Notification": {
+  "Event": "(ChangeAddPost|ChangeUpdatePost|ChangeCABUpdatePost|ChangeCABDeletePost|ChangeDeletePost|ChangeLinkAddPost|ChangeLinkDeletePost|ChangeAttachmentAddPost|ChangeAttachmentDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::Notification",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###03-Condition": {
+  "Event": "(ChangeAddPost|ChangeUpdatePost)",
+  "Module": "Kernel::System::ITSMChange::Event::Condition",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###1000-GenericInterface": {
+  "Event": "",
+  "Module": "Kernel::GenericInterface::Event::Handler",
+  "Transaction": "1"
+ },
+ "ITSMChange::EventModule###80-ToolBarChangeManagerCacheDelete": {
+  "Event": "(ChangeAddPost|ChangeUpdatePost|ChangeDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::ToolBarChangeManagerCacheDelete",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###81-ToolBarMyChangesCacheDelete": {
+  "Event": "(ChangeAddPost|ChangeUpdatePost|ChangeDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::ToolBarMyChangesCacheDelete",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###82-ToolBarMyCABCacheDelete": {
+  "Event": "(ChangeCABUpdatePost|ChangeCABDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::ToolBarMyCABCacheDelete",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###90-ConditionDelete": {
+  "Event": "(ChangeDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::ConditionDelete",
+  "Transaction": "0"
+ },
+ "ITSMChange::EventModule###91-HistoryDelete": {
+  "Event": "(ChangeDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::HistoryDelete",
+  "Transaction": "0"
+ },
+ "ITSMChange::Frontend::AdminITSMChangeNotification###RichText": "1",
+ "ITSMChange::Frontend::AdminITSMChangeNotification###RichTextHeight": "320",
+ "ITSMChange::Frontend::AdminITSMChangeNotification###RichTextWidth": "620",
+ "ITSMChange::Frontend::AgentHTMLFieldHeightDefault": "100",
+ "ITSMChange::Frontend::AgentHTMLFieldHeightMax": "2500",
+ "ITSMChange::Frontend::AgentITSMChange###Filter::ChangeStates": [
+  "requested",
+  "pending approval",
+  "rejected",
+  "approved",
+  "in progress",
+  "pending pir",
+  "successful",
+  "failed",
+  "canceled",
+  "retracted"
+ ],
+ "ITSMChange::Frontend::AgentITSMChange###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChange###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChange###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "1",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderCount": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChange###SortBy::Default": "ChangeNumber",
+ "ITSMChange::Frontend::AgentITSMChangeAdd###DynamicField": {},
+ "ITSMChange::Frontend::AgentITSMChangeAdd###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeAdd###RequestedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangeAddFromTemplate###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeCABTemplate###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeCondition###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeConditionEdit###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeDelete###ChangeStates": [
+  "requested",
+  "pending approval"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeDelete###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeEdit###ChangeState": "0",
+ "ITSMChange::Frontend::AgentITSMChangeEdit###DynamicField": {},
+ "ITSMChange::Frontend::AgentITSMChangeEdit###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeEdit###RequestedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangeHistory###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeHistoryZoom###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeInvolvedPersons###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeManager###Filter::ChangeStates": [
+  "requested",
+  "pending approval",
+  "approved",
+  "in progress",
+  "pending pir"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeManager###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangeManager###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeManager###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "1",
+  "ChangeManager": "1",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderCount": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeManager###SortBy::Default": "ChangeNumber",
+ "ITSMChange::Frontend::AgentITSMChangeMyCAB###Filter::ChangeStates": [
+  "requested",
+  "pending approval",
+  "approved",
+  "in progress",
+  "pending pir"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeMyCAB###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangeMyCAB###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeMyCAB###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "1",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderCount": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeMyCAB###SortBy::Default": "ChangeNumber",
+ "ITSMChange::Frontend::AgentITSMChangeMyChanges###Filter::ChangeStates": [
+  "requested",
+  "pending approval",
+  "approved",
+  "in progress",
+  "pending pir"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeMyChanges###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangeMyChanges###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeMyChanges###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "1",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderCount": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeMyChanges###SortBy::Default": "PlannedStartTime",
+ "ITSMChange::Frontend::AgentITSMChangeMyWorkOrders###Filter::WorkOrderStates": [
+  "created",
+  "accepted",
+  "ready",
+  "in progress"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeMyWorkOrders###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangeMyWorkOrders###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeMyWorkOrders###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "0",
+  "ChangeManager": "0",
+  "ChangeNumber": "0",
+  "ChangeState": "0",
+  "ChangeStateSignal": "0",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_WorkOrderFieldName1": "0",
+  "DynamicField_WorkOrderFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "0",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderAgent": "1",
+  "WorkOrderCount": "0",
+  "WorkOrderNumber": "1",
+  "WorkOrderState": "1",
+  "WorkOrderStateSignal": "1",
+  "WorkOrderTitle": "1",
+  "WorkOrderType": "0"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeMyWorkOrders###SortBy::Default": "PlannedStartTime",
+ "ITSMChange::Frontend::AgentITSMChangePIR###Filter::WorkOrderStates": [
+  "accepted",
+  "ready",
+  "in progress",
+  "closed",
+  "canceled"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangePIR###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangePIR###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangePIR###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "0",
+  "ChangeManager": "0",
+  "ChangeNumber": "0",
+  "ChangeState": "0",
+  "ChangeStateSignal": "0",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_WorkOrderFieldName1": "0",
+  "DynamicField_WorkOrderFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "0",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderAgent": "1",
+  "WorkOrderCount": "0",
+  "WorkOrderNumber": "1",
+  "WorkOrderState": "1",
+  "WorkOrderStateSignal": "1",
+  "WorkOrderTitle": "1",
+  "WorkOrderType": "0"
+ },
+ "ITSMChange::Frontend::AgentITSMChangePIR###SortBy::Default": "PlannedStartTime",
+ "ITSMChange::Frontend::AgentITSMChangePIR###WorkOrderTypes": [
+  "pir"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangePSA###Filter::ChangeStates": [
+  "approved"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangePSA###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangePSA###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangePSA###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "0",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "1",
+  "WorkOrderCount": "0"
+ },
+ "ITSMChange::Frontend::AgentITSMChangePSA###SortBy::Default": "PlannedStartTime",
+ "ITSMChange::Frontend::AgentITSMChangePrint###AccountedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangePrint###DynamicField": {},
+ "ITSMChange::Frontend::AgentITSMChangePrint###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangePrint###PlannedEffort": "1",
+ "ITSMChange::Frontend::AgentITSMChangePrint###RequestedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangeReset###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeSchedule###Filter::ChangeStates": [
+  "approved"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeSchedule###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMChangeSchedule###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeSchedule###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "1",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderCount": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeSchedule###SortBy::Default": "PlannedStartTime",
+ "ITSMChange::Frontend::AgentITSMChangeSearch###DynamicField": {},
+ "ITSMChange::Frontend::AgentITSMChangeSearch###RequestedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangeSearch###SearchCSVData": [
+  "ChangeNumber",
+  "ChangeTitle",
+  "ChangeBuilder",
+  "WorkOrderCount",
+  "ChangeState",
+  "Priority",
+  "PlannedStartTime",
+  "PlannedEndTime"
+ ],
+ "ITSMChange::Frontend::AgentITSMChangeSearch###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "1",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTime": "0",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "1",
+  "RequestedTime": "0",
+  "Services": "0",
+  "WorkOrderCount": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeTemplate###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeTimeSlot###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMChangeZoom###AccountedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangeZoom###DynamicField": {},
+ "ITSMChange::Frontend::AgentITSMChangeZoom###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMChangeZoom###PlannedEffort": "1",
+ "ITSMChange::Frontend::AgentITSMChangeZoom###RequestedTime": "1",
+ "ITSMChange::Frontend::AgentITSMChangeZoom###Tooltip::WorkOrderAttributes": {
+  "AccountedTime": "0",
+  "ActualEndTime": "1",
+  "ActualStartTime": "1",
+  "DynamicField_WorkOrderFieldName1": "0",
+  "DynamicField_WorkOrderFieldName2": "0",
+  "Instruction": "0",
+  "PlannedEffort": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Report": "0",
+  "WorkOrderAgent": "1",
+  "WorkOrderState": "1",
+  "WorkOrderTitle": "1",
+  "WorkOrderType": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeZoom###WorkOrderGraph": {
+  "TimeLineColor": "#DC143C",
+  "TimeLineWidth": "2",
+  "approval_actual_color": "#FF7F50",
+  "approval_planned_color": "#FF4500",
+  "backout_actual_color": "#C0C0C0",
+  "backout_planned_color": "#696969",
+  "pir_actual_color": "#87CEEB",
+  "pir_planned_color": "#4682B4",
+  "undefined_actual_color": "#F08080",
+  "undefined_planned_color": "#B22222",
+  "workorder_actual_color": "#3CB371",
+  "workorder_planned_color": "#006400"
+ },
+ "ITSMChange::Frontend::AgentITSMChangeZoom###WorkOrderState": "0",
+ "ITSMChange::Frontend::AgentITSMChangeZoom###WorkOrderTitle": "0",
+ "ITSMChange::Frontend::AgentITSMTemplateDelete###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMTemplateEdit###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMTemplateEditCAB###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMTemplateEditContent###DefaultChangeTitle": "Helper dummy change needed for editing a workorder template",
+ "ITSMChange::Frontend::AgentITSMTemplateEditContent###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMTemplateOverview###Filter::TemplateTypes": [
+  "ITSMChange",
+  "ITSMWorkOrder",
+  "CAB"
+ ],
+ "ITSMChange::Frontend::AgentITSMTemplateOverview###Order::Default": "Up",
+ "ITSMChange::Frontend::AgentITSMTemplateOverview###Permission": "ro",
+ "ITSMChange::Frontend::AgentITSMTemplateOverview###ShowColumns": {
+  "ChangeBy": "0",
+  "ChangeTime": "0",
+  "Comment": "1",
+  "CreateBy": "1",
+  "CreateTime": "1",
+  "Delete": "1",
+  "EditContent": "1",
+  "Name": "1",
+  "Type": "1",
+  "Valid": "1"
+ },
+ "ITSMChange::Frontend::AgentITSMTemplateOverview###SortBy::Default": "TemplateID",
+ "ITSMChange::Frontend::AgentITSMWorkOrderAdd###DynamicField": {},
+ "ITSMChange::Frontend::AgentITSMWorkOrderAdd###Permission": "rw",
+ "ITSMChange::Frontend::AgentITSMWorkOrderAdd###PlannedEffort": "1",
+ "ITSMChange::Frontend::AgentITSMWorkOrderAddFromTemplate###Permission": "rw",
+ "ITSMChange::Frontend::CustomerITSMChangeSchedule###Filter::ChangeStates": [
+  "approved",
+  "in progress"
+ ],
+ "ITSMChange::Frontend::CustomerITSMChangeSchedule###Order::Default": "Up",
+ "ITSMChange::Frontend::CustomerITSMChangeSchedule###ShowColumns": {
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "Category": "0",
+  "ChangeBuilder": "0",
+  "ChangeManager": "0",
+  "ChangeNumber": "1",
+  "ChangeState": "1",
+  "ChangeStateSignal": "1",
+  "ChangeTitle": "1",
+  "CreateTime": "0",
+  "DynamicField_ChangeFieldName1": "0",
+  "DynamicField_ChangeFieldName2": "0",
+  "Impact": "0",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "Priority": "0",
+  "RequestedTime": "0",
+  "Services": "1",
+  "WorkOrderCount": "0"
+ },
+ "ITSMChange::Frontend::CustomerITSMChangeSchedule###ShowOnlyChangesWithAllowedServices": "1",
+ "ITSMChange::Frontend::CustomerITSMChangeSchedule###SortBy::Default": "PlannedStartTime",
+ "ITSMChange::Frontend::HistoryOrder": "normal",
+ "ITSMChange::Frontend::MenuModule###000-Back": {
+  "Action": "",
+  "Description": "Back",
+  "Link": "[% Env(\"LastScreenChanges\") %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Back",
+  "Target": "Back"
+ },
+ "ITSMChange::Frontend::MenuModule###010-History": {
+  "Action": "AgentITSMChangeHistory",
+  "Description": "History",
+  "Link": "Action=AgentITSMChangeHistory;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "History",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###020-Print": {
+  "Action": "AgentITSMChangePrint",
+  "Description": "Print the change.",
+  "Link": "Action=AgentITSMChangePrint;ChangeID=[% Data.ChangeID | html %]",
+  "LinkParam": "target=\"print_change\"",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Print",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###030-Edit": {
+  "Action": "AgentITSMChangeEdit",
+  "Description": "Edit the change.",
+  "Link": "Action=AgentITSMChangeEdit;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Edit",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###040-InvolvedPersons": {
+  "Action": "AgentITSMChangeInvolvedPersons",
+  "Description": "Change involved persons of the change.",
+  "Link": "Action=AgentITSMChangeInvolvedPersons;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Involved Persons",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###050-WorkOrderAdd": {
+  "Action": "AgentITSMWorkOrderAdd",
+  "Description": "Add a workorder to the change.",
+  "Link": "Action=AgentITSMWorkOrderAdd;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Add Workorder",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###055-WorkOrderAddFromTemplate": {
+  "Action": "AgentITSMWorkOrderAddFromTemplate",
+  "Description": "Add a workorder (from template) to the change.",
+  "Link": "Action=AgentITSMWorkOrderAddFromTemplate;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Add Workorder (from Template)",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###060-Conditions": {
+  "Action": "AgentITSMChangeCondition",
+  "Description": "Edit the conditions of the change.",
+  "Link": "Action=AgentITSMChangeCondition;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Conditions",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###070-Link": {
+  "Action": "AgentLinkObject",
+  "Description": "Link another object to the change.",
+  "Link": "Action=AgentLinkObject;SourceObject=ITSMChange;SourceKey=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Link",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###080-MoveTimeSlot": {
+  "Action": "AgentITSMChangeTimeSlot",
+  "Description": "Move all workorders in time.",
+  "Link": "Action=AgentITSMChangeTimeSlot;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuTimeSlot",
+  "Name": "Move Time Slot",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###090-Template": {
+  "Action": "AgentITSMChangeTemplate",
+  "Description": "Save change as a template.",
+  "Link": "Action=AgentITSMChangeTemplate;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Template",
+  "Target": "PopUp"
+ },
+ "ITSMChange::Frontend::MenuModule###100-ChangeDelete": {
+  "Action": "AgentITSMChangeDelete",
+  "ConfirmedActionQueryString": "Action=AgentITSMChangeDelete;Subaction=ChangeDelete;ChangeID=[% Data.ChangeID | html %]",
+  "Description": "Delete the change.",
+  "DialogContentQueryString": "Action=AgentITSMChangeDelete;ChangeID=[% Data.ChangeID | html %]",
+  "DialogTitle": "[% Translate(\"Delete\") | html %] [% Config(\"ITSMChange::Hook\") %] [% Data.ChangeNumber | html %]",
+  "ElementSelector": "#Menu[% Data.MenuID | html %]",
+  "Link": "Action=AgentITSMChangeDelete;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuChangeDelete",
+  "Name": "Delete",
+  "Target": "ConfirmDialog"
+ },
+ "ITSMChange::Frontend::MenuModule###110-ChangeReset": {
+  "Action": "AgentITSMChangeReset",
+  "ConfirmedActionQueryString": "Action=AgentITSMChangeReset;Subaction=Reset;ChangeID=[% Data.ChangeID | html %]",
+  "Description": "Reset change and its workorders.",
+  "DialogContentQueryString": "Action=AgentITSMChangeReset;ChangeID=[% Data.ChangeID | html %]",
+  "DialogTitle": "[% Translate(\"Reset\") | html %] [% Config(\"ITSMChange::Hook\") %] [% Data.ChangeNumber | html %]",
+  "ElementSelector": "#Menu[% Data.MenuID | html %]",
+  "Link": "Action=AgentITSMChangeReset;ChangeID=[% Data.ChangeID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMChange::MenuGeneric",
+  "Name": "Reset",
+  "Target": "ConfirmDialog"
+ },
+ "ITSMChange::Frontend::Overview###Small": {
+  "Module": "Kernel::Output::HTML::ITSMChange::OverviewSmall",
+  "Name": "Small",
+  "NameShort": "S",
+  "PageShown": "25"
+ },
+ "ITSMChange::Frontend::TemplateOverview###Small": {
+  "Module": "Kernel::Output::HTML::ITSMTemplate::OverviewSmall",
+  "Name": "Small",
+  "NameShort": "S",
+  "PageShown": "25"
+ },
+ "ITSMChange::Hook": "Change#",
+ "ITSMChange::Impact::Default": "3 normal",
+ "ITSMChange::Mapping::Action::Attribute::Operator###AccountedTime": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ActualEndTime": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ActualStartTime": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###CategoryID": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ChangeBuilderID": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ChangeManagerID": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ChangeStateID": {
+  "lock": "1",
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ChangeTitle": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###DynamicField": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###ImpactID": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###PlannedEffort": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###PlannedEndTime": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###PlannedStartTime": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###PriorityID": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Attribute::Operator###RequestedTime": {
+  "set": "1"
+ },
+ "ITSMChange::Mapping::Action::Object::Attribute": {
+  "AccountedTime": "0",
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "CategoryID": "1",
+  "ChangeBuilderID": "0",
+  "ChangeManagerID": "1",
+  "ChangeStateID": "1",
+  "ChangeTitle": "0",
+  "DynamicField": "1",
+  "ImpactID": "1",
+  "PlannedEffort": "0",
+  "PlannedEndTime": "0",
+  "PlannedStartTime": "0",
+  "PriorityID": "1",
+  "RequestedTime": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###AccountedTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ActualEndTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ActualStartTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###CategoryID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ChangeBuilderID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ChangeManagerID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ChangeStateID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ChangeTitle": {
+  "begins with": "1",
+  "contains": "1",
+  "ends with": "1",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "1"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###DynamicField": {
+  "begins with": "1",
+  "contains": "1",
+  "ends with": "1",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "1"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###ImpactID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###PlannedEffort": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###PlannedEndTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###PlannedStartTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###PriorityID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Attribute::Operator###RequestedTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMChange::Mapping::Expression::Object::Attribute": {
+  "AccountedTime": "1",
+  "ActualEndTime": "1",
+  "ActualStartTime": "1",
+  "CategoryID": "1",
+  "ChangeBuilderID": "1",
+  "ChangeManagerID": "1",
+  "ChangeStateID": "1",
+  "ChangeTitle": "1",
+  "DynamicField": "1",
+  "ImpactID": "1",
+  "PlannedEffort": "1",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "PriorityID": "1",
+  "RequestedTime": "1"
+ },
+ "ITSMChange::NumberGenerator": "Kernel::System::ITSMChange::Number::DateChecksum",
+ "ITSMChange::NumberGenerator::AutoIncrement::MinCounterSize": "5",
+ "ITSMChange::NumberGenerator::Date::UseFormattedCounter": "1",
+ "ITSMChange::NumberGenerator::MinCounterSize": "5",
+ "ITSMChange::Permission###06-AddWorkOrderCheck": {
+  "Granted": "0",
+  "Module": "Kernel::System::ITSMChange::Permission::AddWorkOrderCheck",
+  "Required": "1"
+ },
+ "ITSMChange::Permission###10-ChangeManagerCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::Permission::ChangeManagerCheck",
+  "Required": "0"
+ },
+ "ITSMChange::Permission###20-ChangeBuilderCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::Permission::ChangeBuilderCheck",
+  "Required": "0"
+ },
+ "ITSMChange::Permission###30-ChangeAgentCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::Permission::ChangeAgentCheck",
+  "Required": "0"
+ },
+ "ITSMChange::Permission###40-CABCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::Permission::CABCheck",
+  "Required": "0"
+ },
+ "ITSMChange::RestrictTicketTypes::Groups": [
+  "itsm-change",
+  "itsm-change-builder",
+  "itsm-change-manager"
+ ],
+ "ITSMChange::SendNotifications": "1",
+ "ITSMChange::State::Signal": {
+  "approved": "greenled",
+  "canceled": "redled",
+  "failed": "redled",
+  "in progress": "yellowled",
+  "pending approval": "yellowled",
+  "pending pir": "yellowled",
+  "rejected": "redled",
+  "requested": "grayled",
+  "retracted": "grayled",
+  "successful": "greenled"
+ },
+ "ITSMChange::StateLock::AllowEndStates": "1",
+ "ITSMChange::TimeReachedNotifications###Frequency": "once",
+ "ITSMChange::TimeReachedNotifications###Hours": "1",
+ "ITSMChange::ToolBar::CacheTTL": "180",
+ "ITSMChangeCronjob::EventModule###01-HistoryAdd": {
+  "Event": "(ChangePlannedStartTimeReachedPost|ChangePlannedEndTimeReachedPost|ChangeActualStartTimeReachedPost|ChangeActualEndTimeReachedPost|ChangeRequestedTimeReachedPost|WorkOrderPlannedStartTimeReachedPost|WorkOrderPlannedEndTimeReachedPost|WorkOrderActualStartTimeReachedPost|WorkOrderActualEndTimeReachedPost)",
+  "Module": "Kernel::System::ITSMChange::Event::HistoryAdd",
+  "Transaction": "0"
+ },
+ "ITSMChangeCronjob::EventModule###02-Notification": {
+  "Event": "(ChangePlannedStartTimeReachedPost|ChangePlannedEndTimeReachedPost|ChangeActualStartTimeReachedPost|ChangeActualEndTimeReachedPost|ChangeRequestedTimeReachedPost|WorkOrderPlannedStartTimeReachedPost|WorkOrderPlannedEndTimeReachedPost|WorkOrderActualStartTimeReachedPost|WorkOrderActualEndTimeReachedPost)",
+  "Module": "Kernel::System::ITSMChange::Event::Notification",
+  "Transaction": "0"
+ },
+ "ITSMChangeCronjob::EventModule###03-Condition": {
+  "Event": "(ChangePlannedStartTimeReachedPost|ChangePlannedEndTimeReachedPost|ChangeActualStartTimeReachedPost|ChangeActualEndTimeReachedPost|ChangeRequestedTimeReachedPost|WorkOrderPlannedStartTimeReachedPost|WorkOrderPlannedEndTimeReachedPost|WorkOrderActualStartTimeReachedPost|WorkOrderActualEndTimeReachedPost)",
+  "Module": "Kernel::System::ITSMChange::Event::Condition",
+  "Transaction": "0"
+ },
+ "ITSMChangeManagementNotification::EventModule###01-HistoryAdd": {
+  "Event": "(ChangeNotificationSentPost|WorkOrderNotificationSentPost)",
+  "Module": "Kernel::System::ITSMChange::Event::HistoryAdd",
+  "Transaction": "0"
+ },
+ "ITSMCondition::EventModule###01-HistoryAdd": {
+  "Event": "(ConditionAddPost|ConditionUpdatePost|ConditionDeletePost|ConditionDeleteAllPost|ExpressionAddPost|ExpressionUpdatePost|ExpressionDeletePost|ExpressionDeleteAllPost|ActionAddPost|ActionUpdatePost|ActionDeletePost|ActionDeleteAllPost|ActionExecutePost)",
+  "Module": "Kernel::System::ITSMChange::Event::HistoryAdd",
+  "Transaction": "0"
+ },
+ "ITSMCondition::EventModule###02-Notification": {
+  "Event": "(ActionExecutePost)",
+  "Module": "Kernel::System::ITSMChange::Event::Notification",
+  "Transaction": "0"
+ },
+ "ITSMConfigItem::CINameRegex": {
+  "Computer::CINameRegex": "^ABC.*",
+  "Computer::CINameRegexErrorMessage": "A computer name must start with ABC!",
+  "Hardware::CINameRegex": ".*\\d\\d$",
+  "Hardware::CINameRegexErrorMessage": "A hardware name must end with two digits!"
+ },
+ "ITSMConfigItem::EventModulePost###042-ITSMConfigItemTicketStatusLink": {
+  "Event": "(LinkAdd|LinkDelete)",
+  "Module": "Kernel::System::Ticket::Event::TicketStatusLink"
+ },
+ "ITSMConfigItem::EventModulePost###100-CIAttachment": {
+  "Event": "(VersionCreate|VersionDelete)",
+  "Module": "Kernel::System::ITSMConfigItem::Event::CIAttachment",
+  "Transaction": "0"
+ },
+ "ITSMConfigItem::EventModulePost###100-History": {
+  "Event": "(ConfigItemCreate|VersionCreate|DeploymentStateUpdate|IncidentStateUpdate|ConfigItemDelete|LinkAdd|LinkDelete|DefinitionUpdate|NameUpdate|ValueUpdate|DefinitionCreate|VersionDelete|AttachmentAddPost|AttachmentDeletePost)",
+  "Module": "Kernel::System::ITSMConfigItem::Event::DoHistory",
+  "Transaction": "0"
+ },
+ "ITSMConfigItem::EventModulePost###9900-GenericInterface": {
+  "Event": "",
+  "Module": "Kernel::GenericInterface::Event::Handler",
+  "Transaction": "1"
+ },
+ "ITSMConfigItem::Frontend::AdminITSMConfigItem###EditorRows": "30",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItem###Permission": "ro",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItem###SearchLimit": "10000",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItem###ShowColumns": {
+  "Class": "0",
+  "CurDeplSignal": "1",
+  "CurDeplState": "1",
+  "CurDeplStateType": "0",
+  "CurInciSignal": "1",
+  "CurInciState": "1",
+  "CurInciStateType": "1",
+  "LastChanged": "1",
+  "Name": "1",
+  "Number": "1"
+ },
+ "ITSMConfigItem::Frontend::AgentITSMConfigItem###ShowColumnsByClass": [
+  "Computer::Name",
+  "Computer::Number",
+  "Computer::CurInciSignal",
+  "Computer::CurDeplSignal",
+  "Computer::CurDeplState",
+  "Computer::HardDisk::1",
+  "Computer::HardDisk::1::Capacity::1",
+  "Computer::HardDisk::2",
+  "Computer::HardDisk::2::Capacity::1",
+  "Computer::HardDisk::3",
+  "Computer::HardDisk::3::Capacity::1",
+  "Computer::WarrantyExpirationDate::1",
+  "Computer::CreateTime",
+  "Location::CurInciSignal",
+  "Location::Number",
+  "Location::Type::1",
+  "Location::Name",
+  "Location::Address::1",
+  "Location::LastChanged"
+ ],
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemAdd###Permission": "rw",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemBulk###DeplState": "1",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemBulk###InciState": "1",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemCustomerCIs###CustomerCompany": "0",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemCustomerCIs###CustomerUser": "1",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemCustomerCIs###Mapping": {
+  "Computer": "fa-laptop"
+ },
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemCustomerCIs###Permission": "ro",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemCustomerCIs###SearchLimit": "100",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemDelete###Permission": "rw",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemEdit###Permission": "rw",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemHistory###Permission": "ro",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemPrint###Permission": "ro",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###CustomerID": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###Description": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###FQDN": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###InstallDate": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###Model": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###Note": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###Owner": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###SerialNumber": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###Type": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###Vendor": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Computer###WarrantyExpirationDate": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###CustomerID": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###Description": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###InstallDate": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###Model": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###Note": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###Owner": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###SerialNumber": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###Type": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###Vendor": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Hardware###WarrantyExpirationDate": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Address": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###CustomerID": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###E-Mail": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Fax": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Note": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Owner": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Phone1": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Phone2": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Location###Type": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Network###CustomerID": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Network###Description": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Network###NetworkAddress": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Network###Note": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Network###Owner": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Network###Type": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###CustomerID": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###Description": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###LicenceKey": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###LicenceType": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###Note": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###Owner": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###SerialNumber": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###Type": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###Vendor": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###Software###Version": "***",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Permission": "ro",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###SearchCSVData": [
+  "Class",
+  "Incident State",
+  "Name",
+  "ConfigItemNumber",
+  "Deployment State",
+  "Version",
+  "Create Time"
+ ],
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###SearchLimit": "10000",
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###ShowColumns": {
+  "Class": "0",
+  "CurDeplSignal": "1",
+  "CurDeplState": "1",
+  "CurDeplStateType": "0",
+  "CurInciSignal": "1",
+  "CurInciState": "1",
+  "CurInciStateType": "0",
+  "LastChanged": "1",
+  "Name": "1",
+  "Number": "1"
+ },
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###ShowColumnsByClass": [
+  "Computer::Name",
+  "Computer::Number",
+  "Computer::CurInciSignal",
+  "Computer::CurDeplSignal",
+  "Computer::CurDeplState",
+  "Computer::HardDisk::1",
+  "Computer::HardDisk::1::Capacity::1",
+  "Computer::HardDisk::2",
+  "Computer::HardDisk::2::Capacity::1",
+  "Computer::HardDisk::3",
+  "Computer::HardDisk::3::Capacity::1",
+  "Computer::WarrantyExpirationDate::1",
+  "Computer::CreateTime",
+  "Location::CurInciSignal",
+  "Location::Number",
+  "Location::Type::1",
+  "Location::Name",
+  "Location::Address::1",
+  "Location::LastChanged"
+ ],
+ "ITSMConfigItem::Frontend::AgentITSMConfigItemZoom###Permission": "ro",
+ "ITSMConfigItem::Frontend::BulkFeature": "1",
+ "ITSMConfigItem::Frontend::BulkFeatureGroup": [
+  "admin",
+  "users",
+  "itsm-configitem"
+ ],
+ "ITSMConfigItem::Frontend::HistoryOrder": "normal",
+ "ITSMConfigItem::Frontend::MenuModule###000-Back": {
+  "Action": "",
+  "Description": "Back",
+  "Link": "[% Env(\"LastScreenOverview\") %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Back",
+  "Target": ""
+ },
+ "ITSMConfigItem::Frontend::MenuModule###200-History": {
+  "Action": "AgentITSMConfigItemHistory",
+  "Description": "History",
+  "Link": "Action=AgentITSMConfigItemHistory;ConfigItemID=[% Data.ConfigItemID | html %];VersionID=[% Data.VersionID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "History",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Frontend::MenuModule###300-Edit": {
+  "Action": "AgentITSMConfigItemEdit",
+  "Description": "Edit",
+  "Link": "Action=AgentITSMConfigItemEdit;ConfigItemID=[% Data.ConfigItemID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Edit",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Frontend::MenuModule###400-Print": {
+  "Action": "AgentITSMConfigItemPrint",
+  "Description": "Print",
+  "Link": "Action=AgentITSMConfigItemPrint;ConfigItemID=[% Data.ConfigItemID | html %];VersionID=[% Data.VersionID | html %]",
+  "LinkParam": "target=\"print\"",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Print",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Frontend::MenuModule###500-Link": {
+  "Action": "AgentLinkObject",
+  "Description": "Link",
+  "Link": "Action=AgentLinkObject;SourceObject=ITSMConfigItem;SourceKey=[% Data.ConfigItemID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Link",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Frontend::MenuModule###600-Duplicate": {
+  "Action": "AgentITSMConfigItemEdit",
+  "Description": "Duplicate",
+  "Link": "Action=AgentITSMConfigItemEdit;DuplicateID=[% Data.ConfigItemID | html %];VersionID=[% Data.VersionID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Duplicate",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Frontend::MenuModule###700-ConfigItemDelete": {
+  "Action": "AgentITSMConfigItemDelete",
+  "ConfirmedActionQueryString": "Action=AgentITSMConfigItemDelete;Subaction=ConfigItemDelete;ConfigItemID=[% Data.ConfigItemID | html %]",
+  "Description": "Delete Configuration Item",
+  "DialogContentQueryString": "Action=AgentITSMConfigItemDelete;ConfigItemID=[% Data.ConfigItemID | html %]",
+  "DialogTitle": "[% Translate(\"Delete\") | html %] [% Config(\"ITSMConfigItem::Hook\") %] [% Data.Number | html %]",
+  "ElementSelector": "#Menu[% Data.MenuID | html %]",
+  "Link": "Action=AgentITSMConfigItemDelete;ConfigItemID=[% Data.ConfigItemID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Delete",
+  "Target": "ConfirmDialog"
+ },
+ "ITSMConfigItem::Frontend::Overview###Small": {
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::OverviewSmall",
+  "Name": "Small",
+  "NameShort": "S",
+  "PageShown": "25"
+ },
+ "ITSMConfigItem::Frontend::PreMenuModule###100-Zoom": {
+  "Action": "AgentITSMConfigItemZoom",
+  "Description": "Zoom",
+  "Link": "Action=AgentITSMConfigItemZoom;ConfigItemID=[% Data.ConfigItemID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Zoom",
+  "Target": ""
+ },
+ "ITSMConfigItem::Frontend::PreMenuModule###200-History": {
+  "Action": "AgentITSMConfigItemHistory",
+  "Description": "History",
+  "Link": "Action=AgentITSMConfigItemHistory;ConfigItemID=[% Data.ConfigItemID | html %];VersionID=[% Data.VersionID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "History",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Frontend::PreMenuModule###300-Duplicate": {
+  "Action": "AgentITSMConfigItemEdit",
+  "Description": "Duplicate",
+  "Link": "Action=AgentITSMConfigItemEdit;DuplicateID=[% Data.ConfigItemID | html %];VersionID=[% Data.VersionID | html %];ReturnToLastScreen=1",
+  "Module": "Kernel::Output::HTML::ITSMConfigItem::MenuGeneric",
+  "Name": "Duplicate",
+  "Target": "PopUp"
+ },
+ "ITSMConfigItem::Hook": "ConfigItem#",
+ "ITSMConfigItem::LinkStatus::DeploymentStates": [
+  "Production"
+ ],
+ "ITSMConfigItem::LinkStatus::IncidentStates": [
+  "Incident",
+  "Warning",
+  "Operational"
+ ],
+ "ITSMConfigItem::LinkStatus::LinkTypes": {
+  "RelevantTo": "Incident"
+ },
+ "ITSMConfigItem::LinkStatus::TicketTypes": [
+  "Incident"
+ ],
+ "ITSMConfigItem::NumberGenerator": "Kernel::System::ITSMConfigItem::Number::AutoIncrement",
+ "ITSMConfigItem::Permission::Class###010-ClassGroupCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMConfigItem::Permission::ClassGroupCheck",
+  "Required": "0"
+ },
+ "ITSMConfigItem::Permission::Item###010-ItemClassGroupCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMConfigItem::Permission::ItemClassGroupCheck",
+  "Required": "0"
+ },
+ "ITSMConfigItem::SetIncidentStateOnLink": "0",
+ "ITSMSLA::Frontend::MenuModule###000-Back": {
+  "Action": "",
+  "Description": "Back",
+  "Link": "Action=AgentITSMSLA",
+  "Module": "Kernel::Output::HTML::ITSMSLAMenu::Generic",
+  "Name": "Back",
+  "Target": "Back"
+ },
+ "ITSMSLA::Frontend::MenuModule###100-Print": {
+  "Action": "AgentITSMSLAPrint",
+  "Description": "Print",
+  "Link": "Action=AgentITSMSLAPrint;SLAID=[% Data.SLAID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMSLAMenu::Generic",
+  "Name": "Print",
+  "Target": "PopUp"
+ },
+ "ITSMService::Frontend::MenuModule###000-Back": {
+  "Action": "",
+  "Description": "Back",
+  "Link": "Action=AgentITSMService",
+  "Module": "Kernel::Output::HTML::ITSMServiceMenu::Generic",
+  "Name": "Back",
+  "Target": "Back"
+ },
+ "ITSMService::Frontend::MenuModule###100-Print": {
+  "Action": "AgentITSMServicePrint",
+  "Description": "Print",
+  "Link": "Action=AgentITSMServicePrint;ServiceID=[% Data.ServiceID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMServiceMenu::Generic",
+  "Name": "Print",
+  "Target": "PopUp"
+ },
+ "ITSMService::Frontend::MenuModule###200-Link": {
+  "Action": "AgentITSMService",
+  "Description": "Link",
+  "Link": "Action=AgentLinkObject;SourceObject=Service;SourceKey=[% Data.ServiceID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMServiceMenu::Link",
+  "Name": "Link",
+  "Target": "PopUp"
+ },
+ "ITSMStateMachine::Object###Change": {
+  "Class": "ITSM::ChangeManagement::Change::State",
+  "Name": "Change"
+ },
+ "ITSMStateMachine::Object###WorkOrder": {
+  "Class": "ITSM::ChangeManagement::WorkOrder::State",
+  "Name": "WorkOrder"
+ },
+ "ITSMWorkOrder::ActualStartTimeSet::States": [
+  "in progress"
+ ],
+ "ITSMWorkOrder::Attribute::CompareValue::FieldType": {
+  "AccountedTime": "Text",
+  "ActualEndTime": "Date",
+  "ActualStartTime": "Date",
+  "DynamicField": "Text",
+  "PlannedEffort": "Text",
+  "PlannedEndTime": "Date",
+  "PlannedStartTime": "Date",
+  "WorkOrderAgentID": "Selection",
+  "WorkOrderNumber": "Text",
+  "WorkOrderStateID": "Selection",
+  "WorkOrderTitle": "Text",
+  "WorkOrderTypeID": "Selection"
+ },
+ "ITSMWorkOrder::EventModule###01-WorkOrderNumberCalc": {
+  "Event": "(WorkOrderUpdatePost|WorkOrderDeletePost)",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Event::WorkOrderNumberCalc",
+  "Transaction": "0"
+ },
+ "ITSMWorkOrder::EventModule###02-WorkOrderActualTimesSet": {
+  "Event": "WorkOrderUpdatePost",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Event::WorkOrderActualTimesSet",
+  "Transaction": "0"
+ },
+ "ITSMWorkOrder::EventModule###03-HistoryAdd": {
+  "Event": "(WorkOrderAddPost|WorkOrderUpdatePost|WorkOrderDeletePost|WorkOrderLinkAddPost|WorkOrderLinkDeletePost|WorkOrderAttachmentAddPost|WorkOrderAttachmentDeletePost|WorkOrderReportAttachmentAddPost|WorkOrderReportAttachmentDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::HistoryAdd",
+  "Transaction": "0"
+ },
+ "ITSMWorkOrder::EventModule###04-Notification": {
+  "Event": "(WorkOrderAddPost|WorkOrderUpdatePost|WorkOrderDeletePost|WorkOrderLinkAddPost|WorkOrderLinkDeletePost|WorkOrderAttachmentAddPost|WorkOrderAttachmentDeletePost|WorkOrderReportAttachmentAddPost|WorkOrderReportAttachmentDeletePost)",
+  "Module": "Kernel::System::ITSMChange::Event::Notification",
+  "Transaction": "0"
+ },
+ "ITSMWorkOrder::EventModule###05-Condition": {
+  "Event": "(WorkOrderAddPost|WorkOrderUpdatePost)",
+  "Module": "Kernel::System::ITSMChange::Event::Condition",
+  "Transaction": "0"
+ },
+ "ITSMWorkOrder::EventModule###1000-GenericInterface": {
+  "Event": "",
+  "Module": "Kernel::GenericInterface::Event::Handler",
+  "Transaction": "1"
+ },
+ "ITSMWorkOrder::EventModule###80-ToolBarMyWorkOrdersCacheDelete": {
+  "Event": "(WorkOrderAddPost|WorkOrderUpdatePost|WorkOrderDeletePost)",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Event::ToolBarMyWorkOrdersCacheDelete",
+  "Transaction": "0"
+ },
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderAgent###Permission": "rw",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderDelete###Permission": "rw",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderEdit###DynamicField": {},
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderEdit###MoveFollowingWorkOrders": "1",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderEdit###Permission": "rw",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderEdit###PlannedEffort": "1",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderHistory###Permission": "ro",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderHistoryZoom###Permission": "ro",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderReport###AccountedTime": "1",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderReport###ActualTimeSpan": "0",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderReport###DynamicField": {},
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderReport###Permission": "rw",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderTake###Permission": "rw",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderTemplate###Permission": "rw",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderZoom###AccountedTime": "1",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderZoom###DynamicField": {},
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderZoom###Permission": "ro",
+ "ITSMWorkOrder::Frontend::AgentITSMWorkOrderZoom###PlannedEffort": "1",
+ "ITSMWorkOrder::Frontend::MenuModule###000-Back": {
+  "Action": "",
+  "Description": "Back",
+  "Link": "[% Env(\"LastScreenWorkOrders\") %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuGeneric",
+  "Name": "Back",
+  "Target": "Back"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###010-History": {
+  "Action": "AgentITSMWorkOrderHistory",
+  "Description": "History",
+  "Link": "Action=AgentITSMWorkOrderHistory;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuGeneric",
+  "Name": "History",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###020-Print": {
+  "Action": "AgentITSMChangePrint",
+  "Description": "Print the workorder.",
+  "Link": "Action=AgentITSMChangePrint;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuGeneric",
+  "Name": "Print",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###030-Edit": {
+  "Action": "AgentITSMWorkOrderEdit",
+  "Description": "Edit the workorder.",
+  "Link": "Action=AgentITSMWorkOrderEdit;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuWithPermissionFromChange",
+  "Name": "Edit",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###035-Take": {
+  "Action": "AgentITSMWorkOrderTake",
+  "ConfirmedActionQueryString": "Action=AgentITSMWorkOrderTake;Subaction=WorkOrderTake;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Description": "Take the workorder.",
+  "DialogContentQueryString": "Action=AgentITSMWorkOrderTake;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "DialogTitle": "[% Translate(\"Take Workorder\") | html %]: [% Config(\"ITSMWorkOrder::Hook\") %] [% Data.ChangeNumber | html %] - [% Data.WorkOrderNumber | html %]",
+  "ElementSelector": "#Menu[% Data.MenuID | html %]",
+  "Link": "Action=AgentITSMWorkOrderTake;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuWithTakePermission",
+  "Name": "Take Workorder",
+  "Target": "ConfirmDialog"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###040-WorkOrderAgent": {
+  "Action": "AgentITSMWorkOrderAgent",
+  "Description": "Set the agent for the workorder.",
+  "Link": "Action=AgentITSMWorkOrderAgent;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuWithPermissionFromChange",
+  "Name": "Workorder Agent",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###050-Report": {
+  "Action": "AgentITSMWorkOrderReport",
+  "Description": "Report",
+  "Link": "Action=AgentITSMWorkOrderReport;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuGeneric",
+  "Name": "Report",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###060-Link": {
+  "Action": "AgentLinkObject",
+  "Description": "Link another object to the workorder.",
+  "Link": "Action=AgentLinkObject;SourceObject=ITSMWorkOrder;SourceKey=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuGeneric",
+  "Name": "Link",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###080-Template": {
+  "Action": "AgentITSMWorkOrderTemplate",
+  "Description": "Save workorder as a template.",
+  "Link": "Action=AgentITSMWorkOrderTemplate;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuWithPermissionFromChange",
+  "Name": "Template",
+  "Target": "PopUp"
+ },
+ "ITSMWorkOrder::Frontend::MenuModule###090-WorkOrderDelete": {
+  "Action": "AgentITSMWorkOrderDelete",
+  "ConfirmedActionQueryString": "Action=AgentITSMWorkOrderDelete;Subaction=WorkOrderDelete;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Description": "Delete the workorder.",
+  "DialogContentQueryString": "Action=AgentITSMWorkOrderDelete;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "DialogTitle": "[% Translate(\"Delete\") | html %] [% Config(\"ITSMWorkOrder::Hook\") %] [% Data.ChangeNumber | html %]-[% Data.WorkOrderNumber | html %]",
+  "ElementSelector": "#Menu[% Data.MenuID | html %]",
+  "Link": "Action=AgentITSMWorkOrderDelete;WorkOrderID=[% Data.WorkOrderID | html %]",
+  "Module": "Kernel::Output::HTML::ITSMWorkOrder::MenuWithPermissionFromChange",
+  "Name": "Delete",
+  "Target": "ConfirmDialog"
+ },
+ "ITSMWorkOrder::Hook": "Workorder#",
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###AccountedTime": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###ActualEndTime": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###ActualStartTime": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###DynamicField": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###PlannedEffort": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###PlannedEndTime": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###PlannedStartTime": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###WorkOrderAgentID": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###WorkOrderNumber": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###WorkOrderStateID": {
+  "lock": "1",
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###WorkOrderTitle": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Attribute::Operator###WorkOrderTypeID": {
+  "set": "1"
+ },
+ "ITSMWorkOrder::Mapping::Action::Object::Attribute": {
+  "AccountedTime": "0",
+  "ActualEndTime": "0",
+  "ActualStartTime": "0",
+  "DynamicField": "1",
+  "PlannedEffort": "0",
+  "PlannedEndTime": "0",
+  "PlannedStartTime": "0",
+  "WorkOrderAgentID": "1",
+  "WorkOrderNumber": "0",
+  "WorkOrderStateID": "1",
+  "WorkOrderTitle": "0",
+  "WorkOrderTypeID": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###AccountedTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###ActualEndTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###ActualStartTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###DynamicField": {
+  "begins with": "1",
+  "contains": "1",
+  "ends with": "1",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "1"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###PlannedEffort": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###PlannedEndTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###PlannedStartTime": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "1",
+  "is before": "1",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###WorkOrderAgentID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###WorkOrderNumber": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "1",
+  "is less than": "1",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###WorkOrderStateID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###WorkOrderTitle": {
+  "begins with": "1",
+  "contains": "1",
+  "ends with": "1",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "1",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "1",
+  "not contains": "1"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Attribute::Operator###WorkOrderTypeID": {
+  "begins with": "0",
+  "contains": "0",
+  "ends with": "0",
+  "is": "1",
+  "is after": "0",
+  "is before": "0",
+  "is empty": "0",
+  "is greater than": "0",
+  "is less than": "0",
+  "is not": "1",
+  "is not empty": "0",
+  "not contains": "0"
+ },
+ "ITSMWorkOrder::Mapping::Expression::Object::Attribute": {
+  "AccountedTime": "1",
+  "ActualEndTime": "1",
+  "ActualStartTime": "1",
+  "DynamicField": "1",
+  "PlannedEffort": "1",
+  "PlannedEndTime": "1",
+  "PlannedStartTime": "1",
+  "WorkOrderAgentID": "1",
+  "WorkOrderNumber": "1",
+  "WorkOrderStateID": "1",
+  "WorkOrderTitle": "1",
+  "WorkOrderTypeID": "1"
+ },
+ "ITSMWorkOrder::Permission###10-ChangeManagerCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Permission::ChangeManagerCheck",
+  "Required": "0"
+ },
+ "ITSMWorkOrder::Permission###20-ChangeBuilderCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Permission::ChangeBuilderCheck",
+  "Required": "0"
+ },
+ "ITSMWorkOrder::Permission###30-WorkOrderAgentCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Permission::WorkOrderAgentCheck",
+  "Required": "0"
+ },
+ "ITSMWorkOrder::Permission###40-CABCheck": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Permission::CABCheck",
+  "Required": "0"
+ },
+ "ITSMWorkOrder::State::Signal": {
+  "accepted": "grayled",
+  "canceled": "redled",
+  "closed": "greenled",
+  "created": "grayled",
+  "in progress": "yellowled",
+  "ready": "yellowled"
+ },
+ "ITSMWorkOrder::StateLock::AllowEndStates": "1",
+ "ITSMWorkOrder::TakePermission###10-EmptyAgent": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Permission::EmptyAgentCheck",
+  "Required": "0"
+ },
+ "ITSMWorkOrder::TakePermission###20-ListAgent": {
+  "Granted": "1",
+  "Module": "Kernel::System::ITSMChange::ITSMWorkOrder::Permission::ListAgentCheck",
+  "Required": "0"
+ },
+ "ITSMWorkOrder::TakePermission::List": {
+  "": "1"
+ },
+ "ITSMWorkOrder::TimePeriod": {
+  "YearPeriodFuture": "5",
+  "YearPeriodPast": "5"
+ },
+ "ITSMWorkOrder::Type::Default": "workorder",
+ "LinkObject::ComplexTable###Appointment": {
+  "DefaultColumns": {
+   "CalendarName": "1",
+   "Changed": "1",
+   "Created": "1",
+   "Description": "2",
+   "EndTime": "2",
+   "Location": "1",
+   "NotificationTime": "1",
+   "StartTime": "2"
+  },
+  "Module": "Kernel::Output::HTML::LinkObject::Appointment.pm",
+  "Priority": {
+   "CalendarName": "100",
+   "Changed": "160",
+   "Created": "170",
+   "Description": "110",
+   "EndTime": "130",
+   "Location": "140",
+   "NotificationTime": "150",
+   "StartTime": "120"
+  }
+ },
+ "LinkObject::ComplexTable###ITSMChange": {
+  "DefaultColumns": {
+   "AccountedTime": "1",
+   "ActualEndTime": "1",
+   "ActualStartTime": "1",
+   "Category": "2",
+   "ChangeState": "2",
+   "ChangeTime": "2",
+   "ChangeTitle": "2",
+   "CreateTime": "1",
+   "Impact": "2",
+   "PlannedEffort": "1",
+   "PlannedEndTime": "1",
+   "PlannedStartTime": "1",
+   "Priority": "2",
+   "RequestedTime": "1"
+  },
+  "Module": "Kernel::Output::HTML::LinkObject::ITSMChange.pm",
+  "Priority": {
+   "AccountedTime": "200",
+   "ActualEndTime": "180",
+   "ActualStartTime": "170",
+   "Category": "120",
+   "ChangeState": "110",
+   "ChangeTime": "230",
+   "ChangeTitle": "100",
+   "CreateTime": "220",
+   "Impact": "130",
+   "PlannedEffort": "190",
+   "PlannedEndTime": "160",
+   "PlannedStartTime": "150",
+   "Priority": "140",
+   "RequestedTime": "210"
+  }
+ },
+ "LinkObject::ComplexTable###ITSMWorkOrder": {
+  "DefaultColumns": {
+   "AccountedTime": "1",
+   "ActualEndTime": "1",
+   "ActualStartTime": "1",
+   "ChangeTime": "2",
+   "CreateTime": "1",
+   "PlannedEffort": "1",
+   "PlannedEndTime": "1",
+   "PlannedStartTime": "1",
+   "WorkOrderState": "2",
+   "WorkOrderTitle": "2",
+   "WorkOrderType": "2"
+  },
+  "Module": "Kernel::Output::HTML::LinkObject::ITSMWorkOrder.pm",
+  "Priority": {
+   "AccountedTime": "180",
+   "ActualEndTime": "160",
+   "ActualStartTime": "150",
+   "ChangeTime": "200",
+   "CreateTime": "190",
+   "PlannedEffort": "170",
+   "PlannedEndTime": "140",
+   "PlannedStartTime": "130",
+   "WorkOrderState": "110",
+   "WorkOrderTitle": "100",
+   "WorkOrderType": "120"
+  }
+ },
+ "LinkObject::ComplexTable###Service": {
+  "DefaultColumns": {
+   "ChangeTime": "1",
+   "Comment": "1",
+   "CreateTime": "1",
+   "Criticality": "2",
+   "CurInciState": "2",
+   "Type": "2"
+  },
+  "Module": "Kernel::Output::HTML::LinkObject::Service.pm",
+  "Priority": {
+   "ChangeTime": "160",
+   "Comment": "110",
+   "CreateTime": "150",
+   "Criticality": "130",
+   "CurInciState": "140",
+   "Type": "120"
+  }
+ },
+ "LinkObject::ComplexTable###Ticket": {
+  "DefaultColumns": {
+   "Age": "1",
+   "Changed": "1",
+   "Created": "2",
+   "CustomerCompanyName": "1",
+   "CustomerID": "1",
+   "CustomerName": "1",
+   "CustomerUserID": "1",
+   "EscalationResponseTime": "1",
+   "EscalationSolutionTime": "1",
+   "EscalationTime": "1",
+   "EscalationUpdateTime": "1",
+   "Lock": "1",
+   "Owner": "1",
+   "PendingTime": "1",
+   "Priority": "1",
+   "Queue": "2",
+   "Responsible": "1",
+   "SLA": "1",
+   "Service": "1",
+   "State": "2",
+   "TicketNumber": "2",
+   "Title": "2",
+   "Type": "1"
+  },
+  "Module": "Kernel::Output::HTML::LinkObject::Ticket.pm",
+  "Priority": {
+   "Age": "110",
+   "Changed": "120",
+   "Created": "310",
+   "CustomerCompanyName": "320",
+   "CustomerID": "240",
+   "CustomerName": "250",
+   "CustomerUserID": "260",
+   "EscalationResponseTime": "160",
+   "EscalationSolutionTime": "150",
+   "EscalationTime": "140",
+   "EscalationUpdateTime": "170",
+   "Lock": "200",
+   "Owner": "220",
+   "PendingTime": "130",
+   "Priority": "300",
+   "Queue": "210",
+   "Responsible": "230",
+   "SLA": "290",
+   "Service": "280",
+   "State": "190",
+   "TicketNumber": "100",
+   "Title": "180",
+   "Type": "270"
+  }
+ },
+ "LinkObject::ComplexTable::SettingsVisibility###Appointment": [
+  "AgentTicketZoom"
+ ],
+ "LinkObject::ComplexTable::SettingsVisibility###ITSMChangeManagement": [
+  "AgentITSMChangeZoom",
+  "AgentITSMWorkOrderZoom"
+ ],
+ "LinkObject::ComplexTable::SettingsVisibility###ITSMConfigItem": [
+  "AgentITSMConfigItemZoom"
+ ],
+ "LinkObject::ComplexTable::SettingsVisibility###Service": [
+  "AgentITSMServiceZoom"
+ ],
+ "LinkObject::ComplexTable::SettingsVisibility###Ticket": [
+  "AgentTicketZoom"
+ ],
+ "LinkObject::DefaultSubObject###ITSMConfigItem": "Computer",
+ "LinkObject::EventModulePost###9900-GenericInterface": {
+  "Event": "",
+  "Module": "Kernel::GenericInterface::Event::Handler",
+  "Transaction": "1"
+ },
+ "LinkObject::ITSMConfigItem::ShowColumns": [
+  "CurInciSignal",
+  "CurDeplSignal"
+ ],
+ "LinkObject::ITSMConfigItem::ShowColumnsByClass": [
+  "Computer::Name",
+  "Computer::CurDeplState",
+  "Computer::HardDisk::1",
+  "Computer::HardDisk::1::Capacity::1",
+  "Computer::HardDisk::2",
+  "Computer::HardDisk::2::Capacity::1",
+  "Computer::HardDisk::3",
+  "Computer::HardDisk::3::Capacity::1",
+  "Computer::WarrantyExpirationDate::1",
+  "Computer::CreateTime",
+  "Location::Type::1",
+  "Location::Address::1"
+ ],
+ "LinkObject::IgnoreLinkedTicketStateTypes": [
+  "merged",
+  "removed"
+ ],
+ "LinkObject::PossibleLink###0200": {
+  "Object1": "Ticket",
+  "Object2": "Ticket",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###0201": {
+  "Object1": "Ticket",
+  "Object2": "Ticket",
+  "Type": "ParentChild"
+ },
+ "LinkObject::PossibleLink###1200": {
+  "Object1": "Appointment",
+  "Object2": "Ticket",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###3200": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "ITSMConfigItem",
+  "Type": "AlternativeTo"
+ },
+ "LinkObject::PossibleLink###3201": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "ITSMConfigItem",
+  "Type": "ConnectedTo"
+ },
+ "LinkObject::PossibleLink###3202": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "ITSMConfigItem",
+  "Type": "DependsOn"
+ },
+ "LinkObject::PossibleLink###3203": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "ITSMConfigItem",
+  "Type": "Includes"
+ },
+ "LinkObject::PossibleLink###3204": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "ITSMConfigItem",
+  "Type": "RelevantTo"
+ },
+ "LinkObject::PossibleLink###3220": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "Ticket",
+  "Type": "AlternativeTo"
+ },
+ "LinkObject::PossibleLink###3221": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "Ticket",
+  "Type": "DependsOn"
+ },
+ "LinkObject::PossibleLink###3222": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "Ticket",
+  "Type": "RelevantTo"
+ },
+ "LinkObject::PossibleLink###3240": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "Service",
+  "Type": "AlternativeTo"
+ },
+ "LinkObject::PossibleLink###3241": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "Service",
+  "Type": "DependsOn"
+ },
+ "LinkObject::PossibleLink###3242": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "Service",
+  "Type": "RelevantTo"
+ },
+ "LinkObject::PossibleLink###3260": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "FAQ",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###3261": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "FAQ",
+  "Type": "ParentChild"
+ },
+ "LinkObject::PossibleLink###3262": {
+  "Object1": "ITSMConfigItem",
+  "Object2": "FAQ",
+  "Type": "RelevantTo"
+ },
+ "LinkObject::PossibleLink###3280": {
+  "Object1": "Service",
+  "Object2": "FAQ",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###3281": {
+  "Object1": "Service",
+  "Object2": "FAQ",
+  "Type": "ParentChild"
+ },
+ "LinkObject::PossibleLink###3282": {
+  "Object1": "Service",
+  "Object2": "FAQ",
+  "Type": "RelevantTo"
+ },
+ "LinkObject::PossibleLink###3400": {
+  "Object1": "ITSMWorkOrder",
+  "Object2": "Service",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###3401": {
+  "Object1": "ITSMWorkOrder",
+  "Object2": "Service",
+  "Type": "DependsOn"
+ },
+ "LinkObject::PossibleLink###3410": {
+  "Object1": "ITSMWorkOrder",
+  "Object2": "ITSMConfigItem",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###3411": {
+  "Object1": "ITSMWorkOrder",
+  "Object2": "ITSMConfigItem",
+  "Type": "DependsOn"
+ },
+ "LinkObject::PossibleLink###3412": {
+  "Object1": "ITSMWorkOrder",
+  "Object2": "Ticket",
+  "Type": "Normal"
+ },
+ "LinkObject::PossibleLink###3420": {
+  "Object1": "ITSMChange",
+  "Object2": "Ticket",
+  "Type": "Normal"
+ },
+ "LinkObject::ShowDeleteButton": "1",
+ "LinkObject::StrikeThroughLinkedTicketStateTypes": [
+  "merged"
+ ],
+ "LinkObject::Type###AlternativeTo": {
+  "SourceName": "Alternative to",
+  "TargetName": "Alternative to"
+ },
+ "LinkObject::Type###ConnectedTo": {
+  "SourceName": "Connected to",
+  "TargetName": "Connected to"
+ },
+ "LinkObject::Type###DependsOn": {
+  "SourceName": "Depends on",
+  "TargetName": "Required for"
+ },
+ "LinkObject::Type###Includes": {
+  "SourceName": "Includes",
+  "TargetName": "Part of"
+ },
+ "LinkObject::Type###Normal": {
+  "SourceName": "Normal",
+  "TargetName": "Normal"
+ },
+ "LinkObject::Type###ParentChild": {
+  "SourceName": "Parent",
+  "TargetName": "Child"
+ },
+ "LinkObject::Type###RelevantTo": {
+  "SourceName": "Relevant to",
+  "TargetName": "Relevant to"
+ },
+ "LinkObject::TypeGroup###0001": [
+  "Normal",
+  "ParentChild"
+ ],
+ "LinkObject::ViewMode": "Complex",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Body": "",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###DynamicField": {
+  "ITSMDueDate": "1",
+  "ITSMRecoveryStartTime": "1",
+  "ITSMRepairStartTime": "1"
+ },
+ "Ticket::Frontend::AgentTicketAddtlITSMField###FormDraft": "1",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###HistoryComment": "%%FreeText",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###HistoryType": "AddNote",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###InformAgent": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###InvolvedAgent": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###IsVisibleForCustomerDefault": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Note": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###NoteMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Owner": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###OwnerMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Permission": "rw",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Priority": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###PriorityDefault": "3 normal",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Queue": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###QueueMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###RequiredLock": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Responsible": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###ResponsibleMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###SLAMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Service": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###ServiceMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###ShowIncidentState": "1",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###State": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###StateDefault": "open",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###StateMandatory": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###StateType": [
+  "open",
+  "closed",
+  "pending reminder",
+  "pending auto"
+ ],
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Subject": "",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###TicketType": "0",
+ "Ticket::Frontend::AgentTicketAddtlITSMField###Title": "1",
+ "Ticket::Frontend::AgentTicketDecision###Body": "",
+ "Ticket::Frontend::AgentTicketDecision###DynamicField": {
+  "ITSMDecisionDate": "1",
+  "ITSMDecisionResult": "1"
+ },
+ "Ticket::Frontend::AgentTicketDecision###FormDraft": "1",
+ "Ticket::Frontend::AgentTicketDecision###HistoryComment": "%%Note",
+ "Ticket::Frontend::AgentTicketDecision###HistoryType": "AddNote",
+ "Ticket::Frontend::AgentTicketDecision###InformAgent": "0",
+ "Ticket::Frontend::AgentTicketDecision###InvolvedAgent": "0",
+ "Ticket::Frontend::AgentTicketDecision###IsVisibleForCustomerDefault": "0",
+ "Ticket::Frontend::AgentTicketDecision###Note": "1",
+ "Ticket::Frontend::AgentTicketDecision###NoteMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###Owner": "0",
+ "Ticket::Frontend::AgentTicketDecision###OwnerMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###Permission": "rw",
+ "Ticket::Frontend::AgentTicketDecision###Priority": "0",
+ "Ticket::Frontend::AgentTicketDecision###PriorityDefault": "3 normal",
+ "Ticket::Frontend::AgentTicketDecision###Queue": "0",
+ "Ticket::Frontend::AgentTicketDecision###QueueMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###RequiredLock": "0",
+ "Ticket::Frontend::AgentTicketDecision###Responsible": "0",
+ "Ticket::Frontend::AgentTicketDecision###ResponsibleMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###SLAMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###Service": "0",
+ "Ticket::Frontend::AgentTicketDecision###ServiceMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###ShowIncidentState": "1",
+ "Ticket::Frontend::AgentTicketDecision###State": "0",
+ "Ticket::Frontend::AgentTicketDecision###StateDefault": "open",
+ "Ticket::Frontend::AgentTicketDecision###StateMandatory": "0",
+ "Ticket::Frontend::AgentTicketDecision###StateType": [
+  "open",
+  "closed",
+  "pending reminder",
+  "pending auto"
+ ],
+ "Ticket::Frontend::AgentTicketDecision###Subject": "",
+ "Ticket::Frontend::AgentTicketDecision###TicketType": "0",
+ "Ticket::Frontend::AgentTicketDecision###Title": "0"
+}

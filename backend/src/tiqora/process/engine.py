@@ -76,6 +76,7 @@ from tiqora.domain.attachments_in import ArticleAttachmentIn, AttachmentInvalid,
 from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
+    LinkConflict,
     TicketIn,
     _state_type_name,  # noqa: PLC2701
     _ticket_must_exist,  # noqa: PLC2701
@@ -1022,16 +1023,30 @@ async def _action_link_add(
     for obj, key in ((source_object, source_key), (target_object, target_key)):
         if obj == "Ticket" and not key.isdigit():
             raise RequiredFieldMissing(f"LinkAdd: {key!r} is not a ticket id")
-    await link_objects(
-        session,
-        source_object=source_object,
-        source_key=source_key,
-        target_object=target_object,
-        target_key=target_key,
-        link_type=str(config.get("Type") or config.get("LinkType") or "Normal"),
-        state=str(config.get("State") or "Valid"),
-        user_id=actor,
-    )
+    link_type = str(config.get("Type") or config.get("LinkType") or "Normal")
+    try:
+        await link_objects(
+            session,
+            source_object=source_object,
+            source_key=source_key,
+            target_object=target_object,
+            target_key=target_key,
+            link_type=link_type,
+            state=str(config.get("State") or "Valid"),
+            user_id=actor,
+        )
+    except LinkConflict as exc:
+        # LinkAdd.pm: ``return if !LinkObject->LinkAdd(...)`` -- Znuny logs the refusal and the
+        # process goes on; so does Tiqora.
+        logger.warning(
+            "Process LinkAdd skipped (%s): %s %s -> %s %s (%s)",
+            exc.reason,
+            source_object,
+            source_key,
+            target_object,
+            target_key,
+            link_type,
+        )
 
 
 _LINK_OBJECT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,99}$")
@@ -1333,13 +1348,23 @@ async def _action_ticket_create(
                 source_id, target_id = new_ticket_id, ticket_id
             else:
                 source_id, target_id = ticket_id, new_ticket_id
-            await link_tickets(
-                session,
-                source_ticket_id=source_id,
-                target_ticket_id=target_id,
-                link_type=link_type,
-                user_id=user_id,
-            )
+            try:
+                await link_tickets(
+                    session,
+                    source_ticket_id=source_id,
+                    target_ticket_id=target_id,
+                    link_type=link_type,
+                    user_id=user_id,
+                )
+            except LinkConflict as exc:
+                # TicketCreate.pm: a refused LinkAdd is logged, the new ticket stays (like LinkAdd)
+                logger.warning(
+                    "TicketCreate: LinkAs %r skipped (%s): ticket %s -> %s",
+                    link_as,
+                    exc.reason,
+                    source_id,
+                    target_id,
+                )
 
 
 async def execute_transition_action(

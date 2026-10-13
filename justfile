@@ -129,15 +129,31 @@ golden-up:
     #!/usr/bin/env bash
     set -euo pipefail
     eval "$(python3 tests/golden/peer_env.py "${GOLDEN_PEER:-}")"
+    BUILD=--build
     if [ "${GOLDEN_SOURCE_OK}" != "1" ]; then
-      echo "ERROR: peer ${GOLDEN_PEER}: source missing or incomplete at ${GOLDEN_SOURCE_PATH}" >&2
-      echo "Place a real release tree there (no external symlink; Docker COPY requires a real dir)." >&2
+      # A worktree has no release tree; a cached image of the (base) peer is enough to start.
+      if docker image inspect "tiqora-golden-peer-${GOLDEN_IMAGE_PEER}" >/dev/null 2>&1; then
+        echo "[golden-up] no source tree at ${GOLDEN_SOURCE_PATH}; using cached image tiqora-golden-peer-${GOLDEN_IMAGE_PEER}"
+        BUILD=--no-build
+      else
+        echo "ERROR: peer ${GOLDEN_PEER}: source missing or incomplete at ${GOLDEN_SOURCE_PATH}" >&2
+        echo "Place a real release tree there (no external symlink; Docker COPY requires a real dir)." >&2
+        exit 1
+      fi
+    fi
+    if [ "${GOLDEN_ITSM}" = "1" ] && [ ! -f "${GOLDEN_ITSM_DIR}/install-order.txt" ]; then
+      echo "ERROR: ITSM peer ${GOLDEN_PEER}: run 'just golden-itsm-fetch ${GOLDEN_PEER}' first" >&2
       exit 1
     fi
-    echo "[golden-up] peer=${GOLDEN_PEER} project=${GOLDEN_COMPOSE_PROJECT} source=${GOLDEN_SOURCE_DIR}"
-    export GOLDEN_PEER GOLDEN_SOURCE_DIR GOLDEN_COMPOSE_PROJECT
+    echo "[golden-up] peer=${GOLDEN_PEER} project=${GOLDEN_COMPOSE_PROJECT} source=${GOLDEN_SOURCE_DIR} itsm=${GOLDEN_ITSM}"
+    export GOLDEN_PEER GOLDEN_SOURCE_DIR GOLDEN_COMPOSE_PROJECT GOLDEN_IMAGE_PEER GOLDEN_ITSM GOLDEN_ITSM_DIR GOLDEN_START_PERIOD
     docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
-      -f tests/golden/docker-compose.golden.yml up -d --build --wait
+      -f tests/golden/docker-compose.golden.yml up -d ${BUILD} --wait
+
+# Download + verify + unpack the Znuny ITSM packages of an ITSM peer (PEER = znuny-6.5-itsm | znuny-7.3-itsm).
+# First fetch: add --record to write the sha256 values into tests/golden/itsm-packages.yaml.
+golden-itsm-fetch PEER *ARGS:
+    cd backend && uv run python ../tests/golden/fetch_itsm_packages.py {{PEER}} {{ARGS}}
 
 # Seed baseline fixtures (admin agent, queue, customer user) into the shared DB
 golden-seed:

@@ -287,3 +287,55 @@ def test_itsm_link_type_ddl() -> None:
     assert 'server_default="0"' in migration
     assert migration.count("server_default=sa.false()") == 5
     assert migration.count("server_default=sa.true()") == 1
+
+
+def test_itsm_core_ddl_equals_migration() -> None:
+    """``test_orm_ddl_equals_migration``: the ITSM core ORM tables carry the same server
+    defaults, key columns and text types as migration ``20261010_0078`` (database-level
+    comparison: ``test_itsm_models.py``)."""
+    from tiqora.itsm.models import (
+        TiqoraItsmBulkTarget,
+        TiqoraItsmMajorIncident,
+        TiqoraItsmMajorIncidentUpdate,
+        TiqoraItsmPriorityMatrix,
+        TiqoraItsmProblem,
+        TiqoraItsmServiceMeta,
+    )
+
+    for dialect in (mysql.dialect(), postgresql.dialect()):
+        meta = TiqoraItsmServiceMeta.__table__
+        assert "DEFAULT true" in _column_ddl(meta, "portal_visible", dialect)
+        assert "SERIAL" not in _column_ddl(meta, "service_id", dialect)
+        assert "AUTO_INCREMENT" not in _column_ddl(meta, "service_id", dialect)
+        problem = TiqoraItsmProblem.__table__
+        assert "DEFAULT false" in _column_ddl(problem, "known_error", dialect)
+        assert "SERIAL" not in _column_ddl(problem, "ticket_id", dialect)
+        assert "AUTO_INCREMENT" not in _column_ddl(problem, "ticket_id", dialect)
+        update = TiqoraItsmMajorIncidentUpdate.__table__
+        assert "DEFAULT '0'" in _column_ddl(update, "target_count", dialect)
+        assert "VARCHAR(500)" in _column_ddl(TiqoraItsmMajorIncident.__table__, "summary", dialect)
+        matrix = TiqoraItsmPriorityMatrix.__table__
+        assert "VARCHAR(200) NOT NULL" in _column_ddl(matrix, "criticality", dialect)
+        bulk = TiqoraItsmBulkTarget.__table__
+        assert "AUTO_INCREMENT" not in _column_ddl(bulk, "job_id", dialect)
+        assert "SERIAL" not in _column_ddl(bulk, "ticket_id", dialect)
+    # long free text fits on MariaDB (the migration uses MEDIUMTEXT for the same columns)
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraItsmProblem.__table__, "root_cause", mysql.dialect())
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraItsmProblem.__table__, "workaround", mysql.dialect())
+    assert "MEDIUMTEXT" in _column_ddl(
+        TiqoraItsmMajorIncidentUpdate.__table__, "body", mysql.dialect()
+    )
+    assert _column_ddl(TiqoraItsmProblem.__table__, "root_cause", postgresql.dialect()) == (
+        "root_cause TEXT,"
+    )
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261010_0078_itsm_core.py"
+    ).read_text()
+    assert 'revision: str = "20261010_0078"' in migration
+    assert 'down_revision: str | None = "20261010_0080"' in migration
+    assert "tiqora_itsm_link_type" not in migration.replace("20261010_0077", "").replace(
+        "``tiqora_itsm_link_type``", ""
+    )
+    assert migration.count("server_default=sa.false()") == 1
+    assert migration.count("server_default=sa.true()") == 1
+    assert migration.count("MEDIUMTEXT") == 1

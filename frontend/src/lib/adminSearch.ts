@@ -460,6 +460,33 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     ],
   },
   {
+    slug: "itsm",
+    route: "/admin/itsm",
+    group: "tickets",
+    nameKey: "admin.nav.itsm",
+    descriptionKey: "admin.pageDescriptions.itsm",
+    keywords: [
+      "itsm", "cmdb", "konfigurationselemente", "ci", "prioritätsmatrix", "priority matrix", "kritikalität",
+      "auswirkung", "criticality", "impact", "incident", "störung", "problem", "großstörung", "major incident",
+    ],
+  },
+  {
+    slug: "itsm-link-types",
+    route: "/admin/itsm/link-types",
+    group: "tickets",
+    nameKey: "admin.nav.itsmLinkTypes",
+    descriptionKey: "admin.pageDescriptions.itsmLinkTypes",
+    keywords: ["verknüpfungstypen", "verknüpfung", "link types", "links", "linktyp", "itsm", "propagation"],
+  },
+  {
+    slug: "settings-itsm",
+    route: "/admin/settings/itsm",
+    group: "tickets",
+    nameKey: "admin.settings.itsm.title",
+    descriptionKey: "admin.pageDescriptions.settingsItsm",
+    keywords: ["itsm", "ticket-typ", "workaround", "bekannter fehler", "known error", "znuny-adresse"],
+  },
+  {
     slug: "api-keys",
     route: "/admin/api-keys",
     group: "automation",

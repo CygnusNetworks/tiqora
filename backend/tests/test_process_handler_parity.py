@@ -19,9 +19,9 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._sysconfig_rows import set_sysconfig_rows
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.deployed import clear_revision_cache
-from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.process.config import TransitionActionConfig
 from tiqora.process.engine import execute_transition_action
 from tiqora.process.exceptions import RequiredFieldMissing
@@ -50,9 +50,13 @@ _CLEANUP = (
     "DELETE FROM article WHERE ticket_id BETWEEN 899000 AND 899999",
     "DELETE FROM tiqora_event_outbox WHERE ticket_id BETWEEN 899000 AND 899999",
     "DELETE FROM tiqora_cache_invalidation WHERE ticket_id BETWEEN 899000 AND 899999",
+    # LinkAdd drops Znuny's whole LinkObject cache type (a signal without a ticket).
+    "DELETE FROM tiqora_cache_invalidation WHERE ticket_id IS NULL AND cache_type = 'LinkObject'",
     "DELETE FROM ticket WHERE id BETWEEN 899000 AND 899999",
     f"DELETE FROM queue WHERE name = '{OTHER_QUEUE}'",
     f"DELETE FROM system_address WHERE value0 IN ('{SA_ADDR}', '{OTHER_ADDR}')",
+    "DELETE FROM sysconfig_modified WHERE id BETWEEN 899050 AND 899059",
+    "DELETE FROM sysconfig_default WHERE id BETWEEN 899050 AND 899059",
     "DELETE FROM user_preferences WHERE user_id BETWEEN 899010 AND 899019",
     "DELETE FROM users WHERE id BETWEEN 899010 AND 899019",
 )
@@ -81,6 +85,34 @@ def _run(sync_url: str, statements: tuple[str, ...]) -> None:
 def _seed(sync_url: str) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
+        # LinkObject.pm::LinkAdd refuses a type that is not a PossibleLink of the two objects, so
+        # the fictitious object of the POD example (FAQ there) needs its pair configured.
+        set_sysconfig_rows(
+            conn,
+            899050,
+            {
+                "LinkObject::Type###Normal": {"SourceName": "Normal", "TargetName": "Normal"},
+                "LinkObject::Type###ParentChild": {
+                    "SourceName": "Parent",
+                    "TargetName": "Child",
+                },
+                "LinkObject::PossibleLink###0100": {
+                    "Object1": "Ticket",
+                    "Object2": "Ticket",
+                    "Type": "Normal",
+                },
+                "LinkObject::PossibleLink###0200": {
+                    "Object1": "Ticket",
+                    "Object2": "Ticket",
+                    "Type": "ParentChild",
+                },
+                "LinkObject::PossibleLink###0201": {
+                    "Object1": "Ticket",
+                    "Object2": OBJECT,
+                    "Type": "ParentChild",
+                },
+            },
+        )
         for uid, login, valid, email in (
             (ACTOR, "wf3.par.actor", 1, None),
             (WATCH_A, "wf3.par.a", 1, "wf3.a@example.org"),
@@ -332,8 +364,8 @@ async def test_link_add_rejects_what_cannot_be_linked(env: Env) -> None:
         await env.run("LinkAdd", {"SourceObject": "Ticket"}, ticket=T_SRC)
     with pytest.raises(RequiredFieldMissing):
         await env.run("LinkAdd", {"TargetObject": "Ticket", "TargetKey": "not-an-id"}, ticket=T_SRC)
-    with pytest.raises(InvalidInput):
-        await env.run("LinkAdd", {"TargetKey": str(T_DST), "Type": "NoSuchLinkType"}, ticket=T_SRC)
+    # An impossible type is not an error: LinkAdd.pm ignores LinkObject->LinkAdd's refusal.
+    await env.run("LinkAdd", {"TargetKey": str(T_DST), "Type": "NoSuchLinkType"}, ticket=T_SRC)
     assert await env.links() == []
 
 

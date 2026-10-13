@@ -1,0 +1,109 @@
+---
+- Key: Vendor
+  Name: Vendor
+  Searchable: 1
+  Input:
+    Type: Text
+    Size: 50
+    MaxLength: 50
+
+- Key: Version
+  Name: Version
+  Searchable: 1
+  Input:
+    Type: Text
+    Size: 50
+    MaxLength: 50
+
+- Key: Description
+  Name: Description
+  Searchable: 1
+  Input:
+    Type: TextArea
+
+- Key: Type
+  Name: Type
+  Searchable: 1
+  Input:
+    Type: GeneralCatalog
+    Class: ITSM::ConfigItem::Software::Type
+    Translation: 1
+
+- Key: CustomerID
+  Name: Customer Company
+  Searchable: 1
+  Input:
+    Type: CustomerCompany
+
+- Key: Owner
+  Name: Owner
+  Searchable: 1
+  Input:
+    Type: Customer
+
+- Key: SerialNumber
+  Name: Serial Number
+  Searchable: 1
+  Input:
+    Type: Text
+    Size: 50
+    MaxLength: 50
+
+- Key: LicenceType
+  Name: Licence Type
+  Searchable: 1
+  Input:
+    Type: GeneralCatalog
+    Class: ITSM::ConfigItem::Software::LicenceType
+    Translation: 1
+
+- Key: LicenceKey
+  Name: Licence Key
+  Searchable: 1
+  Input:
+    Type: Text
+    Size: 50
+    MaxLength: 50
+    Required: 1
+  CountMin: 0
+  CountMax: 100
+  CountDefault: 0
+  Sub:
+  - Key: Quantity
+    Name: Quantity
+    Input:
+      Type: Integer
+      ValueMin: 1
+      ValueMax: 1000
+      ValueDefault: 1
+      Required: 1
+    CountMin: 0
+    CountMax: 1
+    CountDefault: 0
+  - Key: ExpirationDate
+    Name: Expiration Date
+    Input:
+      Type: Date
+      Required: 1
+      YearPeriodPast: 20
+      YearPeriodFuture: 10
+    CountMin: 0
+    CountMax: 1
+    CountDefault: 0
+
+- Key: Media
+  Name: Media
+  Input:
+    Type: Text
+    Size: 40
+    MaxLength: 20
+
+- Key: Note
+  Name: Note
+  Searchable: 1
+  Input:
+    Type: TextArea
+    Required: 1
+  CountMin: 0
+  CountMax: 1
+  CountDefault: 0

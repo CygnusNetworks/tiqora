@@ -15,6 +15,7 @@ import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
 import { resolveGiData } from "./giMock";
+import { resolveItsmData } from "./itsmMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
@@ -1634,6 +1635,7 @@ const demoZoomActions = [
   "AgentTicketMove", "AgentTicketOwner", "AgentTicketResponsible", "AgentTicketCustomer",
   "AgentTicketLock", "AgentTicketWatcher", "AgentLinkObject", "AgentTicketMerge",
   "AgentTicketPrint", "AgentTicketFreeText", "AgentTicketProcess",
+  "AgentTicketAddtlITSMField", "AgentTicketDecision",
 ];
 
 const demoDeployRevision = {
@@ -2216,6 +2218,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   const wcData = resolveWebchatData(p, method);
   if (wcData !== undefined) return wcData;
   const giData = resolveGiData(p, method); if (giData !== undefined) return giData;
+  const itsmData = resolveItsmData(p, method); if (itsmData !== undefined) return itsmData;
   // Auth
   if (p.endsWith("/auth/methods")) return {
     password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,

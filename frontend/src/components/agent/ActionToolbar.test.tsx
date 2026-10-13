@@ -24,6 +24,12 @@ const {
   createCustomer: vi.fn(),
 }));
 
+const linkTypes = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/itsmApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/itsmApi")>("@/lib/itsmApi");
+  return { ...actual, itsmApi: { ...actual.itsmApi, linkTypes } };
+});
+
 // Scoped owner/responsible lists (the server applies queue permissions and ACLs).
 const fieldOptionsFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
@@ -426,6 +432,45 @@ describe("ActionToolbar", () => {
 });
 
 describe("LinkDialog", () => {
+  beforeEach(() => {
+    linkTypes.mockReset().mockRejectedValue(new Error("itsm off"));
+  });
+
+  it("offers the types from /itsm/link-types and sends the chosen one", async () => {
+    linkTypes.mockReset().mockResolvedValue([
+      { name: "Normal", pointed: false, source_label: "Normal", target_label: "Normal", propagation: "none", origin: "znuny", source_name: null, target_name: null },
+      { name: "DependsOn", pointed: true, source_label: "Hängt ab von", target_label: "Voraussetzung für", propagation: "source", origin: "znuny", source_name: null, target_name: null },
+    ]);
+    searchTickets.mockReset().mockResolvedValue([{ ticket_id: 4711, tn: "2026092610000038", title: "x" }]);
+    createTicketLink.mockReset().mockResolvedValue(undefined);
+    wrap(<LinkDialog ticketId={7} onClose={() => {}} />);
+    await waitFor(() => expect(linkTypes).toHaveBeenCalledWith("ticket_ticket", expect.anything()));
+    fireEvent.click(await screen.findByTestId("link-type-select"));
+    fireEvent.click(await screen.findByText("Hängt ab von / Voraussetzung für"));
+    const input = screen.getByTestId("link-dialog").querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026092610000038" } });
+    fireEvent.click(screen.getByRole("button", { name: /speichern|save/i }));
+    await waitFor(() =>
+      expect(createTicketLink).toHaveBeenCalledWith(7, { target_ticket_id: 4711, link_type: "DependsOn" }),
+    );
+  });
+
+  it("defaults to the first offered type when the admin hid Normal", async () => {
+    linkTypes.mockReset().mockResolvedValue([
+      { name: "ParentChild", pointed: true, source_label: "Übergeordnet", target_label: "Untergeordnet", propagation: "none", origin: "znuny", source_name: null, target_name: null },
+    ]);
+    searchTickets.mockReset().mockResolvedValue([{ ticket_id: 4711, tn: "2026092610000038", title: "x" }]);
+    createTicketLink.mockReset().mockResolvedValue(undefined);
+    wrap(<LinkDialog ticketId={7} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("link-type-select").textContent).toContain("Übergeordnet / Untergeordnet"));
+    const input = screen.getByTestId("link-dialog").querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026092610000038" } });
+    fireEvent.click(screen.getByRole("button", { name: /speichern|save/i }));
+    await waitFor(() =>
+      expect(createTicketLink).toHaveBeenCalledWith(7, { target_ticket_id: 4711, link_type: "ParentChild" }),
+    );
+  });
+
   it("resolves a typed ticket number to the internal id before linking", async () => {
     searchTickets.mockReset().mockResolvedValue([
       { ticket_id: 4711, tn: "2026092610000038", title: "x" },

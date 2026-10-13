@@ -11,6 +11,7 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import TicketTypeCreate, TicketTypeOut, TicketTypeUpdate
 from tiqora.db.legacy.ticket import TicketType
+from tiqora.domain.znuny_admin_writes import create_ticket_type_row
 
 router = APIRouter(prefix="/types", tags=["admin:types"])
 
@@ -37,16 +38,9 @@ async def get_type(type_id: int, admin: AdminUser, session: DbSession) -> Ticket
 
 @router.post("", response_model=TicketTypeOut, status_code=status.HTTP_201_CREATED)
 async def create_type(body: TicketTypeCreate, admin: AdminUser, session: DbSession) -> TicketType:
-    ts = now()
-    row = TicketType(
-        **body.model_dump(),
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
+    row = await create_ticket_type_row(
+        session, name=body.name, valid_id=body.valid_id, user_id=admin.id
     )
-    session.add(row)
-    await invalidate_znuny_cache_types(session, TYPE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row

@@ -105,7 +105,7 @@ def test_dataclasses_are_frozen_with_i3_fields() -> None:
             "limit",
             "offset",
         ],
-        "CiPage": ["items", "total"],
+        "CiPage": ["items", "total", "truncated"],
         "CiTicketLink": ["ticket_id", "ci", "link_type", "direction", "created_at"],
         "LinkTypeOption": ["name", "source_label", "target_label", "pointed"],
         "ServiceIncidentState": ["service_id", "state", "cis_incident", "cis_warning"],
@@ -161,7 +161,8 @@ def test_ci_providers_extension_point() -> None:
     reg.add(CI_PROVIDERS, factory)
     assert reg.get(CI_PROVIDERS, "tiqora") is factory
     assert reg.get(CI_PROVIDERS, "znuny_readthrough") is None
-    assert not hasattr(providers, "get_ci_provider")  # itsm1 Task 7
+    # the lookups moved here from Task 7 (ruling F6): both are defined in providers.py
+    assert callable(providers.get_ci_provider) and callable(providers.tiqora_cmdb_empty)
 
 
 def test_mode_keys() -> None:

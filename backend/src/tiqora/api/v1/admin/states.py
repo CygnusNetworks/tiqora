@@ -7,15 +7,14 @@ from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import (
-    STATE_CACHE_TYPES,
     invalidate_cache_for_state,
-    invalidate_znuny_cache_types,
     now,
 )
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import StateCreate, StateOut, StateUpdate
 from tiqora.db.legacy.ticket import TicketState
+from tiqora.domain.znuny_admin_writes import create_ticket_state_row
 
 router = APIRouter(prefix="/states", tags=["admin:states"])
 
@@ -42,43 +41,19 @@ async def get_state(state_id: int, admin: AdminUser, session: DbSession) -> Tick
 
 @router.post("", response_model=StateOut, status_code=status.HTTP_201_CREATED)
 async def create_state(body: StateCreate, admin: AdminUser, session: DbSession) -> TicketState:
-    from tiqora.db.legacy.profile import default_color_for_write, insert_row_with_color
-
-    ts = now()
-    data = body.model_dump()
-    color = default_color_for_write()
-    if color is None:
-        state = TicketState(
-            **data,
-            create_time=ts,
-            create_by=admin.id,
-            change_time=ts,
-            change_by=admin.id,
-        )
-        session.add(state)
-    else:
-        # Znuny 7.0+: ticket_state.color is NOT NULL and not on the 6.5 ORM
-        # baseline. Insert via shared Core helper (see DEFAULT_STATE_PRIORITY_COLOR).
-        state_id = await insert_row_with_color(
+    try:
+        state = await create_ticket_state_row(
             session,
-            table_name="ticket_state",
-            values={
-                **data,
-                "create_time": ts,
-                "create_by": admin.id,
-                "change_time": ts,
-                "change_by": admin.id,
-                "color": color,
-            },
+            name=body.name,
+            type_id=body.type_id,
+            comments=body.comments,
+            valid_id=body.valid_id,
+            user_id=admin.id,
         )
-        loaded = await session.get(TicketState, state_id)
-        if loaded is None:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="State insert failed",
-            )
-        state = loaded
-    await invalidate_znuny_cache_types(session, STATE_CACHE_TYPES)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="State insert failed"
+        ) from exc
     await session.commit()
     await session.refresh(state)
     return state

@@ -1,0 +1,110 @@
+{
+ "peer": "znuny-6.5-itsm",
+ "znuny_version": "6.5.22",
+ "packages": [
+  {
+   "name": "ITSM",
+   "version": "6.5.3",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "GeneralCatalog",
+   "version": "6.5.3",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "ITSMCore",
+   "version": "6.5.5",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "ITSMIncidentProblemManagement",
+   "version": "6.5.2",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "ITSMConfigurationManagement",
+   "version": "6.5.4",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "ITSMChangeManagement",
+   "version": "6.5.2",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "ITSMServiceLevelManagement",
+   "version": "6.5.1",
+   "framework": [
+    "6.5.x"
+   ]
+  },
+  {
+   "name": "ImportExport",
+   "version": "6.5.4",
+   "framework": [
+    "6.5.x"
+   ]
+  }
+ ],
+ "tables": [
+  "general_catalog",
+  "general_catalog_preferences",
+  "cip_allocate",
+  "configitem",
+  "configitem_definition",
+  "configitem_version",
+  "configitem_counter",
+  "configitem_history_type",
+  "configitem_history",
+  "change_item",
+  "change_workorder",
+  "change_cab",
+  "change_history_type",
+  "change_history",
+  "change_template_type",
+  "change_template",
+  "change_cip_allocate",
+  "change_state_machine",
+  "condition_object",
+  "condition_attribute",
+  "condition_operator",
+  "change_condition",
+  "condition_expression",
+  "condition_action",
+  "change_notification",
+  "change_notification_message",
+  "change_notification_grps",
+  "change_notification_rec",
+  "change_number_counter",
+  "imexport_template",
+  "imexport_object",
+  "imexport_format",
+  "imexport_mapping",
+  "imexport_mapping_object",
+  "imexport_mapping_format",
+  "imexport_search"
+ ],
+ "altered_columns": {
+  "service": [
+   "type_id",
+   "criticality"
+  ],
+  "sla": [
+   "type_id",
+   "min_time_bet_incidents"
+  ]
+ }
+}

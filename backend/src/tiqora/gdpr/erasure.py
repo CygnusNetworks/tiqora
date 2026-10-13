@@ -85,6 +85,14 @@ INVALID_VALID_ID = 2
 # dynamic_field_value.value_text) when anonymizing — rollback-able via backup.
 _ANON_PLACEHOLDER = "[anonymisiert]"
 
+# ITSM tables keyed by ``ticket_id`` (tiqora-owned): child before parent, so the update rows of a
+# major incident are backed up before the incident row (its FK would cascade without a backup).
+ITSM_TICKET_TABLES: tuple[str, ...] = (
+    "tiqora_itsm_major_incident_update",
+    "tiqora_itsm_major_incident",
+    "tiqora_itsm_problem",
+)
+
 # Optional ticket HARD-DELETE (delete_tickets): every table with a FK to
 # ticket/article, in FK-safe DELETE order (children → parents). Each entry is
 # (table, fk_column, scope) where scope selects ticket_ids vs article_ids. Rows
@@ -107,6 +115,10 @@ _TICKET_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
     # and the visitor's page URL; ticket-keyed, deleted before the articles.
     ("tiqora_chat_message", "ticket_id", "ticket"),
     ("tiqora_chat_session", "ticket_id", "ticket"),
+    # ITSM problem / major-incident records (tiqora-owned, no FK to Znuny): free text of the
+    # ticket (root cause, workaround, update bodies). Updates are deleted explicitly before
+    # their major incident so every row is backed up (the FK cascade would skip the backup).
+    *((table, "ticket_id", "ticket") for table in ITSM_TICKET_TABLES),
     ("article_search_index", "ticket_id", "ticket"),  # FK to article + ticket
     ("time_accounting", "ticket_id", "ticket"),  # FK to article + ticket
     ("ticket_history", "ticket_id", "ticket"),  # FK to article + ticket
@@ -1155,6 +1167,7 @@ async def run_erasure(
         "tiqora_telegram_message": 0,
         "tiqora_chat_message": 0,
         "tiqora_chat_session": 0,
+        **{table: 0 for table in ITSM_TICKET_TABLES},
         "customer_preferences": 0,
         "customer_user_customer": 0,
         "group_customer_user": 0,
@@ -1905,6 +1918,20 @@ async def run_erasure(
                 )
                 counts[chat_table] = counts.get(chat_table, 0) + n_chat
 
+        # ---- ITSM problem / major-incident records: free text of these tickets, removed
+        # whole (backed up for rollback_job). Hard delete handled them via _TICKET_DELETE_ORDER.
+        if ticket_ids and not do_ticket_delete:
+            for itsm_table in ITSM_TICKET_TABLES:
+                n_itsm = await _backup_and_delete_by(
+                    session,
+                    job_id=job_id,
+                    table=itsm_table,
+                    fk_col="ticket_id",
+                    ids=ticket_ids,
+                    now=now,
+                )
+                counts[itsm_table] = counts.get(itsm_table, 0) + n_itsm
+
         # ---- customer_company: anonymize PII (keep PK) or delete if orphan ----
         company_ids = sorted({str(c.customer_id) for c in ordered if c.customer_id})
         for company_id in company_ids:
@@ -2296,6 +2323,7 @@ async def rollback_job(
                     "tiqora_avatar",
                     "tiqora_chat_message",
                     "tiqora_chat_session",
+                    *ITSM_TICKET_TABLES,
                 ):
                     await _insert_row(session, table, {**pk, **original})
                 else:

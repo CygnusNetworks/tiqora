@@ -24,6 +24,7 @@ import pymysql
 import pytest
 import pytest_asyncio
 from _helpers import znuny_console, znuny_perl_eval  # noqa: F401 — re-exported for test modules
+from peer_env import resolve as resolve_peer
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 GOLDEN_DIR = Path(__file__).resolve().parent
@@ -34,19 +35,56 @@ def _golden_enabled() -> bool:
     return os.environ.get("GOLDEN") == "1"
 
 
+def _peer_id() -> str:
+    return os.environ.get("GOLDEN_PEER", "znuny-6.5")
+
+
+def _peer_is_itsm() -> bool:
+    """True when the selected ``GOLDEN_PEER`` is an ITSM variant (``itsm: true`` in peers.yaml)."""
+    return resolve_peer(_peer_id())["GOLDEN_ITSM"] == "1"
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "golden: golden-master tests comparing real Znuny vs Tiqora (GOLDEN=1, needs Docker)",
     )
+    config.addinivalue_line(
+        "markers",
+        "itsm_peer: needs a Znuny ITSM peer (GOLDEN_PEER=znuny-6.5-itsm | znuny-7.3-itsm); "
+        "skipped on a plain peer",
+    )
+    config.addinivalue_line(
+        "markers",
+        "plain_peer: needs a plain peer without ITSM packages (e.g. GOLDEN_PEER=znuny-6.5); "
+        "skipped on an ITSM peer",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if _golden_enabled():
+    if not _golden_enabled():
+        skip = pytest.mark.skip(reason="set GOLDEN=1 and run `just golden-up` first")
+        for item in items:
+            item.add_marker(skip)
         return
-    skip = pytest.mark.skip(reason="set GOLDEN=1 and run `just golden-up` first")
+    # The toolkit runs ONE peer per session (one compose project, fixed host ports), so tests
+    # that need the other kind of peer are skipped, not run against the wrong one.
+    itsm = _peer_is_itsm()
     for item in items:
-        item.add_marker(skip)
+        if item.get_closest_marker("itsm_peer") and not itsm:
+            item.add_marker(
+                pytest.mark.skip(reason=f"needs an ITSM peer (GOLDEN_PEER={_peer_id()} is plain)")
+            )
+        if item.get_closest_marker("plain_peer") and itsm:
+            item.add_marker(
+                pytest.mark.skip(reason=f"needs a plain peer (GOLDEN_PEER={_peer_id()} is ITSM)")
+            )
+
+
+@pytest.fixture(scope="session")
+def golden_peer_id() -> str:
+    """The peer id of this session (``GOLDEN_PEER``), e.g. ``znuny-6.5-itsm``."""
+    return _peer_id()
 
 
 @pytest.fixture(scope="session")
@@ -108,7 +146,9 @@ async def _golden_legacy_profile(golden_db_url: str) -> None:
             profile = await ensure_legacy_schema_supported(
                 session,
                 allow_unknown=True,
-                profile_override=override or os.environ.get("GOLDEN_PEER", ""),
+                # ITSM peers (``znuny-6.5-itsm``) are no schema profile of their own: use the
+                # profile of the base peer (``peers.yaml``: schema_profile).
+                profile_override=override or resolve_peer(_peer_id())["GOLDEN_SCHEMA_PROFILE"],
                 dialect_hint="mysql",
             )
         print(
