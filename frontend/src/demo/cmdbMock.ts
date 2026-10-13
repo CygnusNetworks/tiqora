@@ -126,7 +126,7 @@ const DEMO_EXT_LABELS: Record<string, Record<string, string>> = {
 const classOf = (id: number): CmdbClass => CLASSES.find((c) => c.id === id) ?? CLASSES[0];
 
 const LINK_TYPES: LinkType[] = [
-  { name: "DependsOn", pointed: true, propagation: "source", source_label: "hängt ab von", target_label: "wird benötigt von", position: 1, offer_ci_ci: true, offer_ci_service: true, offer_ticket_ci: false },
+  { name: "DependsOn", pointed: true, propagation: "both", source_label: "hängt ab von", target_label: "wird benötigt von", position: 1, offer_ci_ci: true, offer_ci_service: true, offer_ticket_ci: false },
   { name: "ConnectedTo", pointed: false, propagation: "none", source_label: "verbunden mit", target_label: "verbunden mit", position: 2, offer_ci_ci: true, offer_ci_service: false, offer_ticket_ci: false },
   { name: "RelevantTo", pointed: true, propagation: "none", source_label: "betrifft", target_label: "betroffen von", position: 3, offer_ci_ci: false, offer_ci_service: false, offer_ticket_ci: true },
 ];
