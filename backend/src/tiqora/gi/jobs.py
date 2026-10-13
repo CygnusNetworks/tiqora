@@ -40,6 +40,7 @@ from tiqora.gi.requester import run_requester
 from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import enqueue_job
+from tiqora.plugins.gi_points import MAX_INVOKER_TIMEOUT
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -260,7 +261,7 @@ def _handler(kind: str, lane: str) -> JobHandler:
         payload_model=GiInvokePayload,
         run=run_gi_invoke,
         title_key="jobs.kinds.core.gi_invoke",
-        timeout_seconds=get_settings().gi_max_timeout_seconds + 120,
+        timeout_seconds=get_settings().gi_max_timeout_seconds + 120 + 2 * MAX_INVOKER_TIMEOUT,
         lane=lane,
         max_attempts=3,
         requeue_if_interrupted=True,

@@ -17,8 +17,10 @@ An invoker (``registry.gi_invoker``, ``Plugin_<short_id>::<Name>``) is the outgo
 ``prepare(ctx, data)`` receives a copy of the event data (``TicketID``, ``Event`` ...) and returns
 the dict to send, or ``None`` to skip the call (no error, no retry). It then passes the outbound
 mapping and the transport. ``handle_response(ctx, response)`` is optional and receives an
-``InvokerResponse`` with the mapped answer or the error. An exception or timeout (at most 120
-seconds) in ``prepare`` runs the webservice's error handling (retries) like a core invoker.
+``InvokerResponse`` with the mapped answer or the error; it can get ``success=False`` after any
+earlier stage, but a failure raised by ``handle_response`` itself is not passed back to it.
+``prepare`` must have no side effects: it also runs for the admin dry run. An exception or timeout
+(at most 120 seconds) in ``prepare`` runs the webservice's error handling (retries) like a core invoker.
 """
 
 from __future__ import annotations

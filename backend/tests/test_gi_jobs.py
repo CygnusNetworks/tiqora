@@ -44,6 +44,7 @@ from tiqora.gi.jobs import (
 from tiqora.gi.requester import RequesterOutcome
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.jobs.runner import JobRunner
+from tiqora.plugins.gi_points import MAX_INVOKER_TIMEOUT
 
 pytestmark = pytest.mark.db
 
@@ -263,7 +264,10 @@ async def test_handlers_registered_with_lanes() -> None:
     for handler in (async_handler, sync_handler):
         assert handler.requeue_if_interrupted and handler.result_private
         assert handler.max_attempts == 3
-        assert handler.timeout_seconds == get_settings().gi_max_timeout_seconds + 120
+        assert (
+            handler.timeout_seconds
+            == get_settings().gi_max_timeout_seconds + 120 + 2 * MAX_INVOKER_TIMEOUT
+        )
 
 
 async def test_success_result_and_lane(env: Env, mock: Mock) -> None:

@@ -26,10 +26,11 @@ from typing import Any, Final
 
 from tiqora.domain.history_render import split_history_name
 from tiqora.gi.conditions import ConditionWarning, condition_check, serialize_config
-from tiqora.gi.config import InvokerConfig
+from tiqora.gi.config import SUPPORTED_INVOKER_TYPES, InvokerConfig
 from tiqora.gi.jobs import GiInvokePayload
 from tiqora.gi.loader import GiWebservice
 from tiqora.plugins.events import TicketEvent
+from tiqora.plugins.gi_points import plugin_invoker
 
 __all__ = ["DeepGetLoader", "event_data", "invoker_can_fire", "match_invokers"]
 
@@ -81,8 +82,14 @@ def event_data(event: TicketEvent) -> dict[str, Any]:
 
 
 def invoker_can_fire(invoker: InvokerConfig) -> bool:
-    """Supported type and a usable mapping: anything else is skipped (the debugger shows why)."""
-    return invoker.supported and invoker.mapping_error is None
+    """Supported type and a usable mapping: anything else is skipped (the debugger shows why).
+
+    The plugin part is decided now, not taken from ``invoker.supported``: the worker's webservice
+    snapshot is only re-parsed when a webservice row changes, so a plugin that booted late (or was
+    disabled) after the parse would otherwise keep its stale flag.
+    """
+    supported = invoker.type in SUPPORTED_INVOKER_TYPES or plugin_invoker(invoker.type) is not None
+    return supported and invoker.mapping_error is None
 
 
 def _has_condition(condition: dict[str, Any] | None) -> bool:

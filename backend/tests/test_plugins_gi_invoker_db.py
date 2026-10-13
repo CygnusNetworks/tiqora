@@ -200,6 +200,20 @@ def test_plugin_invoker_supported(url_fixture: str) -> None:
     assert parse_requester(config, huge_xml=False).invokers["Sync"].supported is False
 
 
+def test_late_plugin_boot_makes_parsed_invoker_fire(url_fixture: str) -> None:
+    from tiqora.gi.events import invoker_can_fire
+
+    config = {"Requester": {"Invoker": {"Sync": dict(SYNC)}}}
+    set_loaded_plugins([PluginLoadResult(PLUGIN_ID, "1.0.0", RuntimeState.DISABLED, None, ())])
+    invoker = parse_requester(config, huge_xml=False).invokers["Sync"]  # the stale snapshot
+    assert invoker.supported is False and invoker_can_fire(invoker) is False
+    set_loaded_plugins([PluginLoadResult(PLUGIN_ID, "1.0.0", RuntimeState.ACTIVE, None, ())])
+    assert invoker.supported is False  # the snapshot is not re-parsed
+    assert invoker_can_fire(invoker) is True
+    set_loaded_plugins([PluginLoadResult(PLUGIN_ID, "1.0.0", RuntimeState.DISABLED, None, ())])
+    assert invoker_can_fire(invoker) is False
+
+
 async def test_requester_runs_plugin_invoker(url_fixture: str) -> None:
     invoker = {
         **SYNC,
