@@ -3875,7 +3875,8 @@
         "save": "Salvează"
       },
       "transports": "Delivery channels",
-      "transportEmail": "E-mail"
+      "transportEmail": "E-mail",
+      "transportsEmptyHint": "Select at least one delivery channel. To stop a notification, switch it off instead."
     },
     "tar": {
       "title": "Relații de atribute tichet",

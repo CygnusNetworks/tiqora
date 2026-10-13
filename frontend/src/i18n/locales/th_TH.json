@@ -3875,7 +3875,8 @@
         "save": "บันทึก"
       },
       "transports": "Delivery channels",
-      "transportEmail": "E-mail"
+      "transportEmail": "E-mail",
+      "transportsEmptyHint": "Select at least one delivery channel. To stop a notification, switch it off instead."
     },
     "tar": {
       "title": "ความสัมพันธ์แอตทริบิวต์ตั๋ว",

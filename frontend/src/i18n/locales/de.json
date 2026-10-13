@@ -3883,7 +3883,8 @@
         "save": "Speichern"
       },
       "transports": "Versandwege",
-      "transportEmail": "E-Mail"
+      "transportEmail": "E-Mail",
+      "transportsEmptyHint": "Wählen Sie mindestens einen Versandweg aus. Um eine Benachrichtigung zu stoppen, schalten Sie sie stattdessen ab."
     },
     "tar": {
       "title": "Ticket-Attributbeziehungen",

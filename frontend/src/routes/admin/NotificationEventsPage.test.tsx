@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -163,5 +163,35 @@ describe("NotificationEventsPage Versandwege", () => {
     expect(update.mock.calls[0][1]).toEqual({
       items: { ...baseItems, Transports: ["Email", "SMS", "Plugin_points_Chat"] },
     });
+  });
+
+  it("shows E-Mail checked when no Transports item exists and keeps it on save", async () => {
+    transports.mockResolvedValue([
+      { key: "Email", label: "E-Mail", plugin_id: null },
+      { key: "Plugin_points_Chat", label: "Chat (Test)", plugin_id: "org.example.points" },
+    ]);
+    const { Transports: _t, ...noTransports } = baseItems;
+    list.mockResolvedValue([notification(noTransports)]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Versandwege" }));
+    const form = await screen.findByTestId("notification-transports");
+    expect(screen.getByLabelText("E-Mail")).toBeChecked();
+    fireEvent.click(await screen.findByLabelText("Chat (Test)"));
+    fireEvent.submit(form);
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][1]).toEqual({
+      items: { ...noTransports, Transports: ["Email", "Plugin_points_Chat"] },
+    });
+  });
+
+  it("blocks saving an empty Versandwege selection", async () => {
+    transports.mockResolvedValue([{ key: "Email", label: "E-Mail", plugin_id: null }]);
+    list.mockResolvedValue([notification({ ...baseItems, Transports: ["Email"] })]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Versandwege" }));
+    const form = await screen.findByTestId("notification-transports");
+    fireEvent.click(screen.getByLabelText("E-Mail"));
+    expect(screen.getByTestId("notification-transports-empty")).toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Speichern" })).toBeDisabled();
   });
 });

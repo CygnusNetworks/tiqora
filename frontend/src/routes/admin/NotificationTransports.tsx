@@ -10,6 +10,8 @@ const EMAIL = "Email";
  * "Versandwege" of one notification: the stored `Transports` item rows.
  * Values that are not on the offered list (a switched-off plugin, a transport
  * Znuny knows) stay in the list unchanged and are shown read-only by key.
+ * The backend treats a missing/empty list as "e-mail on", so an empty stored
+ * list is shown as E-Mail checked, and saving an empty selection is blocked.
  */
 export function NotificationTransports({
   current,
@@ -23,7 +25,7 @@ export function NotificationTransports({
   onSave: (next: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<string[]>(current);
+  const [selected, setSelected] = useState<string[]>(current.length ? current : [EMAIL]);
   const offered = [
     { key: EMAIL, label: t("admin.notificationEvents.transportEmail") },
     ...transports.filter((tr) => tr.key !== EMAIL).map((tr) => ({ key: tr.key, label: tr.label })),
@@ -38,6 +40,7 @@ export function NotificationTransports({
       data-testid="notification-transports"
       onSubmit={(e) => {
         e.preventDefault();
+        if (selected.length === 0) return;
         onSave(selected);
       }}
     >
@@ -60,7 +63,12 @@ export function NotificationTransports({
           </label>
         ))}
       </fieldset>
-      <Button type="submit" size="sm" disabled={saving}>
+      {selected.length === 0 && (
+        <p className="text-xs text-muted" data-testid="notification-transports-empty">
+          {t("admin.notificationEvents.transportsEmptyHint")}
+        </p>
+      )}
+      <Button type="submit" size="sm" disabled={saving || selected.length === 0}>
         {t("admin.form.save")}
       </Button>
     </form>

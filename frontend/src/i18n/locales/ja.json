@@ -3883,7 +3883,8 @@
         "save": "保存"
       },
       "transports": "Delivery channels",
-      "transportEmail": "E-mail"
+      "transportEmail": "E-mail",
+      "transportsEmptyHint": "Select at least one delivery channel. To stop a notification, switch it off instead."
     },
     "tar": {
       "title": "チケット属性リレーション",
