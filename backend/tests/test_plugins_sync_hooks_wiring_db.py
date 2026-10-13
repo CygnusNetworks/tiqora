@@ -374,6 +374,19 @@ async def test_invalid_patch_is_ignored_by_a_fail_open_hook(env: Env) -> None:
     assert SyncBreaker.failures("sync:org.example.points:ticket_create") == 1
 
 
+@pytest.mark.parametrize("mode", ["enrich_bad_df", "enrich_unknown_df"])
+async def test_invalid_df_value_from_a_fail_open_hook_is_a_hook_failure(
+    env: Env, mode: str
+) -> None:
+    """A patch value the field rejects must not turn every agent create into a 422."""
+    points_behaviour().MODE["hook.ticket.create"] = mode
+    tid = await env.run(lambda svc: svc.create_ticket(AGENT, _ticket_in(env)))
+    assert env.scalar("SELECT title FROM ticket WHERE id = :t", t=tid) == "Drucker defekt"
+    stored = env.count("dynamic_field_value", "object_id = :t AND field_id = :f", t=tid, f=DF_FLAG)
+    assert stored == 0
+    assert SyncBreaker.failures("sync:org.example.points:ticket_create") == 1
+
+
 async def test_module_level_functions_never_hook(env: Env) -> None:
     behaviour = points_behaviour()
     for op in sync_hooks.SYNC_OPERATIONS:

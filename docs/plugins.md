@@ -1113,8 +1113,10 @@ Behaviour, all pinned by tests:
   failure: it never touches the breaker.
 - `ticket.create` handlers may return a `TicketCreatePatch` (`title`,
   `priority`, `type`, `dynamic_fields`); later hooks see the merged result.
-  Unknown priority or type names, a malformed patch or a patch for another
-  operation count as a hook failure.
+  Unknown priority or type names, a malformed patch, a patch for another
+  operation, an unknown dynamic field, or a dynamic-field value the field
+  rejects (its base type or a DF-type plugin's validator) count as a hook
+  failure: the patch is dropped and the ticket is created without it.
 - Hooks get `op` objects, never a session. Read with `ctx.plugin.tickets.get`
   (own session, committed data only). Hooks must not write. A hook on
   `ticket.dynamic_fields_update` sees the values before a DF-type plugin

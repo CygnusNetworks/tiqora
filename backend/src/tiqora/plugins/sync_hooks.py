@@ -162,6 +162,8 @@ SYNC_HOOKS: Final[ExtensionPoint[SyncHook]] = ExtensionPoint(
 )
 
 NameExists = Callable[[str, str], Awaitable[bool]]
+#: checks a dynamic-field value a ``ticket.create`` patch sets; ``ValueError`` when not storable
+DfValuesCheck = Callable[[str, Sequence[str]], Awaitable[None]]
 
 
 def hook_key(hook: SyncHook) -> str:
@@ -378,8 +380,43 @@ def _db_name_exists(session: AsyncSession | None) -> NameExists:
     return exists
 
 
+def _db_df_check(session: AsyncSession | None) -> DfValuesCheck:
+    """Validate patch values like the write will (base type, then the plugin type's validator).
+
+    Without this a value the field rejects would pass the hook (counted as a success) and fail
+    the create itself with a 422 -- on every agent create, since the breaker never trips.
+    """
+
+    async def check(name: str, values: Sequence[str]) -> None:
+        from tiqora.domain.dynamic_field_values import (
+            DynamicFieldValueError,
+            load_ticket_dynamic_field,
+            validated_df_values,
+        )
+
+        async def run(s: AsyncSession) -> None:
+            df = await load_ticket_dynamic_field(s, name)
+            if df is None:
+                raise ValueError(f"Dynamisches Feld „{name}“ gibt es nicht")
+            try:
+                await validated_df_values(df, list(values))
+            except DynamicFieldValueError as exc:
+                raise ValueError(f"{name}: {exc}") from exc
+
+        if session is not None:
+            await run(session)
+            return
+        async with get_session_factory()() as own:
+            await run(own)
+
+    return check
+
+
 async def _validated_merge(
-    op: TicketCreateOp, patch: TicketCreatePatch, name_exists: NameExists
+    op: TicketCreateOp,
+    patch: TicketCreatePatch,
+    name_exists: NameExists,
+    df_check: DfValuesCheck,
 ) -> TicketCreateOp:
     """Apply a hook's patch to the create op; ``ValueError`` when the patch is not acceptable."""
     changes: dict[str, Any] = {}
@@ -407,7 +444,10 @@ async def _validated_merge(
                 or isinstance(values, (str, bytes, bytearray))
             ):
                 raise ValueError("Ungültige Werte für dynamische Felder")
-            merged[name] = tuple(str(v) for v in values)
+            new_values = tuple(str(v) for v in values)
+            if new_values != tuple(op.dynamic_fields.get(name, ())):
+                await df_check(name, new_values)  # only what the hook changed is its fault
+            merged[name] = new_values
         changes["dynamic_fields"] = merged
     return dataclasses.replace(op, **changes) if changes else op
 
@@ -440,17 +480,19 @@ async def run_sync_hooks(
     registry: Registry | None = None,
     session: AsyncSession | None = None,
     name_exists: NameExists | None = None,
+    df_check: DfValuesCheck | None = None,
 ) -> Any:
     """Run the hooks of ``operation``; returns ``op`` (``ticket.create``: possibly patched).
 
-    Raises :class:`OperationVetoed`. ``session`` (the caller's) is only used to check names a
-    ``ticket.create`` patch introduces, so they are looked up in the same transaction.
+    Raises :class:`OperationVetoed`. ``session`` (the caller's) is only used to check names and
+    dynamic-field values a ``ticket.create`` patch introduces, in the same transaction.
     """
     reg = registry if registry is not None else get_registry()
     hooks = _hooks_for(operation, reg)
     if not hooks:
         return op
     lookup = name_exists or _db_name_exists(session)
+    values_ok = df_check or _db_df_check(session)
     await SyncBreaker.refresh_if_due()
     budget = PluginCallBudget(OPERATION_BUDGET_SECONDS)
     for hook in hooks:
@@ -459,7 +501,7 @@ async def run_sync_hooks(
             if hook.on_error == "deny":
                 raise _denied(hook, "tripped")
             continue
-        op = await _run_one(hook, key, operation, op, agent_id, budget, lookup)
+        op = await _run_one(hook, key, operation, op, agent_id, budget, lookup, values_ok)
     return op
 
 
@@ -471,6 +513,7 @@ async def _run_one(
     agent_id: int,
     budget: PluginCallBudget,
     name_exists: NameExists,
+    df_check: DfValuesCheck,
 ) -> Any:
     ctx = HookContext(
         plugin=hook.context or minimal_context(hook.plugin_id),
@@ -500,7 +543,7 @@ async def _run_one(
                     veto.plugin_id = hook.plugin_id
                 raise veto
             try:
-                op = await _apply_patch(hook, operation, op, patch, name_exists)
+                op = await _apply_patch(hook, operation, op, patch, name_exists, df_check)
             except ValueError as exc:
                 error = f"Ungültiges Ergebnis: {exc}"[:MAX_ERROR_LEN]
                 logger.warning("plugin_call_failed", plugin=hook.plugin_id, what=key, error=error)
@@ -514,7 +557,12 @@ async def _run_one(
 
 
 async def _apply_patch(
-    hook: SyncHook, operation: SyncOperation, op: Any, patch: Any, name_exists: NameExists
+    hook: SyncHook,
+    operation: SyncOperation,
+    op: Any,
+    patch: Any,
+    name_exists: NameExists,
+    df_check: DfValuesCheck,
 ) -> Any:
     if patch is None:
         return op
@@ -522,4 +570,4 @@ async def _apply_patch(
         raise ValueError(f"unerwarteter Rückgabewert {type(patch).__name__}")
     if operation != "ticket.create":
         raise ValueError("Änderungen sind nur beim Anlegen eines Tickets erlaubt")
-    return await _validated_merge(op, patch, name_exists)
+    return await _validated_merge(op, patch, name_exists, df_check)

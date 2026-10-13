@@ -407,6 +407,14 @@ async def _normalize_and_validate(field: DynamicFieldConfig, values: Sequence[st
     return new
 
 
+async def validated_df_values(field: DynamicFieldConfig, values: Sequence[str]) -> list[str]:
+    """The values ``set_ticket_dynamic_field`` would store; ``DynamicFieldValueError`` if invalid.
+
+    For callers that must check a value before the write (a sync hook's create patch).
+    """
+    return await _normalize_and_validate(field, values)
+
+
 async def set_ticket_dynamic_field(
     session: AsyncSession,
     *,
