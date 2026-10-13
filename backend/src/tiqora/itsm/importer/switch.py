@@ -294,3 +294,17 @@ async def import_status(session: AsyncSession) -> ImportStatus:
         znuny_counts=counts,
         znuny_changes_since_switch=drift,
     )
+
+
+async def release_readonly(session: AsyncSession) -> None:
+    """ "Sperre aufheben": clear a stuck ``itsm.znuny_readonly`` flag (flush only).
+
+    Refused while a job is active (it owns the flag) and after the switch (the flag is then
+    meant to stay set).
+    """
+    if await facades.get_ports(session).mode.is_switched():
+        raise SwitchBlocked(ALREADY_SWITCHED)
+    if await _active_job_id(session) is not None:
+        raise SwitchBlocked(BUSY)
+    await _put_setting(session, READONLY_KEY, "0")
+    await session.flush()

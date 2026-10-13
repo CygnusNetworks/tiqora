@@ -22029,6 +22029,436 @@
         "title": "ItsmDetectedOut",
         "type": "object"
       },
+      "ItsmImportIssueOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "object_ref": {
+            "title": "Object Ref",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "code",
+          "object_ref",
+          "message",
+          "explanation"
+        ],
+        "title": "ItsmImportIssueOut",
+        "type": "object"
+      },
+      "ItsmImportRollbackIn": {
+        "properties": {
+          "confirm": {
+            "maxLength": 50,
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "ItsmImportRollbackIn",
+        "type": "object"
+      },
+      "ItsmImportRunOut": {
+        "properties": {
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "issue_count": {
+            "title": "Issue Count",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ItsmImportIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "kind": {
+            "enum": [
+              "dry_run",
+              "import",
+              "switch",
+              "rollback"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "started_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started By Name"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "steps": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ItsmImportStepCountsOut"
+            },
+            "title": "Steps",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "started_at",
+          "finished_at",
+          "started_by_name",
+          "job_id",
+          "profile",
+          "message",
+          "steps",
+          "issues",
+          "issue_count"
+        ],
+        "title": "ItsmImportRunOut",
+        "type": "object"
+      },
+      "ItsmImportStartIn": {
+        "properties": {
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "dry_run"
+        ],
+        "title": "ItsmImportStartIn",
+        "type": "object"
+      },
+      "ItsmImportStatusOut": {
+        "properties": {
+          "active_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Job Id"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "can_import": {
+            "title": "Can Import",
+            "type": "boolean"
+          },
+          "can_switch": {
+            "title": "Can Switch",
+            "type": "boolean"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItsmImportRunOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "readonly_flag": {
+            "title": "Readonly Flag",
+            "type": "boolean"
+          },
+          "switched": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItsmImportSwitchInfoOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "znuny_changes_since_switch": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Znuny Changes Since Switch"
+          },
+          "znuny_counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItsmImportZnunyCountsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "znuny_itsm_present": {
+            "title": "Znuny Itsm Present",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "znuny_itsm_present",
+          "profile",
+          "switched",
+          "readonly_flag",
+          "last_run",
+          "active_job_id",
+          "can_import",
+          "can_switch",
+          "blocked_reason",
+          "znuny_counts",
+          "znuny_changes_since_switch"
+        ],
+        "title": "ItsmImportStatusOut",
+        "type": "object"
+      },
+      "ItsmImportStepCountsOut": {
+        "properties": {
+          "created": {
+            "default": 0,
+            "title": "Created",
+            "type": "integer"
+          },
+          "problems": {
+            "default": 0,
+            "title": "Problems",
+            "type": "integer"
+          },
+          "skipped": {
+            "default": 0,
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "unchanged": {
+            "default": 0,
+            "title": "Unchanged",
+            "type": "integer"
+          },
+          "updated": {
+            "default": 0,
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "title": "ItsmImportStepCountsOut",
+        "type": "object"
+      },
+      "ItsmImportSwitchIn": {
+        "properties": {
+          "addon_installed": {
+            "title": "Addon Installed",
+            "type": "boolean"
+          },
+          "confirm": {
+            "maxLength": 50,
+            "title": "Confirm",
+            "type": "string"
+          },
+          "edits_stopped": {
+            "default": false,
+            "title": "Edits Stopped",
+            "type": "boolean"
+          },
+          "without_ci_data": {
+            "default": false,
+            "title": "Without Ci Data",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm",
+          "addon_installed"
+        ],
+        "title": "ItsmImportSwitchIn",
+        "type": "object"
+      },
+      "ItsmImportSwitchInfoOut": {
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "switched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Switched At"
+          }
+        },
+        "required": [
+          "switched_at",
+          "by",
+          "run_id"
+        ],
+        "title": "ItsmImportSwitchInfoOut",
+        "type": "object"
+      },
+      "ItsmImportZnunyCountsOut": {
+        "properties": {
+          "changes": {
+            "title": "Changes",
+            "type": "integer"
+          },
+          "cis": {
+            "title": "Cis",
+            "type": "integer"
+          },
+          "classes": {
+            "title": "Classes",
+            "type": "integer"
+          },
+          "workorders": {
+            "title": "Workorders",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cis",
+          "classes",
+          "changes",
+          "workorders"
+        ],
+        "title": "ItsmImportZnunyCountsOut",
+        "type": "object"
+      },
       "ItsmModeIn": {
         "properties": {
           "mode": {
@@ -68645,6 +69075,518 @@
         "summary": "Get Itsm Admin",
         "tags": [
           "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/import/release-lock": {
+      "post": {
+        "description": "\"Sperre aufheben\": clear a read-only flag that stayed set without a switch (F10).",
+        "operationId": "release_lock_api_v1_admin_itsm_import_release_lock_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmImportStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Lock",
+        "tags": [
+          "admin:itsm-import"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/import/rollback": {
+      "post": {
+        "description": "Back to Znuny (Mode A): two setting writes and a run row, so no job.",
+        "operationId": "rollback_switch_api_v1_admin_itsm_import_rollback_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItsmImportRollbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmImportStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rollback Switch",
+        "tags": [
+          "admin:itsm-import"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/import/runs": {
+      "get": {
+        "operationId": "list_runs_api_v1_admin_itsm_import_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ItsmImportRunOut"
+                  },
+                  "title": "Response List Runs Api V1 Admin Itsm Import Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs",
+        "tags": [
+          "admin:itsm-import"
+        ]
+      },
+      "post": {
+        "description": "Queue a dry run or the import; 409 when blocked (after the switch, busy, no Znuny ITSM).",
+        "operationId": "start_import_api_v1_admin_itsm_import_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItsmImportStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Import",
+        "tags": [
+          "admin:itsm-import"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/import/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_api_v1_admin_itsm_import_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmImportRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "admin:itsm-import"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/import/status": {
+      "get": {
+        "operationId": "get_import_status_api_v1_admin_itsm_import_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmImportStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Import Status",
+        "tags": [
+          "admin:itsm-import"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/import/switch": {
+      "post": {
+        "description": "Queue the switch to Tiqora (final import under the read-only flag, then itsm1's switch).",
+        "operationId": "start_switch_api_v1_admin_itsm_import_switch_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItsmImportSwitchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Switch",
+        "tags": [
+          "admin:itsm-import"
         ]
       }
     },
