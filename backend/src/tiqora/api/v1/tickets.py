@@ -93,7 +93,7 @@ from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.filters import Filter, FilterError
 from tiqora.filters.ticket_params import TicketListParams, filter_from_list_params
 from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
-from tiqora.itsm.link_types import offered_link_types
+from tiqora.itsm.link_types import ticket_ticket_link_types
 from tiqora.itsm.priority import (
     apply_matrix_after_write,
     changed_matrix_fields,
@@ -2224,9 +2224,7 @@ async def create_ticket_link(
     try:
         async with session.begin():
             # Inside the transaction block: the read must not autobegin before it (F11).
-            offered = await offered_link_types(
-                session, pair="ticket_ticket", mode="znuny_readthrough"
-            )
+            offered = await ticket_ticket_link_types(session)
             if body.link_type not in {o.name for o in offered}:
                 raise HTTPException(
                     status.HTTP_422_UNPROCESSABLE_ENTITY,

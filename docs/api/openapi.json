@@ -18636,6 +18636,14 @@
             ],
             "title": "Ci Source"
           },
+          "criticality_field": {
+            "title": "Criticality Field",
+            "type": "string"
+          },
+          "impact_field": {
+            "title": "Impact Field",
+            "type": "string"
+          },
           "mode": {
             "enum": [
               "off",
@@ -18681,7 +18689,9 @@
           "ci_source",
           "unavailable_code",
           "znuny",
-          "setup_complete"
+          "setup_complete",
+          "criticality_field",
+          "impact_field"
         ],
         "title": "ItsmStatusOut",
         "type": "object"
@@ -20323,11 +20333,8 @@
             "type": "string"
           },
           "mode": {
+            "const": "note",
             "default": "note",
-            "enum": [
-              "note",
-              "reply"
-            ],
             "title": "Mode",
             "type": "string"
           },
@@ -103518,7 +103525,7 @@
     },
     "/api/v1/tickets/{ticket_id}/linked-articles": {
       "post": {
-        "description": "Queue a note (or e-mail reply) on tickets linked to this one. Needs ``rw`` on the ticket.\n\nThe targets must be linked to the ticket now; the job re-checks links and ``rw`` per target.",
+        "description": "Queue an internal note on tickets linked to this one. Needs ``rw`` on the ticket.\n\nA general ticket feature (replaces ``AgentTicketNoteToLinkedTicket``), so it works in every\nITSM mode, ``off`` included. The targets must be linked to the ticket now; the job re-checks\nlinks and ``rw`` per target.",
         "operationId": "post_linked_articles_api_v1_tickets__ticket_id__linked_articles_post",
         "parameters": [
           {

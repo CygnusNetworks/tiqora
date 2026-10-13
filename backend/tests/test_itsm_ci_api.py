@@ -33,6 +33,7 @@ from tests.test_itsm_znuny_provider import Env, seed_world
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.config import Settings
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.api_key_scopes import path_to_area
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import Registry, set_registry_for_tests
@@ -226,6 +227,21 @@ async def test_status_setup_complete_follows_the_seeded_rows(world: World) -> No
         assert (await c.get("/api/v1/itsm/status")).json()["setup_complete"] is False, table
         await s.execute(text(f"UPDATE {table} SET valid_id = 1 WHERE name = :n"), {"n": name})  # noqa: S608
         assert (await c.get("/api/v1/itsm/status")).json()["setup_complete"] is True, table
+
+
+async def test_status_names_the_matrix_fields(world: World) -> None:
+    """Forms suggest the matrix priority from these fields, so a rename must reach them."""
+    body = (await world.client.get("/api/v1/itsm/status")).json()
+    assert (body["criticality_field"], body["impact_field"]) == ("ITSMCriticality", "ITSMImpact")
+    world.session.add_all(
+        [
+            TiqoraSettings(key="itsm.criticality_field", value="SiteCriticality"),
+            TiqoraSettings(key="itsm.impact_field", value="SiteImpact"),
+        ]
+    )
+    await world.session.flush()
+    body = (await world.client.get("/api/v1/itsm/status")).json()
+    assert (body["criticality_field"], body["impact_field"]) == ("SiteCriticality", "SiteImpact")
 
 
 # --- catalog, search, detail -------------------------------------------------------------------

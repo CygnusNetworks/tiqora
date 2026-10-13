@@ -340,6 +340,8 @@ async def put_service_meta(
         ) from exc
     except CiReadOnly as exc:  # refused before anything was written
         raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "read_only"}) from exc
+    except CiUnavailable as exc:  # Mode A: the Znuny ITSM tables are unusable
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": exc.code}) from exc
     out = await _service_meta_out(session, settings, service_id, admin.id)
     await session.commit()
     return out

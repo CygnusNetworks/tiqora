@@ -21,6 +21,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.itsm.link_types import (
     offered_link_types,
     sync_link_type_rows,
+    ticket_ticket_link_types,
     znuny_link_types,
 )
 from tiqora.itsm.models import TiqoraItsmLinkType
@@ -259,6 +260,8 @@ async def test_offered_ticket_ticket_only_storable_types(itsm: Db) -> None:
     assert await itsm.offered("ticket_ticket", "znuny_readthrough") == ["Normal"]
     async with itsm.factory() as session:
         (normal,) = await offered_link_types(session, pair="ticket_ticket", mode="off")
+        # the mode-free wrapper link create uses gives the same list (final review M5)
+        assert await ticket_ticket_link_types(session) == [normal]
     assert (normal.source_label, normal.source_name, normal.target_name) == (
         "Standard",
         "Normal",

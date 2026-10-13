@@ -11231,9 +11231,11 @@ export interface paths {
         put?: never;
         /**
          * Post Linked Articles
-         * @description Queue a note (or e-mail reply) on tickets linked to this one. Needs ``rw`` on the ticket.
+         * @description Queue an internal note on tickets linked to this one. Needs ``rw`` on the ticket.
          *
-         *     The targets must be linked to the ticket now; the job re-checks links and ``rw`` per target.
+         *     A general ticket feature (replaces ``AgentTicketNoteToLinkedTicket``), so it works in every
+         *     ITSM mode, ``off`` included. The targets must be linked to the ticket now; the job re-checks
+         *     links and ``rw`` per target.
          */
         post: operations["post_linked_articles_api_v1_tickets__ticket_id__linked_articles_post"];
         delete?: never;
@@ -18143,6 +18145,10 @@ export interface components {
             ci_read_only: boolean;
             /** Ci Source */
             ci_source: ("znuny" | "tiqora") | null;
+            /** Criticality Field */
+            criticality_field: string;
+            /** Impact Field */
+            impact_field: string;
             /**
              * Mode
              * @enum {string}
@@ -18751,9 +18757,9 @@ export interface components {
             /**
              * Mode
              * @default note
-             * @enum {string}
+             * @constant
              */
-            mode: "note" | "reply";
+            mode: "note";
             /** Subject */
             subject: string;
             /** Target Ticket Ids */

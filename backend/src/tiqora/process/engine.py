@@ -1348,13 +1348,23 @@ async def _action_ticket_create(
                 source_id, target_id = new_ticket_id, ticket_id
             else:
                 source_id, target_id = ticket_id, new_ticket_id
-            await link_tickets(
-                session,
-                source_ticket_id=source_id,
-                target_ticket_id=target_id,
-                link_type=link_type,
-                user_id=user_id,
-            )
+            try:
+                await link_tickets(
+                    session,
+                    source_ticket_id=source_id,
+                    target_ticket_id=target_id,
+                    link_type=link_type,
+                    user_id=user_id,
+                )
+            except LinkConflict as exc:
+                # TicketCreate.pm: a refused LinkAdd is logged, the new ticket stays (like LinkAdd)
+                logger.warning(
+                    "TicketCreate: LinkAs %r skipped (%s): ticket %s -> %s",
+                    link_as,
+                    exc.reason,
+                    source_id,
+                    target_id,
+                )
 
 
 async def execute_transition_action(

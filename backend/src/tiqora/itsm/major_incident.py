@@ -40,8 +40,8 @@ from tiqora.itsm.linked_articles import (
 )
 from tiqora.itsm.models import TiqoraItsmMajorIncident, TiqoraItsmMajorIncidentUpdate
 from tiqora.itsm.settings import ItsmSettings
+from tiqora.itsm.ticket_access import TicketAccessDenied, readable_tickets, require_ticket
 from tiqora.jobs.service import utc_now
-from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
 UpdateMode = Literal["internal", "note", "reply"]
@@ -111,40 +111,19 @@ async def _ticket(
 ) -> tuple[str, str]:
     """``(tn, title)`` of a readable ticket. Unreadable and missing are both 404; ``write``
     without ``rw`` is 403."""
-    row = (
-        await session.execute(
-            text("SELECT queue_id, tn, title FROM ticket WHERE id = :t"), {"t": ticket_id}
-        )
-    ).first()
-    engine = PermissionEngine(session)
-    if row is None or not await engine.check(user_id, int(row[0]), "ro"):
-        raise MajorIncidentError("ticket_not_found", 404)
-    if write and not await engine.check(user_id, int(row[0]), "rw"):
-        raise MajorIncidentError("forbidden", 403)
-    return str(row[1]), str(row[2])
+    try:
+        facts = await require_ticket(session, ticket_id, user_id=user_id, write=write)
+    except TicketAccessDenied as exc:
+        raise MajorIncidentError(exc.code, exc.http_status) from exc
+    return facts.tn, facts.title
 
 
 async def _readable_ids(
     session: AsyncSession, ticket_ids: Sequence[int], *, user_id: int
 ) -> dict[int, tuple[str, str]]:
     """``{id: (tn, title)}`` of the tickets among ``ticket_ids`` the user may read."""
-    ids = sorted(set(ticket_ids))
-    engine = PermissionEngine(session)
-    allowed: dict[int, bool] = {}
-    out: dict[int, tuple[str, str]] = {}
-    stmt = text("SELECT id, tn, title, queue_id FROM ticket WHERE id IN :ids").bindparams(
-        bindparam("ids", expanding=True)
-    )
-    for start in range(0, len(ids), CHUNK):
-        for tid, tn, title, queue_id in (
-            await session.execute(stmt, {"ids": ids[start : start + CHUNK]})
-        ).all():
-            qid = int(queue_id)
-            if qid not in allowed:
-                allowed[qid] = await engine.check(user_id, qid, "ro")
-            if allowed[qid]:
-                out[int(tid)] = (str(tn), str(title))
-    return out
+    readable = await readable_tickets(session, ticket_ids, user_id=user_id)
+    return {tid: (f.tn, f.title) for tid, f in readable.items()}
 
 
 async def _timeline(session: AsyncSession, row: TiqoraItsmMajorIncident) -> list[TimelineEntry]:
@@ -251,7 +230,9 @@ async def declare(
         sysconfig=sysconfig,
     )
     now = _now()
-    text_summary = _clean(summary)
+    # one line: the summary becomes the e-mail subject of reply updates ("Major Incident: …"),
+    # where a line break would make every message fail
+    text_summary = _clean(" ".join((summary or "").split()))
     if text_summary is not None:
         text_summary = text_summary[:MAX_SUMMARY]
     if existing is not None:
@@ -329,7 +310,7 @@ async def post_update(
         targets = sorted(await _readable_ids(session, sorted(linked), user_id=user_id))
         if len(targets) > cfg.linked_articles_max_tickets:
             raise MajorIncidentError("too_many_targets", 422)
-    subject = f"Major Incident: {row.summary or title}"[:250]
+    subject = " ".join(f"Major Incident: {row.summary or title}".split())[:250]
     await writer.add_article(
         user_id,
         ticket_id,

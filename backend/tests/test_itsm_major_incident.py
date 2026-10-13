@@ -213,6 +213,12 @@ async def test_declare_changes_type_and_records(w: World) -> None:
     assert await w.session.get(TiqoraItsmMajorIncident, PLAIN) is None
 
 
+async def test_declare_summary_is_one_line(w: World) -> None:
+    """The summary is the reply subject; a line break in it would fail every e-mail."""
+    body = await w.declare(summary="Core-Switch\r\nausgefallen\t im  RZ ")
+    assert body["summary"] == "Core-Switch ausgefallen im RZ"
+
+
 async def test_declare_twice_is_idempotent(w: World) -> None:
     first = await w.declare(summary="Erste")
     second = await w.declare(summary="Zweite")

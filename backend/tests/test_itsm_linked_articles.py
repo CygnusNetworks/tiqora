@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, select, text, update
+from sqlalchemy import create_engine, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests._itsm_adapter_helpers import itsm_session, seed_customer
@@ -40,6 +40,7 @@ from tiqora.domain.ticket_write_service import link_tickets
 from tiqora.itsm.linked_articles import (
     LINKED_ARTICLES_JOB,
     LinkedArticlesPayload,
+    enqueue_linked_articles,
     result_from_table,
     run_linked_articles,
 )
@@ -92,10 +93,27 @@ class World:
         )
 
     async def start_job(self, body: dict[str, Any] | None = None) -> tuple[int, Any]:
-        """POST, then mark the queued job running; returns (job id, validated payload)."""
-        got = await self.client.post(SOURCE, json=body or self.body())
-        assert got.status_code == 202, got.text
-        job_id = int(got.json()["job_id"])
+        """Queue the job, then mark it running; returns (job id, validated payload).
+
+        A note goes through the API. The API offers no reply mode (only the major-incident update
+        sends customer e-mail), so a reply job is queued the way that producer queues it.
+        """
+        body = body or self.body()
+        if body.get("mode") == "reply":
+            job = await enqueue_linked_articles(
+                self.session,
+                LinkedArticlesPayload(
+                    source_ticket_id=T_A,
+                    origin="major_incident_update",
+                    acting_user_id=FULL,
+                    **body,
+                ),
+            )
+            job_id = int(job.id)
+        else:
+            got = await self.client.post(SOURCE, json=body)
+            assert got.status_code == 202, got.text
+            job_id = int(got.json()["job_id"])
         await self.session.execute(
             update(TiqoraJob).where(TiqoraJob.id == job_id).values(status="running", attempts=1)
         )
@@ -115,6 +133,17 @@ class World:
             "body_html": "<p>Wir arbeiten daran.</p><script>alert(1)</script>",
             **over,
         }
+
+    async def job_count(self) -> int:
+        return int(
+            (
+                await self.session.execute(
+                    select(func.count())
+                    .select_from(TiqoraJob)
+                    .where(TiqoraJob.kind == LINKED_ARTICLES_JOB.kind)
+                )
+            ).scalar_one()
+        )
 
     async def articles(self, ticket_id: int) -> list[Any]:
         return list(
@@ -263,6 +292,25 @@ async def test_api_refuses_unlinked_and_unknown_targets_without_echo(w: World) -
 async def test_linked_articles_404_without_ro(w: World) -> None:
     got = await w.client.post(f"/api/v1/tickets/{T_B}/linked-articles", json=w.body())
     assert got.status_code == 404
+
+
+async def test_api_reply_mode_refused(w: World, mail_spy: list[int]) -> None:
+    """No bulk customer e-mail through this route: the admin gate for that lives on the
+    major-incident update only (I1 of the final review)."""
+    jobs_before = await w.job_count()
+    got = await w.client.post(SOURCE, json=w.body(mode="reply"))
+    assert got.status_code == 422, got.text
+    assert await w.job_count() == jobs_before and mail_spy == []
+
+
+async def test_api_works_with_itsm_off(w: World) -> None:
+    """A general ticket feature: it stays in mode ``off`` (plan open question 6)."""
+    await w.session.execute(
+        update(TiqoraSettings).where(TiqoraSettings.key == SETTING_MODE).values(value="off")
+    )
+    await w.session.flush()
+    got = await w.client.post(SOURCE, json=w.body())
+    assert got.status_code == 202, got.text
 
 
 async def test_max_targets_enforced(w: World) -> None:

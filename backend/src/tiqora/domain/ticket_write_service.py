@@ -34,6 +34,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final, Literal
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -85,6 +86,7 @@ from tiqora.znuny.history import (
     add_unsubscribe,
     history_add,
 )
+from tiqora.znuny.link_config import read_link_config
 from tiqora.znuny.perl_format import perl_num, perl_num_str
 from tiqora.znuny.search_flag import mark_search_rebuild, message_id_md5
 from tiqora.znuny.sysconfig import SysConfig
@@ -105,6 +107,9 @@ class TicketNotFound(Exception):
 
 class TicketAccessDenied(Exception):
     """User lacks permission on the ticket's queue group."""
+
+
+_log = structlog.get_logger(__name__)
 
 
 class InvalidInput(Exception):
@@ -2571,67 +2576,6 @@ async def _link_state_id(session: AsyncSession, name: str) -> int:
     return int(row[0])
 
 
-@dataclass(frozen=True, slots=True)
-class _LinkConfig:
-    """``LinkObject::Type`` / ``PossibleLink`` / ``TypeGroup`` as the SysConfig defines them."""
-
-    pointed: dict[str, bool]  # type name -> SourceName ne TargetName
-    possible: list[tuple[str, str, str]]  # (Object1, Object2, Type)
-    groups: list[list[str]]
-
-
-# Framework.xml / Ticket.xml defaults, used when the sysconfig tables carry no link type at all
-# (a database that never had its configuration rebuilt).
-_DEFAULT_LINK_CONFIG: Final = _LinkConfig(
-    pointed={"Normal": False, "ParentChild": True},
-    possible=[("Ticket", "Ticket", "Normal"), ("Ticket", "Ticket", "ParentChild")],
-    groups=[["Normal", "ParentChild"]],
-)
-
-
-async def _link_config(session: AsyncSession) -> _LinkConfig:
-    """Port of ``LinkObject.pm`` ``TypeList`` / ``PossibleLinkList`` / ``TypeGroupList``."""
-    cfg = SysConfig(session)
-    raw_types = await cfg.get_prefix("LinkObject::Type###")
-    if not raw_types:
-        return _DEFAULT_LINK_CONFIG
-    pointed: dict[str, bool] = {}
-    for name, value in raw_types.items():
-        if not isinstance(value, dict):
-            continue
-        src = " ".join(str(value.get("SourceName") or "").split())
-        tgt = " ".join(str(value.get("TargetName") or "").split())
-        if src and tgt:  # TypeList drops a type without both names
-            pointed[name.removeprefix("LinkObject::Type###")] = src != tgt
-    possible: list[tuple[str, str, str]] = []
-    for _name, value in sorted((await cfg.get_prefix("LinkObject::PossibleLink###")).items()):
-        if not isinstance(value, dict):
-            continue
-        o1, o2, ty = (str(value.get(k) or "").strip() for k in ("Object1", "Object2", "Type"))
-        if o1 and o2 and ty in pointed:
-            possible.append((o1, o2, ty))
-    groups: list[list[str]] = []
-    for _name, value in sorted((await cfg.get_prefix("LinkObject::TypeGroup###")).items()):
-        if isinstance(value, list):
-            members = [str(t).strip() for t in value]
-            if members and all(m in pointed for m in members):
-                groups.append(members)
-    return _LinkConfig(pointed=pointed, possible=possible, groups=groups)
-
-
-def _type_possible(cfg: _LinkConfig, object1: str, object2: str, link_type: str) -> bool:
-    """``PossibleTypesList``: the pair is listed in either order for that type."""
-    return any(
-        ty == link_type and ((o1, o2) == (object1, object2) or (o2, o1) == (object1, object2))
-        for o1, o2, ty in cfg.possible
-    )
-
-
-def _same_type_group(cfg: _LinkConfig, type1: str, type2: str) -> bool:
-    """``LinkObject.pm::PossibleType`` is the negation: two types in one group cancel out."""
-    return any(type1 in g and type2 in g for g in cfg.groups)
-
-
 async def _link_object_id_if_exists(session: AsyncSession, name: str) -> int | None:
     row = (
         await session.execute(
@@ -2701,8 +2645,8 @@ async def link_objects(
     """
     if source_object == target_object and str(source_key) == str(target_key):
         return False  # LinkObject.pm::LinkAdd: "Can't link an object with itself"
-    cfg = await _link_config(session)
-    if not _type_possible(cfg, source_object, target_object, link_type):
+    cfg = await read_link_config(SysConfig(session))
+    if not cfg.allows(link_type, source_object, target_object):
         raise LinkConflict("not_possible")
     src_obj_id = await _link_object_id(session, source_object)
     tgt_obj_id = await _link_object_id(session, target_object)
@@ -2735,7 +2679,7 @@ async def link_objects(
     if existing is not None:
         if int(existing["state_id"]) != state_id:
             raise LinkConflict("state")
-        if not cfg.pointed.get(link_type, False):
+        if not cfg.pointed(link_type):
             return False
         if int(existing["source_object_id"]) == src_obj_id and str(existing["source_key"]) == str(
             source_key
@@ -2759,7 +2703,7 @@ async def link_objects(
             )
         ).all()
         for (other_type,) in others:
-            if _same_type_group(cfg, str(other_type), link_type):
+            if cfg.same_group(str(other_type), link_type):
                 raise LinkConflict("type_group")
     await session.execute(
         text(
@@ -3477,13 +3421,20 @@ class TicketWriteService:
             ),
             user_id=user_id,
         )
-        await link_tickets(
-            self._session,
-            source_ticket_id=ticket_id,
-            target_ticket_id=new_ticket_id,
-            link_type="ParentChild",
-            user_id=user_id,
-        )
+        try:
+            await link_tickets(
+                self._session,
+                source_ticket_id=ticket_id,
+                target_ticket_id=new_ticket_id,
+                link_type="ParentChild",
+                user_id=user_id,
+            )
+        except LinkConflict as exc:
+            # Znuny's split screens ignore a refused LinkAdd (it logs a notice); the new ticket
+            # stays, e.g. when the admin removed the ParentChild PossibleLink.
+            _log.warning(
+                "split_link_skipped", reason=exc.reason, ticket_id=ticket_id, new=new_ticket_id
+            )
         return new_ticket_id
 
     async def delete_article(self, user_id: int, ticket_id: int, article_id: int) -> None:

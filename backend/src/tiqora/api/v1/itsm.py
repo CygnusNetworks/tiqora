@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Annotated, Final, Literal, NoReturn
 
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
-from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
@@ -109,9 +108,9 @@ from tiqora.itsm.services import (
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
 from tiqora.itsm.setup import setup_complete
 from tiqora.itsm.summary import ticket_itsm_summary
+from tiqora.itsm.ticket_access import TicketAccessDenied, readable_tickets, require_ticket
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.kb.service import KbService
-from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/itsm", tags=["itsm"])
@@ -242,53 +241,15 @@ def _version(v: CiVersionInfo) -> CiVersionOut:
     )
 
 
-async def _ticket_queue(session: AsyncSession, ticket_id: int) -> int | None:
-    row = (
-        await session.execute(text("SELECT queue_id FROM ticket WHERE id = :t"), {"t": ticket_id})
-    ).scalar_one_or_none()
-    return None if row is None else int(row)
-
-
 async def _require_ticket(
     session: AsyncSession, user_id: int, ticket_id: int, *, write: bool = False
 ) -> None:
     """``ro`` on the ticket's queue, else 404 (a ticket never shows whether it exists); with
     ``write`` also ``rw``, else 403."""
-    queue_id = await _ticket_queue(session, ticket_id)
-    engine = PermissionEngine(session)
-    if queue_id is None or not await engine.check(user_id, queue_id, "ro"):
-        _refuse("ticket_not_found", status.HTTP_404_NOT_FOUND)
-    if write and not await engine.check(user_id, queue_id, "rw"):
-        _refuse("forbidden", status.HTTP_403_FORBIDDEN)
-
-
-async def _readable_tickets(
-    session: AsyncSession, user_id: int, ticket_ids: Sequence[int]
-) -> dict[int, dict[str, object]]:
-    """Ticket facts of the ids the user holds ``ro`` on (others are simply absent)."""
-    if not ticket_ids:
-        return {}
-    stmt = text(
-        "SELECT t.id, t.tn, t.title, t.queue_id, ts.name, tst.name"
-        " FROM ticket t JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-        " JOIN ticket_state_type tst ON tst.id = ts.type_id WHERE t.id IN :ids"
-    ).bindparams(bindparam("ids", expanding=True))
-    rows = (await session.execute(stmt, {"ids": list(ticket_ids)})).all()
-    engine = PermissionEngine(session)
-    allowed: dict[int, bool] = {}
-    out: dict[int, dict[str, object]] = {}
-    for tid, tn, title, queue_id, state, state_type in rows:
-        qid = int(queue_id)
-        if qid not in allowed:
-            allowed[qid] = await engine.check(user_id, qid, "ro")
-        if allowed[qid]:
-            out[int(tid)] = {
-                "tn": tn,
-                "title": title,
-                "state": state,
-                "state_type": state_type,
-            }
-    return out
+    try:
+        await require_ticket(session, ticket_id, user_id=user_id, write=write)
+    except TicketAccessDenied as exc:
+        _refuse(exc.code, exc.http_status)
 
 
 async def _status(session: AsyncSession, state: ItsmModeState, cfg: ItsmSettings) -> ItsmStatusOut:
@@ -316,6 +277,8 @@ async def _status(session: AsyncSession, state: ItsmModeState, cfg: ItsmSettings
             packages=dict(info.packages),
         ),
         setup_complete=await setup_complete(session, cfg),
+        criticality_field=cfg.criticality_field,
+        impact_field=cfg.impact_field,
     )
 
 
@@ -463,7 +426,7 @@ async def get_ci_tickets(
     ref = _parse_ref(source, ci_id)
     with _ci_errors():
         ticket_ids = await provider.ci_ticket_ids(session, ref, user_id=user.id)
-        readable = await _readable_tickets(session, user.id, ticket_ids)
+        readable = await readable_tickets(session, ticket_ids, user_id=user.id)
         shown = sorted(readable, reverse=True)[:CI_TICKETS_MAX]
         links = await provider.ticket_links(session, shown, user_id=user.id)
     out: list[TicketLinkTargetOut] = []
@@ -479,10 +442,10 @@ async def get_ci_tickets(
                     link_type=link.link_type,
                     state="Valid",
                     other_ticket_id=ticket_id,
-                    other_tn=str(facts["tn"]),
-                    other_title=str(facts["title"]),
-                    other_state=str(facts["state"]),
-                    other_state_type=str(facts["state_type"]),
+                    other_tn=facts.tn,
+                    other_title=facts.title,
+                    other_state=facts.state,
+                    other_state_type=facts.state_type,
                 )
             )
     return out
@@ -600,11 +563,12 @@ async def post_linked_articles(
     session: DbSession,
     settings: AppSettings,
 ) -> JobAccepted:
-    """Queue a note (or e-mail reply) on tickets linked to this one. Needs ``rw`` on the ticket.
+    """Queue an internal note on tickets linked to this one. Needs ``rw`` on the ticket.
 
-    The targets must be linked to the ticket now; the job re-checks links and ``rw`` per target.
+    A general ticket feature (replaces ``AgentTicketNoteToLinkedTicket``), so it works in every
+    ITSM mode, ``off`` included. The targets must be linked to the ticket now; the job re-checks
+    links and ``rw`` per target.
     """
-    await require_itsm_enabled(session)
     await _require_ticket(session, user.id, ticket_id, write=True)
     cfg = await load_itsm_settings(session, settings)
     targets = list(dict.fromkeys(t for t in body.target_ticket_ids if t != ticket_id))
@@ -619,7 +583,7 @@ async def post_linked_articles(
         LinkedArticlesPayload(
             source_ticket_id=ticket_id,
             target_ticket_ids=targets,
-            mode=body.mode,
+            mode="note",
             subject=body.subject,
             body_html=body.body_html,
             visible_for_customer=body.visible_for_customer,

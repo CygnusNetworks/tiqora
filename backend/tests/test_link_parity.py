@@ -527,6 +527,19 @@ async def test_split_article_still_links(env: Env) -> None:
     assert await env.history(new_id, "TicketLinkAdd") == [f"%%{TN[T_A]}%%{T_A}%%{new_id}"]
 
 
+async def test_split_article_without_parent_child_possible_link(env: Env) -> None:
+    """The admin removed the ParentChild PossibleLink: the split still creates the ticket and
+    only the link is skipped, as in Znuny (final review M6)."""
+    env.configure({k: v for k, v in CONFIG.items() if k != "LinkObject::PossibleLink###0201"})
+    async with env.factory() as session, session.begin():
+        svc = TicketWriteService(session, env.factory, SysConfig(session))
+        new_id = await svc.split_article(AGENT, T_A, ARTICLE, queue_id=QUEUE, title="Split off")
+    env.extra_tickets.append(new_id)
+    assert await env.rows("SELECT 1 FROM ticket WHERE id = :t", t=new_id)
+    assert await env.relations() == []
+    assert await env.history(T_A, "TicketLinkAdd") == []
+
+
 async def _tn(env: Env, ticket_id: int) -> str:
     return str((await env.rows("SELECT tn FROM ticket WHERE id = :t", t=ticket_id))[0][0])
 

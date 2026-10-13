@@ -32,7 +32,7 @@ from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import Registry, set_registry_for_tests
-from tiqora.itsm.ci_provider import CiReadOnly
+from tiqora.itsm.ci_provider import CiReadOnly, CiUnavailable
 from tiqora.itsm.mode import SETTING_MODE
 from tiqora.itsm.models import TiqoraItsmServiceMeta
 from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
@@ -257,6 +257,23 @@ async def test_tiqora_meta_round_trip(mode_b: World) -> None:
     assert cleared["portal_visible"] is True
     unknown = await mode_b.client.put(f"{ADMIN_API}/services/941299/meta", json={})
     assert unknown.status_code == 404
+
+
+async def test_put_meta_maps_ci_unavailable_to_409(
+    mode_a: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mode A with unusable Znuny ITSM tables: ``save_service_meta`` raises ``CiUnavailable``
+    (via ``get_reader``); the route answers 409 with the code, not 500."""
+    from tiqora.api.v1.admin import itsm as admin_itsm
+
+    async def unavailable(*_args: Any, **_kwargs: Any) -> None:
+        raise CiUnavailable("unsupported_znuny_itsm_version")
+
+    monkeypatch.setattr(admin_itsm, "save_service_meta", unavailable)
+    await seed_service(mode_a.session, S_PLAIN, "svc941 plain")
+    got = await mode_a.client.put(f"{ADMIN_API}/services/{S_PLAIN}/meta", json={})
+    assert got.status_code == 409, got.text
+    assert got.json()["detail"] == {"code": "unsupported_znuny_itsm_version"}
 
 
 async def test_import_mode_bypass_for_itsm_import(mode_a: World) -> None:

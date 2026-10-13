@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.itsm.link_type_defaults import ensure_default_link_types
 from tiqora.itsm.mode import ItsmMode
 from tiqora.itsm.models import LINK_TYPE_PROPAGATIONS, TiqoraItsmLinkType
+from tiqora.znuny.link_config import read_link_config
 from tiqora.znuny.sysconfig import SysConfig
 
 Propagation = Literal["none", "source", "target", "both"]
@@ -40,8 +41,6 @@ _PAIR_OBJECTS: Final[dict[str, tuple[str, str]]] = {
     "ci_service": (CI_OBJECT, "Service"),
 }
 _OFFER_COLUMN: Final[dict[str, str]] = {pair: f"offer_{pair}" for pair in _PAIR_OBJECTS}
-_TYPE_PREFIX: Final = "LinkObject::Type###"
-_POSSIBLE_PREFIX: Final = "LinkObject::PossibleLink###"
 _DIRECTION_SETTING: Final = "ITSM::Core::IncidentLinkTypeDirection"
 _DIRECTION: Final[dict[str, Propagation]] = {
     "source": "source",
@@ -93,41 +92,13 @@ def _now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def _squash(value: object) -> str:
-    return " ".join(str(value or "").split())
-
-
-def _fallback_types() -> dict[str, ZnunyLinkType]:
-    """Framework defaults for a database whose SysConfig never carried a link type."""
-    ticket = frozenset({("Ticket", "Ticket")})
-    return {
-        "Normal": ZnunyLinkType("Normal", "Normal", "Normal", False, ticket, "none"),
-        "ParentChild": ZnunyLinkType("ParentChild", "Parent", "Child", True, ticket, "none"),
-    }
-
-
 async def znuny_link_types(sysconfig: SysConfig) -> dict[str, ZnunyLinkType]:
     """The link types Znuny's SysConfig defines, in name order (port of ``LinkObject.pm``).
 
-    A type needs both names (``TypeList``); a ``PossibleLink`` counts only for a known type.
+    Types and object pairs come from the shared reader :func:`read_link_config` (the same the
+    link write path uses); the incident direction is ITSM's own setting.
     """
-    raw_types = await sysconfig.get_prefix(_TYPE_PREFIX)
-    if not raw_types:
-        return _fallback_types()
-    names: dict[str, tuple[str, str]] = {}
-    for key, value in raw_types.items():
-        if not isinstance(value, dict):
-            continue
-        src, tgt = _squash(value.get("SourceName")), _squash(value.get("TargetName"))
-        if src and tgt:
-            names[key.removeprefix(_TYPE_PREFIX)] = (src, tgt)
-    possible: dict[str, set[tuple[str, str]]] = {name: set() for name in names}
-    for _key, value in sorted((await sysconfig.get_prefix(_POSSIBLE_PREFIX)).items()):
-        if not isinstance(value, dict):
-            continue
-        o1, o2, ty = (str(value.get(k) or "").strip() for k in ("Object1", "Object2", "Type"))
-        if o1 and o2 and ty in possible:
-            possible[ty].add((o1, o2))
+    config = await read_link_config(sysconfig)
     direction = await sysconfig.get(_DIRECTION_SETTING)
     directions: dict[str, Propagation] = {}
     if isinstance(direction, dict):
@@ -138,13 +109,13 @@ async def znuny_link_types(sysconfig: SysConfig) -> dict[str, ZnunyLinkType]:
     return {
         name: ZnunyLinkType(
             name=name,
-            source_name=names[name][0],
-            target_name=names[name][1],
-            pointed=names[name][0] != names[name][1],
-            possible=frozenset(possible[name]),
+            source_name=src,
+            target_name=tgt,
+            pointed=config.pointed(name),
+            possible=config.possible.get(name, frozenset()),
             propagation=directions.get(name, "none"),
         )
-        for name in sorted(names)
+        for name, (src, tgt) in config.names.items()
     }
 
 
@@ -256,6 +227,19 @@ async def offered_link_types(
         return [_option(r, None) for r in picked]
     if mode == "off" and pair != "ticket_ticket":
         return []
+    return await _znuny_offered(session, pair, rows)
+
+
+async def ticket_ticket_link_types(session: AsyncSession) -> list[LinkTypeOption]:
+    """The ticket-ticket link types: the same in every ITSM mode (only what Znuny can store)."""
+    return await _znuny_offered(session, "ticket_ticket", await _rows_by_name(session))
+
+
+async def _znuny_offered(
+    session: AsyncSession, pair: LinkPair, rows: dict[str, TiqoraItsmLinkType]
+) -> list[LinkTypeOption]:
+    """SysConfig types whose ``PossibleLink`` lists the pair, minus what the table hides."""
+    flag = _OFFER_COLUMN[pair]
     catalogue = await znuny_link_types(SysConfig(session))
     objects = _PAIR_OBJECTS[pair]
     offered: list[tuple[int, str, LinkTypeOption]] = []
@@ -405,6 +389,7 @@ __all__ = [
     "missing_from_table",
     "offered_link_types",
     "sync_link_type_rows",
+    "ticket_ticket_link_types",
     "update_link_type",
     "znuny_link_types",
 ]

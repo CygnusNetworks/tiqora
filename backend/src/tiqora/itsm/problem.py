@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,11 +34,11 @@ from tiqora.itsm.linked_articles import (
 )
 from tiqora.itsm.models import TiqoraItsmProblem
 from tiqora.itsm.settings import ItsmSettings
+from tiqora.itsm.ticket_access import TicketAccessDenied, readable_tickets, require_ticket
 from tiqora.kb.models import STATE_REVIEW, TiqoraKbArticle, TiqoraKbCategory, TiqoraKbLink
 from tiqora.kb.schemas import ArticleIn as KbArticleIn
 from tiqora.kb.schemas import ArticleUpdateIn as KbArticleUpdateIn
 from tiqora.kb.service import KbService
-from tiqora.permissions.engine import PermissionEngine
 
 MAX_LINK_INCIDENTS = 50
 MAX_TEXT = 20000
@@ -112,67 +112,34 @@ async def _problem_ticket(
     Unreadable and missing collapse to 404 (a ticket never shows whether it exists); without
     ``rw`` a ``write`` is 403; a ticket of another type is 409 ``not_a_problem``.
     """
-    row = (
-        await session.execute(
-            text(
-                "SELECT t.queue_id, t.tn, t.title, tt.name FROM ticket t"
-                " LEFT JOIN ticket_type tt ON tt.id = t.type_id WHERE t.id = :t"
-            ),
-            {"t": ticket_id},
-        )
-    ).first()
-    engine = PermissionEngine(session)
-    if row is None or not await engine.check(user_id, int(row[0]), "ro"):
-        raise ProblemError("ticket_not_found", 404)
-    if write and not await engine.check(user_id, int(row[0]), "rw"):
-        raise ProblemError("forbidden", 403)
-    if row[3] != cfg.problem_type:
+    try:
+        facts = await require_ticket(session, ticket_id, user_id=user_id, write=write)
+    except TicketAccessDenied as exc:
+        raise ProblemError(exc.code, exc.http_status) from exc
+    if facts.type_name != cfg.problem_type:
         raise ProblemError("not_a_problem")
-    return str(row[1]), str(row[2])
+    return facts.tn, facts.title
 
 
 async def _incident_tickets(
     session: AsyncSession, ticket_ids: Sequence[int], *, user_id: int, cfg: ItsmSettings
 ) -> list[LinkedIncident]:
     """Incident-typed tickets among ``ticket_ids`` that the user may read (others are absent)."""
-    if not ticket_ids:
-        return []
-    stmt = text(
-        "SELECT t.id, t.tn, t.title, t.queue_id, tt.name, ts.name, tst.name FROM ticket t"
-        " JOIN ticket_type tt ON tt.id = t.type_id"
-        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-        " WHERE t.id IN :ids AND tt.name IN :types ORDER BY t.id"
-    ).bindparams(bindparam("ids", expanding=True), bindparam("types", expanding=True))
-    rows = (
-        await session.execute(
-            stmt,
-            {
-                "ids": sorted(set(ticket_ids)),
-                "types": [cfg.incident_type, cfg.major_incident_type],
-            },
+    types = {cfg.incident_type, cfg.major_incident_type}
+    readable = await readable_tickets(session, ticket_ids, user_id=user_id)
+    return [
+        LinkedIncident(
+            ticket_id=f.ticket_id,
+            tn=f.tn,
+            title=f.title,
+            type_name=f.type_name or "",
+            state=f.state,
+            state_type=f.state_type,
+            closed=f.state_type in CLOSED_STATE_TYPES,
         )
-    ).all()
-    engine = PermissionEngine(session)
-    allowed: dict[int, bool] = {}
-    out: list[LinkedIncident] = []
-    for tid, tn, title, queue_id, type_name, state, state_type in rows:
-        qid = int(queue_id)
-        if qid not in allowed:
-            allowed[qid] = await engine.check(user_id, qid, "ro")
-        if allowed[qid]:
-            out.append(
-                LinkedIncident(
-                    ticket_id=int(tid),
-                    tn=str(tn),
-                    title=str(title),
-                    type_name=str(type_name),
-                    state=str(state),
-                    state_type=str(state_type),
-                    closed=str(state_type) in CLOSED_STATE_TYPES,
-                )
-            )
-    return out
+        for f in readable.values()
+        if f.type_name in types
+    ]
 
 
 async def _view(

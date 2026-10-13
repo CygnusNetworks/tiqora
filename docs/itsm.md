@@ -15,7 +15,7 @@ CMDB. Welche Teile sichtbar sind, bestimmt der **ITSM-Modus** (Admin, Seite „I
 | Modus | Oberfläche | Wer führt die Konfigurationselemente (CIs)? |
 |---|---|---|
 | **Aus** | Keine CIs, keine ITSM-Dialoge, keine Prioritätsmatrix, keine Problem- und Großstörungs-Felder. Verknüpfen, Löschen von Verknüpfungen, Verknüpfungstypen, Notiz an verknüpfte Tickets und Verknüpfungsgrafik bleiben, denn sie sind allgemeine Ticket-Funktionen. | niemand |
-| **Znuny führt das ITSM (Durchlesen)**, Modus A | CIs werden aus Znuny gelesen und in Tiqora angezeigt und mit Tickets verknüpft; geändert wird in Znuny („In Znuny bearbeiten“). | Znuny |
+| **Znuny führt das ITSM (nur lesen)**, Modus A | CIs werden aus Znuny gelesen und in Tiqora angezeigt und mit Tickets verknüpft; geändert wird in Znuny („In Znuny bearbeiten“). | Znuny |
 | **Tiqora führt das ITSM**, Modus B | Tiqora hält die CMDB selbst (Kapitel 6). | Tiqora |
 
 **Empfehlung: Modus B ist das Ziel.** Modus A ist die Brücke für Standorte, die heute Znuny ITSM
@@ -114,9 +114,9 @@ aktiven Großstörung. „Aktualisierung senden“ hat drei Arten:
 Der Text der Aktualisierung wird beim Speichern bereinigt (wie Artikeltext). „Beenden“ trägt das
 Ende in die Zeitleiste ein; der Ticket-Typ bleibt, denn Znuny kennt kein „Beenden“.
 
-**Einschränkung (kanalgebundene Antwort).** Der Antwortmodus bei Großstörungen und die Antwort
-an verknüpfte Tickets senden **für jedes verknüpfte Ticket eine E-Mail**, auch wenn das Ticket über
-einen Plugin-Kanal (zum Beispiel Chat oder Messenger) läuft. Eine kanalbewusste Antwort gibt es in
+**Einschränkung (kanalgebundene Antwort).** Der Antwortmodus bei Großstörungen sendet **für jedes
+verknüpfte Ticket eine E-Mail**, auch wenn das Ticket über einen Plugin-Kanal (zum Beispiel Chat
+oder Messenger) läuft. Eine kanalbewusste Antwort gibt es in
 Wave 4 nicht; sie ist ein späterer Punkt. Wer Plugin-Kanäle einsetzt, sollte den Antwortmodus
 ausgeschaltet lassen und den Notizmodus verwenden.
 
@@ -184,8 +184,13 @@ Quellticket, die Ziele müssen weiterhin verknüpft sein (sonst 422, ohne die Id
 wird nochmals geprüft: ohne Schreibrecht wird übersprungen („keine Schreibberechtigung“), ebenso bei
 fehlender Verknüpfung oder Kundenadresse. Höchstens so viele Tickets, wie die Einstellung erlaubt
 (Vorgabe 200). Ein Neustart nach dem Schreiben sendet nichts doppelt: Der Fortschritt je Ziel wird in
-derselben Transaktion wie der Artikel gespeichert (`tiqora_itsm_bulk_target`). Die Antwort per E-Mail
-nutzt immer E-Mail, auch bei Plugin-Kanälen (Kapitel 2).
+derselben Transaktion wie der Artikel gespeichert (`tiqora_itsm_bulk_target`).
+
+Dieser Auftrag schreibt nur interne Notizen; die Schnittstelle nimmt keinen Antwortmodus an (422).
+E-Mail an die Kunden aller verknüpften Tickets gibt es nur als Aktualisierung einer Großstörung,
+und nur mit der Einstellung „Kundenantwort bei Großstörungen“ (Kapitel 2). Die Notiz an verknüpfte
+Tickets ist eine allgemeine Ticket-Funktion und steht in jedem ITSM-Modus zur Verfügung, auch bei
+„Aus“.
 
 ### Verknüpfungsgrafik
 
@@ -219,8 +224,11 @@ nicht unterstützt“.
 
 ### Wer welche CIs sieht
 
-Ein Agent sieht ein Znuny-CI nur mit `ro` in der Znuny-Gruppe `itsm-configitem` und `ro` auf der
-Berechtigungsgruppe der Klasse (Klassenvorgabe `Permission` im Allgemeinen Katalog, wenn gesetzt).
+Ein Agent sieht ein Znuny-CI nur mit `ro` auf der Berechtigungsgruppe seiner Klasse
+(Klassenvorgabe `Permission` im Allgemeinen Katalog), so wie Znunys `ItemClassGroupCheck`. Eine
+Klasse ohne diese Vorgabe sieht niemand. Die Gruppe `itsm-configitem` prüft Tiqora nicht: Sie
+schützt in Znuny nur Anlegen, Bearbeiten und Löschen, nicht Ansicht, Suche und Verknüpfen
+(`docs/itsm-import.md`, Vermessung Punkt 6). Das weicht vom Plan ab, der beide Prüfungen vorsah.
 Ein Ticket mit einem CI verknüpfen oder die Verknüpfung lösen verlangt `rw` auf dem Ticket und
 `ro` auf dem CI. Das ist **bewusst strenger als Znuny** (dort `ro` auf beiden Seiten), weil Tiqora
 schon für Ticket-Ticket-Verknüpfungen `rw` auf beiden verlangt und die Verknüpfung in die

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.itsm.ci_provider import CiUnavailable
 from tiqora.itsm.mode import ItsmModeState, get_itsm_mode
 from tiqora.itsm.providers import get_ci_provider
-from tiqora.permissions.engine import PermissionEngine
+from tiqora.itsm.ticket_access import readable_tickets
 from tiqora.znuny.sysconfig import SysConfig
 
 CHUNK = 500
@@ -76,25 +76,8 @@ async def _ticket_facts(
     session: AsyncSession, ticket_ids: Sequence[int], *, user_id: int
 ) -> dict[int, tuple[str, str, str, str]]:
     """``{id: (tn, title, state, state_type)}`` of the tickets the user may read."""
-    ids = sorted(set(ticket_ids))
-    stmt = text(
-        "SELECT t.id, t.tn, t.title, t.queue_id, ts.name, tst.name"
-        " FROM ticket t JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-        " JOIN ticket_state_type tst ON tst.id = ts.type_id WHERE t.id IN :ids"
-    ).bindparams(bindparam("ids", expanding=True))
-    engine = PermissionEngine(session)
-    allowed: dict[int, bool] = {}
-    out: dict[int, tuple[str, str, str, str]] = {}
-    for start in range(0, len(ids), CHUNK):
-        for tid, tn, title, queue_id, state, state_type in (
-            await session.execute(stmt, {"ids": ids[start : start + CHUNK]})
-        ).all():
-            qid = int(queue_id)
-            if qid not in allowed:
-                allowed[qid] = await engine.check(user_id, qid, "ro")
-            if allowed[qid]:
-                out[int(tid)] = (str(tn), str(title), str(state), str(state_type))
-    return out
+    readable = await readable_tickets(session, ticket_ids, user_id=user_id)
+    return {tid: (f.tn, f.title, f.state, f.state_type) for tid, f in readable.items()}
 
 
 async def _relations(

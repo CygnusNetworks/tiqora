@@ -47,6 +47,7 @@ from tiqora.itsm.services import (
 )
 from tiqora.itsm.settings import ItsmSettings
 from tiqora.itsm.setup import setup_complete
+from tiqora.itsm.ticket_access import TicketAccessDenied, require_ticket
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -212,20 +213,13 @@ async def ticket_itsm_summary(
     ``enabled=False`` (mode off, or the ITSM ticket types / state / matrix fields are not set
     up) carries only the mode; no other query runs.
     """
-    row = (
-        await session.execute(
-            text(
-                "SELECT t.queue_id, t.service_id, tt.name FROM ticket t"
-                " LEFT JOIN ticket_type tt ON tt.id = t.type_id WHERE t.id = :t"
-            ),
-            {"t": ticket_id},
-        )
-    ).first()
     engine = PermissionEngine(session)  # loads the caller's groups once; shared below
-    if row is None or not await engine.check(user_id, int(row[0]), "ro"):
-        raise TicketNotReadable(ticket_id)
-    service_id = None if row[1] is None else int(row[1])
-    role = role_of(None if row[2] is None else str(row[2]), cfg)
+    try:
+        facts = await require_ticket(session, ticket_id, user_id=user_id, engine=engine)
+    except TicketAccessDenied as exc:
+        raise TicketNotReadable(ticket_id) from exc
+    service_id = facts.service_id or None
+    role = role_of(facts.type_name, cfg)
 
     state = mode or await get_itsm_mode(session)
     if state.mode == "off" or not await setup_complete(session, cfg):

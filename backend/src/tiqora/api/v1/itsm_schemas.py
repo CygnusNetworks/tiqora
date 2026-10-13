@@ -54,6 +54,10 @@ class ItsmStatusOut(BaseModel):
     znuny: ItsmZnunyInfoOut
     #: the ticket types, the workaround state and the criticality/impact fields exist and are valid
     setup_complete: bool
+    #: names of the dynamic fields the priority matrix reads (admin setting, default
+    #: ``ITSMCriticality`` / ``ITSMImpact``); forms that suggest the matrix priority use them
+    criticality_field: str
+    impact_field: str
 
 
 class CatalogValueOut(BaseModel):
@@ -267,7 +271,9 @@ def service_out(info: ServiceItsmInfo, *, default_minutes: int) -> ServiceItsmOu
 
 class LinkedArticlesIn(BaseModel):
     target_ticket_ids: list[int] = Field(min_length=1)
-    mode: Literal["note", "reply"] = "note"
+    #: Internal notes only. A customer e-mail to every linked ticket is not offered here: the only
+    #: bulk customer reply is the major-incident update, behind its own admin setting.
+    mode: Literal["note"] = "note"
     subject: str = Field(min_length=1, max_length=250)
     body_html: str = Field(min_length=1, max_length=200_000)
     visible_for_customer: bool = False
