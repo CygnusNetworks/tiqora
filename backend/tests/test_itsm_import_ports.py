@@ -147,6 +147,6 @@ async def test_source_reads_cis_versions_and_links(
         assert any(i.catalog_class == "ITSM::ConfigItem::Class" and i.valid for i in items)
         defs = await p.source.class_definitions()
         assert defs and all(d.raw and d.version >= 1 for d in defs)
-        with pytest.raises(NotImplementedError):
-            await p.source.attachments([a], with_data=False)
+        # Task 11: the adapter reads virtual_fs (none seeded here); the reader has its own tests
+        assert await p.source.attachments([a], with_data=False) == []
         clear_detect_cache()

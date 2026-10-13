@@ -1,19 +1,23 @@
 """Znuny reads the itsm1 adapter does not offer (C3 fallback): links by CI id and change times.
 
 Plain ``text()`` statements with bound parameters on Znuny tables only (no ``tiqora_*`` join).
-Attachments (``virtual_fs``) and change counts follow with their tasks (11, 12).
+CI attachments (``virtual_fs``, Task 11); change counts follow with Task 12.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
+import re
 from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.itsm.importer.ports import EPOCH, ZnunyLink
+from tiqora.itsm.importer.ports import EPOCH, ZnunyAttachment, ZnunyLink
 from tiqora.itsm.znuny_adapter.catalog import chunks
+from tiqora.znuny.sysconfig import SysConfig
 
 _LINKS_BY_KEY = text(
     "SELECT so.name, r.source_key, tobj.name, r.target_key, lt.name, ls.name,"
@@ -71,3 +75,125 @@ async def count_cis_changed_since(session: AsyncSession, since: datetime) -> int
             )
         ).scalar_one()
     )
+
+
+# --- CI attachments (Znuny ITSMConfigItem::ConfigItemAttachmentAdd/List/Get) --------------------
+#
+# ``virtual_fs.filename = 'ConfigItem/<ConfigItemID>/<FileName>'``; ``virtual_fs.backend`` names
+# the storage class: ``Kernel::System::VirtualFS::DB`` keeps the bytes in ``virtual_fs_db`` (row id
+# = ``virtual_fs.backend_key``; MySQL as BLOB, PostgreSQL as MIME::Base64 text), any other backend
+# (``...::FS``) keeps files on Znuny's disk, which Tiqora cannot reach (``data`` stays None).
+# ``virtual_fs_preferences`` carries ``ContentType`` and ``FilesizeRaw``.
+
+#: largest attachment whose bytes the reader loads (the step reports larger ones)
+MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
+_FS_PREFIX = "ConfigItem/"
+_DB_BACKEND_SUFFIX = "::DB"
+_PREFIX_CHUNK = 50  # one LIKE per CI: keep the statement small
+_FILENAME = re.compile(r"ConfigItem/(\d+)/(.+)", re.DOTALL)
+
+
+def _prefix_query(n: int) -> str:
+    likes = " OR ".join(f"filename LIKE :p{i}" for i in range(n))
+    return (
+        "SELECT id, filename, backend, backend_key, create_time FROM virtual_fs"
+        f" WHERE {likes} ORDER BY id"
+    )
+
+
+_PREFERENCES = text(
+    "SELECT virtual_fs_id, preferences_key, preferences_value FROM virtual_fs_preferences"
+    " WHERE virtual_fs_id IN :ids AND preferences_key IN ('ContentType', 'FilesizeRaw')"
+).bindparams(bindparam("ids", expanding=True))
+_CONTENT = text("SELECT id, content FROM virtual_fs_db WHERE id IN :ids").bindparams(
+    bindparam("ids", expanding=True)
+)
+
+
+def _decode_content(value: object) -> bytes:
+    """``virtual_fs_db.content`` as bytes (BLOB, or PostgreSQL's base64 text)."""
+    if value is None:
+        return b""
+    if isinstance(value, memoryview):
+        return value.tobytes()
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    raw = str(value)
+    try:
+        return base64.b64decode("".join(raw.split()), validate=True)
+    except (binascii.Error, ValueError):
+        return raw.encode("utf-8")
+
+
+async def read_ci_attachments(
+    session: AsyncSession,
+    ci_ids: Sequence[int],
+    *,
+    with_data: bool,
+    sysconfig: SysConfig | None = None,
+) -> list[ZnunyAttachment]:
+    """Attachments of the CIs, ordered by CI id and ``virtual_fs.id``.
+
+    ``with_data=False`` never reads ``virtual_fs_db.content``. With data, only the DB backend is
+    read, and only files up to :data:`MAX_ATTACHMENT_BYTES` (larger ones keep ``data=None`` and
+    their real ``size``, so the caller can report them). ``sysconfig`` is accepted for the
+    adapter's signature; the FS backend is never read, so no path setting is needed.
+    """
+    wanted = sorted({int(i) for i in ci_ids})
+    files: list[tuple[int, int, str, str, str, datetime]] = []  # vfs id, ci, name, backend, key, t
+    for part in chunks(wanted, _PREFIX_CHUNK):
+        params = {f"p{i}": f"{_FS_PREFIX}{ci}/%" for i, ci in enumerate(part)}
+        for r in (await session.execute(text(_prefix_query(len(part))), params)).all():
+            match = _FILENAME.fullmatch(str(r[1]))
+            if match is None or int(match.group(1)) not in wanted:
+                continue  # LIKE is case-insensitive on MariaDB; the id must match exactly
+            files.append(
+                (
+                    int(r[0]),
+                    int(match.group(1)),
+                    match.group(2),
+                    str(r[2]),
+                    str(r[3]),
+                    r[4] if r[4] is not None else EPOCH,
+                )
+            )
+    if not files:
+        return []
+    prefs: dict[int, dict[str, str]] = {}
+    for part in chunks([f[0] for f in files]):
+        for r in (await session.execute(_PREFERENCES, {"ids": list(part)})).all():
+            prefs.setdefault(int(r[0]), {})[str(r[1])] = "" if r[2] is None else str(r[2])
+    sizes = {f[0]: _size(prefs.get(f[0], {})) for f in files}
+    content: dict[int, bytes] = {}
+    if with_data:
+        db_keys = {
+            f[0]: int(f[4])
+            for f in files
+            if f[3].endswith(_DB_BACKEND_SUFFIX)
+            and f[4].isdigit()
+            and (sizes[f[0]] or 0) <= MAX_ATTACHMENT_BYTES
+        }
+        by_key = {key: vfs for vfs, key in db_keys.items()}
+        for part in chunks(sorted(by_key)):
+            for r in (await session.execute(_CONTENT, {"ids": list(part)})).all():
+                content[by_key[int(r[0])]] = _decode_content(r[1])
+    out: list[ZnunyAttachment] = []
+    for vfs_id, ci, name, _backend, _key, created in sorted(files, key=lambda f: (f[1], f[0])):
+        data = content.get(vfs_id)
+        size = sizes[vfs_id]
+        out.append(
+            ZnunyAttachment(
+                ci_id=ci,
+                filename=name,
+                content_type=prefs.get(vfs_id, {}).get("ContentType") or "",
+                size=len(data) if size is None and data is not None else (size or 0),
+                data=data,
+                created_at=created,
+            )
+        )
+    return out
+
+
+def _size(prefs: dict[str, str]) -> int | None:
+    raw = prefs.get("FilesizeRaw", "").strip()
+    return int(raw) if raw.isdigit() else None

@@ -15,9 +15,10 @@ C3  Znuny read adapter ``znuny_adapter.reader.ZnunyItsmReader`` via ``get_reader
                        ``iter_general_catalog``, ``iter_class_definitions``, ``iter_config_items``,
                        ``get_cis``, ``versions_for`` + ``version_xml_data`` (raw XMLData, R10).
                        Added by this plan in ``importer/source_extra.py``: ``links_for_cis``,
-                       ``ci_count``, ``max_ci_change_time``, ``count_cis_changed_since``.
-                       Not available yet (Task 11 / 12): ``attachments`` (``virtual_fs``) and
-                       ``change_counts`` raise ``NotImplementedError``.
+                       ``ci_count``, ``max_ci_change_time``, ``count_cis_changed_since``,
+                       ``read_ci_attachments`` (``virtual_fs``, Task 11).
+                       Not available yet (Task 12): ``change_counts`` raises
+                       ``NotImplementedError``.
 C4  Definition parsing ``tiqora.cmdb.znuny_definition.parse_znuny_definition`` (R8; this plan has
                        no parser); used by Tasks 3 and 8, not by a facade.
 C5  CMDB tables        ``TiqoraCmdb*`` / ``TiqoraItsmLink`` in ``tiqora.db.tiqora.models`` (columns
@@ -240,7 +241,8 @@ class ZnunyAdapterSource:
         )
 
     async def attachments(self, ci_ids: Sequence[int], *, with_data: bool) -> list[ZnunyAttachment]:
-        raise NotImplementedError("CI attachments from virtual_fs are added by Task 11")
+        await self._reader()
+        return await source_extra.read_ci_attachments(self._s, ci_ids, with_data=with_data)
 
     async def change_counts(self) -> dict[str, int]:
         raise NotImplementedError("change and work order counts are added by Task 12")
