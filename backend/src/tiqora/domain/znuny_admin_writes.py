@@ -8,7 +8,7 @@ back).
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -115,9 +115,18 @@ async def create_dynamic_field_row(
     valid_id: int = 1,
     internal_field: int = 0,
     user_id: int,
+    caller_checked_keys: Collection[str] = (),
 ) -> DynamicField:
-    """Validate *config* (final, as stored), serialise it to YAML and insert the field."""
-    validate_dynamic_field_config(field_type, config)
+    """Validate *config* (final, as stored), serialise it to YAML and insert the field.
+
+    ``caller_checked_keys``: top-level keys the caller has validated itself (e.g. the admin
+    route's request-shaped extras, R14). They are stored as given and left out of the Znuny
+    key check; every other key is validated as usual. The default checks every key.
+    """
+    skip = frozenset(caller_checked_keys)
+    validate_dynamic_field_config(
+        field_type, {k: v for k, v in config.items() if k not in skip} if skip else config
+    )
     ts = _now()
     row = DynamicField(
         internal_field=internal_field,

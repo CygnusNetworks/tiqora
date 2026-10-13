@@ -37,6 +37,7 @@ from tiqora.domain.dynamic_field_config import (
     config_to_yaml,
     validate_dynamic_field_config,
 )
+from tiqora.domain.znuny_admin_writes import create_dynamic_field_row
 from tiqora.extensions.core import get_registry
 from tiqora.plugins.df_types import (
     DYNAMIC_FIELD_TYPES as PLUGIN_DF_TYPES,
@@ -190,23 +191,23 @@ async def create_dynamic_field(
                 "TiqoraPluginType und TiqoraPluginConfig gibt es nur bei Feldern mit plugin_type"
             )
 
-    ts = now()
-    row = DynamicField(
-        internal_field=0,
-        name=body.name,
-        label=body.label,
-        field_order=body.field_order,
-        field_type=body.field_type,
-        object_type=body.object_type,
-        config=config_to_yaml(config),
-        valid_id=body.valid_id,
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(row)
-    await invalidate_znuny_cache_types(session, DYNAMIC_FIELD_CACHE_TYPES)
+    # R14: the request-shaped plugin handling above; persistence (validate, YAML, insert,
+    # cache) is itsm1's plugin-free helper, which leaves the plugin keys to this route
+    try:
+        row = await create_dynamic_field_row(
+            session,
+            name=body.name,
+            label=body.label,
+            field_type=body.field_type,
+            object_type=body.object_type,
+            config=config,
+            field_order=body.field_order,
+            valid_id=body.valid_id,
+            user_id=admin.id,
+            caller_checked_keys=_PLUGIN_KEYS if body.plugin_type is not None else (),
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
     await session.commit()
     await session.refresh(row)
     return _to_out(row)

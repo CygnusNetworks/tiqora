@@ -217,6 +217,36 @@ async def test_admin_creates_plugin_field_as_base_type(env: Env, admin: AsyncCli
     assert got["plugin_type"] == TYPE
 
 
+async def test_create_persists_through_the_shared_helper(
+    env: Env, admin: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R14: the route keeps the plugin logic; the insert is itsm1's plugin-free helper, which
+    gets the final config and skips only the plugin keys in its Znuny key check."""
+    from tiqora.api.v1.admin import dynamic_fields as route
+    from tiqora.domain import znuny_admin_writes
+
+    seen: list[tuple[dict[str, Any], tuple[str, ...]]] = []
+    original = znuny_admin_writes.create_dynamic_field_row
+
+    async def spy(*args: Any, **kwargs: Any) -> Any:
+        seen.append((dict(kwargs["config"]), tuple(kwargs["caller_checked_keys"])))
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(route, "create_dynamic_field_row", spy)
+    await _create(admin)
+    await _create(admin, name="PP55Plain", plugin_type=None, config={})
+    assert seen == [
+        (
+            {"TiqoraPluginType": TYPE, "TiqoraPluginConfig": {"prefix": "V-", "style": "plain"}},
+            ("TiqoraPluginType", "TiqoraPluginConfig"),
+        ),
+        ({}, ()),
+    ]
+    # the helper's own key check still runs on the core part of a plugin-typed field
+    stray = await admin.post(BASE, json=_body(name="PP55Stray", config={"Nonsense": 1}))
+    assert stray.status_code == 422
+
+
 async def test_create_without_plugin_settings_stores_the_defaults(
     env: Env, admin: AsyncClient
 ) -> None:

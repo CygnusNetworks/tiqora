@@ -178,3 +178,35 @@ def test_validator_accepts_keys_znuny_writes_and_still_rejects_typos() -> None:
     validate_dynamic_field_config("Dropdown", {"PossibleValues": {"a": "a"}, "TreeView": 0})
     with pytest.raises(ValueError, match="Unknown config keys"):
         validate_dynamic_field_config("DateTime", {"YearsPerid": 1})
+
+
+async def test_dynamic_field_helper_is_plugin_free(request, dialect: str) -> None:
+    """R14: without ``caller_checked_keys`` the helper refuses the plugin keys like any unknown
+    key (the ITSM setup creates core fields only); with them, it stores them as given and still
+    checks every other key."""
+    url = cleaned_plain_url(request, dialect, fields=("W4PluginKeys", "W4PluginStray"))
+    engine, factory = session_factory(url)
+    plugin = {"TiqoraPluginType": "Plugin_x_T", "TiqoraPluginConfig": {"a": 1}}
+    keys = ("TiqoraPluginType", "TiqoraPluginConfig")
+    try:
+        async with factory() as session:
+            with pytest.raises(ValueError, match="Unknown config keys"):
+                await create_dynamic_field_row(
+                    session, name="W4PluginKeys", label="x", field_type="Text",
+                    object_type="Ticket", config=dict(plugin), field_order=902, user_id=ADMIN.id,
+                )  # fmt: skip
+            with pytest.raises(ValueError, match="Nonsense"):
+                await create_dynamic_field_row(
+                    session, name="W4PluginStray", label="x", field_type="Text",
+                    object_type="Ticket", config={**plugin, "Nonsense": 1}, field_order=903,
+                    user_id=ADMIN.id, caller_checked_keys=keys,
+                )  # fmt: skip
+            row = await create_dynamic_field_row(
+                session, name="W4PluginKeys", label="x", field_type="Text",
+                object_type="Ticket", config={**plugin, "DefaultValue": ""}, field_order=902,
+                user_id=ADMIN.id, caller_checked_keys=keys,
+            )  # fmt: skip
+            await session.commit()
+            assert config_from_yaml(row.config) == {**plugin, "DefaultValue": ""}
+    finally:
+        await engine.dispose()
