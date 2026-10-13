@@ -163,16 +163,18 @@ def inspect_read_package(
     problems += _requires_problems(manifest.requires, installed, image_plugin_ids)
 
     # 3. module name collisions. The plugin's own runtime copy is exempt, but only for names the
-    # installed record says it already owns (an uploaded wheel cannot name an image dist).
-    own_dist = None
-    if (
-        inst is not None
-        and inst.source != "image"
-        and manifest.id not in image_plugin_ids
-        and set(wheel.top_level) <= set(inst.top_level)
-    ):
-        own_dist = wheel.dist_name
-    problems += collision_problems(list(wheel.top_level), own_dist=own_dist)
+    # installed record says it already owns (an uploaded wheel cannot name an image dist). Names
+    # a new release adds are checked without the exemption (Task 6 M8: they used to make the
+    # old copy count as a foreign package for every name).
+    owned: set[str] = set()
+    if inst is not None and inst.source != "image" and manifest.id not in image_plugin_ids:
+        owned = set(inst.top_level)
+    own_names = [t for t in wheel.top_level if t in owned]
+    new_names = [t for t in wheel.top_level if t not in owned]
+    if own_names:
+        problems += collision_problems(own_names, own_dist=wheel.dist_name)
+    if new_names:
+        problems += collision_problems(new_names)
 
     # 4. blocking static checks and warnings
     problems += prefix_problems(wheel.files, manifest.short_id)

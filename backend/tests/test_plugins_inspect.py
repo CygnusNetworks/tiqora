@@ -192,6 +192,28 @@ def test_own_dist_only_from_the_installed_runtime_copy(
     assert seen == ["tq_fixture_hello", None, None, None]
 
 
+def test_update_adding_a_module_is_not_refused_by_its_own_old_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 6 M8: the new release adds ``tq_newmod``; the old runtime copy (on sys.path,
+    dist ``tq-fixture-hello``) must not count as a foreign package for the names it owns."""
+    from tiqora.plugins import install_checks
+
+    monkeypatch.setattr(
+        install_checks.metadata,
+        "packages_distributions",
+        lambda: {"tq_fixture_hello": ["tq_fixture_hello"], "json": []},
+    )
+    data, _ = _package(tmp_path, extra_members={"tq_newmod/__init__.py": b""})
+    r = _inspect(data, settings=S_UNSIGNED, installed=_installed("0.9.0"))
+    assert r.action == "update"
+    assert not any("gibt es in Tiqora schon" in p for p in r.problems), r.problems
+    assert r.installable
+    # a fresh install of the same package still collides with that copy
+    fresh = _inspect(data, settings=S_UNSIGNED)
+    assert any("„tq_fixture_hello“" in p for p in fresh.problems)
+
+
 def test_module_name_collision_is_blocking(tmp_path: Path) -> None:
     data, _ = _package(tmp_path, "tq_fixture_hello", extra_members={"json/__init__.py": b""})
     r = _inspect(data, settings=S_UNSIGNED)
