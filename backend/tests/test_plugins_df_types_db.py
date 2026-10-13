@@ -242,9 +242,12 @@ async def test_create_persists_through_the_shared_helper(
         ),
         ({}, ()),
     ]
-    # the helper's own key check still runs on the core part of a plugin-typed field
+    # an unknown core key of a plugin-typed field is refused by the route's own check
+    # (_core_config), before the helper is called; the helper-side check is proven in
+    # test_znuny_admin_writes.test_dynamic_field_helper_is_plugin_free
     stray = await admin.post(BASE, json=_body(name="PP55Stray", config={"Nonsense": 1}))
     assert stray.status_code == 422
+    assert len(seen) == 2  # no third helper call for PP55Stray
 
 
 async def test_create_without_plugin_settings_stores_the_defaults(
