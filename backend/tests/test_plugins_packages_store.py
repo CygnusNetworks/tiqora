@@ -5,6 +5,7 @@ Band 62040-62059: plugin ids ``org.example.plg6204x``/``plg6205x``, hashes start
 
 from __future__ import annotations
 
+import random
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 
@@ -18,6 +19,8 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginPackage
 from tiqora.plugins.inspect import PackageReport
 from tiqora.plugins.packages_store import (
+    PACKET_TOO_LARGE_TEXT,
+    PackageTooLargeForDatabase,
     delete_package,
     get_package,
     get_package_data,
@@ -198,7 +201,9 @@ async def test_purge_stale_only_never_installed_and_old(
         await _put(s, 8, PID2, at=old)  # old, never installed but referenced: kept
         s.add(_plugin(PID2, sha(8)))
         await s.flush()
-        assert await purge_stale_packages(s, older_than=cutoff) == 1
+        # table-wide purge: other modules' rows may be counted, ours must not be
+        assert await purge_stale_packages(s, older_than=cutoff) >= 1
+        assert await get_package(s, sha(5)) is None
         assert await purge_stale_packages(s, older_than=cutoff) == 0
         await s.commit()
     async with factory() as s:
@@ -244,3 +249,51 @@ async def test_keep_shas_current_and_previous(factory: async_sessionmaker[AsyncS
         assert keep[PID] == [sha(12), sha(11)]  # current + newest previous, not sha(10)
         assert keep[PID2] == [sha(14)]
         await s.commit()
+
+
+async def test_store_rejects_unknown_source(factory: async_sessionmaker[AsyncSession]) -> None:
+    async with factory() as s:
+        with pytest.raises(ValueError, match="repo"):
+            await store_package(
+                s,
+                data=b"abc",
+                report=report(20),
+                manifest_text="m",
+                source="repo",
+                repository_id=None,
+                uploaded_by=None,
+                now=T0,
+            )
+
+
+async def test_oversized_blob_maps_to_german_error_on_mariadb(
+    mariadb_znuny_url: str,
+) -> None:
+    """F11: a blob over max_allowed_packet (16 MiB) raises the domain error, not a driver one."""
+    engine = create_async_engine(to_async_url(mariadb_znuny_url))
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: TiqoraBase.metadata.create_all(c, checkfirst=True))
+    sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    await _clean(sm)
+    try:
+        blob = random.Random(63).randbytes(40 * 1024 * 1024)
+        async with sm() as s:
+            with pytest.raises(PackageTooLargeForDatabase) as ei:
+                await store_package(
+                    s,
+                    data=blob,
+                    report=report(21),
+                    manifest_text="m",
+                    source="upload",
+                    repository_id=None,
+                    uploaded_by=None,
+                    now=T0,
+                )
+            assert str(ei.value) == PACKET_TOO_LARGE_TEXT
+            assert "max_allowed_packet" in str(ei.value)
+            await s.rollback()
+        async with sm() as s:
+            assert await get_package(s, sha(21)) is None
+    finally:
+        await _clean(sm)
+        await engine.dispose()

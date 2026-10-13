@@ -10,12 +10,31 @@ from collections import defaultdict
 from datetime import datetime
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginPackage
 from tiqora.plugins.inspect import PackageReport
 
 RUNTIME_SOURCES = ("upload", "repository")
+
+PACKET_TOO_LARGE_TEXT = (
+    "Paket zu groß für die Datenbank-Einstellung max_allowed_packet; "
+    "bitte erhöhen oder TIQORA_PLUGINS_MAX_PACKAGE_MB senken"
+)
+_PACKET_ERRORS = (1153, 2013)  # ER_NET_PACKET_TOO_LARGE, CR_SERVER_LOST (aiomysql)
+
+
+class PackageTooLargeForDatabase(Exception):
+    """The blob exceeds the MariaDB ``max_allowed_packet``; ``str()`` is the German text."""
+
+    def __init__(self) -> None:
+        super().__init__(PACKET_TOO_LARGE_TEXT)
+
+
+def _is_packet_error(exc: DBAPIError) -> bool:
+    args: tuple[object, ...] = tuple(getattr(exc.orig, "args", ()))
+    return bool(args) and args[0] in _PACKET_ERRORS
 
 
 async def store_package(
@@ -29,7 +48,13 @@ async def store_package(
     uploaded_by: int | None,
     now: datetime,
 ) -> TiqoraPluginPackage:
-    """Insert the package, or refresh the report of the row that already has this hash."""
+    """Insert the package, or refresh the report of the row that already has this hash.
+
+    Raises ``PackageTooLargeForDatabase`` when MariaDB rejects the blob (1153/2013). After
+    2013 the connection is gone: the caller must roll back the session.
+    """
+    if source not in RUNTIME_SOURCES:
+        raise ValueError(f"unknown package source {source!r}")
     existing = (
         await session.execute(
             select(TiqoraPluginPackage).where(TiqoraPluginPackage.sha256 == report.sha256)
@@ -58,7 +83,12 @@ async def store_package(
         installed_at=None,
     )
     session.add(row)
-    await session.flush()
+    try:
+        await session.flush()
+    except DBAPIError as exc:
+        if session.bind.dialect.name in ("mysql", "mariadb") and _is_packet_error(exc):
+            raise PackageTooLargeForDatabase from exc
+        raise
     return row
 
 
@@ -111,7 +141,8 @@ async def purge_stale_packages(session: AsyncSession, *, older_than: datetime) -
             )
         ).scalars()
     )
-    doomed = [s for s in candidates if s not in await _referenced(session, candidates)]
+    referenced = await _referenced(session, candidates)
+    doomed = [s for s in candidates if s not in referenced]
     if not doomed:
         return 0
     result = await session.execute(
