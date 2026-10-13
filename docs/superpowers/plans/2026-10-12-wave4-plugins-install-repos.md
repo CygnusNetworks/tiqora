@@ -347,7 +347,9 @@ class PackageReport(BaseModel):
     action: Literal["install", "update", "reinstall", "downgrade", "blocked_image"]
     installable: bool
 def inspect_package(data: bytes, *, settings: Settings, ring: KeyRing,
-                    installed: Mapping[str, InstalledPlugin], image_plugin_ids: frozenset[str]) -> PackageReport
+                    installed: Mapping[str, InstalledPlugin], image_plugin_ids: frozenset[str],
+                    short_id_owners: Mapping[str, str] | None = None) -> PackageReport
+    # short_id_owners (F2): short id -> plugin id that owns it (installed, discovered, kept data); the caller builds it
     # never raises for package content: unreadable zip -> report-less PackageError (the API maps it to 422);
     # order of problems: envelope/wheel (PackageError aborts) -> compat (check_compat with release_core_version())
     # -> requirements -> collisions -> blocking static checks -> trust -> image id -> downgrade.
