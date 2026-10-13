@@ -1,6 +1,8 @@
 import { test, type Page } from "@playwright/test";
 import { mockRich, loginAsAgentRich } from "./fixtures/rich-mock";
 import { mockApi, loginAsAgent } from "./fixtures/mock-api";
+import { seedMajorIncident, seedTicketCi } from "./fixtures/itsm-store";
+import { DEMO_ITSM_MODE_KEY } from "../src/demo/itsmMode";
 
 /**
  * Screenshot generator for the README / GitHub project page. Not part of the
@@ -368,4 +370,26 @@ test("dashboard filter bar, report widget and wallboard screenshots", async ({ p
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.waitForTimeout(900);
   await page.screenshot({ path: `${OUT}/wallboard-dark.png`, fullPage: false });
+});
+
+// ITSM core (Mode A, Znuny read-through): ticket zoom with affected CIs and the major-incident banner,
+// a CI detail page and the admin ITSM page. Uses the stateful e2e mock (its ITSM scenario is German
+// example data), seeded so that ticket 103 is linked to an active major incident and to two CIs.
+test("ITSM screenshots", async ({ page }) => {
+  await prep(page);
+  await page.addInitScript((key) => {
+    try {
+      localStorage.setItem(key, "znuny_readthrough");
+    } catch {
+      /* ignore */
+    }
+  }, DEMO_ITSM_MODE_KEY);
+  await mockApi(page);
+  seedMajorIncident(100, "Kundenportale nicht erreichbar");
+  seedTicketCi(103, 201);
+  seedTicketCi(103, 202);
+  await loginAsAgent(page);
+  await shot(page, "/agent/tickets/103", "itsm-ticket-zoom");
+  await shot(page, "/agent/itsm/cis/znuny/201", "itsm-ci-detail");
+  await shot(page, "/admin/itsm", "admin-itsm");
 });

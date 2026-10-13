@@ -15,6 +15,7 @@ import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedul
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
+import { itsmStoreReply, resetItsmStore } from "./itsm-store";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
 import type {
@@ -664,6 +665,7 @@ export async function mockApi(page: Page) {
     kbArticleFull = initialKbArticle();
     ticketProcessState = ticketProcessStateNotInProcess;
     resetSavedStore();
+    resetItsmStore();
   }
 
   await page.route("**/api/v1/**", async (route) => {
@@ -1170,14 +1172,25 @@ export async function mockApi(page: Page) {
       }
     }
 
-    // ITSM core (Mode A demo data; the mode comes from the page's localStorage, default "tiqora")
-    if (method === "GET" && /\/api\/v1\/(itsm\/|tickets\/\d+\/(cis|itsm|link-graph|problem|major-incident)$)/.test(path)) {
+    // ITSM core: the stateful store answers the routes the e2e flows write to and read back; the demo
+    // resolver answers the rest (read-only Mode A data). The mode comes from the page's localStorage
+    // (default "tiqora").
+    if (/\/api\/v1\/(itsm\/|admin\/itsm|admin\/priorities|jobs\/|tickets\/(search$|\d+\/(cis|itsm|links|link-graph|problem|major-incident|linked-articles)))/.test(path)) {
       const stored = await page.evaluate((key) => localStorage.getItem(key), DEMO_ITSM_MODE_KEY).catch(() => null);
       const mode: DemoItsmMode = stored === "off" || stored === "znuny_readthrough" ? stored : "tiqora";
-      const itsm = resolveItsmData(path, method, url.search, mode);
-      if (itsm !== undefined) {
-        await json(route, 200, itsm);
+      const hasBody = method !== "GET" && method !== "DELETE" && req.postData() !== null;
+      const written = itsmStoreReply(path, method, url.search, hasBody ? (req.postDataJSON() as Record<string, unknown>) : undefined, mode);
+      if (written) {
+        if (written.status === 204) await route.fulfill({ status: 204, body: "" });
+        else await json(route, written.status, written.body);
         return;
+      }
+      if (method === "GET") {
+        const itsm = resolveItsmData(path, method, url.search, mode);
+        if (itsm !== undefined) {
+          await json(route, 200, itsm);
+          return;
+        }
       }
     }
 
