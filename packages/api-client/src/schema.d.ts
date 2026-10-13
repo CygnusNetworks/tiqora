@@ -13488,6 +13488,8 @@ export interface components {
             activity_changed: boolean;
             /** New Activity Entity Id */
             new_activity_entity_id: string | null;
+            /** Skipped Actions */
+            skipped_actions?: components["schemas"]["SkippedActionOut"][];
             state: components["schemas"]["TicketProcessStateOut"];
             /** Transition Entity Id */
             transition_entity_id: string | null;
@@ -22648,6 +22650,8 @@ export interface components {
         NewProcessTicketOut: {
             /** Activity Changed */
             activity_changed: boolean;
+            /** Skipped Actions */
+            skipped_actions?: components["schemas"]["SkippedActionOut"][];
             state: components["schemas"]["TicketProcessStateOut"];
             /** Ticket Id */
             ticket_id: number;
@@ -26622,6 +26626,18 @@ export interface components {
         SimilarTicketsOut: {
             /** Items */
             items: components["schemas"]["SimilarTicketItem"][];
+        };
+        /**
+         * SkippedActionOut
+         * @description A transition action that was skipped on this run (the transition itself went through).
+         */
+        SkippedActionOut: {
+            /** Detail */
+            detail: string;
+            /** Module */
+            module: string;
+            /** Reason */
+            reason: string;
         };
         /** SlaCreate */
         SlaCreate: {

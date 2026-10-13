@@ -92,6 +92,7 @@ from tiqora.process.schemas import (
     ProcessPathOut,
     ProcessStartIn,
     ProcessSummaryOut,
+    SkippedActionOut,
     TicketProcessStateOut,
 )
 from tiqora.process.ticket_state import get_ticket_process_candidates
@@ -461,6 +462,9 @@ async def create_new_process_ticket(
         ticket_number=result.ticket_number,
         activity_changed=result.transition.activity_changed,
         unsupported_actions=result.transition.unsupported_actions,
+        skipped_actions=[
+            SkippedActionOut.model_validate(a) for a in result.transition.skipped_actions
+        ],
         state=state,
     )
 
@@ -534,5 +538,6 @@ async def submit_ticket_activity_dialog(
         new_activity_entity_id=result.new_activity_entity_id,
         transition_entity_id=result.transition_entity_id,
         unsupported_actions=result.unsupported_actions,
+        skipped_actions=[SkippedActionOut.model_validate(a) for a in result.skipped_actions],
         state=state,
     )

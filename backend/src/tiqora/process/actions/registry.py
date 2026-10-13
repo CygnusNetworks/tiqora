@@ -51,6 +51,17 @@ class ActionUnsupported(Exception):  # noqa: N818 - the engine's signal, not an 
     reports the module as unsupported instead of failing the transition."""
 
 
+class ActionSkipped(Exception):  # noqa: N818 - the engine's signal, not an error class
+    """Raised by a handler that refuses to act on this run (``reason`` is a stable code such as
+    ``vetoed`` or ``itsm_off``, ``detail`` a German text for agents). The engine rolls the
+    action's savepoint back, records the skip on the transition outcome and runs on."""
+
+    def __init__(self, reason: str, detail: str) -> None:
+        super().__init__(f"{reason}: {detail}")
+        self.reason = reason
+        self.detail = detail
+
+
 ActionHandler = Callable[[AsyncSession, dict[str, Any], int, int, SysConfig], Awaitable[None]]
 """``(session, config, ticket_id, user_id, sysconfig)``; ``config`` has smart tags replaced."""
 

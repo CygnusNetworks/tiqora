@@ -165,6 +165,16 @@ class ActivityDialogSubmitIn(BaseModel):
     field_values: dict[str, Any] = Field(default_factory=dict)
 
 
+class SkippedActionOut(BaseModel):
+    """A transition action that was skipped on this run (the transition itself went through)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    module: str
+    reason: str  # stable code: ``vetoed``, ``itsm_off``, ``link_refused``, ...
+    detail: str  # German text for the agent
+
+
 class ActivityDialogSubmitOut(BaseModel):
     """Outcome of submitting an activity dialog, mirroring
     :class:`tiqora.process.engine.ActivityDialogSubmitResult`, plus the
@@ -175,6 +185,7 @@ class ActivityDialogSubmitOut(BaseModel):
     new_activity_entity_id: str | None
     transition_entity_id: str | None
     unsupported_actions: list[str]
+    skipped_actions: list[SkippedActionOut] = Field(default_factory=list)
     state: TicketProcessStateOut
 
 
@@ -192,6 +203,7 @@ class NewProcessTicketOut(BaseModel):
     ticket_number: str
     activity_changed: bool
     unsupported_actions: list[str]
+    skipped_actions: list[SkippedActionOut] = Field(default_factory=list)
     state: TicketProcessStateOut
 
 
