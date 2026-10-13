@@ -104,8 +104,8 @@ nothing else.
    `tiqora plugins verify --import --strict`: a plugin that is incomplete
    (for example `web/index.js` dropped from the wheel by `.gitignore`), cannot
    be imported, or pins `tiqora`/`tiqora-sdk` fails the build.
-4. Use the new image for `tiqora-api`, `tiqora-worker` **and** `tiqora-mcp`.
-   The `ai-worker` does not load plugins.
+4. Use the new image for `tiqora-api`, `tiqora-worker`, `tiqora-mcp` **and** `tiqora-ai-worker`.
+   The `ai-worker` loads plugins too (since SDK 0.2.0): use the same image and the same plugin volume as for the other roles.
 
 ### Restart order
 
@@ -116,13 +116,13 @@ MCP process that starts earlier boots core-only, logs `plugins_boot_failed`
 and retries loading plugins every 60 seconds for up to 30 minutes; after that
 it needs a restart. Run exactly **one** `tiqora-worker` replica: with two,
 every plugin task runs twice and event subscribers race for their cursors.
-Switching a plugin on or off takes effect after a restart of all three.
+Switching a plugin on or off takes effect after a restart of all of them (the `tiqora-ai-worker` too, where you run one).
 
 ### Environment variables
 
 | Variable | Default | Notes |
 |---|---|---|
-| `TIQORA_PLUGINS_SAFE_MODE` | `false` | `1` imports no plugin code in api/worker/mcp. The admin page still lists plugins (without importing them). |
+| `TIQORA_PLUGINS_SAFE_MODE` | `false` | `1` imports no plugin code in api/worker/mcp/ai-worker. The admin page still lists plugins (without importing them). |
 | `TIQORA_PLUGINS_DISABLED` | *(empty)* | Comma-separated plugin ids that are not loaded, whatever their switch says. |
 | `TIQORA_PLUGINS_AUTO_ENABLE` | `true` | Newly discovered plugins start switched on; `0` requires a click in the admin page. |
 | `TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS` | `20` (1–300) | Import limit per plugin. A timed-out import keeps running in its daemon thread and its module-level side effects can still happen; an import that holds the GIL in C cannot be timed out at all (use safe mode or `TIQORA_PLUGINS_DISABLED`). |

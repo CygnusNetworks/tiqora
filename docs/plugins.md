@@ -2,7 +2,7 @@
 
 > Teil 1 richtet sich an Administratoren und ist auf Deutsch. Teil 2
 > ("Developer guide") richtet sich an Entwickler von Erweiterungen und ist auf
-> Englisch. Teil 3 beschreibt die Grenzen der ersten Ausbaustufe.
+> Englisch. Teil 3 beschreibt die Grenzen der Ausbaustufen 1 und 2a.
 > Hintergrund und Entscheidungen: [Design](superpowers/specs/2026-10-08-plugin-system-design.md),
 > Aufbau im Code: [architecture.md](architecture.md), Abschnitt "Plugins", Betrieb:
 > [deployment.md](deployment.md#erweiterungen-einbauen-plugins).
@@ -15,7 +15,10 @@ Eine Erweiterung ist ein Python-Paket (mit optionalem Oberflächenteil), das
 Tiqora um Funktionen ergänzt: eigene Einstellungen, Schnittstellen (HTTP),
 Reaktionen auf Ticketänderungen, geplante Aufgaben, Hintergrund-Jobs,
 KI-Werkzeuge (MCP) und vier Stellen in der Oberfläche (Menüpunkt, eigene Seite,
-Feld in der Ticketansicht, Kachel im Dashboard). Sie ersetzen die
+Feld in der Ticketansicht, Kachel im Dashboard). Seit dem SDK 0.2.0 kommen
+Prüfungen vor dem Speichern, Prozess-Aktionen, Platzhalter, Ticketnummer-Schemata,
+Zusatzfeld-Arten, E-Mail-Filter, Versandwege, Kanäle, Anmeldung, Kundenverzeichnisse,
+Webservice-Erweiterungen und Berichte hinzu (Abschnitt 6). Sie ersetzen die
 OPM-Zusatzpakete von Znuny, die in Tiqora nicht laufen (Perl).
 
 Wichtig für die Einschätzung:
@@ -24,10 +27,10 @@ Wichtig für die Einschätzung:
   mit Zugriff auf die Datenbank, die Einstellungen und das Netzwerk des
   Servers. Es gibt in dieser Stufe keine Sandbox. Die Angaben, die eine
   Erweiterung in der Verwaltung macht (zum Beispiel "ruft api.example.org
-  auf"), zeigen, was sie vorgibt zu tun. Das ist keine Absicherung: Das SDK
-  bietet in der ersten Stufe zwar keinen Erweiterungspunkt für Middleware,
-  Anmeldung oder Authentifizierung, aber Erweiterungscode könnte trotzdem
-  alles ändern. Schalten Sie nur Erweiterungen ein, deren Quelltext Sie
+  auf"), zeigen, was sie vorgibt zu tun. Das ist keine Absicherung: Auch
+  wenn das SDK für Middleware keinen Erweiterungspunkt bietet, könnte
+  Erweiterungscode trotzdem alles ändern; seit 0.2.0 darf er außerdem bei der
+  Anmeldung mitwirken (Abschnitt 6). Schalten Sie nur Erweiterungen ein, deren Quelltext Sie
   kennen.
 - **Nur eigene Repositories.** Erweiterungen kommen aus Ihren eigenen
   Paketquellen. Es gibt keinen Marktplatz und keine Signaturprüfung; ein
@@ -150,10 +153,13 @@ Prozessen, in denen sie läuft, und ihren automatischen Abläufen.
   handeln", nicht "Arbeit ansammeln".) Das gilt auch, wenn Sie aus- und
   gleich wieder einschalten, ohne dazwischen neu zu starten: Änderungen aus
   dieser Zeit bekommt die Erweiterung nicht.
-- **Eine Erweiterung ist in drei Prozessen geladen:** Weboberfläche und
-  Schnittstelle (`api`), Hintergrunddienst (`worker`) und KI-Schnittstelle
-  (`mcp`). Der Hintergrunddienst führt Ticket-Abonnements, geplante Aufgaben
-  und Jobs aus. Der KI-Worker (`ai-worker`) lädt keine Erweiterungen.
+- **Eine Erweiterung ist in vier Prozessen geladen:** Weboberfläche und
+  Schnittstelle (`api`), Hintergrunddienst (`worker`), KI-Schnittstelle
+  (`mcp`) und KI-Hintergrunddienst (`ai-worker`). Der Hintergrunddienst führt
+  Ticket-Abonnements, geplante Aufgaben und Jobs aus; der KI-Hintergrunddienst
+  führt keine Abonnements, Aufgaben oder Schnittstellen aus, nutzt aber die
+  Erweiterungspunkte (zum Beispiel Platzhalter, Prüfungen und Kanäle bei
+  KI-Antworten).
 
 | Zustand (Anzeige) | Bedeutung | Was tun |
 |---|---|---|
@@ -246,6 +252,125 @@ fehlen im Wheel, solange das Paket sie nicht ausdrücklich einschließt.
 Paket"). Die Abhilfe gehört in die `pyproject.toml` der Erweiterung (siehe
 Developer guide, Abschnitt "Packaging").
 
+## 6. Neue Erweiterungspunkte (Ausbaustufe 2a)
+
+Mit dem SDK 0.2.0 können Erweiterungen weitere Teile von Tiqora ergänzen. Was
+eine Erweiterung kann, steht in ihrer Karte unter "Erweiterungen" (Bereich
+"Fähigkeiten"). Die Texte dort bedeuten:
+
+| Anzeige | Bedeutung |
+|---|---|
+| Prüft Ticketänderungen vor dem Speichern (kann sie ablehnen) | Prüfung vor dem Speichern, siehe unten |
+| Liefert Aktionen / Bedingungen für Prozesse | Zusätzliche Aktionen und Bedingungen im Prozess-Designer |
+| Liefert Platzhalter für Vorlagen | Zusätzliche Platzhalter in Textbausteinen und Benachrichtigungen |
+| Liefert ein Ticketnummer-Schema | Zusätzliches Nummernschema für neue Tickets |
+| Liefert Arten von Zusatzfeldern | Zusätzliche Arten beim Anlegen von Zusatzfeldern |
+| Bearbeitet eingehende E-Mails | Wirkt beim Abholen von E-Mails (nur im Hintergrunddienst) |
+| Prüft ausgehende E-Mails (kann den Versand ablehnen) | Wirkt bei jedem E-Mail-Versand |
+| Liefert Versandwege für Benachrichtigungen | Zusätzliche Versandwege neben E-Mail |
+| Liefert einen Kanal | Eigener Kanal für Kundengespräche (zum Beispiel Chat) |
+| Prüft Kennwörter bei der Anmeldung | Zusätzliche Anmeldung mit Kennwort |
+| Liefert ein Kundenverzeichnis | Externe Kundendaten, die Sie übernehmen können |
+| Liefert Webservice-Operationen / -Aufrufe / -Zuordnungen | Erweiterungen für die GenericInterface-Webservices |
+| Liefert fertige Berichte / Liefert Datenquellen für Berichte | Zusätzliche Berichte im Berichtskatalog |
+
+Der KI-Hintergrunddienst (`ai-worker`) lädt Erweiterungen jetzt ebenfalls:
+Nutzen Sie dasselbe Image und dasselbe Volume wie für die anderen Dienste (siehe
+[deployment.md](deployment.md)). Auf der Seite "Dienste" erscheint er mit der
+Rolle "KI-Hintergrunddienst". Wer keinen `ai-worker` betreibt, hat dafür keinen
+Eintrag, und das stört den Zustand der Erweiterung nicht.
+
+### Prüfung vor dem Speichern
+
+Eine Erweiterung kann Änderungen von Mitarbeitenden prüfen, **bevor** sie
+gespeichert oder verschickt werden: Ticket anlegen, Nachricht oder Notiz
+hinzufügen, Queue wechseln, Status ändern, Zusatzfelder ändern. Lehnt sie ab,
+sieht die Person einen Hinweistext, und es wurde nichts gespeichert und nichts
+verschickt (auch keine E-Mail).
+
+- Jede Prüfung hat insgesamt höchstens 5 Sekunden. Fällt eine Prüfung aus oder
+  ist zu langsam, entscheidet die Erweiterung vorher, ob die Änderung dann
+  durchgeht ("fail open") oder abgelehnt wird ("fail closed").
+- Nach 5 Fehlern in Folge zeigt die Seite der Erweiterung die Prüfung als
+  "angehalten". Eine angehaltene "ablehnende" Prüfung lehnt weiter ab, damit
+  nichts ungeprüft durchgeht; alle 30 Sekunden wird sie einmal versucht, und
+  bei Erfolg arbeitet sie wieder. "Erneut versuchen" setzt sie sofort zurück.
+- **Nicht geprüft werden:** eingehende E-Mails, Änderungen über die
+  GenericInterface-Webservices, Prozess-Aktionen, Änderungen durch Znuny
+  selbst und Schreibzugriffe einer Erweiterung im Namen des Systems.
+
+### Ticketnummer-Schema
+
+Bietet eine Erweiterung ein Schema, wählen Sie es unter "Erweiterungen" im
+Bereich "Ticketnummer-Schema" ("Für neue Tickets verwenden"). Sie sehen ein
+Beispiel. Zu wissen:
+
+- Tickets, die Znuny parallel anlegt, bekommen weiter Nummern nach dem
+  Znuny-Schema. Antworten auf beide Arten von Nummern werden erkannt, solange das
+  Schema der Erweiterung gewählt ist. Wechseln Sie zurück ("Znuny-Schema
+  verwenden"), erkennt Tiqora die alten Nummern nur noch über die Kopfzeilen
+  der Antwort, nicht mehr im Betreff.
+- Zählt das Schema mit dem Znuny-Zähler, muss es dasselbe Zurücksetzen haben
+  wie das Znuny-Schema (täglich, monatlich, nie); sonst lehnt Tiqora die
+  Auswahl ab. Ändern Sie später das Znuny-Schema, prüft Tiqora das nicht
+  erneut.
+- Liefert das Schema keine gültige Nummer, nimmt Tiqora für dieses Ticket das
+  Znuny-Schema.
+
+### Versandwege
+
+In einer Benachrichtigungsregel sehen Sie unter "Versandwege" neben "E-Mail"
+die Wege der Erweiterungen. Ein Weg einer Erweiterung bekommt den fertigen
+Text, aber ohne Signatur und Verschlüsselung der Regel; im Ticketverlauf
+erscheint nichts. Ein Fehler zählt in den Benachrichtigungsfehlern.
+
+### Zusatzfelder aus Erweiterungen
+
+Beim Anlegen eines Zusatzfelds wählen Sie "Art aus Erweiterung". Die Prüfung
+läuft in Tiqora; in Znuny erscheint das Feld als normales Feld der Grundart.
+Speichern Sie das Feld in der Znuny-Oberfläche, geht die Zusatzart verloren
+und das Feld ist ein gewöhnliches Feld der Grundart.
+
+### Kanäle
+
+Ein Kanal einer Erweiterung erscheint beim Antworten ("Antwort über …"). Die
+Nachricht wird erst gespeichert, wenn der Versand geklappt hat; bei einem
+Fehler steht "Zustellung über … fehlgeschlagen" und nichts ist gespeichert.
+Znuny zeigt solche Nachrichten wie WebChat-Nachrichten an, kann aber nicht auf
+diesem Kanal antworten. KI-Antworten laufen in Tiqora über denselben Kanal.
+
+### Kundenverzeichnis
+
+Erweiterungen können ein externes Kundenverzeichnis anbinden. Treffer
+erscheinen in der Kundensuche unter "Aus Kundenverzeichnis" (erst ab drei
+Zeichen oder über "Im Kundenverzeichnis suchen"). "Übernehmen" legt den
+Kunden einmal in Tiqora an; ein bestehender Kunde wird nie überschrieben.
+Gehört die E-Mail-Adresse schon einem anderen Kunden, bricht die Übernahme ab.
+Je nach Erweiterung legt Tiqora unbekannte Absender eingehender E-Mails
+automatisch an.
+
+### Anmeldung über Erweiterung
+
+Eine Erweiterung kann zusätzlich Kennwörter prüfen (zum Beispiel gegen ein
+Verzeichnis). Sie ersetzt nie die Sicherheitsfunktionen: Sperre nach
+Fehlversuchen, Zwei-Faktor-Anmeldung und Einrichtung gelten weiter, und die
+Gesamtprüfung ist auf 20 Sekunden begrenzt. Der Kennworttext wird nicht
+protokolliert. **Achtung:** Für Mitarbeitende, die über SCIM und Single
+Sign-on verwaltet werden und bei denen der Mehrfaktor-Nachweis des
+Anmeldedienstes verlangt wird, kann eine Kennwort-Erweiterung diese
+Anforderung umgehen. Schalten Sie eine solche Erweiterung dort nicht ein.
+Ein nicht erreichbarer LDAP-Server antwortet weiterhin mit "nicht verfügbar",
+bevor die Erweiterung gefragt wird.
+
+### Webservices, Berichte, Platzhalter
+
+Webservice-Operationen einer Erweiterung prüfen die Anmeldung selbst; eine
+Operation, die das unterlässt, ist für jeden erreichbar, der die Adresse des
+Webservice kennt. Lassen Sie solche Erweiterungen vor dem Einschalten prüfen.
+Znuny meldet unbekannte Webservice-Typen, Prozessaktionen und Versandwege einer
+Erweiterung als unbekannt; die übrigen Teile laufen weiter. Berichte von
+Erweiterungen erscheinen im Berichtskatalog mit eigenen Titeln.
+
 # Part 2: Developer guide
 
 This part is for people who write extensions. A plugin is an ordinary Python
@@ -328,12 +453,13 @@ homepage = "https://example.org/hello"
 support = "support@example.org"
 categories = ["tickets"]
 entry = "example_hello:plugin"   # module:attribute; equals the entry-point value
-sdk = ">=0.1,<0.2"               # SDK versions this plugin works with (required)
+sdk = ">=0.2,<0.3"               # SDK versions this plugin works with (required)
 tiqora = ">=0.16"                # optional: Tiqora release range
 # requires = { "org.example.base" = ">=1.0" }   # other plugins that must be active
 
 [capabilities]
-# Every extension point the plugin uses must be declared.
+# Every extension point the plugin uses must be declared (SDK 0.2.0 adds
+# the keys listed in "Extension points of SDK 0.2.0", e.g. "core.events.sync_hooks").
 extension_points = [
   "core.settings_sections", "core.http.routes", "core.events.subscribers",
   "core.worker.scheduled_tasks", "core.job_handlers", "core.mcp.tools",
@@ -491,8 +617,9 @@ Handed to events and tasks as `ctx.plugin`, and available as
   `ro` on the ticket's queue. **In routes and MCP tools always pass the calling
   agent** (`agent.id`, `current_agent_id(ctx)`). Without it the read is in system
   context, which is right for events and tasks only. Queue and group checks
-  for anything else a plugin reads are the plugin's duty; phase 1 offers no
-  write access to tickets.
+  for anything else a plugin reads are the plugin's duty. Writes are
+  `create`, `add_article`, `set_state`, `move` and `set_dynamic_field`
+  (SDK 0.2.0, see "Write services and `as_agent`").
 - `ctx.logger`: a structlog logger bound to the plugin id.
 - `ctx.session_factory()`: an async SQLAlchemy session factory for Tiqora's
   database (full trust: nothing restricts the SQL you run). Plugins cannot
@@ -817,19 +944,545 @@ before the update that loads a plugin for the first time afterwards can mix old
 and new runtime files, and the plugin's slot then shows an error until the
 reload.
 
+## Extension points of SDK 0.2.0
+
+SDK 0.2.0 adds fifteen backend extension points, write-capable ticket
+services and the `ai-worker` as a plugin host. Every point is opt-in: declare
+its capability in `capabilities.extension_points`, call the registrar method in
+`register()`, and the name rules below apply. The examples are taken from the
+fixture plugin `org.example.points` (`backend/tests/plugins/fixtures/tq_fixture_points`),
+which has one `_register_<point>` function per point and is the contract test
+for each of them. Use only `example.org` / `.test` addresses in your own
+examples.
+
+| Registrar method | Capability (manifest) | SDK module |
+|---|---|---|
+| `before(operation, name, handler, ...)` | `core.events.sync_hooks` | `tiqora_sdk.hooks` |
+| `transition_action(name, run, ...)` | `core.process.transition_actions` | `tiqora_sdk.process` |
+| `condition_module(name, run)` | `core.process.condition_modules` | `tiqora_sdk.process` |
+| `placeholder(name, resolve, ...)` | `core.templates.placeholders` | `tiqora_sdk.templates` |
+| `number_generator(name, build, ...)` | `core.tickets.number_generators` | `tiqora_sdk.templates` |
+| `dynamic_field_type(name, ...)` | `core.dynamic_fields.types` | `tiqora_sdk.fields` |
+| `mail_filter(name, "pre" \| "post", run, ...)` | `core.mail.inbound_filters` | `tiqora_sdk.mail` |
+| `mail_filter(name, "outbound", run, ...)` | `core.mail.outbound_filters` | `tiqora_sdk.mail` |
+| `notification_transport(name, send, ...)` | `core.notifications.transports` | `tiqora_sdk.notifications` |
+| `channel(name, ...)` | `core.channels.drivers` | `tiqora_sdk.channels` |
+| `password_provider(name, authenticate, *, audience, ...)` | `core.auth.password_providers` | `tiqora_sdk.auth` |
+| `customer_source(name, ...)` | `core.customers.sources` | `tiqora_sdk.customers` |
+| `gi_operation(name, run, ...)` | `core.gi.operations` | `tiqora_sdk.gi` |
+| `gi_invoker(name, prepare, ...)` | `core.gi.invokers` | `tiqora_sdk.gi` |
+| `gi_mapping(name, factory)` | `core.gi.mappings` | `tiqora_sdk.gi` |
+| `report_source(source)` | `core.reporting.sources` | `tiqora_sdk.reporting` |
+| `builtin_report(name, ...)` | `core.reporting.builtin_reports` | `tiqora_sdk.reporting` |
+
+A registrar call that breaks a rule raises `RegistrationRejected` with a German
+message that names what was checked. Let it propagate: the staged items of a
+plugin are committed atomically, so the plugin then shows as "Fehlgeschlagen"
+with that reason and none of its items go live.
+
+### Plugin-qualified names
+
+A plugin passes only `<Name>`; the registrar builds the qualified form with
+its short id (here `points`). Names for Znuny-shaped items match
+`^[A-Z][A-Za-z0-9]{1,40}$`, placeholder names `^[A-Z][A-Z0-9_]{1,40}$`.
+Core never registers a name starting with `Plugin_`, `plugin_` or `PLUGIN_`
+(pinned by a test), so a plugin cannot shadow a core or Znuny name such as
+`TicketStateSet`, `Ticket::TicketCreate`, `Simple`, `Email`, `TICKET_TITLE`,
+`DateChecksum`, `Text` or `email`: those are rejected at registration, and
+core keeps working. Names are always qualified, never bare.
+
+| Point | Stored or referenced as | Example |
+|---|---|---|
+| transition action | process config `Module: Kernel::System::ProcessManagement::TransitionAction::<qualified>` | `Plugin_points_SetContract` |
+| condition module | `…::TransitionValidation::<qualified>` | `Plugin_points_IsVip` |
+| GI operation / invoker | web service YAML `Type: <qualified>::<Name>` | `Plugin_points::ContractGet` |
+| GI mapping | `MappingInbound/Outbound.Type` | `Plugin_points_Upper` |
+| notification transport | `notification_event_item` key `Transports` value | `Plugin_points_Chat` |
+| number generator | `tiqora_settings` `tickets.number_generator` | `Plugin_points_Yearly` |
+| DF type | DF config YAML `TiqoraPluginType` | `Plugin_points_Contract` |
+| channel | `communication_channel.name` / `ArticleIn.channel` | `Plugin_points_Chat` / `plugin_points_chat` |
+| placeholder | tag | `<TIQORA_PLUGIN_POINTS_GREETING>` |
+| sync hooks, mail filters, password providers, customer sources | key `<plugin id>:<name>` with the phase-1 name rule `^[a-z][a-z0-9_]{1,40}$` | `org.example.points:tagger` |
+
+### Failure isolation, timeouts and budgets
+
+Plugin code is called through `tiqora.plugins.calls.call_plugin` (async) or
+`call_plugin_sync` (pure callbacks). A callback that raises, times out,
+returns the wrong type or raises `SystemExit` counts as a failure of that
+call: it is logged as `plugin_call_failed` (plugin, what, error; never the call
+arguments) and the point falls back as described per point. Timeouts are
+**cooperative** like everywhere in plugins: a callback that blocks the event
+loop (`time.sleep`, blocking I/O) cannot be interrupted, and one that swallows
+`asyncio.CancelledError` is not stopped. Pure synchronous callbacks (condition
+modules, mappings, number builders) have no timeout at all and must be fast.
+Number building and DF validate/display additionally run in a worker thread
+with a one second `wait_for`, so a stuck callback does not freeze the API
+process (the thread itself keeps running).
+
+Everything that runs inside an HTTP request is bounded, because nginx cuts
+requests at 90 s and Tiqora treats 60 s as its limit:
+
+| Point | Per call | Shared per request |
+|---|---|---|
+| sync hooks | 50..3000 ms (`timeout_ms`) | 5 s per operation |
+| transition actions | 1..10 s | 20 s per dialog submit; a timeout answers 422 and discards the transaction |
+| placeholders | 50..2000 ms | 2 s per text; 3 s for a template list or a notification |
+| outbound mail filters | 1..5 s effective | 10 s per send |
+| inbound mail filters | 1..30 s | 30 s per stage (worker, not a request) |
+| password providers | 1..15 s | 20 s for the whole chain |
+| customer sources | 1..10 s | 3 s for a search |
+| channel `send` | 1..30 s | – |
+| GI operations | 1..45 s | – (operation plus mapping stays under 60 s) |
+| GI invokers | 1..120 s | – (worker) |
+
+### Which process runs what
+
+Every process loads every enabled plugin; the table says where a point is
+exercised. The `ai-worker` is a plugin host since 0.2.0 (it calls
+`init_registry(role="ai-worker")` first): it hosts no subscribers, tasks or
+routes, but its AI auto-replies and summaries run the write services, sync
+hooks, placeholders, number generators, DF types, outbound filters and
+channels. A site without an `ai-worker` container has no `ai-worker` runtime
+row, which does not affect the plugin status.
+
+| Point | api | worker | mcp | ai-worker |
+|---|---|---|---|---|
+| sync hooks, channels | yes | yes | yes | yes |
+| transition actions, conditions | yes | yes | yes | – |
+| placeholders, number generators, DF types, outbound mail filters | yes | yes | yes | yes |
+| inbound mail filters, notification transports | – | yes | – | – |
+| password providers | yes | – | – | – |
+| customer sources | yes | yes | – | – |
+| GI operations, mappings | yes | mappings only | – | – |
+| GI invokers | – | yes | – | – |
+| report sources, built-in reports | yes | yes | – | – |
+
+### Sync hooks (`registry.before`)
+
+`registry.before(operation, name, handler, timeout_ms=1000,
+on_error="allow", order=100)` runs `handler(HookContext, op)` **before**
+an agent action is written or sent and may veto it or, for `ticket.create`,
+enrich it.
+
+| Operation | Op type | Fires in |
+|---|---|---|
+| `ticket.create` | `TicketCreateOp` | `TicketWriteService.create_ticket` |
+| `article.create` | `ArticleOp` | `TicketWriteService.add_article`, before any e-mail, Telegram, WebChat or plugin-channel send |
+| `ticket.queue_move` | `QueueMoveOp` | `move_queue` |
+| `ticket.state_change` | `StateChangeOp` | `change_state` (after the state validation; the reply route checks it before it sends anything) |
+| `ticket.dynamic_fields_update` | `DynamicFieldsOp` | `update_dynamic_field(s)` |
+
+```python
+from tiqora_sdk.hooks import HookContext, OperationVetoed, StateChangeOp
+
+async def need_contract(ctx: HookContext, op: StateChangeOp) -> None:
+    if op.new_state_type == "closed":
+        ticket = await ctx.plugin.tickets.get(op.ticket.id)
+        if ticket is not None and "V-" not in ticket.title:
+            raise OperationVetoed("Vertragsnummer fehlt")
+
+registry.before("ticket.state_change", "need_contract", need_contract,
+                timeout_ms=500, on_error="deny")
+```
+
+Behaviour, all pinned by tests:
+
+- Hooks of one operation run in `(order, key)` order under one 5 s budget for
+  the whole operation (one PATCH can fire several operations; each has its own
+  budget). Raising `OperationVetoed("<German reason, 300 characters>")`
+  refuses the action: the agent gets 422 with that text, and nothing was
+  written or sent (no article row, no SMTP, Telegram or channel send, no
+  history).
+- Any other exception, a timeout or an exhausted budget is a hook **failure**:
+  `on_error="allow"` skips the hook, `on_error="deny"` vetoes the action with
+  "Prüfung durch Erweiterung „…“ fehlgeschlagen; Vorgang abgelehnt".
+  Pick `deny` only when letting an unchecked action through is worse than
+  blocking agents.
+- Five failures in a row open a circuit breaker for that hook (the plugin page
+  shows "angehalten"). A tripped `deny` hook keeps vetoing, a tripped `allow`
+  hook is skipped. Every 30 s one half-open probe call goes through; a success
+  closes the breaker, and the admin's "Erneut versuchen" resets it. The
+  failure counter is stored in `tiqora_plugin_hook` (kind `sync`) and is
+  cumulative across processes: three failures in the api and two in the mcp
+  process trip every process at the next refresh. A veto is a decision, not a
+  failure: it never touches the breaker.
+- `ticket.create` handlers may return a `TicketCreatePatch` (`title`,
+  `priority`, `type`, `dynamic_fields`); later hooks see the merged result.
+  Unknown priority or type names, a malformed patch or a patch for another
+  operation count as a hook failure.
+- Hooks get `op` objects, never a session. Read with `ctx.plugin.tickets.get`
+  (own session, committed data only). Hooks must not write. A hook on
+  `ticket.dynamic_fields_update` sees the values before a DF-type plugin
+  normalised them (`v-12`, not `V-12`).
+
+**Not hooked** (they write without calling sync hooks): inbound e-mail
+processing (use the inbound mail filters), GenericInterface provider
+operations, process transition actions, plugin writes with `as_agent=None`
+(trusted system user), the module-level write functions, MCP tools that do
+not go through `TicketWriteService`, the derived writes of the ITSM features
+(priority matrix, major-incident type change), anything Znuny itself does, and
+the plugin channel `ingest`. Agent-side writes through `TicketWriteService`
+(web UI, API, MCP write tools, plugin writes with `as_agent=<id>`, chat end and
+triage accept) are hooked. A bulk job that writes through the service treats
+`OperationVetoed` as a per-ticket skip.
+
+### Write services and `as_agent`
+
+`ctx.tickets` (a `PluginTickets`) gains `create(TicketDraft)`, `add_article`,
+`set_state`, `move` and `set_dynamic_field`; `ctx.customers` is a read-only
+`get(login)` / `search(q)` over the customer database (it never asks plugin
+customer sources). Names (queue, state, priority, type, DF) are resolved with
+exact-name lookups on valid Znuny rows; an unknown name raises
+`PluginWriteError` (German). Name matching follows the database collation:
+case-insensitive on MariaDB, case-sensitive on PostgreSQL, so use the exact
+spelling.
+
+- `as_agent=None` writes as the system user: no permission check and no sync
+  hooks. The plugin is trusted.
+- `as_agent=<id>` goes through `TicketWriteService`: permission checks
+  (`PluginPermissionDenied`) and sync hooks apply; a veto surfaces to the
+  plugin as `OperationVetoed` (inside an HTTP route you normally let it become
+  a 422).
+- `session=None` opens and commits its own session; with `session=` the caller
+  commits and the method never calls `begin()`.
+- Plugins never send e-mail through `add_article`: any core channel other than
+  `internal` and `phone` raises `PluginWriteError`. Use your own channel.
+- `create` passes `customer_user` and `customer_id` through unchanged (like
+  Znuny's `TicketCreate`): giving only `customer_user` leaves `customer_id`
+  empty. `set_state` with a pending state writes no pending time (due
+  immediately); avoid pending states.
+
+`ActionContext.session` (transition actions) is allowed only to be passed on to
+`ctx.plugin.tickets.*(..., session=ac.session)`. Plugins write Znuny tables
+only through these services, never with raw SQL.
+
+### Process: transition actions and condition modules
+
+```python
+from tiqora_sdk.process import ActionContext
+
+async def set_contract(ac: ActionContext) -> None:
+    await ac.plugin.tickets.set_dynamic_field(
+        ac.ticket_id, "Contract", [str(ac.config["Contract"])], session=ac.session)
+
+registry.transition_action("SetContract", set_contract, timeout_seconds=5)
+registry.condition_module("IsVip", lambda data, field: data.get("CustomerID") == "vip.example.org")
+```
+
+Both are usable in the process designer as `Plugin_<short_id>_<Name>`.
+`transition_action` returns the qualified name, `condition_module` the full
+match path. `config` has the smart tags already replaced. The action runs in a
+savepoint: an ordinary exception rolls the savepoint back, is logged
+(`plugin_transition_action_failed`) and the transition continues, as Znuny does
+for a failing action. A **timeout** is different: the dialog answers 422
+("Aktion der Erweiterung „…“ hat zu lange gebraucht; nichts wurde
+gespeichert"), the transaction is rolled back and the session invalidated,
+because an async DB connection is not safe to reuse after a cancelled
+statement. A plugin that is switched off is skipped at runtime (logged
+`plugin_transition_action_skipped`, not reported as unsupported). Condition
+modules are plain synchronous functions that run on the event loop; they must be
+pure and fast; a failure or a non-`bool` result counts as "no match".
+
+### Placeholders
+
+`registry.placeholder("GREETING", resolve)` provides
+`<TIQORA_PLUGIN_POINTS_GREETING>` (and `<OTRS_PLUGIN_POINTS_GREETING>`) in
+templates, notifications and process smart tags. `resolve(PlaceholderRequest)`
+returns a string (at most 10,000 characters); `request.recipient`, `.bracket`
+(`[n]`) and `.time_zone` are filled where known. An unknown tag, an inactive
+plugin, a failure, a timeout or a non-string renders `""`. Results are
+memoised per text and tag. The tag passes the same masking and HTML escaping
+as core tags: the full tag `PLUGIN_<SHORTID>_<NAME>` must not match the
+secret/password patterns (a name containing `PASSWORD` or `SECRET`, or a
+short id that does so, is rejected with a message that names the cause). Znuny
+renders `<OTRS_PLUGIN_…>` as `-`.
+
+### Ticket number generators
+
+`registry.number_generator("Yearly", build, label=, pattern=, uses_counter=True,
+date_based=False)`; `build(NumberRequest)` is pure and synchronous and returns
+e.g. `f"{req.now_local:%Y}-{req.counter:06d}"`. `pattern` is a regex for the
+whole number, at most 200 characters, **without capturing groups and without
+`^`/`$` anchors** (core wraps it for subject matching; registration rejects an
+anchored pattern, which would silently disable follow-up detection).
+Registration also builds an example and rejects a pattern that does not match
+it. Numbers must also match
+`^[A-Za-z0-9][A-Za-z0-9._/-]{0,49}$` (they appear in mail headers), at most
+50 characters; an invalid or failing number falls back to the Znuny
+generator for that ticket, as do three collisions in a row.
+
+The admin chooses the generator (`tickets.number_generator`, Tiqora-only
+setting). If the generator uses the counter, its `date_based` flag must agree
+with the Znuny generator's (e.g. date-based Znuny scheme with a date-based
+plugin scheme): `PUT` refuses a mismatch, but a later change of the Znuny
+SysConfig is not re-checked. There is no separate counter table (no
+migration). Only the **selected** scheme is recognised in subjects for
+follow-up detection: after switching away, replies that quote the old numbers
+in the subject still match via `References`/`In-Reply-To` only. Tickets that
+Znuny creates in parallel keep its own number scheme.
+
+### Dynamic field types
+
+```python
+from pydantic import BaseModel
+
+class ContractConfig(BaseModel):
+    prefix: str = "V-"
+
+def validate(values: list[str], config) -> list[str]:
+    if any(not v.upper().startswith("V-") for v in values):
+        raise ValueError("Vertragsnummer muss wie V-123 aussehen")
+    return [v.upper() for v in values]
+
+registry.dynamic_field_type("Contract", label="Vertragsnummer", base_type="Text",
+                            validate=validate, config_model=ContractConfig)
+```
+
+The plugin type is stored in the DF's Znuny `config` YAML
+(`TiqoraPluginType`, `TiqoraPluginConfig`); Znuny and the agent forms treat the
+field as its `base_type`. Raise **exactly `ValueError`** to reject a value
+(a subclass such as a pydantic `ValidationError` also rejects, and shows an
+English text); any other failure, a timeout or a result that is not a list of
+strings fails open (values stored unchanged, logged). Validation and display
+callbacks are synchronous and run in a thread with a one second limit. The
+core checks `PossibleValues` of a Dropdown base type *before* your callback,
+so a transforming plugin type can store a value outside the list; check it
+yourself. DF types apply to Ticket and Article fields only. A save of the
+field in Znuny's admin drops the plugin keys (it becomes a plain base-type
+field); there is no widget slot for DF types in this version.
+
+### Mail filters
+
+```python
+from tiqora_sdk.mail import InboundMail, MailFilterContext, MailVetoed, OutboundMail
+
+async def urgent(ctx: MailFilterContext, mail: InboundMail) -> None:
+    if "DRINGEND" in mail.subject:
+        mail.headers["X-OTRS-Priority"] = "5 very high"   # str values, Znuny spelling
+
+async def stamp(ctx: MailFilterContext, mail: OutboundMail) -> None:
+    mail.add_header("X-Checked", "1")
+    if any(a.endswith("@blocked.example.net") for a in mail.to):
+        raise MailVetoed("Empfänger gesperrt")
+
+registry.mail_filter("urgent", "pre", urgent)
+registry.mail_filter("stamp", "outbound", stamp)
+```
+
+- `pre` runs in the worker after Znuny's own postmaster filters and before the
+  ticket match, inside the message's transaction, so `X-OTRS-*` headers
+  (including `X-OTRS-Ignore: yes`) take effect. The `post` stage runs after the
+  commit, success path only, with the final headers; failures are logged only.
+  A failing or timed-out filter is skipped and its header changes are undone;
+  each stage has a 30 s budget.
+- The key is `<plugin id>:<name>`, shared by `pre` and `post`: register a pre
+  and a post filter under different names.
+- `outbound` runs first in `SmtpMailSender.send`, so every real SMTP send
+  (replies, notifications, auto-responses, report mails) passes it. It can add
+  `X-…` headers (not `X-OTRS-*`, no line breaks) but not change content;
+  failures send the mail unchanged. `MailVetoed` refuses the send with a
+  permanent 550, which every caller treats like a permanent SMTP failure.
+  Test senders that do not use `SmtpMailSender` run no filters.
+
+### Notification transports
+
+`registry.notification_transport("Chat", send, label="Chat")` makes
+`Plugin_<short_id>_Chat` selectable as a transport of a notification rule.
+`send(TransportContext, NotificationMessage)` gets the message rendered
+exactly as for the e-mail (`subject`, `body`, `recipient`, `ticket`). A rule
+with only plugin transports sends no e-mail; a failure counts in the
+notification error metrics but writes no ticket history. Plugin transports
+bypass the rule's e-mail security settings (sign and encrypt): the plugin
+receives the plain rendered text. Unknown transport keys are ignored.
+
+### Channel drivers
+
+```python
+from tiqora_sdk.channels import (ChannelCapabilities, ChannelContext, DeliveryResult,
+                                 InboundChannelMessage, OutboundChannelMessage)
+
+async def send(ctx: ChannelContext, msg: OutboundChannelMessage) -> DeliveryResult:
+    await ctx.plugin.http.request("POST", "https://chat.example.org/send",
+                                  json={"to": msg.to, "text": msg.body})
+    return DeliveryResult(external_id="m-1")
+
+registry.channel("Chat", label="Chat", capabilities=ChannelCapabilities(max_length=500), send=send)
+# inbound, e.g. from a public route of the plugin:
+await ctx.plugin.channels.ingest("Chat", InboundChannelMessage(
+    sender="user-42", body="Hallo", external_id="msg-7"))
+```
+
+`register` returns the channel key (`plugin_points_chat`), the value of
+`ArticleIn.channel`. Core stores a `communication_channel` row named
+`Plugin_<short_id>_<Name>` (module `…::Internal`, package `Tiqora`) which
+Znuny reads like WebChat articles. Agent replies go through
+`TicketWriteService.add_article`: length and attachment capabilities are
+checked, `send` is called (send-then-store), a failure stores nothing and
+answers 502 "Zustellung über „…“ fehlgeschlagen". The composer fills `to` from
+the replied-to article's `from_address`, so `ingest` stores
+`from_address = msg.sender` (the handle, display name only as realname).
+`ingest` runs as the system user; `external_id` (`[A-Za-z0-9._-]{1,100}`,
+otherwise `PluginWriteError`) is the idempotency key, so a webhook retry
+returns `duplicate=True`. Concurrent identical retries can race (there is no
+unique constraint without a migration): serialise or acknowledge retries
+yourself. A plugin channel has no default queue setting; pass `queue=` per
+message. AI auto-replies treat plugin channels as Tiqora-only channels
+(Znuny cannot answer them) and send through the driver. `GET
+/api/v1/channels/plugin` lists them for the composer.
+
+**Inbound routes are public and create tickets as the system user.** Always
+verify a signature or shared secret before calling `ingest`
+(`from tiqora_sdk.channels import verify_shared_secret` compares in constant
+time) and never take the customer login from the request body unverified.
+
+### Password auth providers
+
+`registry.password_provider("directory", authenticate, audience="both")`;
+`authenticate(AuthContext, PasswordCheck)` returns the **login of an existing,
+valid account** or `None`. It runs after the local password check and after
+the LDAP block fail to authenticate, in `(order, key)` order, under a 20 s
+chain budget. Raising, hanging, an unknown or invalid login all count as "no"
+and the chain continues. The provider returns a login, never creates accounts.
+On MariaDB a provider that returns a case variant of the login is accepted
+(case-insensitive collation), on PostgreSQL it is rejected as unknown. Rate
+limiting, 2FA and enrollment apply to plugin logins like any other; failed
+attempts count. Notes:
+
+- The password is redacted (`***`) from error text before it is logged or
+  returned, and `PasswordCheck.password` is excluded from `repr`. The
+  redaction is a plain substring replace: a password that reaches an error
+  text escaped, URL-encoded or base64-encoded is not recognised, and a
+  one-character password masks every occurrence of that character. Never put
+  the password in exceptions yourself.
+- An LDAP sign-in that raises `LdapSignInUnavailable` answers 503 before the
+  plugin chain runs.
+- Plugin logins are `auth_method="plugin"` (no local password change).
+- **Known gap (accepted for wave 4):** a plugin password provider can sign in
+  an agent that SCIM manages with an MFA claim requirement, bypassing the SSO
+  step-up. Do not enable a password provider on a site that relies on that
+  requirement; the core check (skip logins with a SCIM row whose provider has
+  `require_mfa_claim`, log `plugin_auth_rejected reason=sso_managed`) is
+  planned for the merge of both features.
+
+### Customer sources
+
+`registry.customer_source("directory", label=, search=, by_login=, by_email=,
+materialize_on_inbound=False)` connects an external customer directory.
+Deviation from the spec: it is a **lookup and take-over** source, not a live
+replacement backend. External hits appear in the customer search only when the
+UI asks for them (`external=true`, from 3 characters after a 400 ms pause, or
+via "Im Kundenverzeichnis suchen") under a 3 s budget; an agent can take a hit
+over (`POST /api/v1/customers/external-import`), which creates a customer user
+once (an existing login is never updated; an e-mail used by another login is a
+409). With `materialize_on_inbound=True` the mail pipeline looks up an unknown
+sender and creates the customer inside the message transaction; any failure
+leaves the sender unknown as before. `ExternalCustomer.company` creates the
+company only if its `customer_id` does not exist yet. The default
+`customer_id` is the company's id, else the e-mail address. Note: SCIM creates
+no customer companies and adds no API-key area `scim`; `ensure_customer_company`
+has no SCIM caller.
+
+### GenericInterface operations, invokers and mappings
+
+```python
+from tiqora_sdk.gi import GiOperationContext
+
+async def contract_get(ctx: GiOperationContext, data: dict) -> dict:
+    principal = await ctx.authenticate(data)       # SessionID or UserLogin+Password
+    if isinstance(principal, dict):
+        return principal                            # Znuny-shaped error result
+    return {"Data": {"Contract": "V-1", "User": principal.login}}
+
+registry.gi_operation("ContractGet", contract_get)       # -> "Plugin_points::ContractGet"
+```
+
+- **The core does not authenticate plugin operations.** An operation that
+  never calls `ctx.authenticate` is reachable without credentials by anyone
+  who can reach the web service URL. Always authenticate and check permissions.
+- Core operation types always win; plugin types resolve through the
+  `plugin:` handler prefix. An inactive plugin answers `Operation.NotImplemented`;
+  a timeout or exception answers Znuny's "OperationObject returned an error,
+  cancelling Request" fault (the text is logged, not returned). Inbound and
+  outbound mappings, debugger and transports are the unchanged provider
+  pipeline. Operations are limited to 45 s so that operation plus mapping stays
+  below 60 s.
+- Invokers: `prepare(InvokerContext, data)` returns the request data, or `None`
+  to skip the call (success, nothing sent, like Znuny's `StopCommunication`).
+  `prepare` also runs for dry runs, so it must be free of side effects.
+  `handle_response(ctx, InvokerResponse)` receives successes **and**
+  failures and is not re-called for its own failure. A failure in `prepare`
+  or `handle_response` goes through the existing error handling and retries.
+- Mappings are pure and synchronous (`factory(config) -> Mapper`); any
+  exception other than `MappingError` becomes one. No timeout is possible.
+
+### Reporting
+
+`registry.report_source(ReportSource(key="plugin.points.contracts", ...))`
+adds a source, `registry.builtin_report(name, category=, definition=,
+overview=False)` a built-in report (key `plugin.<plugin id>.<name>`, at most
+120 characters). Label keys must start with `plugin.<plugin id>:` and are
+translated from the plugin's own locales. A source must read either Znuny
+tables only or only its own tables `tqp_<short_id>_*` (never `tiqora_*`,
+another plugin's tables, or a mix; the check walks the compiled FROM clause
+and is a collation guard, not a security boundary: raw `text()` hides table
+names from it). `requires_facts` must be `False`; `scope_column` is mandatory
+and enforced by the compiler (for a `tqp_` source it is your own column, so
+make it a real ownership column). Dimensions are classified for the kiosk
+view by their key: a plugin dimension keyed like a core one (`channel`,
+`queue`) inherits its classification, so name person-related dimensions
+distinctively. A built-in report's source must be a core source or one of the
+plugin's own.
+
+### Security notes
+
+Plugins are full-trust Python (Part 1). Specific consequences of 0.2.0:
+
+- Write services skip permission checks when `as_agent=None`.
+- Public inbound routes and GI operations authenticate nothing by themselves.
+- Plugin transports do not apply notification signing or encryption.
+- Report sources can read any Znuny table in the database.
+
+### SDK 0.2.0 change list
+
+- New registrar methods and the `tiqora_sdk.{tickets, hooks, process,
+  templates, fields, mail, notifications, channels, auth, customers, gi,
+  reporting}` submodules (exact `__all__` pinned by `test_tiqora_sdk_surface`).
+- `PluginTickets` gains `create`, `add_article`, `set_state`, `move` and
+  `set_dynamic_field`; `PluginContext` gains `customers` and `channels`.
+- `PluginRole` and `PLUGIN_ROLES` include `ai-worker`; hook kind `sync`.
+- `tiqora_sdk.channels.verify_shared_secret` (additive).
+- The npm package `@tiqora/plugin-sdk` changes only its version (`0.2.0`); there
+  is no new frontend slot.
+- Plugins declaring `sdk = ">=0.1,<0.2"` are shown as "Nicht kompatibel": use
+  `sdk = ">=0.2,<0.3"`. Existing 0.1 code needs no other change.
+
+### Limits of this version
+
+- Customer sources are lookup and take-over, not live backends.
+- Password providers are password-only (no redirect flows).
+- DF types have no frontend widget.
+- Sync hooks cover five agent-side operations on `TicketWriteService` paths.
+- Reporting has no export formats.
+- The number generator choice lives in Tiqora; Znuny keeps its own for tickets
+  it creates. There are no title/subject builders.
+- Outbound filters cannot change mail content.
+- No CMDB extension point.
+- Plugins still cannot create tables or migrations (`tqp_<short_id>_*` comes
+  with runtime install in a later release).
+
 ## SDK stability
 
 `tiqora_sdk` (Python) and `@tiqora/plugin-sdk` (TypeScript) are the only API a
-plugin may use. Both carry the same version (`SDK_VERSION`, now `0.1.0`).
+plugin may use. Both carry the same version (`SDK_VERSION`, now `0.2.0`).
 Until 1.0 a minor version (0.x) may break plugins: declare the range you tested
-(`sdk = ">=0.1,<0.2"`). Every change of either surface bumps the version on both
+(`sdk = ">=0.2,<0.3"`). Every change of either surface bumps the version on both
 sides together; tests pin the surface. Anything not exported by the SDK is
 internal. A plugin whose `sdk` range does not include the installed version
 shows as "Nicht kompatibel" and is not loaded.
 
-# Teil 3: Grenzen der ersten Ausbaustufe
+# Teil 3: Grenzen der Ausbaustufen
 
-Was die erste Ausbaustufe bewusst nicht kann (auf Deutsch, in einfachen Worten):
+Was die Ausbaustufen 1 und 2a bewusst nicht können (auf Deutsch, in einfachen Worten):
 
 - **Kein Nachinstallieren im Betrieb.** Neue Erweiterungen und neue Versionen
   gibt es nur durch ein neues Image (siehe oben). Die Verwaltung schaltet nur
@@ -843,14 +1496,25 @@ Was die erste Ausbaustufe bewusst nicht kann (auf Deutsch, in einfachen Worten):
   Alembic-Zweige, Tabellen mit dem Präfix `tqp_<Kurzname>_`) kommen in der
   nächsten Stufe. Bis dahin legen Erweiterungen ihre Daten in ihren
   Einstellungen oder in ihrem eigenen externen Speicher ab.
-- **Der KI-Worker lädt keine Erweiterungen** (es gibt noch keine
-  KI-Erweiterungspunkte).
-- **Kein Schreiben an Tickets über das SDK.** Das SDK liest nur
-  (`ctx.tickets.get`). Änderungen laufen über Tiqoras eigene Schnittstellen.
+- **Der KI-Hintergrunddienst lädt Erweiterungen,** führt aber keine
+  Abonnements, Aufgaben oder Schnittstellen aus. Es gibt keine eigenen
+  KI-Erweiterungspunkte.
+- **Schreiben an Tickets nur über die Dienste des SDK** (anlegen, Nachricht,
+  Status, Queue, Zusatzfeld). Mit `as_agent` gelten Rechte und Prüfungen, ohne
+  schreibt die Erweiterung im Namen des Systems ohne Rechteprüfung.
 - **Vier Stellen in der Oberfläche** (Menüpunkt, Seite, Ticketfeld, Kachel).
-  Das SDK bietet keinen Erweiterungspunkt für Anmeldung, Middleware oder
-  Berichte; der Erweiterungscode läuft aber mit vollem Vertrauen im Prozess
-  (siehe Teil 1).
+  Das SDK bietet keinen Erweiterungspunkt für Middleware und keine
+  Oberflächen-Bausteine für Zusatzfelder, Kanäle oder Berichte; der
+  Erweiterungscode läuft aber mit vollem Vertrauen im Prozess (siehe Teil 1).
+- **Grenzen der neuen Erweiterungspunkte (SDK 0.2.0), in einfachen Worten:**
+  Kundenverzeichnisse werden abgefragt und übernommen, ersetzen aber nicht die
+  Kundendatenbank. Die Anmeldung über Erweiterungen prüft nur Kennwörter (keine
+  Weiterleitung zu einem Anmeldedienst). Prüfungen vor dem Speichern gelten für
+  fünf Änderungen von Mitarbeitenden, nicht für eingehende E-Mails,
+  Webservices oder Znuny. Berichte kennen keine Exportformate. Das
+  Ticketnummer-Schema wählen Sie in Tiqora; Znuny nutzt weiter sein eigenes.
+  Filter für ausgehende E-Mails können den Inhalt nicht ändern. Es gibt keinen
+  Erweiterungspunkt für die Konfigurationsdatenbank (CMDB).
   Das Dashboard zeigt Kacheln von Erweiterungen in einem eigenen Abschnitt, bis
   das Raster der Dashboards kommt.
 - **Ein Schreiber für Ereignisse.** Siehe Galera-Hinweis oben; Ereignisse

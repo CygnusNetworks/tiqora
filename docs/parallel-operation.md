@@ -1027,3 +1027,21 @@ When parallel operation ends:
 2. Enable `alembic/versions_owned/`.
 3. Apply additive migrations only (FKs, helpful indexes, orphan reports).
 4. Run the cutover runbook and keep a rollback probe ready.
+
+## Plugin items and Znuny
+
+Plugin extension points (SDK 0.2.0, see [plugins.md](plugins.md)) store what
+Znuny can see only in tables Znuny already knows. This is what Znuny does with
+each kind of item; the golden test `tests/golden/test_plugin_artefacts.py` pins
+the channel and dynamic-field rows against Znuny 6.5 and 7.3.
+
+| Plugin item | Stored where Znuny reads it | Znuny's behaviour |
+|---|---|---|
+| Transition action / condition module | process config `Module: …::Plugin_<sid>_<Name>` | Znuny cannot load the module: it logs an error and skips the action, or the condition never matches (the same as for Tiqora-only modules) |
+| GI operation / invoker / mapping | web service YAML `Type: Plugin_<sid>…` | Znuny reports the type as unknown for that operation or invoker only; other operations keep working |
+| Notification transport | `notification_event_item` key `Transports` | Znuny skips an unknown transport |
+| Dynamic field type | extra keys `TiqoraPluginType` / `TiqoraPluginConfig` in `dynamic_field.config` | Ignored: the field behaves as its base type. Saving the field in Znuny's admin drops the keys, and it then is a plain base-type field in Tiqora too |
+| Channel | `communication_channel` row `Plugin_<sid>_<Name>` (module `…::Internal`, package `Tiqora`) | Articles of the channel display like WebChat articles; Znuny cannot reply on it |
+| Ticket number generator | `tiqora_settings` `tickets.number_generator` only | Znuny keeps its own generator for tickets it creates; Tiqora recognises numbers of the selected plugin scheme in subjects |
+| Placeholder | template text | `<OTRS_PLUGIN_…>` renders `-` in Znuny; `<TIQORA_PLUGIN_…>` stays raw |
+| Sync hooks, mail filters, password providers, customer sources, report items | not stored in Znuny | Znuny is unaffected; its own writes and mail processing run no sync hooks |
