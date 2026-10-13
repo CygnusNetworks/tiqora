@@ -29,11 +29,24 @@
         </Value>
     </Setting>
     <Setting Name="TiqoraITSM::ReadOnly::Actions" Required="0" Valid="1" ConfigLevel="100">
-        <Description Translatable="1">Znuny actions on configuration items that are refused while the CMDB is read-only. Filled by the guard of this add-on.</Description>
+        <Description Translatable="1">Znuny screens for configuration items that are refused while the CMDB is read-only. An entry is an action name (the whole screen) or Action::Subaction (one subaction). Read screens (zoom, search, history, print, attachment download) are not listed. AgentLinkObject is guarded by the module itself: it refuses to link to or from configuration items.</Description>
         <Navigation>Core::TiqoraITSM</Navigation>
         <Value>
             <Array>
+                <Item>AgentITSMConfigItemAdd</Item>
+                <Item>AgentITSMConfigItemEdit</Item>
+                <Item>AgentITSMConfigItemDelete</Item>
+                <Item>AgentITSMConfigItemBulk</Item>
+                <Item>AdminITSMConfigItem::DefinitionChange</Item>
+                <Item>AdminITSMConfigItem::DefinitionSave</Item>
             </Array>
+        </Value>
+    </Setting>
+    <Setting Name="PreApplicationModule###TiqoraITSMReadOnly" Required="0" Valid="1" ConfigLevel="100">
+        <Description Translatable="1">Refuses the Znuny screens that change configuration items once the CMDB is read-only because Tiqora holds it (TiqoraITSM::ReadOnly::Actions).</Description>
+        <Navigation>Core::TiqoraITSM</Navigation>
+        <Value>
+            <Item ValueType="String" ValueRegex="">Kernel::Modules::TiqoraITSMReadOnly</Item>
         </Value>
     </Setting>
     <Setting Name="TiqoraITSM::Linking::Enabled" Required="1" Valid="1" ConfigLevel="100">
@@ -59,6 +72,81 @@
                 <Item Key="Location">Sidebar</Item>
                 <Item Key="Async">1</Item>
             </Hash>
+        </Value>
+    </Setting>
+    <Setting Name="Frontend::Module###AgentTiqoraITSMLink" Required="0" Valid="1">
+        <Description Translatable="1">Frontend module registration for linking a ticket to a configuration item of Tiqora (AJAX). Does nothing unless TiqoraITSM::Linking::Enabled is on.</Description>
+        <Navigation>Frontend::Agent::ModuleRegistration</Navigation>
+        <Value>
+            <Item ValueType="FrontendRegistration">
+                <Hash>
+                    <Item Key="GroupRo">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="Group">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="Description">Link a ticket to a configuration item of Tiqora.</Item>
+                    <Item Key="Title" Translatable="1">Link CI (Tiqora)</Item>
+                    <Item Key="NavBarName"></Item>
+                </Hash>
+            </Item>
+        </Value>
+    </Setting>
+    <Setting Name="CustomerFrontend::Module###CustomerTiqoraITSM" Required="0" Valid="0">
+        <Description Translatable="1">Frontend module registration for the customer page with the configuration items of Tiqora.</Description>
+        <Navigation>Frontend::Customer::ModuleRegistration</Navigation>
+        <Value>
+            <Item ValueType="FrontendRegistration">
+                <Hash>
+                    <Item Key="Group">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="GroupRo">
+                        <Array>
+                        </Array>
+                    </Item>
+                    <Item Key="Description" Translatable="1">Configuration items of the customer (from Tiqora).</Item>
+                    <Item Key="NavBarName">TiqoraITSM</Item>
+                    <Item Key="Title" Translatable="1">Configuration items</Item>
+                </Hash>
+            </Item>
+        </Value>
+    </Setting>
+    <Setting Name="CustomerFrontend::Navigation###CustomerTiqoraITSM###002-TiqoraITSM" Required="0" Valid="0">
+        <Description Translatable="1">Main menu item registration for the customer page with the configuration items of Tiqora.</Description>
+        <Navigation>Frontend::Customer::ModuleRegistration::MainMenu</Navigation>
+        <Value>
+            <Array>
+                <DefaultItem ValueType="FrontendNavigation">
+                    <Hash>
+                    </Hash>
+                </DefaultItem>
+                <Item>
+                    <Hash>
+                        <Item Key="Group">
+                            <Array>
+                            </Array>
+                        </Item>
+                        <Item Key="GroupRo">
+                            <Array>
+                            </Array>
+                        </Item>
+                        <Item Key="Description" Translatable="1">Configuration items.</Item>
+                        <Item Key="Name" Translatable="1">Configuration items</Item>
+                        <Item Key="Link">Action=CustomerTiqoraITSM</Item>
+                        <Item Key="LinkOption"></Item>
+                        <Item Key="NavBar">TiqoraITSM</Item>
+                        <Item Key="Type">Menu</Item>
+                        <Item Key="Block"></Item>
+                        <Item Key="AccessKey">c</Item>
+                        <Item Key="Prio">400</Item>
+                    </Hash>
+                </Item>
+            </Array>
         </Value>
     </Setting>
 </otrs_config>

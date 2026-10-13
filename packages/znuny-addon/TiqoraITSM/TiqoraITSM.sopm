@@ -17,7 +17,7 @@
     <Vendor>Cygnus Networks GmbH</Vendor>
     <URL>https://cygnusnetworks.de/</URL>
     <License>GPL-3.0-only</License>
-    <ChangeLog Version="1.0.0" Date="2026-10-13">Initial release: the ticket zoom widget "Betroffene CIs (Tiqora)" and the read-only helper module for Znuny sites whose ITSM data moved to Tiqora.</ChangeLog>
+    <ChangeLog Version="1.0.0" Date="2026-10-13">Initial release: the ticket zoom widget "Betroffene CIs (Tiqora)", the read-only guard for the CI screens of Znuny, a customer page with the customer's CIs and optional linking of tickets to CIs, for Znuny sites whose ITSM data moved to Tiqora.</ChangeLog>
     <Description Lang="en">
         Companion of Tiqora, the parallel Python/FastAPI reimplementation of
         Znuny, for sites whose configuration items (CMDB) moved from Znuny's
@@ -43,6 +43,10 @@
         <File Location="Kernel/System/TiqoraITSM.pm" Permission="644"></File>
         <File Location="Kernel/Output/HTML/TicketZoom/TiqoraITSM.pm" Permission="644"></File>
         <File Location="Kernel/Output/HTML/Templates/Standard/AgentTicketZoom/TiqoraITSM.tt" Permission="644"></File>
+        <File Location="Kernel/Modules/TiqoraITSMReadOnly.pm" Permission="644"></File>
+        <File Location="Kernel/Modules/CustomerTiqoraITSM.pm" Permission="644"></File>
+        <File Location="Kernel/Modules/AgentTiqoraITSMLink.pm" Permission="644"></File>
+        <File Location="Kernel/Output/HTML/Templates/Standard/CustomerTiqoraITSM.tt" Permission="644"></File>
         <File Location="Kernel/Language/de_TiqoraITSM.pm" Permission="644"></File>
         <File Location="Kernel/Config/Files/XML/TiqoraITSM.xml" Permission="644"></File>
     </Filelist>

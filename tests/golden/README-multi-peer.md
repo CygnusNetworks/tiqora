@@ -208,6 +208,12 @@ cd backend && GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm uv run python -m pytest -q -m 
   all of it again. Results (2026-10-13): 11 passed on `znuny-6.5` (plain, fresh DB: tables and
   views created by the module) and on `znuny-7.3-itsm` (7.3 framework; the add-on does not read
   `configitem`, so a plain `znuny-7.3` behaves the same; not run separately).
+  Task 27 extends it (29 cases): the read-only guard (`PreApplicationModule###TiqoraITSMReadOnly`,
+  incl. `AgentLinkObject` towards CIs), the customer page and the optional linking
+  (`AgentTiqoraITSMLink` posts cmdb's `LinkIn` with the bearer key to the recording sink
+  `gisink`; refuses GET, a missing challenge token, agents without ticket `rw`, bad ids). The
+  module creates and deletes one ticket and one `customer_user_customer` row. Results
+  (2026-10-13): 29 passed on `znuny-6.5` (plain) and on `znuny-7.3-itsm`.
 
 Package sources (`https://download.znuny.org/releases/itsm/`):
 

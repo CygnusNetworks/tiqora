@@ -28,6 +28,33 @@
                         </li>
                         [% RenderBlockEnd("CI") %]
                     </ul>
+                    [% RenderBlockStart("Link") %]
+                    <form class="TiqoraITSMLinkForm" id="TiqoraITSMLinkForm" method="post" action="[% Env("CGIHandle") | html %]">
+                        <input type="hidden" name="TicketID" value="[% Data.TicketID | html %]"/>
+                        <label for="TiqoraITSMCIID">[% Translate("CI-ID") | html %]</label>
+                        <input type="text" id="TiqoraITSMCIID" name="CIID" size="8" class="Validate_Number"/>
+                        <button type="submit" class="CallForAction Small"><span>[% Translate("CI verknüpfen") | html %]</span></button>
+                        <span class="TiqoraITSMLinkResult" id="TiqoraITSMLinkResult"></span>
+                    </form>
+                    [% WRAPPER JSOnDocumentComplete %]
+                    <script type="text/javascript">//<![CDATA[
+                    $('#TiqoraITSMLinkForm').on('submit', function (Event) {
+                        Event.preventDefault();
+                        Core.AJAX.FunctionCall(Core.Config.Get('CGIHandle'), {
+                            Action: 'AgentTiqoraITSMLink',
+                            TicketID: $('input[name=TicketID]', this).val(),
+                            CIID: $('#TiqoraITSMCIID').val(),
+                            ChallengeToken: Core.Config.Get('ChallengeToken')
+                        }, function (Response) {
+                            $('#TiqoraITSMLinkResult').text(Response && Response.Message ? Response.Message : '');
+                            if (Response && Response.Success) {
+                                window.setTimeout(function () { window.location.reload(); }, 800);
+                            }
+                        }, 'json');
+                    });
+                    //]]></script>
+                    [% END %]
+                    [% RenderBlockEnd("Link") %]
                 </div>
             </div>
         </div>

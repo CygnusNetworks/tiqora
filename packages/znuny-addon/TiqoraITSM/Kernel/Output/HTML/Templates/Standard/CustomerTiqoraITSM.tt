@@ -1,0 +1,39 @@
+# --
+# Copyright (C) 2026 Cygnus Networks GmbH, https://cygnusnetworks.de/
+# --
+# This software comes with ABSOLUTELY NO WARRANTY. For details, see
+# the enclosed LICENSE file (GPL-3.0-only).
+# --
+
+<div class="MainBox ARIARoleMain">
+    <div class="ContentColumn">
+        <h2>[% Translate("Konfigurationselemente") | html %]</h2>
+        <table class="DataTable TiqoraITSMCustomerCIs" summary="[% Translate("Konfigurationselemente") | html %]">
+            <thead>
+                <tr>
+                    <th>[% Translate("Nummer") | html %]</th>
+                    <th>[% Translate("Name") | html %]</th>
+                    <th>[% Translate("Klasse") | html %]</th>
+                    <th>[% Translate("Verwendungsstatus") | html %]</th>
+                    <th>[% Translate("Vorfallstatus") | html %]</th>
+                </tr>
+            </thead>
+            <tbody>
+                [% RenderBlockStart("CI") %]
+                <tr>
+                    <td>[% IF Data.URL %]<a href="[% Data.URL | html %]" target="_blank" rel="noopener noreferrer">[% Data.Number | html %]</a>[% ELSE %][% Data.Number | html %][% END %]</td>
+                    <td>[% Data.Name | html %]</td>
+                    <td>[% Data.ClassName | html %]</td>
+                    <td>[% Data.DeplState | html %]</td>
+                    <td>[% Data.InciState | html %]</td>
+                </tr>
+                [% RenderBlockEnd("CI") %]
+                [% RenderBlockStart("NoCIs") %]
+                <tr>
+                    <td colspan="5">[% Translate("Ihnen sind keine Konfigurationselemente zugeordnet.") | html %]</td>
+                </tr>
+                [% RenderBlockEnd("NoCIs") %]
+            </tbody>
+        </table>
+    </div>
+</div>

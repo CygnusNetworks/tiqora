@@ -200,6 +200,74 @@ sub CustomerCIs {
     return \@CIs;
 }
 
+=head2 ActionBlocked()
+
+C<1> when the Znuny CI screen C<Action> (and C<Subaction>) must be refused:
+the CMDB is read-only (see C<ReadOnly()>) and the screen is listed in
+C<TiqoraITSM::ReadOnly::Actions>. An entry is either an action name (the whole
+screen) or C<Action::Subaction> (one subaction, for screens that also have read
+subactions, such as the class definition admin screen).
+
+C<AgentLinkObject> is not listed in the setting: it serves tickets, services and
+CIs alike, so it is blocked by what it links (C<SourceObject>, C<TargetObject>
+or C<TargetIdentifier> starting with C<ITSMConfigItem>), because a link to a CI
+written in Znuny after the switch would not exist in Tiqora (drift).
+
+    my $Blocked = $TiqoraITSMObject->ActionBlocked(
+        Action        => 'AgentITSMConfigItemEdit',
+        Subaction     => '',                  # optional
+        LinkedObjects => [ 'Ticket', 'ITSMConfigItem::3' ],   # optional, AgentLinkObject only
+    );
+
+=cut
+
+sub ActionBlocked {
+    my ( $Self, %Param ) = @_;
+
+    my $Action = $Param{Action} // '';
+    return 0 if !length $Action;
+    return 0 if !$Self->ReadOnly();
+
+    if ( $Action eq 'AgentLinkObject' ) {
+        return ( grep { defined $_ && $_ =~ m{\AITSMConfigItem(?:::|\z)} } @{ $Param{LinkedObjects} // [] } ) ? 1 : 0;
+    }
+
+    my $Subaction = $Param{Subaction} // '';
+    my $List      = $Kernel::OM->Get('Kernel::Config')->Get('TiqoraITSM::ReadOnly::Actions');
+    return 0 if ref $List ne 'ARRAY';
+
+    for my $Entry ( @{$List} ) {
+        next if !defined $Entry || !length $Entry;
+        return 1 if $Entry eq $Action;
+        return 1 if length $Subaction && $Entry eq "${Action}::${Subaction}";
+    }
+
+    return 0;
+}
+
+=head2 CIReadable()
+
+C<1> when the agent may read the CI (read access to the group of the CI's class;
+members of the C<admin> group may read all), C<0> otherwise, also when the CI,
+the views or the database do not exist. Mirrors what C<TicketCIs()> shows.
+
+=cut
+
+sub CIReadable {
+    my ( $Self, %Param ) = @_;
+
+    return 0 if !$Param{CIID}   || $Param{CIID}   !~ m/^\d+$/;
+    return 0 if !$Param{UserID} || $Param{UserID} !~ m/^\d+$/;
+    return 0 if !$Self->Active() || !$Self->_ViewsPresent();
+
+    my $Rows = $Self->_CIRows( CIIDs => [ $Param{CIID} ] );
+    return 0 if !@{$Rows};
+
+    my $Groups = $Self->_ReadableGroups( UserID => $Param{UserID} );
+
+    return ( $Groups->{All} || $Groups->{ $Rows->[0]->{ClassGroupID} } ) ? 1 : 0;
+}
+
 =head2 CIURL()
 
 The address of a CI in Tiqora's agent interface:

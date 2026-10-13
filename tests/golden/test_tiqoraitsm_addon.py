@@ -13,7 +13,13 @@ is copied in with ``docker compose cp`` (what the OPM install does), the SysConf
   guesses from the Znuny ``configitem`` table);
 - missing views are quiet (empty, no error);
 - ``ReadOnly()`` follows ``itsm.znuny_readonly``; ``CustomerCIs()`` returns portal-visible classes
-  only, header fields only.
+  only, header fields only;
+- the read-only guard (``PreApplicationModule###TiqoraITSMReadOnly``) refuses the CI write screens
+  and ``AgentLinkObject`` towards CIs once the flag is set, and lets read screens through;
+- the customer page lists the customer's own CIs, company CIs (also through
+  ``customer_user_customer``) and nothing from a class that is not portal-visible;
+- the optional linking (``AgentTiqoraITSMLink``) posts cmdb's ``LinkIn`` body with the bearer key
+  to the recording sink, refuses without POST / challenge token / ticket ``rw`` / the setting.
 
 The golden DB may lack the CMDB tables or views: a module fixture creates what is absent and drops
 it again; otherwise it removes only its own rows. Run on both peers:
@@ -30,7 +36,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import znuny_console, znuny_copy_in, znuny_perl_eval
+from _helpers import (
+    gisink_clear,
+    gisink_requests,
+    gisink_respond,
+    znuny_console,
+    znuny_copy_in,
+    znuny_perl_eval,
+)
 from sqlalchemy import bindparam, create_engine, delete, inspect, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -44,6 +57,10 @@ FILES = (
     "Kernel/System/TiqoraITSM.pm",
     "Kernel/Output/HTML/TicketZoom/TiqoraITSM.pm",
     "Kernel/Output/HTML/Templates/Standard/AgentTicketZoom/TiqoraITSM.tt",
+    "Kernel/Modules/TiqoraITSMReadOnly.pm",
+    "Kernel/Modules/CustomerTiqoraITSM.pm",
+    "Kernel/Modules/AgentTiqoraITSMLink.pm",
+    "Kernel/Output/HTML/Templates/Standard/CustomerTiqoraITSM.tt",
     "Kernel/Language/de_TiqoraITSM.pm",
     "Kernel/Config/Files/XML/TiqoraITSM.xml",
 )
@@ -55,6 +72,12 @@ CUSTOMER_LOGIN = "itim56.kunde@example.org"
 TICKET_ID = 9_900_056  # no ticket row needed: the add-on only reads the link views
 BASE_URL = "https://tiqora.example.org"
 PREFIX = "itim56"  # class keys, CI numbers and catalog keys of this module
+COMPANY = "itim56-firma"  # primary CustomerID passed to CustomerCIs / the customer page
+COMPANY_MAPPED = "itim56-mapped"  # reached only through customer_user_customer
+SINK_URL = "http://gisink:8080"  # the golden recording sink, as the peer reaches it
+API_KEY = "itim56-test-key"
+CHALLENGE_TOKEN = "itim56-challenge-token"
+TICKET_TITLE = "itim56 TiqoraITSM linking"
 
 _PERL_HEAD = r"""
 use lib qw(/opt/otrs /opt/otrs/Kernel/cpan-lib /opt/otrs/Custom);
@@ -120,6 +143,138 @@ def _widget_output(ticket_id: int, user_login: str) -> str:
 
 def _addon_eval(code: str) -> str:
     return znuny_perl_eval(_EVAL.replace("__CODE__", code))
+
+
+_LAYOUT = r"""
+$Kernel::OM->ObjectParamAdd('Kernel::Output::HTML::Layout' => {
+    UserID => $UID, UserLogin => '__LOGIN__', Lang => 'de', UserChallengeToken => '__TOKEN__' });
+"""
+
+_PRERUN = (
+    _PERL_HEAD
+    + r"""
+use Kernel::Modules::TiqoraITSMReadOnly;
+binmode STDOUT, ':encoding(UTF-8)';
+my $UID = $Kernel::OM->Get('Kernel::System::User')->UserLookup(UserLogin => '__LOGIN__');
+"""
+    + _LAYOUT
+    + r"""
+$Kernel::OM->Get('Kernel::Output::HTML::Layout');
+my $Guard = Kernel::Modules::TiqoraITSMReadOnly->new(
+    UserID => $UID, Action => '__ACTION__', __EXTRA__);
+print( $Guard->PreRun() // '' );
+"""
+)
+
+_CUSTOMER_PAGE = (
+    _PERL_HEAD
+    + r"""
+use Kernel::Modules::CustomerTiqoraITSM;
+binmode STDOUT, ':encoding(UTF-8)';
+$Kernel::OM->ObjectParamAdd('Kernel::Output::HTML::Layout' => {Lang => 'de'});
+$Kernel::OM->Get('Kernel::Output::HTML::Layout');
+my $Page = Kernel::Modules::CustomerTiqoraITSM->new(
+    UserLogin => '__LOGIN__', UserCustomerID => '__COMPANY__');
+print $Page->Content();
+"""
+)
+
+_LINK = (
+    _PERL_HEAD
+    + r"""
+use CGI;
+use Kernel::Modules::AgentTiqoraITSMLink;
+binmode STDOUT, ':encoding(UTF-8)';
+local $ENV{REQUEST_METHOD} = '__METHOD__';
+my $Config = $Kernel::OM->Get('Kernel::Config');
+$Config->Set(Key => 'TiqoraITSM::Linking::Enabled', Value => __ENABLED__);
+$Config->Set(Key => 'TiqoraITSM::APIKey', Value => '__KEY__');
+$Config->Set(Key => 'TiqoraITSM::BaseURL', Value => '__BASEURL__');
+my $UID = $Kernel::OM->Get('Kernel::System::User')->UserLookup(UserLogin => '__LOGIN__');
+$Kernel::OM->ObjectParamAdd(
+    'Kernel::System::Web::Request' => {WebRequest => CGI->new('__QUERY__')});
+"""
+    + _LAYOUT
+    + r"""
+$Kernel::OM->Get('Kernel::Output::HTML::Layout');
+my $Module = Kernel::Modules::AgentTiqoraITSMLink->new(
+    UserID => $UID, Action => 'AgentTiqoraITSMLink');
+print $Module->Run();
+"""
+)
+
+_TICKET = (
+    _PERL_HEAD
+    + r"""
+my $T = $Kernel::OM->Get('Kernel::System::Ticket');
+my $Action = '__ACTION__';
+if ($Action eq 'create') {
+    my $ID = $T->TicketCreate(
+        Title => '__TITLE__', Queue => 'Raw', Lock => 'unlock', Priority => '3 normal',
+        State => 'new', OwnerID => 1, UserID => 1,
+    ) or die 'TicketCreate failed';
+    print $ID;
+}
+else {
+    my @IDs = $T->TicketSearch(Result => 'ARRAY', Title => '__TITLE__', UserID => 1,
+        Limit => 50, ContentSearch => 'OR', StateType => ['new','open','closed','removed',
+        'pending reminder','pending auto']);
+    $T->TicketDelete(TicketID => $_, UserID => 1) for @IDs;
+    print scalar @IDs;
+}
+"""
+)
+
+
+def _prerun(
+    action: str, user_login: str = "root@localhost", subaction: str | None = None, **extra: str
+) -> str:
+    parts = []
+    if subaction is not None:
+        parts.append(f"Subaction => '{subaction}'")
+    parts += [f"{k} => '{v}'" for k, v in extra.items()]
+    code = (
+        _PRERUN.replace("__LOGIN__", user_login)
+        .replace("__TOKEN__", CHALLENGE_TOKEN)
+        .replace("__ACTION__", action)
+        .replace("__EXTRA__", ", ".join(parts))
+    )
+    return znuny_perl_eval(code)
+
+
+def _customer_page(customer_login: str, company: str = COMPANY) -> str:
+    return znuny_perl_eval(
+        _CUSTOMER_PAGE.replace("__LOGIN__", customer_login).replace("__COMPANY__", company)
+    )
+
+
+def _link_call(
+    ticket_id: int,
+    ci_id: int,
+    *,
+    user_login: str = "root@localhost",
+    method: str = "POST",
+    enabled: bool = True,
+    token: str | None = CHALLENGE_TOKEN,
+    key: str = API_KEY,
+    base_url: str = SINK_URL,
+    link_type: str | None = None,
+) -> str:
+    query = f"TicketID={ticket_id};CIID={ci_id}"
+    if link_type is not None:
+        query += f";LinkType={link_type}"
+    if token is not None:
+        query += f";ChallengeToken={token}"
+    code = (
+        _LINK.replace("__METHOD__", method)
+        .replace("__ENABLED__", "1" if enabled else "0")
+        .replace("__KEY__", key)
+        .replace("__BASEURL__", base_url)
+        .replace("__LOGIN__", user_login)
+        .replace("__TOKEN__", CHALLENGE_TOKEN)
+        .replace("__QUERY__", query)
+    )
+    return znuny_perl_eval(code)
 
 
 class _Seed:
@@ -227,6 +382,8 @@ def _seed_rows(engine: Engine, ids: dict[str, int]) -> None:
             ("open", "open", "itim56 Switch Etage 3", "inci-ok"),
             ("secret", "geheim", "itim56 Geheimer Server", "inci-warn"),
             ("html", "open", "itim56 <b>Patchfeld</b>", "inci-ok"),
+            ("printer", "open", "itim56 Drucker 2. OG", "inci-ok"),
+            ("mapped", "open", "itim56 Router Keller", "inci-ok"),
         ):
             ci = TiqoraCmdbCi(
                 number=f"{PREFIX}-{key}",
@@ -255,13 +412,20 @@ def _seed_rows(engine: Engine, ids: dict[str, int]) -> None:
                     created_at=now,
                 )
             )
-        for key in ("open", "secret"):  # the customer is linked to a portal and a non-portal CI
+        # the customer user is linked to a portal and a non-portal CI, their company to a printer
+        # and the company reachable only through customer_user_customer to a router
+        for key, kind, target in (
+            ("open", "customer_user", CUSTOMER_LOGIN),
+            ("secret", "customer_user", CUSTOMER_LOGIN),
+            ("printer", "customer_company", COMPANY),
+            ("mapped", "customer_company", COMPANY_MAPPED),
+        ):
             session.add(
                 TiqoraItsmLink(
                     source_kind="ci",
                     source_key=str(cis[key].id),
-                    target_kind="customer_user",
-                    target_key=CUSTOMER_LOGIN,
+                    target_kind=kind,
+                    target_key=target,
                     link_type="RelevantTo",
                     created_by=1,
                     created_at=now,
@@ -336,10 +500,19 @@ def addon_base(_engine: Engine) -> Generator[dict[str, int], None, None]:
         peer = json.loads(znuny_perl_eval(_USERS))
         ids.update({"users": peer["users"], "secret": peer["secret"], "agent": peer["uid"]})
         _unseed_rows(_engine)  # leftovers of an aborted run
+        znuny_perl_eval(_TICKET.replace("__ACTION__", "delete").replace("__TITLE__", TICKET_TITLE))
+        ids["ticket"] = int(
+            znuny_perl_eval(
+                _TICKET.replace("__ACTION__", "create").replace("__TITLE__", TICKET_TITLE)
+            )
+        )
+        _map_customer(_engine, present=True)
         _seed_rows(_engine, ids)
         yield ids
     finally:
         _unseed_rows(_engine)
+        _map_customer(_engine, present=False)
+        znuny_perl_eval(_TICKET.replace("__ACTION__", "delete").replace("__TITLE__", TICKET_TITLE))
         with _engine.begin() as conn:
             for key in SETTING_KEYS:
                 conn.execute(text("DELETE FROM tiqora_settings WHERE `key` = :k"), {"k": key})
@@ -401,6 +574,24 @@ def addon_without_views(addon: dict[str, int], _engine: Engine) -> Generator[Non
     finally:
         with _engine.begin() as conn:
             assert create_cmdb_views(conn)
+
+
+def _map_customer(engine: Engine, *, present: bool) -> None:
+    """The customer_user_customer row that maps the customer user to COMPANY_MAPPED."""
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM customer_user_customer WHERE user_id = :u AND customer_id = :c"),
+            {"u": CUSTOMER_LOGIN, "c": COMPANY_MAPPED},
+        )
+        if present:
+            conn.execute(
+                text(
+                    "INSERT INTO customer_user_customer"
+                    " (user_id, customer_id, create_time, create_by, change_time, change_by)"
+                    " VALUES (:u, :c, '2026-10-13 08:00:00', 1, '2026-10-13 08:00:00', 1)"
+                ),
+                {"u": CUSTOMER_LOGIN, "c": COMPANY_MAPPED},
+            )
 
 
 def _set_setting(engine: Engine, key: str, value: str) -> None:
@@ -515,10 +706,214 @@ def test_customer_cis_only_portal_visible_classes(addon: dict[str, int]) -> None
     out = _addon_eval(
         "use JSON::PP; "
         f"my $CIs = $Add->CustomerCIs(CustomerUserID => '{CUSTOMER_LOGIN}', "
-        "CustomerID => 'itim56-none'); "
+        f"CustomerID => '{COMPANY}'); "
         "print JSON::PP->new->canonical->encode($CIs);"
     )
-    cis = json.loads(out)
-    assert [c["Number"] for c in cis] == [f"{PREFIX}-open"]  # the secret CI's class is not visible
-    assert cis[0]["URL"] == f"{BASE_URL}/portal/config-items/{addon['ci_open']}"
-    assert "Attributes" not in cis[0]
+    cis = {c["Number"]: c for c in json.loads(out)}
+    # user link (open), company link (printer), customer_user_customer mapping (mapped);
+    # the secret CI's class is not portal-visible
+    assert sorted(cis) == [f"{PREFIX}-mapped", f"{PREFIX}-open", f"{PREFIX}-printer"]
+    assert cis[f"{PREFIX}-open"]["URL"] == f"{BASE_URL}/portal/config-items/{addon['ci_open']}"
+    assert all("Attributes" not in ci for ci in cis.values())
+
+
+def test_readonly_blocks_ci_edit_screen(addon: dict[str, int], _engine: Engine) -> None:
+    _set_setting(_engine, "itsm.znuny_readonly", "1")
+    for action in (
+        "AgentITSMConfigItemAdd",
+        "AgentITSMConfigItemEdit",
+        "AgentITSMConfigItemDelete",
+        "AgentITSMConfigItemBulk",
+    ):
+        out = _prerun(action)
+        assert "Die CMDB wird jetzt in Tiqora gepflegt" in out, action
+        assert BASE_URL in out  # the comment points to Tiqora
+
+
+def test_readonly_blocks_class_definition_editor_only(
+    addon: dict[str, int], _engine: Engine
+) -> None:
+    _set_setting(_engine, "itsm.znuny_readonly", "1")
+    assert "Die CMDB wird jetzt in Tiqora gepflegt" in _prerun(
+        "AdminITSMConfigItem", subaction="DefinitionChange"
+    )
+    assert "Die CMDB wird jetzt in Tiqora gepflegt" in _prerun(
+        "AdminITSMConfigItem", subaction="DefinitionSave"
+    )
+    assert _prerun("AdminITSMConfigItem", subaction="DefinitionList") == ""
+    assert _prerun("AdminITSMConfigItem", subaction="DefinitionView") == ""
+
+
+def test_readonly_lets_zoom_through(addon: dict[str, int], _engine: Engine) -> None:
+    _set_setting(_engine, "itsm.znuny_readonly", "1")
+    for action in (
+        "AgentITSMConfigItemZoom",
+        "AgentITSMConfigItemSearch",
+        "AgentITSMConfigItemHistory",
+        "AgentITSMConfigItemPrint",
+        "AgentITSMConfigItemAttachment",
+        "AgentITSMConfigItem",
+        "AgentTicketZoom",
+    ):
+        assert _prerun(action) == "", action
+
+
+def test_readonly_off_lets_edit_through(addon: dict[str, int], _engine: Engine) -> None:
+    _set_setting(_engine, "itsm.znuny_readonly", "0")
+    assert _prerun("AgentITSMConfigItemEdit") == ""
+
+
+def test_readonly_force_setting_blocks_without_flag(addon: dict[str, int]) -> None:
+    forced = (
+        _PRERUN.replace("__LOGIN__", "root@localhost")
+        .replace("__TOKEN__", CHALLENGE_TOKEN)
+        .replace("__ACTION__", "AgentITSMConfigItemEdit")
+        .replace("__EXTRA__", "")
+        .replace(
+            "my $Guard =",
+            "$Kernel::OM->Get('Kernel::Config')->Set("
+            "Key => 'TiqoraITSM::ReadOnly::Force', Value => 1); my $Guard =",
+        )
+    )
+    assert "Die CMDB wird jetzt in Tiqora gepflegt" in znuny_perl_eval(forced)
+
+
+def test_readonly_blocks_linking_to_cis_only(addon: dict[str, int], _engine: Engine) -> None:
+    """AgentLinkObject serves tickets, services and CIs; only CI ends are refused."""
+    _set_setting(_engine, "itsm.znuny_readonly", "1")
+    blocked = "Die CMDB wird jetzt in Tiqora gepflegt"
+    assert blocked in _prerun(
+        "AgentLinkObject", SourceObject="Ticket", TargetIdentifier="ITSMConfigItem::3"
+    )
+    assert blocked in _prerun(
+        "AgentLinkObject", SourceObject="ITSMConfigItem", TargetIdentifier="Ticket"
+    )
+    assert _prerun("AgentLinkObject", SourceObject="Ticket", TargetIdentifier="Ticket") == ""
+    assert _prerun("AgentLinkObject", SourceObject="Ticket", TargetIdentifier="Service") == ""
+
+
+def test_customer_page_lists_own_and_company_cis(addon: dict[str, int]) -> None:
+    out = _customer_page(CUSTOMER_LOGIN)
+    assert "itim56 Switch Etage 3" in out  # user link
+    assert "itim56 Drucker 2. OG" in out  # company link (primary CustomerID)
+    assert "itim56 Router Keller" in out  # company link through customer_user_customer
+    assert "itim56 Geheimer Server" not in out  # class not portal-visible
+    assert f'href="{BASE_URL}/portal/config-items/{addon["ci_open"]}"' in out
+
+
+def test_customer_page_escapes_and_is_empty_for_strangers(addon: dict[str, int]) -> None:
+    out = _customer_page("fremd@example.org", company="itim56-fremd")
+    assert "itim56 Switch Etage 3" not in out
+    assert "Ihnen sind keine Konfigurationselemente zugeordnet." in out
+
+
+def test_customer_page_inactive_in_mode_a(addon: dict[str, int], _engine: Engine) -> None:
+    _set_setting(_engine, "itsm.mode", "znuny_readthrough")
+    assert "itim56 Switch Etage 3" not in _customer_page(CUSTOMER_LOGIN)
+
+
+def test_link_module_refuses_when_disabled(addon: dict[str, int]) -> None:
+    gisink_clear()
+    out = _link_call(addon["ticket"], addon["ci_open"], enabled=False)
+    assert '"Success":0' in out
+    assert gisink_requests() == []
+
+
+def test_link_module_refuses_get(addon: dict[str, int]) -> None:
+    gisink_clear()
+    out = _link_call(addon["ticket"], addon["ci_open"], method="GET")
+    assert '"Success":0' in out
+    assert gisink_requests() == []
+
+
+def test_link_module_refuses_missing_challenge_token(addon: dict[str, int]) -> None:
+    """A state-changing AJAX action checks the challenge token itself (finding F20)."""
+    gisink_clear()
+    try:
+        out = _link_call(addon["ticket"], addon["ci_open"], token=None)
+    except RuntimeError as exc:  # FatalError may die while rendering in the bare test layout
+        out = str(exc)
+    assert "challenge" in out.lower()  # Znuny's own refusal page, not our JSON
+    assert '"Success"' not in out
+    assert gisink_requests() == []
+
+
+def test_link_module_refuses_agent_without_ticket_rw(addon: dict[str, int]) -> None:
+    gisink_clear()
+    out = _link_call(addon["ticket"], addon["ci_open"], user_login=AGENT_LOGIN)
+    assert '"Success":0' in out
+    assert gisink_requests() == []
+
+
+def test_link_module_refuses_bad_ids(addon: dict[str, int]) -> None:
+    gisink_clear()
+    out = _link_call(addon["ticket"], "1 OR 1=1")  # type: ignore[arg-type]
+    assert '"Success":0' in out
+    assert gisink_requests() == []
+
+
+def test_link_module_posts_with_bearer_key(addon: dict[str, int]) -> None:
+    gisink_clear()
+    out = _link_call(addon["ticket"], addon["ci_open"])
+    assert '"Success":1' in out
+    assert API_KEY not in out
+    req = gisink_requests()[-1]
+    assert req["method"] == "POST"
+    assert req["path"] == "/api/v1/cmdb/links"
+    assert req["headers"]["Authorization"] == f"Bearer {API_KEY}"
+    assert req["headers"]["Content-Type"].startswith("application/json")
+    # cmdb's LinkIn, no note (cmdb F5)
+    assert json.loads(req["body"]) == {
+        "source_kind": "ci",
+        "source_key": str(addon["ci_open"]),
+        "target_kind": "ticket",
+        "target_key": str(addon["ticket"]),
+        "link_type": "RelevantTo",
+    }
+
+
+def test_link_module_unreachable_tiqora_does_not_leak_key(addon: dict[str, int]) -> None:
+    out = _link_call(addon["ticket"], addon["ci_open"], base_url="http://127.0.0.1:9")
+    assert '"Success":0' in out
+    assert API_KEY not in out
+
+
+def test_link_module_refuses_ci_of_foreign_class(addon: dict[str, int]) -> None:
+    """root is admin and may link anything; a CI the agent cannot read is refused first."""
+    gisink_clear()
+    gisink_respond('{"id": 1}')
+    ok = _link_call(addon["ticket"], addon["ci_secret"])  # admin reads every class
+    assert '"Success":1' in ok
+    gisink_clear()
+    out = _link_call(addon["ticket"], 987654321)  # unknown CI
+    assert '"Success":0' in out
+    assert gisink_requests() == []
+
+
+def _widget_with_linking(ticket_id: int, user_login: str, *, key: str = API_KEY) -> str:
+    code = (
+        _WIDGET.replace("__LOGIN__", user_login)
+        .replace("__TICKET__", str(ticket_id))
+        .replace(
+            "my $UID =",
+            "my $C = $Kernel::OM->Get('Kernel::Config'); "
+            "$C->Set(Key => 'TiqoraITSM::Linking::Enabled', Value => 1); "
+            f"$C->Set(Key => 'TiqoraITSM::APIKey', Value => '{key}'); my $UID =",
+            1,
+        )
+    )
+    return znuny_perl_eval(code)
+
+
+def test_widget_offers_link_form_with_rw_on_the_ticket(addon: dict[str, int]) -> None:
+    # a ticket without linked CIs still shows the widget when the agent may link
+    out = _widget_with_linking(addon["ticket"], "root@localhost")
+    assert 'id="TiqoraITSMLinkForm"' in out
+    assert f'name="TicketID" value="{addon["ticket"]}"' in out
+    assert API_KEY not in out
+    # no rw on the ticket (agent has ro only) -> nothing
+    assert _widget_with_linking(addon["ticket"], AGENT_LOGIN) == ""
+    # no key -> nothing
+    assert _widget_with_linking(addon["ticket"], "root@localhost", key="") == ""
+    # linking off (default): no form
+    assert "TiqoraITSMLinkForm" not in _widget_output(addon["ticket"], "root@localhost")

@@ -5,7 +5,9 @@ CMDB) moved from Znuny's ITSM packages to Tiqora ("Mode B", see
 [`docs/itsm.md`](../../../../docs/itsm.md)). It shows the configuration items
 (CIs) that Tiqora links to a ticket in a sidebar widget of the agent ticket
 zoom: **Betroffene CIs (Tiqora)**, with deployment and incident state and a
-link into Tiqora.
+link into Tiqora. It also refuses Znuny's own CI-changing screens once the CMDB
+moved, can list a customer's CIs in the customer interface and can link a
+ticket to a CI of Tiqora.
 
 **Supported peer frameworks (SOPM):** `6.0.x` … `6.5.x` and `7.0.x` … `7.3.x`.
 
@@ -15,6 +17,13 @@ link into Tiqora.
 - `Kernel/Output/HTML/TicketZoom/TiqoraITSM.pm` and
   `Kernel/Output/HTML/Templates/Standard/AgentTicketZoom/TiqoraITSM.tt` — the
   sidebar widget.
+- `Kernel/Modules/TiqoraITSMReadOnly.pm` — the PreApplication guard for the CI
+  screens (SysConfig `PreApplicationModule###TiqoraITSMReadOnly`, valid).
+- `Kernel/Modules/CustomerTiqoraITSM.pm` and
+  `Kernel/Output/HTML/Templates/Standard/CustomerTiqoraITSM.tt` — the customer
+  page (registered **disabled**).
+- `Kernel/Modules/AgentTiqoraITSMLink.pm` — the optional linking action
+  (registered valid, does nothing until `TiqoraITSM::Linking::Enabled`).
 - `Kernel/Language/de_TiqoraITSM.pm` — German texts.
 - `Kernel/Config/Files/XML/TiqoraITSM.xml` — SysConfig settings
   `TiqoraITSM::*` and the widget registration
@@ -26,7 +35,9 @@ Only these, always with bound parameters:
 
 - the views `tiqora_v1_itsm_ci` and `tiqora_v1_itsm_ci_links` (created by
   Tiqora's migration; the database user of Znuny needs `SELECT` on them);
-- the `tiqora_settings` rows `itsm.mode` and `itsm.znuny_readonly`.
+- the `tiqora_settings` rows `itsm.mode` and `itsm.znuny_readonly`;
+- the Znuny tables `customer_user_customer` (the customer page) and the Znuny
+  permission tables (through Znuny's own APIs).
 
 The widget is **inactive** unless `itsm.mode` is `tiqora`. A missing row, a
 missing view or any database error means: nothing is shown, nothing is logged
@@ -34,11 +45,69 @@ above `debug`. A CI is shown to an agent only if the agent has `ro` (or `rw`)
 permission on the group of the CI's class in Znuny; members of the `admin`
 group see all linked CIs.
 
+## Read-only guard for Znuny's CI screens
+
+Once the switch to Tiqora ran, Tiqora sets `itsm.znuny_readonly` to `1` (or you
+turn on `TiqoraITSM::ReadOnly::Force`). From then on the PreApplication module
+answers the screens in `TiqoraITSM::ReadOnly::Actions` with the page "Die CMDB
+wird jetzt in Tiqora gepflegt." and a pointer to `TiqoraITSM::BaseURL`. Nothing
+is written. The default list was taken from the `Frontend::Module###...`
+registrations of ITSMConfigurationManagement 6.5 and 7.3:
+
+| Entry | Why |
+|-------|-----|
+| `AgentITSMConfigItemAdd` | creates a CI |
+| `AgentITSMConfigItemEdit` | new version, attachments, links of a CI |
+| `AgentITSMConfigItemDelete` | deletes CIs |
+| `AgentITSMConfigItemBulk` | changes states of many CIs |
+| `AdminITSMConfigItem::DefinitionChange`, `AdminITSMConfigItem::DefinitionSave` | class definition editor (the list and the view stay open) |
+
+Not listed, so still usable: `AgentITSMConfigItem` (overview),
+`AgentITSMConfigItemZoom`, `AgentITSMConfigItemSearch`,
+`AgentITSMConfigItemHistory`, `AgentITSMConfigItemPrint`,
+`AgentITSMConfigItemAttachment` (download only),
+`AgentITSMConfigItemCustomerCIsWidget`, `AJAXDynamicFieldConfigItem`.
+`AgentLinkObject` is not in the setting: the module refuses it when the source,
+the target or the target identifier is an `ITSMConfigItem`, and lets ticket,
+service and other links through. Note: `AdminImportExport` is not blocked (it
+also serves other object types); do not import CIs in Znuny after the switch.
+An entry is an action name or `Action::Subaction`.
+
+## Customer page (optional)
+
+`CustomerFrontend::Module###CustomerTiqoraITSM` and
+`CustomerFrontend::Navigation###CustomerTiqoraITSM###002-TiqoraITSM` are both
+registered with `Valid="0"`. Enable both in the System Configuration to give
+customers a page "Konfigurationselemente". It lists, by the customer user, by
+the customer's company (`CustomerID`) and by the `customer_user_customer`
+mappings, the CIs whose class is visible in Tiqora's customer portal
+(`class_portal_visible`). It shows header fields only (number, name, class,
+deployment and incident state), no attributes; the number links to
+`TiqoraITSM::CustomerCIPath` in Tiqora. Nothing is shown unless Tiqora holds the
+data.
+
+## Linking tickets to CIs (optional)
+
+With `TiqoraITSM::Linking::Enabled` on and `TiqoraITSM::APIKey` set, the ticket
+zoom widget gets a small form (CI id + button) for agents with `rw` on the
+ticket. The action `AgentTiqoraITSMLink`:
+
+- accepts `POST` only and checks the Znuny challenge token first;
+- needs `rw` on the ticket and read access to the group of the CI's class;
+- sends `POST <BaseURL>/api/v1/cmdb/links` with `Authorization: Bearer <key>`
+  and the body `{"source_kind": "ci", "source_key": "<ci id>", "target_kind":
+  "ticket", "target_key": "<ticket id>", "link_type": "RelevantTo"}`;
+- never logs, outputs or stores the key, and answers `{Success, Message}`.
+
+Tiqora checks the key user's rights again (`rw` on the ticket, `ro` on the CI);
+the add-on does not weaken that. The Znuny agent is not sent to Tiqora; Tiqora's
+history shows the key user.
+
 ## What the package never does
 
 **Write to the database.** It creates no table, changes no row and runs no
-DDL. Linking and the read-only guard of Znuny's own CI screens are separate
-parts of this package family and use Tiqora's HTTP API, not SQL.
+DDL. The only thing it sends to Tiqora is the optional link request above,
+through Tiqora's HTTP API.
 
 ## Settings
 
@@ -48,7 +117,8 @@ parts of this package family and use Tiqora's HTTP API, not SQL.
 | `TiqoraITSM::AgentCIPath` | `/agent/cmdb/` | Path of a CI in Tiqora; the CI id is appended |
 | `TiqoraITSM::CustomerCIPath` | `/portal/config-items/` | Path of a CI in the customer portal |
 | `TiqoraITSM::ReadOnly::Force` | `0` | Treat the CMDB as read-only even without Tiqora's flag |
-| `TiqoraITSM::ReadOnly::Actions` | empty | Actions refused while read-only |
+| `TiqoraITSM::ReadOnly::Actions` | the list above | Actions (or `Action::Subaction`) refused while read-only |
+| `PreApplicationModule###TiqoraITSMReadOnly` | valid | The guard itself |
 | `TiqoraITSM::Linking::Enabled` | `0` | Allow linking tickets to CIs from the zoom |
 | `TiqoraITSM::APIKey` | empty | API key of a dedicated Tiqora user (area `cmdb:rw` only) |
 

@@ -5,7 +5,10 @@ Home for the optional OPM (Perl) packages that run inside Znuny next to Tiqora:
 - **TiqoraSync** invalidates Znuny ticket caches when Tiqora writes to the shared
   database (and deploys processes and ACLs for Tiqora).
 - **TiqoraITSM** shows the CIs of Tiqora's CMDB in the Znuny agent ticket zoom once
-  the ITSM data moved to Tiqora (Mode B). It only reads.
+  the ITSM data moved to Tiqora (Mode B), refuses Znuny's own CI-changing screens
+  once Tiqora holds the CMDB, offers an optional customer page with the customer's
+  CIs and an optional "link ticket to CI" action (through Tiqora's API). It never
+  writes to the database.
 
 **Status:** implemented, see [`TiqoraSync/`](TiqoraSync/) for the package
 source, module, and SysConfig registration, and

@@ -59,7 +59,9 @@ sub _Render {
         TicketID => $TicketID,
         UserID   => $Self->{UserID},
     );
-    return if !@{ $CIs // [] };
+
+    my $CanLink = $Self->_CanLink( TicketID => $TicketID );
+    return if !@{ $CIs // [] } && !$CanLink;
 
     my $LayoutObject = $Kernel::OM->Get('Kernel::Output::HTML::Layout');
 
@@ -80,10 +82,35 @@ sub _Render {
         );
     }
 
+    if ($CanLink) {
+        $LayoutObject->Block(
+            Name => 'Link',
+            Data => { TicketID => $TicketID },
+        );
+    }
+
     return $LayoutObject->Output(
         TemplateFile => 'AgentTicketZoom/TiqoraITSM',
         Data         => {},
     );
+}
+
+# True when the "link a CI" control is offered: linking is switched on, the add-on is active, an
+# API key is set and the agent has rw on the ticket (the module checks everything again).
+sub _CanLink {
+    my ( $Self, %Param ) = @_;
+
+    my $ConfigObject = $Kernel::OM->Get('Kernel::Config');
+    return 0 if !$ConfigObject->Get('TiqoraITSM::Linking::Enabled');
+    return 0 if !length( $ConfigObject->Get('TiqoraITSM::APIKey') // '' );
+    return 0 if !$Kernel::OM->Get('Kernel::System::TiqoraITSM')->Active();
+
+    return $Kernel::OM->Get('Kernel::System::Ticket')->TicketPermission(
+        Type     => 'rw',
+        TicketID => $Param{TicketID},
+        UserID   => $Self->{UserID},
+        LogNo    => 1,
+    ) ? 1 : 0;
 }
 
 1;
