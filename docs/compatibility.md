@@ -551,6 +551,26 @@ matches (Znuny). `Class` is required (one class per call); the agent needs `ro` 
 | `PreviousVersionSearch` | `Name` is matched against every version (hot and archived). Combined with `CIXMLData` the attributes are matched on the current version only (logged as `gi_previous_version_search_unsupported`) |
 | Bounds (Tiqora-only, a GI call cannot become a job) | Tiqora mode loads at most 10 000 candidates before sorting. Mode A: at most **1 000** ids (the first 1 000 matches in id order are sorted and limited) and a 30 s budget (also as database statement time); running out answers `ConfigItemSearch.Timeout` ("the search took too long"), nothing partial |
 
+### ConfigItemCreate / ConfigItemUpdate
+
+`ConfigItemCreate` and `ConfigItemUpdate` (ITSMConfigurationManagement 6.5.4 and 7.3.5, identical but for
+whitespace) write to the Tiqora CMDB in ITSM mode `tiqora`; Mode A answers `<Op>.NotAvailable`
+("Die CMDB wird in Znuny geführt (Modus A)"), mode `off` `Operation.NotImplemented`. Check order, codes
+and texts follow the Perl `Run()`: parameters, header (`Class`, `Name`, `DeplState`, `InciState`), `CIXMLData`
+against the class' current definition, `rw` on the class' group (Znuny:
+`GenericInterface::Operation::<Op>###Permission`), attachments. The answer is `{"ConfigItemID", "Number"}`
+for both operations (Znuny gives no version id).
+
+| Topic | Behaviour |
+|-------|-----------|
+| `Number` (create) | Ignored: the number comes from the class' own generator, the answer carries it |
+| `CIXMLData` (update) | Merged over the current data at top level (a key you send replaces the whole entry); `ReplaceExistingData: 1` takes it as given and replaces the attachments instead of adding to them (attachments an older version still references stay) |
+| Unchanged update | No new version; the answer is the normal success answer (Znuny's `VersionAdd` returns the current version id) |
+| `Class` (update) | Must be the class of the item (Znuny does not check and would write a version with a foreign definition) |
+| Keys outside the definition | Dropped (Znuny stores them in XML) |
+| `Attachment` | One hash or a list; `Content` is base64, at most **50 MB** decoded per file (`InvalidParameter`), `ContentType` kept; every file is checked before anything is written, a write error rolls the whole call back |
+| Permission on update | Decided by the class of the item; a caller without any `rw` class learns nothing about ids |
+
 ### TicketCreate / TicketUpdate
 
 `ArticleSend: 1` (agents, TicketCreate and TicketUpdate) stores the article like an agent reply (signature, threading headers, `EmailSecurity` — see [crypto.md](crypto.md)) and sends it from the worker, like Znuny's `MailQueue`: each mail of the request (every `ArticleSend` article and every auto response) is one background job (kind `gi_mail`) committed together with the ticket and articles, and the request answers without waiting for SMTP. The worker rebuilds the mail from the stored article (a signed or encrypted mail is sent from its stored bytes, unchanged). The `worker` process must run for these mails. Delivery follows `Kernel/System/MailQueue.pm` with its default settings:

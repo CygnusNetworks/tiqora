@@ -3,8 +3,14 @@
 Port of ``Kernel/GenericInterface/Operation/ConfigItem/*.pm`` of ITSMConfigurationManagement 6.5.4
 and 7.3.5 (the two versions are identical for ``ConfigItemGet``; notes with file and line
 references in ``backend/tests/fixtures/itsm/gi_shapes.md``). This module is the common layer
-(mode gate, authentication, class-group permission, ``GiLookups``) plus ``ConfigItemGet``; the
-other four operations answer ``Operation.NotImplemented`` until Tasks 22-24.
+(mode gate, authentication, class-group permission, ``GiLookups``) plus ``ConfigItemGet``,
+``ConfigItemSearch``, ``ConfigItemCreate`` and ``ConfigItemUpdate``; ``ConfigItemDelete`` answers
+``Operation.NotImplemented`` until Task 24.
+
+``ConfigItemCreate`` / ``ConfigItemUpdate`` (Task 23) write through cmdb's own ``CiService``
+(numbering, history, class-group check, index and incident propagation are its job) and
+``AttachmentService``, not through the importer's ``CmdbWritePort``: that port keeps Znuny
+numbers and timestamps and has no create/attachment calls for live writes.
 
 Modes (open question 4): ``tiqora`` serves the Tiqora CMDB, ``znuny_readthrough`` (Mode A) serves
 reads from Znuny's own tables through the importer facade and refuses writes with
@@ -15,19 +21,30 @@ authentication, so an anonymous caller does not learn it.
 from __future__ import annotations
 
 import base64
+import binascii
+import codecs
+import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, Final, Literal
 
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.article_input import gi_error as _err
 from tiqora.api.compat.operations import _auth_from_params, _reprefix_auth_error
+from tiqora.cmdb.access import load_access
+from tiqora.cmdb.attachments import AttachmentInUse, AttachmentService
 from tiqora.cmdb.catalog import CatalogService
+from tiqora.cmdb.classes import ClassService
+from tiqora.cmdb.definition import dump_definition_json
+from tiqora.cmdb.errors import CmdbError, CmdbForbidden, CmdbNotFound
 from tiqora.cmdb.seed import DEPLOYMENT_STATE, INCIDENT_STATE
+from tiqora.cmdb.service import CiService, InvalidValues
 from tiqora.config import Settings
+from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.domain.auth import SessionStore
 from tiqora.itsm.importer import facades, gi_search
 from tiqora.itsm.importer.gi_search import GiCriteria, GiRow, GiSearchError
@@ -36,12 +53,13 @@ from tiqora.itsm.znuny_format.definition import to_znuny_definition
 from tiqora.itsm.znuny_format.gi_cixml import (
     CixmlError,
     GiLookups,
+    cixml_to_xmldata,
     clean_cixml,
     guard_cixml,
     parse_gi_datetime,
     xmldata_to_cixml,
 )
-from tiqora.itsm.znuny_format.xmldata import attributes_to_xmldata
+from tiqora.itsm.znuny_format.xmldata import attributes_to_xmldata, xmldata_to_attributes
 from tiqora.util.perl import perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -61,6 +79,11 @@ _WRITE_OPS: Final = frozenset({"ConfigItemCreate", "ConfigItemUpdate", "ConfigIt
 #: ``ConfigItemGet`` takes a list of ids; Znuny has no limit, a request cannot grow without one
 MAX_GET_IDS: Final = 500
 _MAX_ID_DIGITS: Final = 18
+#: one attachment of ``ConfigItemCreate`` / ``ConfigItemUpdate`` (Znuny has no limit; the whole
+#: request is bounded by the global body limit, this keeps a single file inside the CMDB's budget)
+MAX_ATTACHMENT_BYTES: Final = 50 * 1024 * 1024
+_CUSTOMER_PROBE_MAX: Final = 1000
+_CUSTOMER_PROBE_LEN: Final = 250
 
 
 # --------------------------------------------------------------------------- common layer
@@ -158,16 +181,72 @@ def _catalog_classes(definition: Sequence[Mapping[str, Any]]) -> set[str]:
     return found
 
 
+def _has_input_type(definition: Sequence[Mapping[str, Any]], kinds: frozenset[str]) -> bool:
+    for item in definition:
+        inp = item.get("Input")
+        if isinstance(inp, Mapping) and inp.get("Type") in kinds:
+            return True
+        sub = item.get("Sub")
+        if isinstance(sub, list) and _has_input_type(sub, kinds):
+            return True
+    return False
+
+
+def _string_leaves(node: Any, out: set[str]) -> None:
+    """Short string values of ``CIXMLData`` (bounded; the caller already guarded its size)."""
+    stack = [node]
+    while stack and len(out) < _CUSTOMER_PROBE_MAX:
+        cur = stack.pop()
+        if isinstance(cur, Mapping):
+            stack.extend(cur.values())
+        elif isinstance(cur, list):
+            stack.extend(cur)
+        elif isinstance(cur, str) and 0 < len(cur) <= _CUSTOMER_PROBE_LEN:
+            out.add(cur)
+
+
+async def _existing_customers(
+    session: AsyncSession, definition: Sequence[Mapping[str, Any]], cixml: Any
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Which strings of ``cixml`` are valid customer logins / customer ids (only looked up when
+    the definition has ``Customer`` / ``CustomerCompany`` inputs)."""
+    users: frozenset[str] = frozenset()
+    companies: frozenset[str] = frozenset()
+    wants_user = _has_input_type(definition, frozenset({"Customer"}))
+    wants_company = _has_input_type(definition, frozenset({"CustomerCompany"}))
+    if cixml is None or not (wants_user or wants_company):
+        return users, companies
+    probes: set[str] = set()
+    _string_leaves(cixml, probes)
+    values = sorted(probes)
+    if wants_user and values:
+        rows = await session.execute(
+            select(CustomerUser.login).where(
+                CustomerUser.login.in_(values), CustomerUser.valid_id == 1
+            )
+        )
+        users = frozenset(str(r) for r in rows.scalars())
+    if wants_company and values:
+        rows = await session.execute(
+            select(CustomerCompany.customer_id).where(
+                CustomerCompany.customer_id.in_(values), CustomerCompany.valid_id == 1
+            )
+        )
+        companies = frozenset(str(r) for r in rows.scalars())
+    return users, companies
+
+
 async def _gi_lookups(
     session: AsyncSession,
     definition: Sequence[Mapping[str, Any]],
     *,
     mode: Mode = "tiqora",
+    cixml: Any = None,
 ) -> GiLookups:
     """Catalog names/ids for the ``GeneralCatalog`` classes of ``definition``.
 
     ``tiqora``: ids of ``tiqora_cmdb_catalog``; ``znuny_readthrough``: Znuny ``general_catalog``
-    ids (names only). Customer existence sets stay empty here; Tasks 23/24 pass them in.
+    ids (names only). ``cixml`` (writes only) is probed for existing customers and companies.
     """
     names: dict[int, str] = {}
     ids: dict[tuple[str, str], int] = {}
@@ -179,7 +258,8 @@ async def _gi_lookups(
         for item in await catalog.items(cls, include_invalid=True):
             names[item.id] = item.name
             ids[(cls, item.name)] = item.id
-    return _Lookups(names, ids)
+    users, companies = await _existing_customers(session, definition, cixml)
+    return _Lookups(names, ids, users, companies)
 
 
 def gi_time(value: datetime | None) -> str:
@@ -646,6 +726,322 @@ async def op_config_item_search(
     return _search_answer(rows, limit)
 
 
+# ----------------------------------------------------------------- ConfigItemCreate/Update
+
+_ATTACHMENT_FIELDS: Final = ("Content", "ContentType", "Filename")
+_CHARSET: Final = re.compile(r"charset=[\"']?(\w+)")
+_MIME: Final = re.compile(r"(\w+/\w+)")
+
+
+class _Attachment:
+    __slots__ = ("content", "content_type", "filename")
+
+    def __init__(self, filename: str, content_type: str, content: bytes) -> None:
+        self.filename = filename
+        self.content_type = content_type
+        self.content = content
+
+
+class _GiResolver:
+    """``GeneralCatalog`` values are Tiqora catalog ids already and ``CIClassReference`` values
+    are Tiqora CI ids (Mode B): plain integers stay what they are."""
+
+    def ci(self, znuny_ci_id: str) -> int | None:
+        return int(znuny_ci_id) if znuny_ci_id.isascii() and znuny_ci_id.isdigit() else None
+
+    def catalog(self, znuny_gc_id: str) -> int | None:
+        return int(znuny_gc_id) if znuny_gc_id.isascii() and znuny_gc_id.isdigit() else None
+
+
+def _max_base64_length() -> int:
+    """Base64 text longer than this cannot decode to ``MAX_ATTACHMENT_BYTES`` (line breaks)."""
+    return (MAX_ATTACHMENT_BYTES // 3 + 1) * 4 + MAX_ATTACHMENT_BYTES // 40 + 4
+
+
+def _strip_all(raw: Mapping[str, Any]) -> dict[str, Any]:
+    return {k: (v.strip() if isinstance(v, str) else v) for k, v in raw.items()}
+
+
+def _check_attachments(op: str, raw: Any) -> list[_Attachment] | dict[str, Any]:
+    """``ConfigItem->Attachment`` (one hash or a list): ``_CheckAttachment`` of both operations
+    plus the size limit; decoded here so that nothing is written when one file is bad."""
+    invalid = _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->Attachment parameter is invalid!")
+    if isinstance(raw, Mapping) and raw:
+        items: list[Any] = [raw]
+    elif isinstance(raw, list) and raw:
+        items = list(raw)
+    else:
+        return invalid
+    update = op == "ConfigItemUpdate"
+    out: list[_Attachment] = []
+    for entry in items:
+        if not (isinstance(entry, Mapping) and entry):
+            return invalid
+        item = _strip_all(entry)
+        for needed in _ATTACHMENT_FIELDS:
+            value = item.get(needed)
+            if (value is None) if update else (not perl_truthy(value)):
+                gap = "  " if update else " "  # ConfigItemUpdate.pm has two spaces here
+                return _err(
+                    f"{op}.MissingParameter",
+                    f"{op}: Attachment->{needed}{gap}parameter is missing!",
+                )
+        content_type = str(item["ContentType"]).lower()
+        bad_type = _err(f"{op}.InvalidParameter", f"{op}: Attachment->ContentType is invalid!")
+        if content_type:
+            charset = _CHARSET.search(content_type)
+            if charset is not None:
+                try:
+                    codecs.lookup(charset.group(1))
+                except LookupError:
+                    return bad_type
+            if _MIME.match(content_type) is None:
+                return bad_type
+        encoded = item["Content"]
+        too_large = _err(
+            f"{op}.InvalidParameter",
+            f"{op}: Attachment->Content is too large (at most {MAX_ATTACHMENT_BYTES >> 20} MB)!",
+        )
+        if not isinstance(encoded, str):
+            return _err(f"{op}.InvalidParameter", f"{op}: Attachment->Content is invalid!")
+        if len(encoded) > _max_base64_length():
+            return too_large
+        try:
+            content = base64.b64decode(encoded)
+        except (binascii.Error, ValueError):
+            return _err(f"{op}.InvalidParameter", f"{op}: Attachment->Content is invalid!")
+        if len(content) > MAX_ATTACHMENT_BYTES:
+            return too_large
+        out.append(_Attachment(str(item["Filename"]), content_type, content))
+    return out
+
+
+async def _state_ids(session: AsyncSession, catalog_class: str) -> dict[str, int]:
+    """Valid catalog items by exact name (``ItemList`` reversed, like ``Common.pm``)."""
+    return {i.name: i.id for i in await CatalogService(session).items(catalog_class)}
+
+
+def _definition_schema(definition: Any) -> dict[str, Any]:
+    return {"attributes": json.loads(dump_definition_json(list(definition.attributes)))}
+
+
+def _value_error(op: str, exc: InvalidValues) -> dict[str, Any]:
+    issue = exc.issues[0] if exc.issues else None
+    if issue is not None and issue.path.split(".")[0] == "name":
+        return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->Name parameter is invalid!")
+    where = f" ({issue.path}: {issue.message})" if issue is not None else ""
+    return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->CIXMLData is invalid{where}!")
+
+
+async def _gi_write(
+    op: Literal["ConfigItemCreate", "ConfigItemUpdate"],
+    data: dict[str, Any],
+    session: AsyncSession,
+    session_store: SessionStore,
+    request: Any | None,
+    settings: Settings | None,
+) -> dict[str, Any]:
+    """Shared body of ``ConfigItemCreate`` and ``ConfigItemUpdate`` (check order of the Perl
+    ``Run()``: parameters, ``_CheckConfigItem``, permission, attachments, then the write)."""
+    auth = await _agent_auth(op, data, session, session_store, request, settings)
+    if isinstance(auth, dict):
+        return auth
+    user_id, _login = auth
+    ports, mode = await _gi_ports(session)
+    if (gate := _mode_error(op, mode)) is not None:
+        return gate
+    update = op == "ConfigItemUpdate"
+
+    raw_item = data.get("ConfigItem")
+    if not (isinstance(raw_item, Mapping) and raw_item):
+        return _err(
+            f"{op}.MissingParameter", f"{op}: ConfigItem parameter is missing or not valid!"
+        )
+    item = _strip_all(raw_item)
+
+    writable: set[int] = set()
+    if user_id != 0:
+        writable = await ports.reader.visible_class_ids(
+            user_id, await _permission_type(session, op)
+        )
+    view: CiView | None = None
+    if update:
+        ci_id = (
+            _parse_id(data.get("ConfigItemID"))
+            if not isinstance(data.get("ConfigItemID"), bool)
+            else None
+        )
+        if ci_id is None:
+            return _err(
+                f"{op}.MissingParameter", f"{op}: ConfigItemID parameter is missing or not valid!"
+            )
+        if not writable:  # a caller without any write right learns nothing about ids
+            return denied(op)
+        view = await ports.reader.get_ci(ci_id)
+        if view is None:
+            return _err(f"{op}.InvalidParameter", f"{op}: ConfigItemID is invalid!")
+        if view.class_id not in writable:  # the class of the item decides, not the request
+            return denied(op)
+
+    missing_cixml = _err(
+        f"{op}.MissingParameter", f"{op}: ConfigItem->CIXMLData is missing or invalid!"
+    )
+    cixml: Any = item.get("CIXMLData")
+    replace = update and perl_truthy(data.get("ReplaceExistingData"))
+    if update:
+        if not replace or cixml is None:
+            cixml = cixml if perl_truthy(cixml) else {}
+            if not isinstance(cixml, Mapping):
+                return missing_cixml
+        # ReplaceExistingData with CIXMLData: taken as given, "empty or invalid" is checked below
+    elif cixml is not None and not (isinstance(cixml, Mapping) and cixml):
+        return missing_cixml
+    if isinstance(cixml, Mapping):
+        try:
+            guard_cixml(cixml, op)
+        except CixmlError as exc:
+            return _err(f"{op}.{exc.code}", exc.message)
+        cixml = clean_cixml(cixml)
+
+    # --- the header (Perl _CheckConfigItem)
+    for needed in ("Class", "Name", "DeplState", "InciState"):
+        value = item.get(needed)
+        if (value is None) if update else (not perl_truthy(value)):
+            return _err(
+                f"{op}.MissingParameter", f"{op}: ConfigItem->{needed} parameter is missing!"
+            )
+    class_name = str(item["Class"])
+    found = await ports.reader.class_by_key_or_name(class_name)
+    class_rec = None
+    if found is not None and found.name == class_name:
+        class_rec = await ClassService(session).get(found.id)
+    if (
+        class_rec is None
+        or not class_rec.valid
+        or (view is not None and class_rec.id != view.class_id)
+    ):
+        return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->Class parameter is invalid!")
+    depl_ids = await _state_ids(session, DEPLOYMENT_STATE)
+    inci_ids = await _state_ids(session, INCIDENT_STATE)
+    if str(item["DeplState"]) not in depl_ids:
+        return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->DeplState parameter is invalid!")
+    if str(item["InciState"]) not in inci_ids:
+        return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->InciState parameter is invalid!")
+
+    class_def = await ClassService(session).current_definition(class_rec.id)
+    schema = _definition_schema(class_def)
+    definition = to_znuny_definition(schema)
+    lookups: GiLookups
+    if update:
+        assert view is not None
+        old_definition = to_znuny_definition(view.schema)
+        if not replace or item.get("CIXMLData") is None:
+            lookups = await _gi_lookups(session, [*old_definition, *definition], mode=mode)
+            try:
+                existing = xmldata_to_cixml(
+                    attributes_to_xmldata(view.attributes, view.schema),
+                    old_definition,
+                    lookups=lookups,
+                )
+            except ValueError as exc:
+                logger.warning("gi_config_item_update_unconvertible", ci_id=view.id, error=str(exc))
+                return _err(f"{op}.InvalidParameter", f"{op}: Could not get ConfigItem data")
+            cixml = {**existing, **(cixml if isinstance(cixml, Mapping) else {})}
+        if not (isinstance(cixml, Mapping) and cixml):
+            return _err(
+                f"{op}.InvalidParameter", f"{op}: ConfigItem->CIXMLData is empty or invalid!"
+            )
+    lookups = await _gi_lookups(session, definition, mode=mode, cixml=cixml)
+    try:
+        xml_data = cixml_to_xmldata(
+            cixml if isinstance(cixml, Mapping) else {}, definition, lookups=lookups, operation=op
+        )
+    except CixmlError as exc:
+        return _err(f"{op}.{exc.code}", exc.message)
+
+    # --- permission on the class (the one of the request == the one of the item)
+    if class_rec.id not in writable:
+        return denied(op)
+
+    attachments: list[_Attachment] = []
+    if item.get("Attachment") is not None:
+        checked = _check_attachments(op, item["Attachment"])
+        if isinstance(checked, dict):
+            return checked
+        attachments = checked
+
+    attributes, issues = xmldata_to_attributes(xml_data, schema, _GiResolver())
+    for issue in issues:
+        if issue.code != "unknown_attribute":  # keys outside the definition are dropped
+            return _err(
+                f"{op}.InvalidParameter",
+                f"{op}: ConfigItem->CIXMLData->{issue.path} parameter value is invalid!",
+            )
+    known = {str(a["key"]) for a in schema["attributes"]}
+    attributes = {k: v for k, v in attributes.items() if k in known}
+
+    # --- write (one transaction; any failure leaves nothing behind)
+    try:
+        access = await load_access(session, user_id)
+        svc = CiService(session)
+        name = str(item["Name"])
+        dep_id, inc_id = depl_ids[str(item["DeplState"])], inci_ids[str(item["InciState"])]
+        files = AttachmentService(session)
+        if update:
+            assert view is not None
+            ci_id = view.id
+            await svc.update(
+                access,
+                ci_id,
+                expected_lock_version=None,
+                name=name,
+                deployment_state_id=dep_id,
+                incident_state_id=inc_id,
+                attributes=attributes,
+                drop_unknown=True,
+            )
+            if replace:
+                for old in await files.list_for_ci(access, ci_id):
+                    try:
+                        await files.delete(access, old.id)
+                    except AttachmentInUse:  # an attribute of a stored version still points at it
+                        logger.info("gi_config_item_update_attachment_kept", attachment_id=old.id)
+            number = view.number
+        else:
+            created = await svc.create(
+                access,
+                class_id=class_rec.id,
+                name=name,
+                deployment_state_id=dep_id,
+                incident_state_id=inc_id,
+                attributes=attributes,
+            )
+            ci_id, number = created.id, created.number
+        for att in attachments:
+            await files.upload(
+                access,
+                ci_id=ci_id,
+                filename=att.filename,
+                content_type=att.content_type,
+                data=att.content,
+            )
+        await session.commit()
+    except InvalidValues as exc:
+        await session.rollback()
+        return _value_error(op, exc)
+    except (CmdbForbidden, CmdbNotFound):
+        await session.rollback()
+        return denied(op)
+    except CmdbError as exc:
+        await session.rollback()
+        logger.warning("gi_config_item_write_refused", op=op, error=str(exc))
+        return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem parameter is invalid!")
+    except Exception:
+        await session.rollback()
+        raise
+    return {"ConfigItemID": ci_id, "Number": number}
+
+
 async def op_config_item_create(
     data: dict[str, Any],
     session: AsyncSession,
@@ -654,9 +1050,11 @@ async def op_config_item_create(
     request: Any | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    return await _not_implemented(
-        "ConfigItemCreate", data, session, session_store, request, settings
-    )
+    """``ConfigItemCreate``: a new item of the Tiqora CMDB; answers ``ConfigItemID`` + ``Number``.
+
+    ``ConfigItem->Number`` is ignored: numbers come from the class's own generator.
+    """
+    return await _gi_write("ConfigItemCreate", data, session, session_store, request, settings)
 
 
 async def op_config_item_update(
@@ -667,9 +1065,12 @@ async def op_config_item_update(
     request: Any | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    return await _not_implemented(
-        "ConfigItemUpdate", data, session, session_store, request, settings
-    )
+    """``ConfigItemUpdate``: a new version of ``ConfigItemID`` (none when nothing changed).
+
+    ``CIXMLData`` is merged over the current data at top level; ``ReplaceExistingData`` takes it
+    as given and replaces the attachments instead of adding to them.
+    """
+    return await _gi_write("ConfigItemUpdate", data, session, session_store, request, settings)
 
 
 async def op_config_item_delete(
