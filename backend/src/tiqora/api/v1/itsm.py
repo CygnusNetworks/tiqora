@@ -956,6 +956,8 @@ async def get_ticket_itsm(
         dialogs=TicketItsmDialogsOut(
             itsm_fields=s.dialogs.itsm_fields, decision=s.dialogs.decision
         ),
+        known_error_category_configured=cfg.known_error_kb_category_id > 0,
+        major_incident_customer_reply=cfg.major_incident_customer_reply,
     )
 
 

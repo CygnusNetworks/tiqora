@@ -38685,6 +38685,10 @@
             ],
             "title": "Impact"
           },
+          "known_error_category_configured": {
+            "title": "Known Error Category Configured",
+            "type": "boolean"
+          },
           "major_banner": {
             "anyOf": [
               {
@@ -38704,6 +38708,10 @@
                 "type": "null"
               }
             ]
+          },
+          "major_incident_customer_reply": {
+            "title": "Major Incident Customer Reply",
+            "type": "boolean"
           },
           "matrix_priority_id": {
             "anyOf": [
@@ -38788,7 +38796,9 @@
           "problem",
           "ci_count",
           "recent_incident",
-          "dialogs"
+          "dialogs",
+          "known_error_category_configured",
+          "major_incident_customer_reply"
         ],
         "title": "TicketItsmOut",
         "type": "object"

@@ -364,6 +364,16 @@ async def test_summary_problem_and_banner(w: World) -> None:
     assert (await w.get(PR))["problem"] is None
 
 
+async def test_summary_reports_the_two_zoom_switches(w: World) -> None:
+    body = await w.get()
+    assert body["known_error_category_configured"] is False
+    assert body["major_incident_customer_reply"] is False
+    await w.configure(known_error_kb_category_id=7, major_incident_customer_reply=True)
+    body = await w.get()
+    assert body["known_error_category_configured"] is True
+    assert body["major_incident_customer_reply"] is True
+
+
 async def test_ticket_itsm_404_without_ro(w: World) -> None:
     for user in (NOBODY, RO):
         w.login(user)

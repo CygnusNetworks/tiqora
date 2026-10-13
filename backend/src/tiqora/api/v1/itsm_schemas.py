@@ -405,6 +405,10 @@ class TicketItsmOut(BaseModel):
     ci_count: int | None
     recent_incident: RecentIncidentOut | None
     dialogs: TicketItsmDialogsOut
+    #: ``known_error_kb_category_id`` is set (the known-error button is offered)
+    known_error_category_configured: bool
+    #: ``major_incident_customer_reply`` is on (the "Antwort an Kunden" update mode is offered)
+    major_incident_customer_reply: bool
 
 
 class LinkGraphNodeOut(BaseModel):

@@ -24787,8 +24787,12 @@ export interface components {
             enabled: boolean;
             /** Impact */
             impact: string | null;
+            /** Known Error Category Configured */
+            known_error_category_configured: boolean;
             major_banner: components["schemas"]["MajorBannerOut"] | null;
             major_incident: components["schemas"]["MajorIncidentOut"] | null;
+            /** Major Incident Customer Reply */
+            major_incident_customer_reply: boolean;
             /** Matrix Priority Id */
             matrix_priority_id: number | null;
             /**

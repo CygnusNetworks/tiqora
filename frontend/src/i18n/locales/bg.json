@@ -7779,6 +7779,82 @@
         "itsm_fields": "ITSM fields",
         "decision": "Decision"
       }
+    },
+    "problem": {
+      "title": "Problem",
+      "unavailable": "The problem record is not available.",
+      "rootCause": "Root cause",
+      "workaround": "Workaround",
+      "saveError": "The problem could not be saved.",
+      "incidents": "Linked incidents",
+      "noIncidents": "No incidents linked.",
+      "link": {
+        "open": "Link incidents",
+        "title": "Link incidents",
+        "search": "Search tickets by number or title",
+        "already": "already linked",
+        "submit": "Link {{count}} ticket(s)",
+        "error": "The incidents could not be linked."
+      },
+      "knownError": {
+        "publish": "Publish as known error",
+        "badge": "Known error",
+        "article": "Known-error article",
+        "noCategory": "No knowledge-base category for known errors is configured (ITSM settings).",
+        "error": "The known-error article could not be created.",
+        "states": {
+          "draft": "Draft",
+          "review": "In review",
+          "published": "Published",
+          "archived": "Archived"
+        }
+      },
+      "close": {
+        "open": "Close linked incidents with workaround",
+        "title": "Close incidents with workaround",
+        "confirm": "{{count}} open incident(s) will get the workaround as a note and be closed. Continue?",
+        "submit": "Close incidents",
+        "error": "The job could not be started.",
+        "done": "Closed {{count}} ticket(s)",
+        "skipped": "Skipped: {{count}} ticket(s)"
+      }
+    },
+    "major": {
+      "title": "Major incident",
+      "banner": "Linked to an active major incident:",
+      "none": "This ticket is not a declared major incident.",
+      "active": "Active",
+      "ended": "Ended",
+      "declare": {
+        "open": "Declare major incident",
+        "title": "Declare major incident",
+        "summary": "Summary (optional)",
+        "submit": "Declare",
+        "error": "The major incident could not be declared."
+      },
+      "end": {
+        "open": "End major incident",
+        "title": "End major incident",
+        "confirm": "The major incident will be marked as ended. The ticket type stays unchanged.",
+        "error": "The major incident could not be ended."
+      },
+      "update": {
+        "title": "Update for everyone affected",
+        "mode": "Delivery",
+        "modes": {
+          "internal": "Internal only",
+          "note": "Note to linked tickets",
+          "reply": "Reply to customers"
+        },
+        "send": "Send update",
+        "error": "The update could not be sent."
+      },
+      "timeline": {
+        "declared": "Declared",
+        "update": "Update",
+        "ended": "Ended",
+        "targets": "{{count}} ticket(s)"
+      }
     }
   }
 }

@@ -7787,6 +7787,82 @@
         "itsm_fields": "ITSM-Felder",
         "decision": "Entscheidung"
       }
+    },
+    "problem": {
+      "title": "Problem",
+      "unavailable": "Der Problemdatensatz ist nicht verfügbar.",
+      "rootCause": "Ursache",
+      "workaround": "Workaround",
+      "saveError": "Das Problem konnte nicht gespeichert werden.",
+      "incidents": "Verknüpfte Incidents",
+      "noIncidents": "Keine Incidents verknüpft.",
+      "link": {
+        "open": "Incidents verknüpfen",
+        "title": "Incidents verknüpfen",
+        "search": "Tickets nach Nummer oder Titel suchen",
+        "already": "bereits verknüpft",
+        "submit": "{{count}} Ticket(s) verknüpfen",
+        "error": "Die Incidents konnten nicht verknüpft werden."
+      },
+      "knownError": {
+        "publish": "Als bekannten Fehler veröffentlichen",
+        "badge": "Bekannter Fehler",
+        "article": "Known-Error-Artikel",
+        "noCategory": "Es ist keine Wissensdatenbank-Kategorie für bekannte Fehler konfiguriert (ITSM-Einstellungen).",
+        "error": "Der Known-Error-Artikel konnte nicht erstellt werden.",
+        "states": {
+          "draft": "Entwurf",
+          "review": "Zur Prüfung",
+          "published": "Veröffentlicht",
+          "archived": "Archiviert"
+        }
+      },
+      "close": {
+        "open": "Verknüpfte Incidents mit Workaround schließen",
+        "title": "Incidents mit Workaround schließen",
+        "confirm": "{{count}} offene(r) Incident(s) erhalten den Workaround als Notiz und werden geschlossen. Fortfahren?",
+        "submit": "Incidents schließen",
+        "error": "Der Auftrag konnte nicht gestartet werden.",
+        "done": "{{count}} Ticket(s) geschlossen",
+        "skipped": "Übersprungen: {{count}} Ticket(s)"
+      }
+    },
+    "major": {
+      "title": "Major Incident",
+      "banner": "Mit einem aktiven Major Incident verknüpft:",
+      "none": "Dieses Ticket ist kein ausgerufener Major Incident.",
+      "active": "Aktiv",
+      "ended": "Beendet",
+      "declare": {
+        "open": "Major Incident ausrufen",
+        "title": "Major Incident ausrufen",
+        "summary": "Zusammenfassung (optional)",
+        "submit": "Ausrufen",
+        "error": "Der Major Incident konnte nicht ausgerufen werden."
+      },
+      "end": {
+        "open": "Major Incident beenden",
+        "title": "Major Incident beenden",
+        "confirm": "Der Major Incident wird als beendet markiert. Der Tickettyp bleibt unverändert.",
+        "error": "Der Major Incident konnte nicht beendet werden."
+      },
+      "update": {
+        "title": "Update an alle Betroffenen",
+        "mode": "Zustellung",
+        "modes": {
+          "internal": "Nur intern",
+          "note": "Notiz an verknüpfte Tickets",
+          "reply": "Antwort an Kunden"
+        },
+        "send": "Update senden",
+        "error": "Das Update konnte nicht gesendet werden."
+      },
+      "timeline": {
+        "declared": "Ausgerufen",
+        "update": "Update",
+        "ended": "Beendet",
+        "targets": "{{count}} Ticket(s)"
+      }
     }
   }
 }

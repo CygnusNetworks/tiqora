@@ -162,6 +162,7 @@ function ticketItsm(id: number, mode: DemoItsmMode): TicketItsm {
     enabled: mode !== "off", mode, role: null, criticality: null, impact: null, matrix_priority_id: null,
     ci_count: LINKS.filter((l) => l.ticket_id === id).length, service: null, recent_incident: null,
     problem: null, major_incident: null, major_banner: null, dialogs: { itsm_fields: false, decision: false },
+    known_error_category_configured: true, major_incident_customer_reply: false,
   };
   if (id === 100) {
     return {
