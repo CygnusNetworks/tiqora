@@ -87,6 +87,11 @@ def main(argv: list[str] | None = None) -> None:
             # default 10 s stop grace period ends in SIGKILL.
             timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_SECONDS,
         )
+        from tiqora.plugins.restart import RESTART_EXIT_CODE, restart_requested
+
+        if restart_requested():
+            # coordinated plugin restart: the container runtime starts the process again
+            sys.exit(RESTART_EXIT_CODE)
     elif command == "worker":
         from tiqora.worker.__main__ import run_worker
 

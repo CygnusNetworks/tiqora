@@ -14,6 +14,7 @@ import asyncio
 import contextlib
 import json
 import os
+import signal
 import socket
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
@@ -66,6 +67,11 @@ _REQUESTED = False
 def restart_requested() -> bool:
     """True once this process left because of a coordinated restart (exit code 75)."""
     return _REQUESTED
+
+
+def sigterm_self() -> None:
+    """``on_exit`` of uvicorn processes: start their graceful shutdown (D10 wiring)."""
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 def restart_roles() -> tuple[ProcessRole, ...]:
@@ -359,17 +365,25 @@ async def purge_dead_processes(session: AsyncSession, *, older_than: datetime) -
 
 
 async def request_restart(
-    session: AsyncSession, *, by: int | None, reason: str, now: datetime
+    session: AsyncSession,
+    *,
+    by: int | None,
+    reason: str,
+    now: datetime,
+    ensure_roles: Sequence[str] = (),
 ) -> int:
     """Record a restart request and return its generation. Flushes only.
 
     ``roles`` is the snapshot of the plugin-hosting roles with a live process now. A
     newer generation supersedes an unfinished older one (it is finished without a
-    message), so two quick installs restart once.
+    message), so two quick installs restart once. ``ensure_roles`` are counted as alive
+    even without a fresh heartbeat (the api endpoint passes ``("api",)``: the request
+    came from a live api process, and the api is the one that closes the sequence).
     """
     rows = (await session.execute(select(TiqoraProcess))).scalars().all()
     cutoff = now - timedelta(seconds=LIVE_WITHIN_SECONDS)
     alive = {r.role for r in rows if r.heartbeat_at >= cutoff and r.exiting_at is None}
+    alive.update(ensure_roles)
     # a role in its restart gap (exited, replacement not registered yet) still needs
     # the newer generation: keep the roles of the request this one supersedes
     open_roles = (
@@ -561,6 +575,62 @@ async def _step(
             log.info("plugin_restart_finished", generation=target.generation)
         await session.commit()
     return False
+
+
+# ---------------------------------------------------------------- wiring helpers
+
+
+@dataclass(slots=True)
+class ProcessWatch:
+    """Handle of a registered process and its watch loop (see :func:`start_process_watch`)."""
+
+    instance_id: str
+    task: asyncio.Task[None]
+    factory: async_sessionmaker[AsyncSession]
+
+
+async def start_process_watch(
+    factory: async_sessionmaker[AsyncSession],
+    role: ProcessRole,
+    *,
+    settings: Settings,
+    on_exit: Callable[[], None],
+    stop: asyncio.Event | None = None,
+    loaded_packages: Sequence[str] = (),
+) -> ProcessWatch | None:
+    """Register this process and start its restart watch loop.
+
+    Never raises: a database problem is logged and the process runs without a registry
+    row (a coordinated restart then simply does not include it).
+    """
+    try:
+        instance_id = await register_process(
+            factory, role, now=utcnow(), loaded_packages=loaded_packages
+        )
+    except Exception as exc:
+        log.warning("plugin_process_register_failed", role=role, error=str(exc))
+        return None
+    task = asyncio.create_task(
+        restart_watch_loop(
+            factory,
+            role,
+            instance_id,
+            settings=settings,
+            on_exit=on_exit,
+            stop=stop,
+            loaded_packages=loaded_packages,
+        )
+    )
+    return ProcessWatch(instance_id, task, factory)
+
+
+async def stop_process_watch(watch: ProcessWatch | None) -> None:
+    """Cancel the loop and remove the row (kept when the process left for a restart)."""
+    if watch is None:
+        return
+    watch.task.cancel()
+    await asyncio.gather(watch.task, return_exceptions=True)
+    await unregister_process(watch.factory, watch.instance_id)
 
 
 # ---------------------------------------------------------------- status for the admin UI

@@ -43,6 +43,7 @@ from tiqora.api.v1.admin import (
     notification_events,
     oauth2_tokens,
     placeholder_variables,
+    plugin_packages,
     plugins,
     postmaster_filters,
     priorities,
@@ -94,6 +95,7 @@ admin_router.include_router(notification_events.router)
 admin_router.include_router(generic_agent.router)
 admin_router.include_router(webhooks.router)
 admin_router.include_router(plugins.router)
+admin_router.include_router(plugin_packages.router)
 admin_router.include_router(api_keys.router)
 admin_router.include_router(crypto_keys.router)
 admin_router.include_router(crypto_settings.router)

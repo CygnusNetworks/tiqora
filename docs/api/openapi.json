@@ -29943,6 +29943,126 @@
         "title": "ResolvedCustomerLink",
         "type": "object"
       },
+      "RestartIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "RestartIn",
+        "type": "object"
+      },
+      "RestartRoleOut": {
+        "properties": {
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
+          "old": {
+            "title": "Old",
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "api",
+              "worker",
+              "mcp",
+              "ai-worker"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "waiting",
+              "restarting",
+              "done",
+              "timeout"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "old",
+          "new",
+          "state"
+        ],
+        "title": "RestartRoleOut",
+        "type": "object"
+      },
+      "RestartStatusOut": {
+        "properties": {
+          "coordinated": {
+            "title": "Coordinated",
+            "type": "boolean"
+          },
+          "failed_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "generation": {
+            "title": "Generation",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RestartRoleOut"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generation",
+          "reason",
+          "requested_at",
+          "finished_at",
+          "failed_message",
+          "coordinated",
+          "roles"
+        ],
+        "title": "RestartStatusOut",
+        "type": "object"
+      },
       "RestoreIn": {
         "properties": {
           "process_entity_id": {
@@ -61603,6 +61723,152 @@
           }
         },
         "summary": "Put Number Generator",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/restart": {
+      "get": {
+        "operationId": "get_restart_api_v1_admin_plugins_restart_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RestartStatusOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Restart Api V1 Admin Plugins Restart Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Restart",
+        "tags": [
+          "admin:plugins"
+        ]
+      },
+      "post": {
+        "operationId": "post_restart_api_v1_admin_plugins_restart_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Restart",
         "tags": [
           "admin:plugins"
         ]

@@ -53,7 +53,11 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/plugins", tags=["admin:plugins"])
 
-RESTART_MESSAGE: Final = "Änderung wird nach einem Neustart von Tiqora wirksam."
+RESTART_MESSAGE: Final = (
+    "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora unten neu starten."
+)
+#: used when the coordinated restart is switched off (the admin has to restart by hand)
+RESTART_MANUAL_MESSAGE: Final = "Änderung wird nach einem Neustart von Tiqora wirksam."
 QUARANTINE_MESSAGE: Final = (
     "Beim Start wiederholt abgestürzt – wird übersprungen, bis Sie „Erneut versuchen“ wählen."
 )
@@ -147,13 +151,14 @@ def _status_message(
     problem: str | None,
     compat_problem: str | None,
     runtime: Sequence[TiqoraPluginRuntime],
+    coordinated: bool = True,
 ) -> str | None:
     if state == "invalid":
         return problem
     if state == "incompatible":
         return compat_problem
     if state == "restart_required":
-        return RESTART_MESSAGE
+        return RESTART_MESSAGE if coordinated else RESTART_MANUAL_MESSAGE
     if state == "unknown":
         return f"{_ROLE_LABELS['api']}: {UNKNOWN_MESSAGE}"
     if state == "quarantined":
@@ -195,6 +200,7 @@ def _build_one(
     *,
     safe_mode: bool,
     activation_problem: str | None = None,
+    coordinated: bool = True,
 ) -> PluginAdminOut:
     manifest = found.manifest if found is not None else None
     registry = get_registry()
@@ -278,7 +284,11 @@ def _build_one(
         status_message=SAFE_MODE_MESSAGE
         if safe_mode_hides
         else _status_message(
-            state, problem=problem, compat_problem=compat_problem, runtime=ordered_rt
+            state,
+            problem=problem,
+            compat_problem=compat_problem,
+            runtime=ordered_rt,
+            coordinated=coordinated,
         ),
         source=row.source if row is not None else "image",
         installed_at=row.installed_at if row is not None else None,
@@ -333,6 +343,7 @@ async def _build_all(
             hooks[pid],
             safe_mode=safe_mode,
             activation_problem=activation.problems.get(pid),
+            coordinated=settings.plugins_coordinated_restart,
         )
         for pid in sorted(set(discovered) | set(rows))
     ]

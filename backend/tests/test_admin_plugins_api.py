@@ -325,7 +325,9 @@ async def test_disable_needs_restart(
     r = await admin_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": False})
     assert r.status_code == 200
     assert r.json()["status"] == "restart_required"
-    assert r.json()["status_message"] == "Änderung wird nach einem Neustart von Tiqora wirksam."
+    assert r.json()["status_message"] == (
+        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora unten neu starten."
+    )
     row = await _plugin_row(factory, PLUGIN_ID)
     assert row.enabled is False and row.changed_by == 1
 

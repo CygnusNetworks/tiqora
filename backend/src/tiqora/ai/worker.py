@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import sys
 import time
 from typing import Any
 
@@ -42,6 +43,12 @@ from tiqora.domain.settings_store import (
 )
 from tiqora.logging_setup import configure_logging
 from tiqora.plugins.bootstrap import init_registry, retry_plugin_boot
+from tiqora.plugins.restart import (
+    RESTART_EXIT_CODE,
+    restart_requested,
+    start_process_watch,
+    stop_process_watch,
+)
 from tiqora.worker.status import record_tick_status
 
 logger = structlog.get_logger(__name__)
@@ -143,11 +150,17 @@ async def _run_all(stop: asyncio.Event) -> None:
     plugin_retry = asyncio.create_task(
         retry_plugin_boot(role="ai-worker", settings=settings, session_factory=factory)
     )
+    # Registered after init_registry (no second activation); sets ``stop`` when this
+    # process is next in a coordinated plugin restart (D10).
+    process_watch = await start_process_watch(
+        factory, "ai-worker", settings=settings, on_exit=stop.set, stop=stop
+    )
     try:
         await asyncio.gather(_heartbeat_loop(stop), _run_loop(stop), run_chat_bot_loop(stop))
     finally:
         plugin_retry.cancel()
         await asyncio.gather(plugin_retry, return_exceptions=True)
+        await stop_process_watch(process_watch)
 
 
 def run_ai_worker() -> None:
@@ -173,6 +186,8 @@ def run_ai_worker() -> None:
     finally:
         loop.close()
         logger.info("tiqora_ai_worker_stopped")
+    if restart_requested():
+        sys.exit(RESTART_EXIT_CODE)
 
 
 if __name__ == "__main__":
