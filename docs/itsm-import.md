@@ -586,7 +586,7 @@ der Wechsel in den Mode B selbst (Schreibsperre in Znuny, Umstellung, Rückweg) 
 |---|---|---|
 | Allgemeiner Katalog (`general_catalog`: Einsatz-, Incident-, Kritikalitäts-, Auswirkungsstufen) | Katalog der Tiqora-Stammdaten | Schlüssel und Reihenfolge bleiben erhalten, Namen werden aktualisiert |
 | CMDB-Klassen | CI-Klassen | Berechtigungsgruppe bleibt erhalten; ohne Gruppe wird die Administratorgruppe gesetzt (`class_without_group`) |
-| Klassendefinitionen (YAML oder Perl, je Version) | Klassendefinitionen (Attributschema) | Es wird kein eigener Parser verwendet, sondern der des CMDB-Moduls; nicht abbildbare Teile stehen im Bericht |
+| Klassendefinitionen (YAML oder Perl, je Version) | Klassendefinitionen (Attributschema) | Es wird kein eigener Parser verwendet, sondern der des CMDB-Moduls; nicht abbildbare Teile stehen im Bericht. `CountMin` wird nur bei `Input.Required` zur Mindestzahl, optionale Attribute erhalten 0 (die Zahl der angezeigten Zeilen bleibt über `CountDefault` erhalten) |
 | Konfigurationselemente (Nummer, Name, Klasse, Zustände) | CIs | Die Znuny-Nummer bleibt erhalten |
 | Versionen mit `xml_storage`-Attributen | CI-Versionen mit Attributen als Schlüssel-Wert-Struktur | Datums- und Verweiswerte werden umgerechnet; Verweise auf andere CIs und Katalogeinträge werden aufgelöst |
 | Verknüpfungen CI mit CI | CI-Verknüpfungen | Verknüpfungstypen kommen aus der Znuny-Konfiguration |
@@ -678,6 +678,6 @@ Bewusste, dokumentierte Unterschiede, die bleiben:
 * Znuny behält nach `Vendor::1 = ''` einen leeren Textwert, Tiqora entfernt den Wert.
 * Link-Typen mit gleichem Quell- und Zielnamen (`RelevantTo`) haben in Znuny keine Richtung; Tiqora
   speichert sie in kanonischer Reihenfolge (CI zuerst).
-* Die Golden-Fälle `ConfigItemUpdate` und Prozess-Aktion setzen den Fix CMDB-PM-I1 voraus (optionale
-  importierte Attribute sind keine Pflichtfelder), sonst scheitern sie an der importierten Klasse
-  `Computer`.
+* Die Golden-Fälle `ConfigItemUpdate` und Prozess-Aktion beruhen auf CMDB-PM-I1 (optionale
+  importierte Attribute sind keine Pflichtfelder); ohne diese Regel scheitern sie an der importierten
+  Klasse `Computer`.
