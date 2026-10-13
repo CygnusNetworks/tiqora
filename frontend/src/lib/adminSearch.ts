@@ -495,6 +495,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["verknüpfungstypen", "verknüpfung", "link types", "links", "linktyp", "itsm", "propagation"],
   },
   {
+    slug: "itsm-import",
+    route: "/admin/itsm-import",
+    group: "tickets",
+    nameKey: "admin.nav.itsmImport",
+    descriptionKey: "admin.pageDescriptions.itsmImport",
+    keywords: ["itsm", "cmdb", "znuny", "import", "übernehmen", "umstellen", "ci", "konfigurationselemente"],
+  },
+  {
     slug: "settings-itsm",
     route: "/admin/settings/itsm",
     group: "tickets",

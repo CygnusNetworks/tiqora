@@ -2224,7 +2224,8 @@
       "cmdbClasses": "CMDB classes",
       "cmdbCatalog": "CMDB catalog",
       "itsm": "ITSM",
-      "itsmLinkTypes": "Link types"
+      "itsmLinkTypes": "Link types",
+      "itsmImport": "ITSM import"
     },
     "table": {
       "id": "ID",
@@ -3866,7 +3867,8 @@
       "cmdbCatalog": "Maintain the selection lists (general catalog) used by CMDB attributes.",
       "itsm": "ITSM mode, setup, priority matrix and services",
       "itsmLinkTypes": "Link types between tickets, configuration items and services",
-      "settingsItsm": "Ticket types, workaround state, limits and the Znuny address for ITSM"
+      "settingsItsm": "Ticket types, workaround state, limits and the Znuny address for ITSM",
+      "itsmImport": "Import ITSM data from Znuny into the Tiqora CMDB and switch over."
     },
     "types": {
       "title_plural": "Tipus de tiquet",
@@ -5641,6 +5643,81 @@
           "service_not_found": "The service was not found.",
           "generic": "The ITSM data could not be saved."
         }
+      }
+    },
+    "itsmImport": {
+      "title": "Import ITSM data from Znuny",
+      "intro": "Here you take over CIs, classes and links from Znuny ITSM into the Tiqora CMDB. You can repeat the import as often as you like until you switch to Tiqora.",
+      "loadError": "The import status could not be loaded.",
+      "startError": "The import could not be started.",
+      "blockedFallback": "The import is not possible right now.",
+      "modeLabel": "Mode",
+      "mode": {
+        "znuny": "Znuny runs the ITSM",
+        "tiqora": "Tiqora runs the ITSM",
+        "off": "ITSM switched off"
+      },
+      "znunyFound": "Znuny ITSM found: {{profile}}",
+      "znunyMissing": "Znuny ITSM was not found.",
+      "counts": {
+        "cis": "CIs",
+        "classes": "Classes",
+        "changes": "Changes",
+        "workorders": "Work orders"
+      },
+      "lastRun": "Last run: {{kind}}, {{time}}, {{status}}",
+      "noRun": "There has been no run yet.",
+      "dryRun": "Dry run",
+      "import": "Import",
+      "confirmTitle": "Import ITSM data",
+      "confirmMessage": "The data is written to the Tiqora CMDB. As long as Znuny runs the ITSM, your agents keep seeing the data from Znuny.",
+      "releaseLock": "Release lock",
+      "releaseLockError": "The lock could not be released.",
+      "runs": "Runs",
+      "col": {
+        "kind": "Type",
+        "started": "Started",
+        "by": "By",
+        "status": "Status",
+        "report": "Report"
+      },
+      "kind": {
+        "dry_run": "Dry run",
+        "import": "Import",
+        "switch": "Switch",
+        "rollback": "Back"
+      },
+      "status": {
+        "running": "Running",
+        "done": "Done",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "steps": {
+        "catalog": "Catalogues",
+        "classes": "Classes",
+        "definitions": "Class definitions",
+        "cis_pass1": "CIs (basic data)",
+        "cis_pass2": "CI versions",
+        "links": "Links",
+        "attachments": "Attachments",
+        "priority_matrix": "Priority matrix",
+        "service_meta": "Service details",
+        "changes": "Changes (counted only)",
+        "deleted_in_znuny": "Deleted in Znuny",
+        "incident_states": "Incident states"
+      },
+      "report": {
+        "step": "Step",
+        "created": "Created",
+        "updated": "Updated",
+        "unchanged": "Unchanged",
+        "skipped": "Skipped",
+        "problems": "Problems",
+        "noIssues": "No issues",
+        "issues": "Issues ({{count}})",
+        "truncated": "Showing the first {{shown}} of {{count}} issues.",
+        "csv": "Full report (CSV)"
       }
     }
   },

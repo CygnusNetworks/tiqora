@@ -2224,7 +2224,8 @@
       "cmdbClasses": "CMDB-Klassen",
       "cmdbCatalog": "CMDB-Auswahllisten",
       "itsm": "ITSM",
-      "itsmLinkTypes": "Verknüpfungstypen"
+      "itsmLinkTypes": "Verknüpfungstypen",
+      "itsmImport": "ITSM-Import"
     },
     "table": {
       "id": "ID",
@@ -3874,7 +3875,8 @@
       "cmdbCatalog": "Auswahllisten (Allgemeiner Katalog) für CMDB-Attribute pflegen.",
       "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
       "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
-      "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM"
+      "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM",
+      "itsmImport": "ITSM-Daten aus Znuny in die CMDB von Tiqora übernehmen und auf Tiqora umstellen."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -5649,6 +5651,81 @@
           "service_not_found": "Der Service wurde nicht gefunden.",
           "generic": "Die ITSM-Daten konnten nicht gespeichert werden."
         }
+      }
+    },
+    "itsmImport": {
+      "title": "ITSM-Daten aus Znuny übernehmen",
+      "intro": "Hier übernehmen Sie CIs, Klassen und Verknüpfungen aus Znuny ITSM in die CMDB von Tiqora. Sie können den Import beliebig oft wiederholen, bis Sie auf Tiqora umstellen.",
+      "loadError": "Der Stand des Imports konnte nicht geladen werden.",
+      "startError": "Der Import konnte nicht gestartet werden.",
+      "blockedFallback": "Der Import ist derzeit nicht möglich.",
+      "modeLabel": "Modus",
+      "mode": {
+        "znuny": "Znuny führt das ITSM",
+        "tiqora": "Tiqora führt das ITSM",
+        "off": "ITSM ausgeschaltet"
+      },
+      "znunyFound": "Znuny ITSM gefunden: {{profile}}",
+      "znunyMissing": "Znuny ITSM wurde nicht gefunden.",
+      "counts": {
+        "cis": "CIs",
+        "classes": "Klassen",
+        "changes": "Changes",
+        "workorders": "Arbeitsaufträge"
+      },
+      "lastRun": "Letzter Lauf: {{kind}}, {{time}}, {{status}}",
+      "noRun": "Es gab noch keinen Lauf.",
+      "dryRun": "Probelauf",
+      "import": "Übernehmen",
+      "confirmTitle": "ITSM-Daten übernehmen",
+      "confirmMessage": "Die Daten werden in die CMDB von Tiqora geschrieben. Solange Znuny das ITSM führt, sehen Ihre Agenten weiter die Daten aus Znuny.",
+      "releaseLock": "Sperre aufheben",
+      "releaseLockError": "Die Sperre konnte nicht aufgehoben werden.",
+      "runs": "Läufe",
+      "col": {
+        "kind": "Art",
+        "started": "Gestartet",
+        "by": "von",
+        "status": "Status",
+        "report": "Bericht"
+      },
+      "kind": {
+        "dry_run": "Probelauf",
+        "import": "Übernahme",
+        "switch": "Umstellung",
+        "rollback": "Zurück"
+      },
+      "status": {
+        "running": "Läuft",
+        "done": "Fertig",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      },
+      "steps": {
+        "catalog": "Auswahllisten",
+        "classes": "Klassen",
+        "definitions": "Klassendefinitionen",
+        "cis_pass1": "CIs (Grunddaten)",
+        "cis_pass2": "CI-Versionen",
+        "links": "Verknüpfungen",
+        "attachments": "Anhänge",
+        "priority_matrix": "Prioritätsmatrix",
+        "service_meta": "Service-Angaben",
+        "changes": "Changes (nur gezählt)",
+        "deleted_in_znuny": "In Znuny gelöscht",
+        "incident_states": "Vorfallstatus"
+      },
+      "report": {
+        "step": "Schritt",
+        "created": "Neu",
+        "updated": "Aktualisiert",
+        "unchanged": "Unverändert",
+        "skipped": "Übersprungen",
+        "problems": "Probleme",
+        "noIssues": "Keine Auffälligkeiten",
+        "issues": "Auffälligkeiten ({{count}})",
+        "truncated": "Es werden die ersten {{shown}} von {{count}} Auffälligkeiten angezeigt.",
+        "csv": "Vollständiger Bericht (CSV)"
       }
     }
   },
