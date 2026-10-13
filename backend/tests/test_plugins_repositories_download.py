@@ -355,6 +355,31 @@ async def test_download_conflicting_publisher_claim_is_unsigned(
     assert row.signature_status == "unsigned" and row.repository_id == rid_a
 
 
+async def test_download_from_the_key_holder_is_unsigned_when_another_repo_claims_the_publisher(
+    factory: async_sessionmaker[AsyncSession], tmp_path: Path
+) -> None:
+    """F10: two verified repositories, one publisher id, different keys -> unverified in both.
+
+    The download comes from B, which DOES list the signer's key; A claims the same publisher id
+    with another key. The cross-repository check must see A although only B's keys may sign.
+    """
+    data = package_bytes(tmp_path, "1.1.0")  # signed with PRIVATE (KEY_ID)
+    a_index = make_index([_version("1.1.0", data)], key_id=OTHER_KEY_ID, public_key=OTHER_PUB)
+    served_a = Served(signed_files(a_index))
+    rid_a = await _add_repo(factory)
+    await _refresh(factory, rid_a, served_a, tmp_path)
+    b_index = make_index([_version("1.1.0", data)])
+    served_b = Served(signed_files(b_index, {f"/packages/{PLUGIN}-1.1.0.tqplugin": data}))
+    rid_b = await _add_repo(factory, URL_B, name="plg62280 b")
+    await _refresh(factory, rid_b, served_b, tmp_path)
+    result = await _download(factory, rid_b, served_b, tmp_path)
+    assert result.installable is False
+    row = (await _packages(factory))[0]
+    assert row.signature_status == "unsigned" and row.repository_id == rid_b
+    report = PackageReport.model_validate_json(row.report)
+    assert report.trust.value == "unsigned" and report.signer is None
+
+
 async def _two_repos_other_publisher(
     factory: async_sessionmaker[AsyncSession], tmp_path: Path
 ) -> tuple[int, Served, str]:

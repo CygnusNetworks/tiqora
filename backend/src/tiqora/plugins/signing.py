@@ -167,6 +167,9 @@ class KeyRing:
     official: Mapping[str, Ed25519PublicKey]
     local: Mapping[str, Ed25519PublicKey]
     publishers: Sequence[PublisherKey]  # only from VERIFIED indexes (D7)
+    #: F10: repository ids whose publisher keys may sign this package (``None`` = any). The
+    #: cross-repository checks (revocation, conflicting claims) always see every publisher key.
+    signer_repositories: frozenset[int] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,44 +217,26 @@ def resolve_trust(
             return _invalid(kid, err)
         return TrustResult(TrustLevel.LOCAL, kid, f"Eigener Schlüssel ({kid})", None)
 
-    matches = [p for p in ring.publishers if p.key_id == kid]
-    if not matches:
+    allowed = ring.signer_repositories
+    if not any(
+        p.key_id == kid and (allowed is None or p.repository_id in allowed) for p in ring.publishers
+    ):
         return TrustResult(
             TrustLevel.UNSIGNED, kid, None, "Signiert mit einem unbekannten Schlüssel"
         )
+    # every repository's claim on the key counts from here on, not only the source's
+    matches = [p for p in ring.publishers if p.key_id == kid]
     # The outcome must not depend on ring order: one key claimed for different
     # publishers is a conflict, never "first entry wins".
-    claims = {(p.publisher_id, p.publisher_name) for p in matches}
     entry = min(matches, key=lambda p: (p.publisher_id, p.publisher_name, p.repository_id))
     err = verified(entry.public_key)
     if err:
         return _invalid(kid, err)
     if any(p.revoked for p in matches):
-        return _invalid(kid, "Schlüssel des Herausgebers wurde zurückgezogen")
-    if len(claims) > 1:
-        return TrustResult(
-            TrustLevel.UNSIGNED,
-            kid,
-            None,
-            "Schlüssel wird für verschiedene Herausgeber beansprucht",
-        )
-    # F10: per repository. Every repository that claims this publisher id must
-    # list the signing key; a repository that claims the id but not the key
-    # makes the id unverified. Several keys inside one repository (rotation)
-    # are fine.
-    claiming = {
-        p.repository_id
-        for p in ring.publishers
-        if p.publisher_id == entry.publisher_id and not p.revoked
-    }
-    listing = {p.repository_id for p in matches if not p.revoked}
-    if claiming - listing:
-        return TrustResult(
-            TrustLevel.UNSIGNED,
-            kid,
-            None,
-            "Mehrere Paketquellen beanspruchen diesen Herausgeber mit unterschiedlichen Schlüsseln",
-        )
+        return _invalid(kid, REVOKED_MESSAGE)
+    contested = _contested(ring, kid)
+    if contested:
+        return TrustResult(TrustLevel.UNSIGNED, kid, None, contested)
     if manifest_publisher_id == entry.publisher_id and plugin_id.startswith(
         entry.publisher_id + "."
     ):
@@ -262,3 +247,49 @@ def resolve_trust(
         None,
         "Signiert mit einem Schlüssel, der nicht zu diesem Herausgeber gehört",
     )
+
+
+REVOKED_MESSAGE: Final = "Schlüssel des Herausgebers wurde zurückgezogen"
+MULTI_PUBLISHER_MESSAGE: Final = "Schlüssel wird für verschiedene Herausgeber beansprucht"
+MULTI_REPOSITORY_MESSAGE: Final = (
+    "Mehrere Paketquellen beanspruchen diesen Herausgeber mit unterschiedlichen Schlüsseln"
+)
+
+
+def _contested(ring: KeyRing, kid: str) -> str | None:
+    """Why the publisher key ``kid`` gives no "verified" label although it is not revoked.
+
+    One key claimed for different publishers is a conflict. F10, per repository: every
+    repository that claims the key's publisher id must list the key; a repository that claims
+    the id but not the key makes the id unverified. Several keys inside one repository
+    (rotation) are fine. Always judged on the whole ring, whichever repository is the source.
+    """
+    matches = [p for p in ring.publishers if p.key_id == kid]
+    if len({(p.publisher_id, p.publisher_name) for p in matches}) > 1:
+        return MULTI_PUBLISHER_MESSAGE
+    publisher_id = matches[0].publisher_id
+    claiming = {
+        p.repository_id for p in ring.publishers if p.publisher_id == publisher_id and not p.revoked
+    }
+    listing = {p.repository_id for p in matches if not p.revoked}
+    if claiming - listing:
+        return MULTI_REPOSITORY_MESSAGE
+    return None
+
+
+def publisher_verified_in(ring: KeyRing, publisher_id: str, repository_id: int) -> bool:
+    """Catalog badge (F10): would a package of ``publisher_id`` signed with one of
+    ``repository_id``'s keys be rated "verifizierter Herausgeber"?
+
+    True when the repository lists at least one key for the publisher that is revoked nowhere
+    and not contested (see :func:`_contested`), i.e. the same rules :func:`resolve_trust`
+    applies to a download from that repository.
+    """
+    for p in ring.publishers:
+        if p.repository_id != repository_id or p.publisher_id != publisher_id or p.revoked:
+            continue
+        if any(q.revoked for q in ring.publishers if q.key_id == p.key_id):
+            continue
+        if _contested(ring, p.key_id) is None:
+            return True
+    return False

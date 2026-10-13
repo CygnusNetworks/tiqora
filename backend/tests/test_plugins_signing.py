@@ -4,12 +4,14 @@ import base64
 import json
 import logging
 import re
+from dataclasses import replace
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from tiqora.config import Settings
 from tiqora.plugins.signing import (
+    MULTI_REPOSITORY_MESSAGE,
     KeyRing,
     PublisherKey,
     SignatureError,
@@ -21,6 +23,7 @@ from tiqora.plugins.signing import (
     parse_public_key,
     parse_signature,
     public_key_text,
+    publisher_verified_in,
     resolve_trust,
     sign_bytes,
     verify_signature,
@@ -392,3 +395,69 @@ def test_local_keys_from_settings_skip_bad_entries(caplog) -> None:
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert "garbage" not in warnings[0].getMessage()
+
+
+def test_source_restriction_keeps_the_cross_repository_check() -> None:
+    """F10: a download from B (which lists the signer) is unverified while A claims the
+    same publisher id with another key; restricting the signer keys must not hide A."""
+    priv_b, pub_b, kid_b = make_keypair()
+    _priv_a, pub_a, kid_a = make_keypair()
+    full = _ring(
+        publishers=[
+            _publisher(pub_a, kid_a, repository_id=1),
+            _publisher(pub_b, kid_b, repository_id=2, publisher_name="Lookalike"),
+        ]
+    )
+    from_b = replace(full, signer_repositories=frozenset({2}))
+    r = _resolve(priv_b, from_b)
+    assert r.level is TrustLevel.UNSIGNED and r.signer is None
+    assert r.problem == MULTI_REPOSITORY_MESSAGE
+    assert _resolve(priv_b, full).problem == MULTI_REPOSITORY_MESSAGE  # upload agrees
+
+
+def test_source_restriction_refuses_keys_of_other_repositories() -> None:
+    priv, pub, kid = make_keypair()
+    ring = _ring(publishers=[_publisher(pub, kid, repository_id=1)])
+    assert _resolve(priv, ring).level is TrustLevel.VERIFIED_PUBLISHER
+    r = _resolve(priv, replace(ring, signer_repositories=frozenset({2})))
+    assert (
+        r.level is TrustLevel.UNSIGNED and r.problem == "Signiert mit einem unbekannten Schlüssel"
+    )
+    assert _resolve(priv, replace(ring, signer_repositories=frozenset())).signer is None
+    assert (
+        _resolve(priv, replace(ring, signer_repositories=frozenset({1}))).level
+        is TrustLevel.VERIFIED_PUBLISHER
+    )
+
+
+def test_catalog_badge_follows_the_install_rules() -> None:
+    _p1, pub1, kid1 = make_keypair()
+    _p2, pub2, kid2 = make_keypair()
+    alone = _ring(publishers=[_publisher(pub1, kid1, repository_id=1)])
+    assert publisher_verified_in(alone, "org.example", 1) is True
+    assert publisher_verified_in(alone, "org.example", 2) is False  # not listed there
+    assert publisher_verified_in(alone, "org.other", 1) is False
+    contested = _ring(
+        publishers=[
+            _publisher(pub1, kid1, repository_id=1),
+            _publisher(pub2, kid2, repository_id=2),
+        ]
+    )
+    assert publisher_verified_in(contested, "org.example", 1) is False
+    assert publisher_verified_in(contested, "org.example", 2) is False
+    revoked = _ring(publishers=[_publisher(pub1, kid1, repository_id=1, revoked=True)])
+    assert publisher_verified_in(revoked, "org.example", 1) is False
+    revoked_elsewhere = _ring(
+        publishers=[
+            _publisher(pub1, kid1, repository_id=1),
+            _publisher(pub1, kid1, repository_id=2, revoked=True),
+        ]
+    )
+    assert publisher_verified_in(revoked_elsewhere, "org.example", 1) is False
+    rotated = _ring(
+        publishers=[
+            _publisher(pub1, kid1, repository_id=1, revoked=True),
+            _publisher(pub2, kid2, repository_id=1),
+        ]
+    )
+    assert publisher_verified_in(rotated, "org.example", 1) is True

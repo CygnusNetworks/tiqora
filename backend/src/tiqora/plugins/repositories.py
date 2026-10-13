@@ -50,6 +50,7 @@ from tiqora.plugins.signing import (
     TrustLevel,
     local_keys,
     parse_public_key,
+    publisher_verified_in,
 )
 from tiqora.security.outbound import HostResolver, OutboundURLError, pin_outbound_url
 
@@ -105,17 +106,20 @@ async def build_key_ring_named(
 def ring_for_source(
     ring: KeyRing, names: dict[int, str], *, source: str, repository_id: int | None
 ) -> tuple[KeyRing, dict[int, str]]:
-    """F10: a package that came from a repository is judged by that repository's keys only.
+    """F10: a package that came from a repository may only be signed by that repository's keys.
 
-    Other sources (upload) keep the full ring. A repository package whose repository is gone
-    (``repository_id`` None) gets no publisher keys at all.
+    Other sources (upload) may use every verified repository's keys. A repository package whose
+    repository is gone (``repository_id`` None) has no signing keys at all. The ring itself
+    stays complete: two verified repositories claiming one publisher id with different keys
+    make the id unverified, whichever of them the package came from.
     """
     if source != "repository":
         return ring, names
-    narrowed = replace(
-        ring, publishers=[p for p in ring.publishers if p.repository_id == repository_id]
+    allowed = frozenset() if repository_id is None else frozenset({repository_id})
+    return (
+        replace(ring, signer_repositories=allowed),
+        {rid: name for rid, name in names.items() if rid == repository_id},
     )
-    return narrowed, {rid: name for rid, name in names.items() if rid == repository_id}
 
 
 async def build_key_ring(session: AsyncSession, settings: Settings) -> KeyRing:
@@ -960,6 +964,8 @@ async def catalog(
     installed = await store.list_plugin_rows(session)
     images = image_plugin_ids(settings)
     publishers_of = await installed_publishers(session, installed)
+    # the whole ring (not only the filtered repository): F10 conflicts span repositories
+    ring = await build_key_ring(session, settings)
     core = release_core_version()
     from tiqora_sdk import SDK_VERSION
 
@@ -984,6 +990,7 @@ async def catalog(
                 key_ids if repo.index_verified else set(),
                 core,
                 SDK_VERSION,
+                ring,
             )
             if entry is None:
                 continue
@@ -1014,6 +1021,7 @@ def _entry(
     verified_key_ids: set[str],
     core: Version | None,
     sdk: str,
+    ring: KeyRing,
 ) -> CatalogEntryOut | None:
     ordered = sorted(plugin.versions, key=_version_key, reverse=True)
     if not ordered:
@@ -1021,8 +1029,12 @@ def _entry(
     latest = next((v for v in ordered if not v.yanked), ordered[0])
     best = newest_compatible(plugin, core=core, sdk=sdk)
     publisher = publishers.get(plugin.publisher_id) if plugin.publisher_id else None
+    # the same rules as the install path (revoked keys, F10 conflicts): resolve_trust
     publisher_verified = bool(
-        repo.index_verified and publisher is not None and plugin.id.startswith(publisher.id + ".")
+        repo.index_verified
+        and publisher is not None
+        and plugin.id.startswith(publisher.id + ".")
+        and publisher_verified_in(ring, publisher.id, repo.id)
     )
     installed_version = installed.version if installed is not None else None
     update = (

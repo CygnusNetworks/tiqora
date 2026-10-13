@@ -42,7 +42,7 @@ from tiqora.plugins.repositories import (
     update_binding_ok,
     url_key,
 )
-from tiqora.plugins.signing import sign_bytes
+from tiqora.plugins.signing import key_id, parse_public_key, sign_bytes
 
 pytestmark = pytest.mark.db
 
@@ -618,6 +618,41 @@ async def test_catalog_filters_and_flags(
         repo.enabled = False
         await s.commit()
     assert {e.repository_id for e in (await run()).entries} == {verified}
+
+
+async def test_catalog_badge_agrees_with_install_trust(
+    url_fixture: async_sessionmaker[AsyncSession],
+) -> None:
+    """Task 18 M1 / F10: revoked keys and a contested publisher id lose the badge."""
+    first = await _add_repo(url_fixture)
+    await _refresh(url_fixture, first, Served(signed(make_index())))
+
+    async def badge() -> bool:
+        async with url_fixture() as s:
+            out = await catalog(s, settings=_settings(), repository_id=first)
+        (entry,) = [e for e in out.entries if e.plugin_id == PLUGIN]
+        return entry.publisher_verified
+
+    assert await badge() is True
+    # a second verified repository claims org.example with another key
+    second = await _add_repo(url_fixture, URL2, name="plg62260 two")
+    other = make_index(generated_at="2026-10-12T09:00:00Z")
+    other["publishers"][0]["keys"] = [
+        {"key_id": key_id(parse_public_key(OTHER_PUB)), "public_key": OTHER_PUB, "revoked": False}
+    ]
+    await _refresh(url_fixture, second, Served(signed(other)))
+    assert await badge() is False  # even with the catalog filtered to the first repository
+    async with url_fixture() as s:
+        repo = await s.get(TiqoraPluginRepository, second)
+        assert repo is not None
+        repo.enabled = False
+        await s.commit()
+    assert await badge() is True
+    # the only key revoked: no badge
+    revoked = make_index(generated_at="2026-10-12T10:00:00Z")
+    revoked["publishers"][0]["keys"][0]["revoked"] = True
+    await _refresh(url_fixture, first, Served(signed(revoked)))
+    assert await badge() is False
 
 
 async def test_catalog_marks_yanked_and_incompatible_versions(
