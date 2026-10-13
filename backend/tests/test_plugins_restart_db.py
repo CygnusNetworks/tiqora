@@ -5,6 +5,8 @@ Band 62080-62119: process hostnames and restart reasons start with ``plg62080``.
 
 from __future__ import annotations
 
+import asyncio
+import json
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 
@@ -19,6 +21,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraJob, TiqoraProcess, TiqoraRestart
 from tiqora.plugins import restart, state
 from tiqora.plugins.restart import (
+    live_loaded_packages,
     plugin_job_active,
     purge_dead_processes,
     register_process,
@@ -278,6 +281,7 @@ async def test_plugin_job_active(factory: async_sessionmaker[AsyncSession]) -> N
         s.add(job)
         await s.commit()
         done = await plugin_job_active(s)
+        assert done is False
         job.status = "queued"
         await s.commit()
         assert await plugin_job_active(s) is True
@@ -461,3 +465,128 @@ async def test_purge_dead_processes(factory: async_sessionmaker[AsyncSession]) -
             ).scalars()
         }
     assert ids == {f"worker:{HOST}:1:fresh"}
+
+
+async def test_unregister_keeps_exiting_row(factory: async_sessionmaker[AsyncSession]) -> None:
+    async with factory() as s:
+        s.add(_proc("a1", "api", 0))
+        s.add(_proc("a2", "api", 0))
+        await s.commit()
+    await _request(factory)
+    exits: list[int] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        pass
+
+    await restart_watch_loop(
+        factory,
+        "api",
+        f"api:{HOST}:1:a1",
+        settings=_settings(),
+        on_exit=lambda: exits.append(1),
+        sleep=fake_sleep,
+        clock=lambda: T0 + timedelta(seconds=1),
+    )
+    assert exits == [1]
+    await unregister_process(factory, f"api:{HOST}:1:a1")
+    async with factory() as s:
+        a1 = (
+            await s.execute(
+                select(TiqoraProcess).where(TiqoraProcess.instance_id == f"api:{HOST}:1:a1")
+            )
+        ).scalar_one()
+    assert a1.exiting_at is not None
+    # a2 must still wait for the replacement of a1
+    stayed: list[int] = []
+
+    async def stop_sleep(seconds: float) -> None:
+        stayed.append(1)
+        raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        await restart_watch_loop(
+            factory,
+            "api",
+            f"api:{HOST}:1:a2",
+            settings=_settings(),
+            on_exit=lambda: exits.append(2),
+            sleep=stop_sleep,
+            clock=lambda: T0 + timedelta(seconds=2),
+        )
+    assert exits == [1] and stayed == [1]
+
+
+async def test_loaded_packages_stored_and_read(factory: async_sessionmaker[AsyncSession]) -> None:
+    iid = await register_process(
+        factory,
+        "api",
+        now=T0,
+        hostname=HOST,
+        pid=7,
+        loaded_packages=["acme.demo@abc123", "acme.other@def456"],
+    )
+    async with factory() as s:
+        row = (
+            await s.execute(select(TiqoraProcess).where(TiqoraProcess.instance_id == iid))
+        ).scalar_one()
+        assert json.loads(row.loaded_packages or "") == ["acme.demo@abc123", "acme.other@def456"]
+        live = await live_loaded_packages(s, now=T0 + timedelta(seconds=5))
+        assert live["acme.demo"] == {"abc123"} and live["acme.other"] == {"def456"}
+        assert await live_loaded_packages(s, now=T0 + timedelta(hours=1)) == {}
+
+
+async def test_reinsert_keeps_generation_and_packages(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await _request(factory)
+    iid = await register_process(
+        factory, "api", now=T0, hostname=HOST, pid=8, loaded_packages=["acme.demo@abc"]
+    )
+    gen_at_boot = (await _row_of(factory, iid)).boot_generation
+    ticks = iter([T0, T0 + timedelta(seconds=1)])
+
+    async def sleep(seconds: float) -> None:
+        async with factory() as s:
+            await s.execute(delete(TiqoraProcess).where(TiqoraProcess.instance_id == iid))
+            await _request_in(s)
+            await s.commit()
+
+    stop = asyncio.Event()
+    calls = 0
+
+    async def sleeper(seconds: float) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            await sleep(seconds)
+        else:
+            stop.set()
+
+    await restart_watch_loop(
+        factory,
+        "api",
+        iid,
+        settings=_settings(plugins_coordinated_restart=False),
+        on_exit=lambda: None,
+        stop=stop,
+        sleep=sleeper,
+        clock=lambda: next(ticks, T0 + timedelta(seconds=2)),
+        loaded_packages=["acme.demo@abc"],
+    )
+    row = await _row_of(factory, iid)
+    async with factory() as s:  # the re-inserted row carries the real hostname
+        await s.execute(delete(TiqoraProcess).where(TiqoraProcess.instance_id == iid))
+        await s.commit()
+    assert row.boot_generation == gen_at_boot
+    assert json.loads(row.loaded_packages or "") == ["acme.demo@abc"]
+
+
+async def _row_of(factory: async_sessionmaker[AsyncSession], iid: str) -> TiqoraProcess:
+    async with factory() as s:
+        return (
+            await s.execute(select(TiqoraProcess).where(TiqoraProcess.instance_id == iid))
+        ).scalar_one()
+
+
+async def _request_in(s: AsyncSession) -> None:
+    await request_restart(s, by=7, reason=REASON, now=T0 + timedelta(seconds=1))

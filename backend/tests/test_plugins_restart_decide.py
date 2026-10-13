@@ -114,6 +114,15 @@ def test_timeout_stops_sequence() -> None:
     )
 
 
+def test_clock_starts_at_exit_after_busy_worker() -> None:
+    # worker held back by a plugin job until T0+170, then gone; mcp must not fail at 185
+    w_gone = P("w1", "worker", 4, hb=170, exiting=170)
+    m = P("m1", "mcp", 4, hb=185)
+    assert D(m, [w_gone, m], at=185).action == "stay"
+    m2 = P("m1", "mcp", 4, hb=360)
+    assert D(m2, [w_gone, m2], at=360).action == "fail"
+
+
 def test_busy_worker_is_not_a_timeout() -> None:
     # an old worker that has not left (a plugin job runs there) never makes mcp fail
     w = P("w1", "worker", 4, hb=500)

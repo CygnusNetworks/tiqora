@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 import socket
 import uuid
@@ -143,8 +144,9 @@ def _timed_out(
         for p in mine
         if p.exiting_at is not None and p.exiting_at >= target.requested_at
     ]
-    if exits and (now - max(exits)).total_seconds() > timeout:
-        return True
+    if exits:
+        # the clock starts at the last exit (D10), also when the replacement is not up yet
+        return (now - max(exits)).total_seconds() > timeout
     return not live and (now - target.requested_at).total_seconds() > timeout
 
 
@@ -242,8 +244,12 @@ async def _insert_process(
     hostname: str,
     pid: int,
     now: datetime,
+    boot_generation: int | None = None,
+    loaded_packages: Sequence[str] = (),
 ) -> None:
-    generation = (await session.execute(select(func.max(TiqoraRestart.generation)))).scalar()
+    generation = boot_generation
+    if generation is None:
+        generation = (await session.execute(select(func.max(TiqoraRestart.generation)))).scalar()
     session.add(
         TiqoraProcess(
             instance_id=instance_id,
@@ -254,6 +260,7 @@ async def _insert_process(
             started_at=now,
             heartbeat_at=now,
             exiting_at=None,
+            loaded_packages=json.dumps(list(loaded_packages)),
         )
     )
 
@@ -265,14 +272,25 @@ async def register_process(
     now: datetime,
     hostname: str | None = None,
     pid: int | None = None,
+    loaded_packages: Sequence[str] = (),
 ) -> str:
-    """Insert this process; ``boot_generation`` is the newest restart generation (0 = none)."""
+    """Insert this process; ``boot_generation`` is the newest restart generation (0 = none).
+
+    ``loaded_packages`` (``id@sha`` entries, F8) is stored so that the boot-time runtime
+    gc (Task 18) keeps the directories live processes have loaded.
+    """
     host = hostname or socket.gethostname()
     process_id = pid if pid is not None else os.getpid()
     instance_id = f"{role}:{host}:{process_id}:{uuid.uuid4().hex[:8]}"
     async with factory() as session:
         await _insert_process(
-            session, instance_id=instance_id, role=role, hostname=host, pid=process_id, now=now
+            session,
+            instance_id=instance_id,
+            role=role,
+            hostname=host,
+            pid=process_id,
+            now=now,
+            loaded_packages=loaded_packages,
         )
         await session.commit()
     return instance_id
@@ -293,15 +311,43 @@ async def heartbeat(
 
 
 async def unregister_process(factory: async_sessionmaker[AsyncSession], instance_id: str) -> None:
-    """Remove the row at clean shutdown. Best effort: errors are logged, not raised."""
+    """Remove the row at clean shutdown. Best effort: errors are logged, not raised.
+
+    A row with ``exiting_at`` (coordinated restart) stays: it is the evidence that
+    serialises same-role restarts and starts the timeout clock; the api purges it later.
+    """
     try:
         async with factory() as session:
             await session.execute(
-                delete(TiqoraProcess).where(TiqoraProcess.instance_id == instance_id)
+                delete(TiqoraProcess).where(
+                    TiqoraProcess.instance_id == instance_id,
+                    TiqoraProcess.exiting_at.is_(None),
+                )
             )
             await session.commit()
     except Exception as exc:
         log.warning("plugin_process_unregister_failed", instance_id=instance_id, error=str(exc))
+
+
+async def live_loaded_packages(session: AsyncSession, *, now: datetime) -> dict[str, set[str]]:
+    """Package id -> shas that live processes have loaded (for the runtime-dir gc, F8)."""
+    cutoff = now - timedelta(seconds=LIVE_WITHIN_SECONDS)
+    rows = (
+        (await session.execute(select(TiqoraProcess).where(TiqoraProcess.heartbeat_at >= cutoff)))
+        .scalars()
+        .all()
+    )
+    out: dict[str, set[str]] = {}
+    for r in rows:
+        try:
+            entries = json.loads(r.loaded_packages or "[]")
+        except ValueError:
+            continue
+        for entry in entries if isinstance(entries, list) else []:
+            pkg, _, sha = str(entry).partition("@")
+            if pkg and sha:
+                out.setdefault(pkg, set()).add(sha)
+    return out
 
 
 async def purge_dead_processes(session: AsyncSession, *, older_than: datetime) -> int:
@@ -324,6 +370,21 @@ async def request_restart(
     rows = (await session.execute(select(TiqoraProcess))).scalars().all()
     cutoff = now - timedelta(seconds=LIVE_WITHIN_SECONDS)
     alive = {r.role for r in rows if r.heartbeat_at >= cutoff and r.exiting_at is None}
+    # a role in its restart gap (exited, replacement not registered yet) still needs
+    # the newer generation: keep the roles of the request this one supersedes
+    open_roles = (
+        (
+            await session.execute(
+                select(TiqoraRestart.roles).where(
+                    TiqoraRestart.finished_at.is_(None), TiqoraRestart.failed_message.is_(None)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for entry in open_roles:
+        alive.update(x for x in entry.split(",") if x)
     roles = [r for r in restart_roles() if r in alive]
     await session.execute(
         update(TiqoraRestart)
@@ -392,6 +453,7 @@ async def restart_watch_loop(
     stop: asyncio.Event | None = None,
     sleep: Callable[[float], Awaitable[object]] | None = None,
     clock: Callable[[], datetime] = utcnow,
+    loaded_packages: Sequence[str] = (),
 ) -> None:
     """Heartbeat and follow restart requests until this process leaves.
 
@@ -400,6 +462,7 @@ async def restart_watch_loop(
     global _REQUESTED
     hostname = socket.gethostname()
     pid = os.getpid()
+    boot_generation: int | None = None
     while stop is None or not stop.is_set():
         try:
             now = clock()
@@ -412,8 +475,19 @@ async def restart_watch_loop(
                         hostname=hostname,
                         pid=pid,
                         now=now,
+                        boot_generation=boot_generation,
+                        loaded_packages=loaded_packages,
                     )
                     await session.commit()
+            elif boot_generation is None:
+                async with factory() as session:
+                    boot_generation = (
+                        await session.execute(
+                            select(TiqoraProcess.boot_generation).where(
+                                TiqoraProcess.instance_id == instance_id
+                            )
+                        )
+                    ).scalar()
             if await _step(factory, role, instance_id, settings, now):
                 _REQUESTED = True
                 log.info("plugin_restart_exit", role=role, instance_id=instance_id)
