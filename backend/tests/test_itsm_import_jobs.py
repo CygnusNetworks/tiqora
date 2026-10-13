@@ -364,27 +364,6 @@ async def test_finish_run_stores_summary_and_truncates_message(world: _World) ->
     assert summary["issues"][0]["code"] == "link_target_unsupported"
 
 
-async def test_switch_job_stub_fails_the_run(world: _World) -> None:
-    async with world.factory() as s:
-        run = await start_run(s, kind="switch", user_id=56309)
-        job = await enqueue_job(
-            s,
-            kind=SWITCH_JOB_KIND,
-            payload=ItsmSwitchPayload(user_id=56309, run_id=run.id, addon_installed=True),
-            created_by=56309,
-            dedupe_key=IMPORT_DEDUPE_KEY,
-        )
-        await s.commit()
-        run_id, job_id = run.id, job.id
-    payload = ItsmSwitchPayload(user_id=56309, run_id=run_id, addon_installed=True)
-    with pytest.raises(JobFailed):
-        await call_handler(
-            world.factory, job_id, jobs.run_itsm_switch_job, payload, SWITCH_JOB_KIND
-        )
-    run_row = await _run(world, run_id)
-    assert run_row.status == "failed" and run_row.job_id == job_id and run_row.message
-
-
 async def test_interrupted_switch_clears_readonly_flag(world: _World) -> None:
     async with world.factory() as s:
         run = await start_run(s, kind="switch", user_id=56310)

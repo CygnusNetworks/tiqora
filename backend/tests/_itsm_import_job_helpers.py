@@ -1,4 +1,4 @@
-"""Shared setup of the importer job and CLI tests (band 56300-56329 for users and runs)."""
+"""Shared setup of the importer job and CLI tests (band 56300-56369 for users and runs)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from tiqora.itsm.importer.jobs import (
 from tiqora.jobs.context import JobContext
 from tiqora.jobs.service import enqueue_job
 
-USER_LO, USER_HI = 56300, 56329
+USER_LO, USER_HI = 56300, 56369
 #: the last id of the shared importer band; map rows of this module are moved there so that
 #: ``cleanup_cmdb_rows`` finds (and deletes) what the runs created
 MAP_BAND_END = 56299
@@ -84,10 +84,10 @@ def wipe(sync_url: str) -> None:
             conn.execute(
                 text(
                     "DELETE FROM tiqora_settings WHERE `key` IN"
-                    " ('itsm.switch', 'itsm.znuny_readonly')"
+                    " ('itsm.switch', 'itsm.znuny_readonly', 'itsm.mode', 'itsm.mode_meta')"
                     if conn.dialect.name == "mysql"
                     else "DELETE FROM tiqora_settings WHERE key IN"
-                    " ('itsm.switch', 'itsm.znuny_readonly')"
+                    " ('itsm.switch', 'itsm.znuny_readonly', 'itsm.mode', 'itsm.mode_meta')"
                 )
             )
     finally:

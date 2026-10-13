@@ -25,6 +25,14 @@ from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraJob, TiqoraSettin
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.pipeline import ImportBlocked, run_import
 from tiqora.itsm.importer.report import ImportReport
+from tiqora.itsm.importer.switch import (
+    ALREADY_SWITCHED as ALREADY_SWITCHED,
+)
+from tiqora.itsm.importer.switch import (
+    SwitchBlocked,
+    check_can_import,
+    check_can_switch,
+)
 from tiqora.itsm.mode import SETTING_ZNUNY_READONLY
 from tiqora.jobs.context import JobCancelled, JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
@@ -35,8 +43,6 @@ SWITCH_JOB_KIND: Final = "core.itsm_switch"
 IMPORT_DEDUPE_KEY: Final = "itsm_import"
 IMPORT_LANE: Final = "itsm_import"
 CSV_NAME: Final = "itsm-import-bericht.csv"
-ALREADY_SWITCHED: Final = "Die ITSM-Daten werden bereits in Tiqora geführt."
-SWITCH_UNAVAILABLE: Final = "Die Umstellung ist noch nicht verfügbar."
 SWITCH_INTERRUPTED: Final = "Die Umstellung wurde unterbrochen; Znuny ist wieder beschreibbar."
 IMPORT_INTERRUPTED: Final = "Der Import wurde unterbrochen."
 MESSAGE_MAX: Final = 500
@@ -49,8 +55,8 @@ class ImportBusy(Exception):
     """An import or switch job is active (API -> 409, CLI -> exit 1)."""
 
 
-class ImportNotAllowed(Exception):
-    """The ITSM data is already kept in Tiqora; the message is shown to the admin (German)."""
+#: the ITSM data is already kept in Tiqora (or another precondition fails); German message
+ImportNotAllowed = SwitchBlocked
 
 
 class ItsmImportPayload(BaseModel):
@@ -64,6 +70,9 @@ class ItsmSwitchPayload(BaseModel):
     user_id: int
     run_id: int
     addon_installed: bool
+    edits_stopped: bool = False
+    #: "Umstellen ohne CI-Daten": Znuny ITSM release the importer cannot read (itsm1 F19)
+    without_ci_data: bool = False
 
 
 async def _lock_import_start(session: AsyncSession) -> None:
@@ -164,12 +173,6 @@ async def _mark_running(
         await session.commit()
 
 
-async def check_can_import(session: AsyncSession) -> None:
-    """Refuse an import after the switch (the data is kept in Tiqora from then on)."""
-    if await facades.get_ports(session).mode.is_switched():
-        raise ImportNotAllowed(ALREADY_SWITCHED)
-
-
 async def set_znuny_readonly(session_factory: async_sessionmaker[AsyncSession], flag: bool) -> None:
     """Write ``itsm.znuny_readonly`` (the only setting the importer writes itself)."""
     async with session_factory() as session:
@@ -180,6 +183,10 @@ async def set_znuny_readonly(session_factory: async_sessionmaker[AsyncSession], 
         else:
             row.value = value
         await session.commit()
+
+
+def _switch_failure_message(exc: BaseException) -> str:
+    return f"Die Umstellung ist fehlgeschlagen ({type(exc).__name__}): {exc}"[:MESSAGE_MAX]
 
 
 def _failure_message(exc: BaseException) -> str:
@@ -228,16 +235,67 @@ async def _import_interrupted(ctx: JobContext, payload: Any) -> None:
 
 
 async def run_itsm_switch_job(ctx: JobContext, payload: Any) -> dict[str, Any] | None:
-    """Stub until Task 14: records the run as failed."""
-    await _mark_running(ctx.session_factory, payload.run_id, ctx.job_id)
-    await finish_run(
-        ctx.session_factory,
-        payload.run_id,
-        status="failed",
-        report=None,
-        message=SWITCH_UNAVAILABLE,
-    )
-    raise JobFailed(SWITCH_UNAVAILABLE)
+    """Final import under the read-only flag, then itsm1's switch in one transaction (D7, R6).
+
+    The flag ``itsm.znuny_readonly`` is set (and committed) before the import reads Znuny, and it
+    is cleared again on every way out that does not end in the switch (error, cancel, timeout).
+    """
+    factory = ctx.session_factory
+    await _mark_running(factory, payload.run_id, ctx.job_id)
+    try:
+        async with factory() as session:
+            await check_can_switch(
+                session,
+                addon_installed=payload.addon_installed,
+                edits_stopped=payload.edits_stopped,
+                without_ci_data=payload.without_ci_data,
+                ignore_job_id=ctx.job_id,
+            )
+    except SwitchBlocked as exc:
+        await finish_run(factory, payload.run_id, status="failed", report=None, message=exc.message)
+        raise JobFailed(exc.message) from exc
+
+    await set_znuny_readonly(factory, True)
+    try:
+        report = ImportReport()
+        if not payload.without_ci_data:
+            report = await run_import(
+                factory,
+                run_id=payload.run_id,
+                user_id=payload.user_id,
+                dry_run=False,
+                page_size=500,
+                progress=ctx.progress,
+                check_cancelled=ctx.check_cancelled,
+            )
+            await ctx.add_file(CSV_NAME, "text/csv; charset=utf-8", report.to_csv())
+        await ctx.check_cancelled()
+        async with factory() as session:
+            await facades.get_ports(session).mode.switch_to_tiqora(
+                user_id=payload.user_id, import_run_id=payload.run_id
+            )
+            await session.commit()
+    except BaseException as exc:
+        # the flag must never stay set unless the switch succeeded
+        await set_znuny_readonly(factory, False)
+        if isinstance(exc, JobCancelled):
+            await finish_run(factory, payload.run_id, status="cancelled", report=None, message=None)
+        elif isinstance(exc, ImportBlocked):
+            await finish_run(
+                factory, payload.run_id, status="failed", report=None, message=str(exc)
+            )
+            raise JobFailed(str(exc)) from exc
+        else:
+            await finish_run(
+                factory,
+                payload.run_id,
+                status="failed",
+                report=None,
+                message=_switch_failure_message(exc),
+            )
+        raise
+    await finish_run(factory, payload.run_id, status="done", report=report, message=None)
+    return {"run_id": payload.run_id, "issues": len(report.issues)}
 
 
 async def _switch_interrupted(ctx: JobContext, payload: Any) -> None:
