@@ -6,7 +6,7 @@
     <title>Tiqora vs Znuny, OTRS, Zammad, FreeScout — self-hosted helpdesk comparison</title>
     <meta
       name="description"
-      content="An honest comparison of self-hosted helpdesks as of October 2026: Tiqora, Znuny, OTRS, Zammad, FreeScout and osTicket. License, stack, AI and PII masking, PGP/S/MIME, GDPR tools, channels, SSO, ITSM and migration paths from OTRS/Znuny, with sources for every claim."
+      content="An honest comparison of self-hosted helpdesks as of October 2026: Tiqora, Znuny, OTRS, Zammad, FreeScout and osTicket. License, stack, AI and PII masking, PGP/S/MIME, GDPR tools, channels and web chat, SSO and SCIM, processes, ITSM/CMDB, reporting, dashboards, extensions and migration paths from OTRS/Znuny, with sources for every claim."
     />
     <meta name="theme-color" content="#0e1015" />
     <link rel="canonical" href="https://cygnusnetworks.github.io/tiqora/compare.html" />
@@ -25,7 +25,7 @@
     <meta property="og:image:height" content="640" />
     <meta property="og:image:alt" content="Tiqora — modern helpdesk, Znuny/OTRS-compatible" />
     <meta property="og:locale" content="en_US" />
-    <meta property="article:modified_time" content="2026-10-01" />
+    <meta property="article:modified_time" content="2026-10-14" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Tiqora vs Znuny, OTRS, Zammad, FreeScout — self-hosted helpdesk comparison" />
     <meta
@@ -39,7 +39,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Tiqora",
-        "description": "Modern self-hosted helpdesk and ticket system, database-compatible with OTRS 6.0.x and Znuny 6.0–7.3, with AI-assisted drafts, summaries and auto-replies, PII masking before LLM calls, an MCP server, PGP/S/MIME and GDPR tooling.",
+        "description": "Modern self-hosted helpdesk and ticket system, database-compatible with OTRS 6.0.x and Znuny 6.0–7.3, with AI-assisted drafts, summaries and auto-replies, PII masking before LLM calls, an MCP server, ITSM and CMDB, process designer, reporting, web chat, SAML/OIDC with SCIM, plugins, PGP/S/MIME and GDPR tooling.",
         "applicationCategory": "BusinessApplication",
         "applicationSubCategory": "Helpdesk / ticket system",
         "operatingSystem": "Linux (Docker)",
@@ -60,7 +60,15 @@
           "MCP server with the same permission engine as the UI",
           "PGP and S/MIME",
           "GDPR anonymization and retention",
-          "OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP and passkeys",
+          "SAML 2.0 and OIDC for agents and customers, SCIM 2.0 provisioning, step-up MFA",
+          "LDAP/AD, Kerberos/SPNEGO, TOTP and passkeys",
+          "ITSM incident and problem management, CMDB, import of Znuny ITSM data",
+          "Process designer for Znuny processes",
+          "Report builder, Znuny statistics import, scheduled PDF/XLSX/CSV reports",
+          "Widget dashboards and wallboards",
+          "Web chat with an AI first line",
+          "GenericInterface provider and requester compatibility",
+          "Plugins from signed packages and repositories",
           "49 UI languages"
         ],
         "sameAs": ["https://github.com/CygnusNetworks/tiqora"],
@@ -404,7 +412,7 @@
     <main>
       <section class="hero">
         <div class="wrap">
-          <div class="eyebrow">Comparison · as of October 2026</div>
+          <div class="eyebrow">Comparison · as of 14 October 2026</div>
           <h1>Tiqora vs Znuny, OTRS, Zammad, FreeScout &amp; osTicket</h1>
           <p class="lede">
             For teams running OTRS or Znuny today, and for anyone choosing a
@@ -413,9 +421,10 @@
           </p>
           <p class="notice">
             <strong>Fair warning:</strong> we build Tiqora, and Tiqora is young — the
-            first public release was in September 2026. This comparison reflects what
-            we could verify in each product's own docs, sites and repositories as of
-            October 2026. Every competitor claim links to a source; where we could not
+            first public release was in September 2026, and its ITSM, CMDB, process
+            designer, report builder, web chat and plugin system are only weeks or
+            months old. This comparison reflects what we could verify in each
+            product's own docs, sites and repositories as of 14 October 2026. Every competitor claim links to a source; where we could not
             verify something, the cell says “—”. Corrections are welcome in
             <a href="https://github.com/CygnusNetworks/tiqora/discussions">GitHub Discussions</a>.
           </p>
@@ -439,9 +448,10 @@
               <h3>Tiqora or stay on Znuny</h3>
               <p>
                 Tiqora runs on your existing database next to Znuny, so you can try a
-                modern UI and AI assistance without a data migration. Znuny itself
-                remains the safe choice if you depend on ITSM/CMDB packages, the stats
-                framework or custom OPM add-ons.
+                modern UI and AI assistance without a data migration. It runs your
+                Znuny processes, reads or imports your Znuny ITSM data and imports
+                your statistics. Znuny remains the safe choice if you need ITSM change
+                management or depend on custom OPM add-ons.
               </p>
             </article>
             <article class="card">
@@ -450,7 +460,8 @@
               <p>
                 Long track record, a broad channel list (chat, social, phone, messaging),
                 hosted and self-hosted editions and commercial support. Tiqora is
-                stronger on PII masking, PGP/S/MIME depth and OTRS/Znuny compatibility.
+                stronger on PII masking, PGP/S/MIME depth, ITSM/CMDB and OTRS/Znuny
+                compatibility.
               </p>
             </article>
             <article class="card">
@@ -487,7 +498,7 @@
           <div class="matrix-wrap" tabindex="0" role="region" aria-label="Helpdesk feature comparison table">
             <table class="matrix compare">
               <caption class="sr-only">
-                Tiqora compared with Znuny, OTRS, Zammad, FreeScout and osTicket, as of October 2026
+                Tiqora compared with Znuny, OTRS, Zammad, FreeScout and osTicket, as of 14 October 2026
               </caption>
               <thead>
                 <tr>
@@ -560,7 +571,7 @@
                 </tr>
                 <tr>
                   <th scope="row">Migration path from OTRS/Znuny</th>
-                  <td class="col-tiqora">No data migration: Znuny keeps running, Tiqora takes over daemons flag by flag, then cutover</td>
+                  <td class="col-tiqora">No data migration: Znuny keeps running, Tiqora takes over daemons flag by flag, then cutover. Imports Znuny ITSM data (CMDB), statistics and search profiles</td>
                   <td>In-place upgrade from OTRS 6 via migration scripts, one minor at a time<sup class="ref"><a href="#s10">10</a></sup></td>
                   <td>Vendor migration offer from ((OTRS)) CE<sup class="ref"><a href="#s17">17</a></sup></td>
                   <td>One-time importer for OTRS 3.1–6.x, optional delta run<sup class="ref"><a href="#s24">24</a></sup></td>
@@ -569,7 +580,7 @@
                 </tr>
                 <tr>
                   <th scope="row">REST API / GenericInterface</th>
-                  <td class="col-tiqora"><span class="badge badge-ok">REST</span> <span class="badge badge-partial">GI compat</span><small>REST <code>/api/v1</code>, webhooks; GenericTicketConnector REST/SOAP (provider side, documented gaps)</small></td>
+                  <td class="col-tiqora"><span class="badge badge-ok">REST</span> <span class="badge badge-partial">GI compat</span><small>REST <code>/api/v1</code>, webhooks. GenericInterface REST/SOAP as provider (ticket, session and <code>ConfigItem*</code> operations) and requester (ticket-event invokers, debugger, dry run); webservices are still edited in Znuny; documented gaps</small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Native GenericInterface (REST/SOAP)</small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Web services; some depend on contract tier<sup class="ref"><a href="#s13">13</a></sup></small></td>
                   <td><span class="badge badge-ok">REST</span><small>Own REST API, no GI compatibility</small></td>
@@ -645,18 +656,27 @@
                 </tr>
                 <tr>
                   <th scope="row">SSO &amp; 2FA</th>
-                  <td class="col-tiqora">OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP, passkeys<small>No SAML</small></td>
+                  <td class="col-tiqora">SAML&nbsp;2.0 and OIDC for agents and customers (several providers, JIT accounts, role rules), LDAP/AD, Kerberos/SPNEGO, TOTP, passkeys; step-up MFA from the IdP</td>
                   <td>LDAP, web-server SSO (e.g. Kerberos), native SAML since 7.3, TOTP<sup class="ref"><a href="#s3">3</a></sup><sup class="ref"><a href="#s7">7</a></sup><sup class="ref"><a href="#s6">6</a></sup></td>
                   <td>LDAP; Keycloak-based identity features<sup class="ref"><a href="#s11">11</a></sup><sup class="ref"><a href="#s13">13</a></sup></td>
                   <td>SAML, OIDC, Microsoft, Google and more; Kerberos SSO; LDAP; TOTP and security keys<sup class="ref"><a href="#s21">21</a></sup><sup class="ref"><a href="#s22">22</a></sup><sup class="ref"><a href="#s28">28</a></sup></td>
                   <td><span class="badge badge-addon">Add-on</span><small>LDAP, SAML, OAuth login and 2FA as paid modules<sup class="ref"><a href="#s32">32</a></sup></small></td>
                   <td><span class="badge badge-addon">Plugins</span><small>LDAP/AD, OAuth2, CAS, 2FA (official plugins)<sup class="ref"><a href="#s37">37</a></sup></small></td>
                 </tr>
+                <tr>
+                  <th scope="row">User provisioning (SCIM)</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>SCIM&nbsp;2.0 per identity provider; groups become agent roles</small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>SCIM&nbsp;2.0 add-on for 6.5 LTS and 7.3, “available with support”<sup class="ref"><a href="#s3b">3</a></sup></small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
 
                 <tr class="group group-names"><th scope="colgroup"><span>Channels &amp; service desk</span></th><th scope="col" class="col-tiqora">Tiqora</th><th scope="col">Znuny</th><th scope="col">OTRS</th><th scope="col">Zammad</th><th scope="col">FreeScout</th><th scope="col">osTicket</th></tr>
                 <tr>
                   <th scope="row">Channels</th>
-                  <td class="col-tiqora">Email, phone with CTI popup, Telegram, SMS, WhatsApp<small>No web chat widget, no Facebook/X</small></td>
+                  <td class="col-tiqora">Email, web chat (embeddable widget, optional AI first line), phone with CTI popup, Telegram, SMS, WhatsApp<small>No Facebook/X</small></td>
                   <td>Email; phone and web-request tickets<sup class="ref"><a href="#s6">6</a></sup></td>
                   <td>Email; inter-agent chat; more via web services<sup class="ref"><a href="#s13">13</a></sup></td>
                   <td>Email (incl. Microsoft 365, Google), web form, chat, phone/CTI, SMS, Telegram, WhatsApp, Facebook<sup class="ref"><a href="#s20">20</a></sup><sup class="ref"><a href="#s22">22</a></sup></td>
@@ -682,22 +702,49 @@
                   <td><span class="badge badge-ok">Yes</span><small>FAQ<sup class="ref"><a href="#s36">36</a></sup></small></td>
                 </tr>
                 <tr>
-                  <th scope="row">Process management / ITSM</th>
-                  <td class="col-tiqora"><span class="badge badge-partial">Partial</span><small>Runs imported Znuny processes (no designer, some conditions/actions missing); no ITSM/CMDB</small></td>
-                  <td><span class="badge badge-ok">Yes</span><small>Process designer in core; free ITSM bundle with CMDB, change, incident/problem<sup class="ref"><a href="#s6">6</a></sup><sup class="ref"><a href="#s6c">6</a></sup></small></td>
-                  <td><span class="badge badge-ok">Yes</span><small>Process engine, CMDB, ITSM<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <th scope="row">Process management</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Runs Znuny processes (agent and portal); designer with validation, Znuny YAML import/export and versions; no test run, desktop only</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Process designer in core<sup class="ref"><a href="#s6">6</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Process engine; ready-made ITSM processes<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>No process engine; core workflows adjust form fields, triggers automate<sup class="ref"><a href="#s20c">20</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Workflows module<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>SLAs, help topics, tasks, routing filters<sup class="ref"><a href="#s40">40</a></sup></small></td>
+                </tr>
+                <tr>
+                  <th scope="row">ITSM / CMDB</th>
+                  <td class="col-tiqora"><span class="badge badge-partial">Partial</span><small>Incident, problem, major incident, priority matrix; own CMDB with versioned classes and impact analysis, or read Znuny's CMDB; importer from Znuny ITSM 6.5/7.3. No change management</small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Free ITSM bundle with CMDB, change, incident/problem<sup class="ref"><a href="#s6c">6</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>IT Service Management, CMDB<sup class="ref"><a href="#s13">13</a></sup></small></td>
                   <td><span class="badge badge-no">No ITSM</span><small>i-doit CMDB integration<sup class="ref"><a href="#s22">22</a></sup></small></td>
-                  <td><span class="badge badge-addon">Add-on</span><small>Workflows module; no ITSM<sup class="ref"><a href="#s32">32</a></sup></small></td>
-                  <td><span class="badge badge-partial">Partial</span><small>SLAs, help topics, tasks; no ITSM<sup class="ref"><a href="#s40">40</a></sup></small></td>
+                  <td><span class="badge badge-no">No</span><sup class="ref"><a href="#s32">32</a></sup></td>
+                  <td><span class="badge badge-no">No</span><sup class="ref"><a href="#s40">40</a></sup></td>
                 </tr>
                 <tr>
                   <th scope="row">Reporting</th>
-                  <td class="col-tiqora"><span class="badge badge-partial">Partial</span><small>Fixed reports (volume, SLA, workload, backlog) + CSV; no configurable stats</small></td>
-                  <td><span class="badge badge-ok">Yes</span><small>Configurable stats framework<sup class="ref"><a href="#s6">6</a></sup></small></td>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>25 built-in reports, report builder, saved reports, Znuny statistics import, PDF/XLSX/CSV, scheduled e-mail delivery; no reports on CMDB data</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Configurable stats framework<sup class="ref"><a href="#s6">6</a></sup>; scheduled delivery with the “Statistic Reports” add-on (available with support)<sup class="ref"><a href="#s9b">9</a></sup></small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Extended ticket stats, time accounting<sup class="ref"><a href="#s13">13</a></sup></small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Elasticsearch-based reporting<sup class="ref"><a href="#s25">25</a></sup></small></td>
                   <td><span class="badge badge-addon">Add-on</span><small>Reports module<sup class="ref"><a href="#s32">32</a></sup></small></td>
                   <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">Dashboards &amp; wallboards</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Several widget dashboards per agent, report widgets, role templates, sharing; TV mode and read-only wallboard links</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>One dashboard per agent: widgets on/off, reorder, per-widget settings<sup class="ref"><a href="#s7b">7</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Dashboard widgets (feature list names a news widget)<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>Personal stats dashboard, updated every 30 minutes<sup class="ref"><a href="#s20d">20</a></sup></small></td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">Extensions</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Plugins</span><small>Python plugins (SDK 0.2.0) with hooks, process actions, channels, field types, report sources and more; signed packages and repositories, installed from the admin UI</small></td>
+                  <td><span class="badge badge-ok">OPM</span><small>Package Manager in core<sup class="ref"><a href="#s6">6</a></sup>; add-ons from Znuny GmbH<sup class="ref"><a href="#s9b">9</a></sup></small></td>
+                  <td>Former feature add-ons included in the contract levels<sup class="ref"><a href="#s13">13</a></sup></td>
+                  <td><span class="badge badge-ok">Packages</span><small>Package management for add-ons<sup class="ref"><a href="#s20b">20</a></sup></small></td>
+                  <td><span class="badge badge-ok">Modules</span><small>Official (mostly paid) and community modules<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-ok">Plugins</span><small>Official plugins<sup class="ref"><a href="#s37">37</a></sup></small></td>
                 </tr>
                 <tr>
                   <th scope="row">UI languages</th>
@@ -722,7 +769,9 @@
           </div>
           <p class="fine">
             “Add-on” does not mean worse: Znuny's ITSM and FAQ packages are free and
-            mature, and FreeScout's modular model keeps its core small on purpose. Prices and
+            mature, and FreeScout's modular model keeps its core small on purpose. A
+            “Yes” for Tiqora means the feature exists, not that it has the same years
+            of production use as in the other products. Prices and
             feature tiers change; check the vendor before you decide.
           </p>
         </div>
@@ -738,16 +787,16 @@
             <article class="card">
               <h3>Znuny</h3>
               <ul>
-                <li>Free ITSM bundle (CMDB, change, incident/problem) and a large OPM add-on ecosystem.</li>
-                <li>Full statistics framework and a graphical process designer.</li>
-                <li>Native SAML (7.3) and a long LTS track record; commercial services from Znuny GmbH.</li>
+                <li>Free ITSM bundle including change management, and a large OPM add-on ecosystem.</li>
+                <li>Statistics framework and process designer with many years of production use; Tiqora's report builder and designer are new.</li>
+                <li>A long LTS track record; commercial services and add-ons (for example SCIM provisioning) from Znuny GmbH.</li>
               </ul>
             </article>
             <article class="card">
               <h3>OTRS</h3>
               <ul>
                 <li>Commercial vendor with support included, managed SaaS or on-premise.</li>
-                <li>ITSM, CMDB and process engine from one vendor.</li>
+                <li>ITSM, CMDB and process engine from one vendor, with ready-made ITSM processes.</li>
                 <li>Rule-based anonymization, pseudonymization and deletion for data privacy.</li>
               </ul>
             </article>
@@ -755,8 +804,8 @@
               <h3>Zammad</h3>
               <ul>
                 <li>Maturity and a large open-source community.</li>
-                <li>Channel breadth: web chat, Facebook, SMS, Telegram, WhatsApp, Microsoft 365/Google mail, several CTI integrations.</li>
-                <li>SAML, many social logins, hosted and self-hosted editions, support contracts.</li>
+                <li>Channel breadth: Facebook, SMS, Telegram, WhatsApp, Microsoft 365/Google mail, several CTI integrations, and a web chat with a long track record.</li>
+                <li>Many social logins (Microsoft, Google and more), hosted and self-hosted editions, support contracts.</li>
               </ul>
             </article>
             <article class="card">
@@ -778,10 +827,10 @@
             <article class="card">
               <h3>Tiqora's own gaps</h3>
               <ul>
-                <li><strong>Missing:</strong> saved searches, configurable dashboards, link overview, several admin screens (sessions, SQL box, maintenance, system log), calendar admin, portal print view.</li>
-                <li><strong>Partial:</strong> statistics, GenericAgent, bulk actions, preferences, GenericInterface edge cases, process conditions/actions.</li>
-                <li><strong>By design:</strong> no OPM Package Manager, process designer, SysConfig editor or webservice editor.</li>
-                <li><strong>Not yet:</strong> SAML, web chat widget, social channels, ITSM/CMDB.</li>
+                <li><strong>Missing:</strong> ITSM change management and work orders, several admin screens (sessions, SQL box, maintenance, system log), calendar admin and appointment rules, portal print view, social channels (Facebook, X).</li>
+                <li><strong>Partial:</strong> dashboard widgets (no customer-info or RSS widget), GenericAgent, bulk actions, preferences, GenericInterface edge cases, custom Perl process condition modules; no reports on CMDB data.</li>
+                <li><strong>By design:</strong> no OPM Package Manager (Python plugins instead), no SysConfig editor, no webservice editor (webservices are edited in Znuny).</li>
+                <li><strong>New:</strong> ITSM, CMDB, SCIM, the plugin packages and the report builder arrived in 2026 and have little production mileage yet.</li>
               </ul>
               <p class="feature-link" style="margin-top:0.7rem;font-size:0.85rem">
                 <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">Full parity list ↗</a>
@@ -854,19 +903,22 @@
           </div>
           <div class="cards">
             <article class="card">
-              <h3>You need ITSM / CMDB</h3>
+              <h3>You need ITSM change management</h3>
               <p>
-                Configuration items, change management and ITIL processes: stay on
-                <strong>Znuny</strong> with its free ITSM packages, or look at
-                <strong>OTRS</strong>. Tiqora has no CMDB.
+                Changes and work orders: stay on <strong>Znuny</strong> with
+                its free ITSM packages, or look at <strong>OTRS</strong>. Tiqora has
+                incidents, problems and a CMDB, and can read Znuny's CMDB while Znuny
+                keeps the changes, but no change management of its own yet.
               </p>
             </article>
             <article class="card">
               <h3>You depend on custom OPM add-ons</h3>
               <p>
-                Tiqora cannot run Perl OPM packages. If your workflows live in add-ons,
-                <strong>Znuny</strong> is the safe home — or run Tiqora alongside and keep
-                those parts in Znuny.
+                Tiqora cannot run Perl OPM packages. Its Python plugins can take over
+                many of the same jobs (hooks, process actions, channels, field types,
+                report sources), but someone has to write them. Until then
+                <strong>Znuny</strong> is the safe home — or run Tiqora alongside and
+                keep those parts in Znuny.
               </p>
             </article>
             <article class="card">
@@ -878,18 +930,21 @@
               </p>
             </article>
             <article class="card">
-              <h3>You need web chat or social channels</h3>
+              <h3>You need social channels</h3>
               <p>
-                A website chat widget or Facebook:
-                <strong>Zammad</strong> covers these out of the box. Tiqora has
-                neither today.
+                Facebook or X: <strong>Zammad</strong> covers Facebook out of the box,
+                <strong>FreeScout</strong> sells modules for both. Tiqora has web chat,
+                Telegram, SMS and WhatsApp, but no social channels.
               </p>
             </article>
             <article class="card">
-              <h3>You need SAML or deep reporting</h3>
+              <h3>You want years of production use</h3>
               <p>
-                SAML-only identity providers or configurable, scheduled statistics:
-                <strong>Znuny 7.3</strong>, <strong>Zammad</strong> or <strong>OTRS</strong>.
+                Tiqora's ITSM, CMDB, process designer, report builder, web chat and
+                plugin packages are weeks to months old. If a feature has to be
+                proven before you rely on it, <strong>Znuny</strong>,
+                <strong>OTRS</strong> or <strong>Zammad</strong> have the longer record
+                — or try Tiqora next to Znuny first.
               </p>
             </article>
             <article class="card">
@@ -923,7 +978,7 @@
           <div class="section-head">
             <h2>Sources</h2>
             <p>
-              Last reviewed <strong>2026-10-01</strong>. Spotted something wrong or
+              Last reviewed <strong>2026-10-14</strong>. Spotted something wrong or
               outdated? Please tell us in
               <a href="https://github.com/CygnusNetworks/tiqora/discussions">GitHub Discussions</a>.
             </p>
@@ -934,13 +989,13 @@
               <ol start="1">
                 <li id="s1"><a href="https://www.znuny.org/en/releases">Znuny release overview</a></li>
                 <li id="s2"><a href="https://www.znuny.org/en/roadmap">Znuny roadmap</a></li>
-                <li id="s3"><a href="https://www.znuny.com/en/blog/znuny-built-in-saml-authentication">Znuny 7.3 — built-in SAML authentication</a></li>
+                <li id="s3"><a href="https://www.znuny.com/en/blog/znuny-built-in-saml-authentication">Znuny 7.3 — built-in SAML authentication</a>; <span id="s3b"><a href="https://www.znuny.com/en/product/add-ons/scim-identity-provisioning">SCIM Identity Provisioning add-on</a></span></li>
                 <li id="s4"><a href="https://www.znuny.com/en/blog/znuny-llm">Znuny-LLM add-on</a></li>
                 <li id="s5"><a href="https://github.com/znuny/Znuny">Znuny on GitHub</a> (license, language, <code>i18n/Znuny</code>)</li>
                 <li id="s6"><a href="https://github.com/znuny/Znuny/tree/dev/Kernel/Modules">Znuny core modules</a> (AdminPGP, AdminSMIME, AdminProcessManagement, AgentStatistics); <span id="s6b"><a href="https://github.com/znuny/FAQ">FAQ package</a></span>; <span id="s6c"><a href="https://github.com/znuny/ITSMCore">ITSM Core</a></span></li>
-                <li id="s7"><a href="https://doc.znuny.org/znuny/admin/usermanagement/user_backends/index.html">Znuny docs — user backends</a></li>
+                <li id="s7"><a href="https://doc.znuny.org/znuny/admin/usermanagement/user_backends/index.html">Znuny docs — user backends</a>; <span id="s7b"><a href="https://doc.znuny.org/znuny/agentinterface/dashboards/index.html">agent dashboards</a></span></li>
                 <li id="s8"><a href="https://codeberg.org/wolkig-it/znuny_mcp">znuny_mcp (community MCP server)</a></li>
-                <li id="s9"><a href="https://www.znuny.com/en">Znuny GmbH — services</a></li>
+                <li id="s9"><a href="https://www.znuny.com/en">Znuny GmbH — services</a>; <span id="s9b"><a href="https://www.znuny.com/en/product/add-ons">add-ons</a></span></li>
                 <li id="s10"><a href="https://doc.znuny.org/znuny_lts/releases/installupdate/update/update-6.5.html">Znuny docs — update to 6.5</a>; <span id="s10b"><a href="https://community.znuny.org/viewtopic.php?t=41010">community forum — GDPR</a></span></li>
               </ol>
               <h3>OTRS</h3>
@@ -959,7 +1014,7 @@
               <ol start="18">
                 <li id="s18"><a href="https://zammad.com/en/product/artificial-intelligence">Zammad AI</a></li>
                 <li id="s19"><a href="https://zammad.com/en/product/releases/7-0">Zammad 7.0 release</a></li>
-                <li id="s20"><a href="https://admin-docs.zammad.org/en/latest/">Zammad admin documentation</a> (channels, knowledge base)</li>
+                <li id="s20"><a href="https://admin-docs.zammad.org/en/latest/">Zammad admin documentation</a> (channels, knowledge base); <span id="s20b"><a href="https://admin-docs.zammad.org/en/latest/system/packages.html">packages</a></span>; <span id="s20c"><a href="https://admin-docs.zammad.org/en/latest/system/core-workflows.html">core workflows</a></span>; <span id="s20d"><a href="https://user-docs.zammad.org/en/latest/extras/dashboard.html">dashboard (user docs)</a></span></li>
                 <li id="s21"><a href="https://admin-docs.zammad.org/en/latest/settings/security/third-party.html">Zammad third-party authentication</a></li>
                 <li id="s22"><a href="https://admin-docs.zammad.org/en/latest/system/integrations.html">Zammad integrations</a></li>
                 <li id="s23"><a href="https://admin-docs.zammad.org/en/latest/system/data-privacy.html">Zammad data privacy</a></li>
@@ -991,7 +1046,7 @@
               </ol>
               <h3>Tiqora</h3>
               <ol start="41">
-                <li id="s41"><a href="https://github.com/CygnusNetworks/tiqora#readme">Tiqora README</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">support matrix</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">parity list</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/ai-integration.md">AI</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/gdpr.md">GDPR</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/crypto.md">PGP &amp; S/MIME</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/channels.md">channels</a></li>
+                <li id="s41"><a href="https://github.com/CygnusNetworks/tiqora#readme">Tiqora README</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">support matrix</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">parity list</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/ai-integration.md">AI</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/gdpr.md">GDPR</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/crypto.md">PGP &amp; S/MIME</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/channels.md">channels</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/guide/webchat.md">web chat</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/guide/identity-providers.md">identity providers and SCIM</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/process-management.md">processes</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/itsm.md">ITSM</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/cmdb.md">CMDB</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/reporting.md">reporting</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/dashboards.md">dashboards</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/plugins.md">plugins</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md">GenericInterface</a></li>
               </ol>
             </div>
           </div>
@@ -1019,7 +1074,7 @@
           company; the names are used solely to describe factual compatibility.
           Zammad, FreeScout, osTicket and all other product names are trademarks of their
           respective owners and are used here only to identify those products. The
-          comparison reflects publicly available information as of 2026-10-01 and is not
+          comparison reflects publicly available information as of 2026-10-14 and is not
           endorsed by any of the vendors named.
         </p>
       </div>

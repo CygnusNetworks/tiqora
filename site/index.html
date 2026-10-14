@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. OTRS/Znuny 6.0–7.3 database-compatible, with a first-class web UI, GDPR tools, and parallel operation."
+      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. OTRS/Znuny 6.0–7.3 database-compatible, with ITSM &amp; CMDB, SAML/OIDC SSO with SCIM, web chat, reporting, plugins, GDPR tools and parallel operation."
     />
     <meta name="theme-color" content="#0e1015" />
     <link rel="canonical" href="https://cygnusnetworks.github.io/tiqora/" />
@@ -14,7 +14,7 @@
     <meta property="og:title" content="Tiqora — the modern helpdesk for your OTRS/Znuny database" />
     <meta
       property="og:description"
-      content="Self-hosted, AGPL-3.0 helpdesk that runs next to Znuny/OTRS 6.0–7.3 on the same database. Modern UI, AI drafts with PII masking, GDPR tools, PGP/S/MIME."
+      content="Self-hosted, AGPL-3.0 helpdesk that runs next to Znuny/OTRS 6.0–7.3 on the same database. Modern UI, AI drafts with PII masking, ITSM &amp; CMDB, SAML/OIDC + SCIM, web chat, GDPR tools, PGP/S/MIME."
     />
     <meta property="og:url" content="https://cygnusnetworks.github.io/tiqora/" />
     <meta property="og:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
@@ -103,7 +103,8 @@
               <h3>Modern web UI</h3>
               <p>
                 Agent workspace, admin console, and customer portal — a clear step up
-                from classic OTRS/Znuny screens.
+                from classic OTRS/Znuny screens, in dark and light themes built for
+                daily agent use.
               </p>
             </article>
             <article class="feature">
@@ -139,6 +140,50 @@
               </p>
             </article>
             <article class="feature">
+              <div class="icon">CI</div>
+              <h3>ITSM &amp; CMDB</h3>
+              <p>
+                Incidents, problems, major incidents and a priority matrix. Read the
+                CIs from Znuny ITSM 6.5/7.3 (“Znuny führt das ITSM”) or keep them in
+                Tiqora's own CMDB (“Tiqora führt das ITSM”) with versioned classes and
+                impact analysis. An importer moves them over, with a dry run and a way
+                back.
+                <a href="#screenshots-itsm">Screens ↓</a>
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">⇢</div>
+              <h3>Process management</h3>
+              <p>
+                Runs Znuny processes from their deployed state, for agents and in the
+                portal. A designer for steps, forms, transitions and actions, with
+                validation, Znuny YAML import/export and versions; deploy from
+                Tiqora while Znuny still runs via the TiqoraSync add-on.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">▤</div>
+              <h3>Reports &amp; dashboards</h3>
+              <p>
+                25 built-in reports, a report builder, saved reports and searches,
+                import of Znuny statistics, PDF/XLSX/CSV export and scheduled
+                delivery by e-mail. Widget dashboards per agent with role templates,
+                report widgets, a TV mode and read-only wallboard links.
+                <a href="#screenshots-dashboards">Screens ↓</a>
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">☎</div>
+              <h3>Web chat, Telegram &amp; phone</h3>
+              <p>
+                An embeddable web chat with opening hours, offline messages, uploads
+                and recognised visitors; an AI assistant can answer first and hand
+                over to the team. A real chat view for Telegram tickets; CTI call
+                popups, caller lookup and compact phone tickets for the hotline.
+                <a href="#screenshots-channels">Screens ↓</a>
+              </p>
+            </article>
+            <article class="feature">
               <div class="icon">🔐</div>
               <h3>PGP &amp; S/MIME</h3>
               <p>
@@ -146,16 +191,6 @@
                 notifications and auto-responses — with per-queue defaults and the
                 key stores shared with Znuny.
                 <a href="#screenshots-security">Screens ↓</a>
-              </p>
-            </article>
-            <article class="feature">
-              <div class="icon">☎</div>
-              <h3>Telegram chat &amp; phone</h3>
-              <p>
-                A real chat view for Telegram tickets with snippets, buttons and
-                quote replies; CTI call popups, caller lookup and compact phone
-                tickets for the hotline.
-                <a href="#screenshots-channels">Screens ↓</a>
               </p>
             </article>
             <article class="feature">
@@ -167,11 +202,36 @@
               </p>
             </article>
             <article class="feature">
-              <div class="icon">✦</div>
-              <h3>Modern design</h3>
+              <div class="icon">🔒</div>
+              <h3>SSO, provisioning &amp; MFA</h3>
               <p>
-                Dark and light themes, compact cobalt design system — built for
-                daily agent use.
+                SAML&nbsp;2.0 and OIDC for agents and customers with several identity
+                providers, just-in-time accounts and role rules; SCIM&nbsp;2.0
+                provisioning; step-up MFA and a session lifetime per provider.
+                Also LDAP/AD, Kerberos/SPNEGO, legacy password hashes, TOTP and
+                passkeys.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">⇄</div>
+              <h3>Integration friendly</h3>
+              <p>
+                REST&nbsp;/api/v1 and webhooks. GenericInterface REST/SOAP
+                compatibility on both sides: the ticket and <code>ConfigItem*</code>
+                operations as a provider, ticket-event invokers with a debugger and
+                dry run as a requester. Channel plugins (email, Telegram, phone/CTI,
+                SMS, WhatsApp, web chat).
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">⧉</div>
+              <h3>Plugins</h3>
+              <p>
+                Python plugins with their own settings, routes, jobs, MCP tools, UI
+                slots and database tables, plus extension points for hooks, process
+                actions, channels, dynamic field types, report sources and more.
+                Admins install signed packages or add package repositories in the
+                web UI.
               </p>
             </article>
             <article class="feature">
@@ -196,24 +256,9 @@
               <div class="icon">P</div>
               <h3>Customer portal &amp; KB</h3>
               <p>
-                Optional self-service portal (opt-in) and a Markdown knowledge base with agent editing
-                and portal search.
-              </p>
-            </article>
-            <article class="feature">
-              <div class="icon">⇄</div>
-              <h3>Integration friendly</h3>
-              <p>
-                REST&nbsp;/api/v1, GenericInterface REST/SOAP compatibility, webhooks,
-                and channel plugins (email, Telegram, phone/CTI, SMS, WhatsApp).
-              </p>
-            </article>
-            <article class="feature">
-              <div class="icon">🔒</div>
-              <h3>Modern authentication</h3>
-              <p>
-                Legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO with seamless
-                re-auth, enforceable TOTP, and passkeys — feature-flagged as you need them.
+                Optional self-service portal (opt-in) with tickets, process tickets,
+                web chat and the customer's own systems from the CMDB, and a Markdown
+                knowledge base with agent editing and portal search.
               </p>
             </article>
           </div>
@@ -372,17 +417,9 @@
                 <img src="./assets/screenshots/agent-ticket-zoom.png" alt="Ticket view" loading="lazy" />
                 <figcaption><strong>Ticket view</strong> Status bar, inline properties and a split or conversation view of the articles</figcaption>
               </figure>
-              <figure data-shot="agent-dashboard">
-                <img src="./assets/screenshots/agent-dashboard.png" alt="Agent dashboard" loading="lazy" />
-                <figcaption><strong>Dashboard</strong> Open work, queues and who is online at a glance</figcaption>
-              </figure>
               <figure data-shot="agent-search">
                 <img src="./assets/screenshots/agent-search.png" alt="Full-text ticket search" loading="lazy" />
                 <figcaption><strong>Search</strong> Full-text ticket search backed by Meilisearch</figcaption>
-              </figure>
-              <figure data-shot="agent-stats">
-                <img src="./assets/screenshots/agent-stats.png" alt="Reporting and SLA" loading="lazy" />
-                <figcaption><strong>Reporting &amp; SLA</strong> Volume, backlog, SLA attainment and agent workload</figcaption>
               </figure>
               <figure data-shot="agent-calendar">
                 <img src="./assets/screenshots/agent-calendar.png" alt="Calendar" loading="lazy" />
@@ -391,6 +428,54 @@
               <figure data-shot="agent-kb">
                 <img src="./assets/screenshots/agent-kb.png" alt="Knowledge base" loading="lazy" />
                 <figcaption><strong>Knowledge base</strong> Markdown articles with review workflow, shared with the portal and the AI</figcaption>
+              </figure>
+            </div>
+
+            <div class="topic" data-topic="itsm" data-label="ITSM &amp; CMDB">
+              <h3 class="topic-title">ITSM &amp; CMDB</h3>
+              <figure data-shot="itsm-ticket-zoom" data-only="light">
+                <img src="./assets/screenshots/itsm-ticket-zoom.png" alt="Ticket with affected CIs and a major-incident banner" loading="lazy" />
+                <figcaption><strong>Incident in the ticket</strong> Affected CIs with deployment and incident state, the link to an active major incident and the linked tickets</figcaption>
+              </figure>
+              <figure data-shot="itsm-ci-detail" data-only="light">
+                <img src="./assets/screenshots/itsm-ci-detail.png" alt="Configuration item read from Znuny ITSM" loading="lazy" />
+                <figcaption><strong>Znuny's CMDB, read-only</strong> While Znuny leads the ITSM, Tiqora shows its CIs, attributes, versions and linked tickets</figcaption>
+              </figure>
+              <figure data-shot="admin-itsm" data-only="light">
+                <img src="./assets/screenshots/admin-itsm.png" alt="ITSM administration with mode, setup and priority matrix" loading="lazy" />
+                <figcaption><strong>ITSM mode and setup</strong> Detected mode, the ticket types and fields the ITSM dialogs need, and the priority matrix</figcaption>
+              </figure>
+              <figure data-shot="agent-cmdb-list" data-only="light">
+                <img src="./assets/screenshots/agent-cmdb-list.png" alt="CMDB list with filters" loading="lazy" />
+                <figcaption><strong>CMDB</strong> Tiqora's own CMDB: CIs by class and state, attribute filters, saved searches, import, export and bulk edit</figcaption>
+              </figure>
+              <figure data-shot="agent-cmdb-ci" data-only="light">
+                <img src="./assets/screenshots/agent-cmdb-ci.png" alt="Configuration item detail" loading="lazy" />
+                <figcaption><strong>Configuration item</strong> Own and derived incident state, links, dependencies, tickets, versions and history</figcaption>
+              </figure>
+              <figure data-shot="agent-cmdb-graph" data-only="light">
+                <img src="./assets/screenshots/agent-cmdb-graph.png" alt="Dependency graph of a configuration item" loading="lazy" />
+                <figcaption><strong>Dependencies and impact</strong> What a CI depends on and what a failure of it would affect</figcaption>
+              </figure>
+              <figure data-shot="admin-cmdb-class-editor" data-only="light">
+                <img src="./assets/screenshots/admin-cmdb-class-editor.png" alt="CMDB class editor" loading="lazy" />
+                <figcaption><strong>Class designer</strong> Typed attributes per class, saved as versioned definitions</figcaption>
+              </figure>
+            </div>
+
+            <div class="topic" data-topic="dashboards" data-label="Dashboards &amp; reports">
+              <h3 class="topic-title">Dashboards &amp; reports</h3>
+              <figure data-shot="agent-dashboard">
+                <img src="./assets/screenshots/agent-dashboard.png" alt="Agent home page" loading="lazy" />
+                <figcaption><strong>Home</strong> Open work, escalations and the agent's own tickets at a glance</figcaption>
+              </figure>
+              <figure data-shot="agent-stats">
+                <img src="./assets/screenshots/agent-stats.png" alt="Reports overview" loading="lazy" />
+                <figcaption><strong>Reports</strong> Ticket volume, backlog, SLA and workload across the queues, with CSV export</figcaption>
+              </figure>
+              <figure data-shot="wallboard" data-only="dark">
+                <img src="./assets/screenshots/wallboard-dark.png" alt="Wallboard on a TV screen" loading="lazy" />
+                <figcaption><strong>Wallboard</strong> A read-only wallboard link rotates dashboards on a screen without a sign-in</figcaption>
               </figure>
             </div>
 
@@ -478,7 +563,7 @@
               <h3 class="topic-title">Sign-in &amp; portal</h3>
               <figure data-shot="login">
                 <img src="./assets/screenshots/login.png" alt="Login" loading="lazy" />
-                <figcaption><strong>Sign-in</strong> Password, LDAP, OIDC, Kerberos and passkeys — whatever is enabled</figcaption>
+                <figcaption><strong>Sign-in</strong> Password, LDAP, SAML or OIDC providers, Kerberos and passkeys — whatever is enabled</figcaption>
               </figure>
               <figure data-shot="agent-security">
                 <img src="./assets/screenshots/agent-security.png" alt="Account security settings" loading="lazy" />
@@ -619,8 +704,10 @@ docker compose -f docker-compose.quickstart.yml up -d</code></pre>
         var theme = "light";
         var current = { topic: 0, shot: 0 };
 
-        function src(name) {
-          return "./assets/screenshots/" + name + (theme === "dark" ? "-dark" : "") + ".png";
+        // A figure with data-only="light" / "dark" exists in that theme only.
+        function src(name, only) {
+          var t = only || theme;
+          return "./assets/screenshots/" + name + (t === "dark" ? "-dark" : "") + ".png";
         }
         function figures(t) {
           return Array.prototype.slice.call(topics[t].querySelectorAll("figure"));
@@ -629,7 +716,8 @@ docker compose -f docker-compose.quickstart.yml up -d</code></pre>
           var cap = fig.querySelector("figcaption");
           var title = cap.querySelector("strong");
           var desc = cap.textContent.replace(title ? title.textContent : "", "").trim();
-          return { name: fig.getAttribute("data-shot"), title: title ? title.textContent : "", desc: desc,
+          return { name: fig.getAttribute("data-shot"), only: fig.getAttribute("data-only"),
+            title: title ? title.textContent : "", desc: desc,
             alt: fig.querySelector("img").getAttribute("alt") || "" };
         }
 
@@ -647,7 +735,7 @@ docker compose -f docker-compose.quickstart.yml up -d</code></pre>
             f.setAttribute("aria-current", i === s ? "true" : "false");
           });
           var p = parts(figs[s]);
-          stageImg.src = src(p.name);
+          stageImg.src = src(p.name, p.only);
           stageImg.alt = p.alt;
           stageTitle.textContent = p.title;
           stageDesc.textContent = p.desc;
@@ -656,7 +744,7 @@ docker compose -f docker-compose.quickstart.yml up -d</code></pre>
         }
         function fillBox() {
           var p = parts(figures(current.topic)[current.shot]);
-          boxImg.src = src(p.name);
+          boxImg.src = src(p.name, p.only);
           boxImg.alt = p.alt;
           boxCaption.textContent = p.title + " — " + p.desc;
         }
@@ -665,7 +753,8 @@ docker compose -f docker-compose.quickstart.yml up -d</code></pre>
         function applyTheme(next) {
           theme = next;
           gallery.querySelectorAll("figure[data-shot] img").forEach(function (img) {
-            img.src = src(img.closest("figure").getAttribute("data-shot"));
+            var fig = img.closest("figure");
+            img.src = src(fig.getAttribute("data-shot"), fig.getAttribute("data-only"));
           });
           themeBtns.forEach(function (b) {
             b.classList.toggle("is-active", b.getAttribute("data-theme-btn") === theme);

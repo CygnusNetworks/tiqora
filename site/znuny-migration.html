@@ -23,6 +23,7 @@
     <meta property="og:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
     <meta property="og:locale" content="en_US" />
     <meta property="article:published_time" content="2026-10-01" />
+    <meta property="article:modified_time" content="2026-10-14" />
     <meta property="article:author" content="Cygnus Networks GmbH" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Moving off OTRS/Znuny without a big-bang migration" />
@@ -40,7 +41,7 @@
         "description": "How to migrate from Znuny or OTRS 6 step by step: run Tiqora on the same database, move agents and background jobs over one by one, keep a rollback at every stage, and retire Znuny only at the end.",
         "image": "https://cygnusnetworks.github.io/tiqora/assets/og-image.png",
         "datePublished": "2026-10-01",
-        "dateModified": "2026-10-01",
+        "dateModified": "2026-10-14",
         "inLanguage": "en",
         "proficiencyLevel": "Expert",
         "keywords": "Znuny migration, OTRS migration, Znuny alternative, OTRS alternative, OTRS Community Edition replacement, helpdesk migration, parallel operation",
@@ -103,7 +104,15 @@
             "name": "What happens to my OPM add-ons and ITSM?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Tiqora leaves add-on tables alone but does not provide add-on functionality such as an ITSM CMDB, and it has no OPM package manager. Inventory what your add-ons do and keep, replace or retire each function before switching Znuny off."
+              "text": "Tiqora cannot run Perl OPM packages; its own Python plugins are the replacement path, and add-on tables are left alone. Znuny's ITSM is covered: Tiqora reads the CMDB of Znuny ITSM 6.5 and 7.3 read-only (Mode A), imports it into its own CMDB and switches to Mode B, with a way back. The GenericInterface layer answers the ConfigItem* operations, and the ConfigItemUpdate process action runs in Mode B. Change management and work orders stay in Znuny. Inventory what your other add-ons do and keep, replace or retire each function before switching Znuny off."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can agents sign in with SAML or OIDC, and can accounts be provisioned with SCIM?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Identity providers (OIDC, SAML 2.0, LDAP/AD) are set up in Tiqora's admin UI, with just-in-time accounts and role rules that can replace roles like Znuny's AuthSync. A provider can also provision agents over SCIM 2.0, require a second factor from the IdP and shorten the session lifetime. Accounts and role assignments are written to Znuny's own tables, so Znuny sees the same agents and permissions."
             }
           },
           {
@@ -587,8 +596,8 @@
               until the last one.
             </p>
             <p class="byline">
-              Cygnus Networks GmbH · <time datetime="2026-10-01">1 October 2026</time> · about
-              12 minutes to read
+              Cygnus Networks GmbH · <time datetime="2026-10-01">1 October 2026</time>, updated
+              <time datetime="2026-10-14">14 October 2026</time> · about 16 minutes to read
             </p>
 
             <nav class="toc" aria-label="On this page">
@@ -597,6 +606,7 @@
                 <li><a href="#problem">The problem with migrating a helpdesk</a></li>
                 <li><a href="#idea">The idea: share the database</a></li>
                 <li><a href="#steps">Step by step, phases 0–5</a></li>
+                <li><a href="#alongside">ITSM, processes, statistics, sign-in and add-ons</a></li>
                 <li><a href="#gaps">What is not there yet</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#next">Try it</a></li>
@@ -689,7 +699,7 @@
               <code>znuny-6.5</code> or <code>znuny-7.3</code>) and adjusts to it. If it
               cannot recognise the schema, it <strong>refuses to start</strong> instead of
               failing later in production. The detected profile is shown under
-              <em>Admin → System info</em>.
+              <em>Admin → System-Info</em>.
             </p>
             <div class="callout callout-info">
               <span class="callout-title">Preferred starting point</span>
@@ -816,7 +826,7 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
               <p>
                 <code>tiqora migrate upgrade</code> only creates <code>tiqora_*</code> tables.
                 The migrations that may touch Znuny's tables sit in a separate chain that
-                stays locked until phase 5. Check <em>Admin → System info</em> to confirm the
+                stays locked until phase 5. Check <em>Admin → System-Info</em> to confirm the
                 detected schema profile matches your Znuny version.
               </p>
               <p>
@@ -843,9 +853,9 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
                 Znuny caches tickets in memory. When Tiqora writes straight to the database,
                 Znuny does not see the change until the cache expires. The fix is
                 <strong>TiqoraSync</strong>, a small optional OPM add-on (GPL-3.0, Framework
-                6.0.x–7.3.x). Install it into the running Znuny:
+                6.0.x–7.3.x, current version 1.2.0). Install it into the running Znuny:
               </p>
-              <pre><code>bin/znuny.Console.pl Admin::Package::Install /path/to/TiqoraSync-1.1.1.opm
+              <pre><code>bin/znuny.Console.pl Admin::Package::Install /path/to/TiqoraSync-1.2.0.opm
 <span class="c"># OTRS 6.0: bin/otrs.Console.pl</span></code></pre>
               <p>
                 It adds one Znuny scheduler task that runs every minute. The task reads the
@@ -853,6 +863,13 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
                 those tickets from Znuny's cache. Worst-case staleness in the Znuny UI is
                 therefore about 60 seconds. If you cannot install add-ons, lowering Znuny's
                 cache TTLs is the documented fallback.
+              </p>
+              <p>
+                Since version 1.2.0 the same task also deploys processes and ACLs when
+                Tiqora asks for it. That lets you press “Bereitstellen” (deploy) in Tiqora's
+                process designer while Znuny still runs: Znuny writes its own deploy files
+                and Tiqora shows the result. Without TiqoraSync, deploy in Znuny until the
+                cutover.
               </p>
               <p>
                 <strong>Check it:</strong> create or edit a queue in Tiqora and confirm it
@@ -900,7 +917,7 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
               <p>
                 Each background duty moves on its own. Every Tiqora worker job has a flag in
                 <code>tiqora_settings</code>, off by default, which you switch under
-                <em>Admin → Services</em>. The worker picks up the change on its next tick
+                <em>Admin → Dienste</em> (services). The worker picks up the change on its next tick
                 without a restart. Run each duty on <strong>one</strong> side only, or work
                 gets done twice: two tickets for one mail, notifications sent twice.
                 <strong>Always switch Znuny's side off first</strong>, then turn Tiqora's on.
@@ -964,6 +981,15 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
                 a flag of their own; they move with the postmaster. Pending reminders only
                 reach anyone once notifications are on Tiqora's side.
               </p>
+              <p>
+                If Znuny calls external systems through GenericInterface invokers, hand those
+                calls over the same way, at any point in this phase: set Znuny's
+                <code>Ticket::<wbr />EventModulePost###<wbr />9900-GenericInterface</code> invalid,
+                wait until Znuny's scheduler has no <code>GenericInterface</code> tasks left, then
+                switch on the service “Ausgehende Webservice-Aufrufe” (outbound webservice calls)
+                under <em>Admin → Dienste</em>. The webservices themselves stay defined in
+                Znuny; Tiqora shows them read-only with a debugger log and a dry run.
+              </p>
               <p>A cron task is switched off in Znuny like this:</p>
               <pre><code>bin/znuny.Console.pl Admin::Config::Update \
   --setting-name "Daemon::SchedulerCronTaskManager::Task###MailAccountFetch" \
@@ -1020,7 +1046,9 @@ bin/znuny.Console.pl Maint::Daemon::Summary</code></pre>
                 representative period. The cutover runbook has its own preconditions. The
                 most important ones: a freshly tested restore, a maintenance window, and an
                 inventory of everything the Znuny host still does (OS cron jobs, add-ons,
-                calendar jobs, the outgoing <code>mail_queue</code>). Then:
+                calendar jobs, the outgoing <code>mail_queue</code>). If you use Znuny ITSM,
+                finish the <a href="#itsm">ITSM switch</a> first: the switch reads Znuny's CMDB a
+                last time, so it has to happen while that database is still current. Then:
               </p>
               <ol>
                 <li>
@@ -1039,11 +1067,12 @@ bin/znuny.Console.pl Maint::Daemon::Summary</code></pre>
                   external integrations call Znuny's webservices. An nginx rewrite from
                   <code>nph-genericinterface.pl</code> to Tiqora's <code>/znuny-compat</code>
                   layer covers the common <code>Session*</code> and <code>Ticket*</code>
-                  operations over REST and SOAP. Test each operation your integrators use.
+                  operations over REST and SOAP, and the <code>ConfigItem*</code> operations
+                  once Tiqora leads the ITSM. Test each operation your integrators use.
                 </li>
                 <li>
                   <strong>Monitor.</strong> Watch error rates and per-service status under
-                  <em>Admin → Services</em> for at least an hour, or a business day for a
+                  <em>Admin → Dienste</em> (services) for at least an hour, or a business day for a
                   cautious rollout.
                 </li>
                 <li>
@@ -1067,7 +1096,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               <p>
                 The first owned migration today only adds three composite indexes. It does
                 not change any rows. Afterwards, archive Znuny's crontab and decommission its
-                frontend. TiqoraSync is retired together with Znuny.
+                frontend. TiqoraSync and TiqoraITSM are retired together with Znuny.
               </p>
               <div class="callout callout-back">
                 <span class="callout-title">If you stop here</span>
@@ -1086,6 +1115,147 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
           </div>
         </section>
 
+        <!-- 3b. Alongside the phases -->
+        <section class="article-section" id="alongside">
+          <div class="wrap prose">
+            <h2>ITSM, processes, statistics, sign-in and add-ons</h2>
+            <p>
+              The phases above move the ticket work. Five more areas usually live in a Znuny
+              installation. Each has its own path, and you can run it during phases 1–4,
+              while Znuny is still there to fall back on. UI labels are quoted in German, the
+              default language of the Tiqora UI.
+            </p>
+
+            <h3 id="itsm">ITSM and the CMDB</h3>
+            <p>
+              Tiqora has incident and problem management, major incidents, a priority matrix
+              and its own CMDB. Who holds the configuration items is set by the “ITSM-Modus”
+              (ITSM mode) under <em>Admin → ITSM</em>, and the mode is chosen automatically
+              at the first start: if Znuny's ITSM tables are in the database, it is
+              <strong>Mode A</strong>, “Znuny führt das ITSM (nur lesen)” (Znuny leads the
+              ITSM, read-only); otherwise <strong>Mode B</strong>, “Tiqora führt das ITSM”
+              (Tiqora leads the ITSM). Mode A is the bridge, Mode B the goal.
+            </p>
+            <ul>
+              <li>
+                <strong>Mode A, side by side.</strong> Tiqora reads the CIs from Znuny's tables
+                and shows them read-only, with “In Znuny bearbeiten” (edit in Znuny) links;
+                agents link tickets and CIs, and use incident, problem and major incident in
+                Tiqora. Znuny's CMDB stays editable and nothing changes for Znuny users. Mode A
+                reads the ITSM package lines of Znuny&nbsp;6.5 and 7.3; with another ITSM
+                version Tiqora shows no CI data.
+              </li>
+              <li>
+                <strong>Import, as often as you like.</strong> <em>Admin → ITSM-Import</em>
+                (page “ITSM-Daten aus Znuny übernehmen”, take over ITSM data from Znuny):
+                “Probelauf” (dry run) reads and counts and writes nothing; “Übernehmen”
+                (import) copies the catalog, classes, CIs with all versions, links,
+                attachments stored in the database, the priority matrix and the service data
+                into Tiqora's CMDB. Every further run only adds what is new. Agents keep
+                seeing Znuny's data until you switch. The same runs are available as
+                <code>tiqora itsm import --dry-run</code> and <code>tiqora itsm import</code>.
+              </li>
+              <li>
+                <strong>Prepare Znuny.</strong> Install the optional Znuny package
+                <strong>TiqoraITSM&nbsp;1.0.0</strong> (Framework 6.0.x–7.3.x, German texts
+                only). It never writes to the database and stays inactive until the switch.
+                Then it shows “Betroffene CIs (Tiqora)” (affected CIs) in Znuny's ticket zoom,
+                locks Znuny's screens that change CIs, and can offer customers a read-only CI
+                page. Also repoint every webservice, console script or import job that writes
+                CIs in Znuny to Tiqora; those paths are not locked.
+              </li>
+              <li>
+                <strong>Switch.</strong> “Auf Tiqora umstellen” (switch to Tiqora) asks whether
+                TiqoraITSM is installed or CIs are no longer edited in Znuny, then locks
+                Znuny's CI editing, imports one last time and sets Mode B. From then on CIs are
+                maintained in Tiqora, and the GenericInterface layer answers
+                <code>ConfigItemGet</code>, <code>-Search</code>, <code>-Create</code>,
+                <code>-Update</code> and <code>-Delete</code> from Tiqora's CMDB. A notice
+                warns if CIs or CI links still change in Znuny afterwards.
+              </li>
+              <li>
+                <strong>Way back.</strong> “Zurück zu Znuny (Modus A)” (back to Znuny, Mode A)
+                lifts the lock and reads Znuny's CIs again. Changes made in Tiqora since the
+                switch are not visible in Znuny; Tiqora keeps them hidden, it does not delete
+                them.
+              </li>
+            </ul>
+            <div class="callout callout-warn">
+              <span class="callout-title">What stays in Znuny</span>
+              <p>
+                Changes and work orders are only counted, not imported, and Tiqora has no
+                change management yet. Znuny's ITSM statistics are not taken over, and CI
+                attachments in Znuny's filesystem storage have to be copied by hand. If an
+                installed ITSM version cannot be read, the switch is offered without CI data
+                and you have to confirm that explicitly.
+              </p>
+            </div>
+
+            <h3 id="processes">Processes and ACLs</h3>
+            <p>
+              Tiqora runs the processes Znuny has deployed and evaluates the same ACLs, for
+              agents and in the customer portal. Its process designer edits Znuny's own
+              <code>pm_*</code> entities, imports and exports Znuny's YAML files and keeps
+              versions. With TiqoraSync 1.2.0 (<a href="#phase-2">phase 2</a>) you can deploy
+              from Tiqora while Znuny still runs. Transition actions such as
+              <code>ConfigItemUpdate</code> and <code>LinkAdd</code> to a CI follow the ITSM
+              mode.
+            </p>
+
+            <h3 id="statistics">Statistics, scheduled reports and search profiles</h3>
+            <p>
+              On the reports page, “Statistiken aus Znuny übernehmen” (take over statistics from
+              Znuny) reads Znuny statistics from the database or from an exported XML file and
+              turns them into saved reports or saved searches, with a preview of what was
+              adjusted or dropped. Znuny is not changed. Scheduled e-mail delivery, which
+              Znuny leaves to add-ons such as “Statistic Reports”, is built in: recreate those
+              deliveries as schedules (“Zeitpläne”) that send PDF, XLSX or CSV; they are not
+              imported. Agents bring their Znuny search profiles over with “Suchvorlagen aus Znuny
+              übernehmen” (take over search templates from Znuny).
+            </p>
+
+            <h3 id="sign-in">Sign-in, SSO and provisioning</h3>
+            <p>
+              Identity providers are set up under <em>Admin → Identitätsanbieter</em> (identity
+              providers): OIDC (for example Microsoft Entra ID, Google Workspace, Keycloak),
+              SAML&nbsp;2.0 (for example ADFS) and LDAP/Active Directory, for agents and, if
+              you want, for portal customers. Znuny's <code>AuthSyncModule</code> settings have a
+              documented mapping. Role rules either only maintain what they assigned themselves
+              (the default) or, with “Wie Znuny” (like Znuny), replace all roles the way
+              Znuny's <code>AuthSync</code> does.
+            </p>
+            <p>
+              A provider can also provision agents over <strong>SCIM&nbsp;2.0</strong>
+              (<code>/scim/v2</code>, one token per provider), require proof of a second factor
+              from the IdP and shorten the session lifetime. Accounts and role assignments land
+              in Znuny's own tables, so Znuny sees the same agents and permissions. A SCIM
+              deactivation sets the account invalid in Znuny and ends its Tiqora sessions.
+            </p>
+            <div class="callout callout-warn">
+              <span class="callout-title">Check technical accounts first</span>
+              <p>
+                An account that SCIM manages under a provider requiring the IdP's second factor
+                can no longer sign in with a password anywhere in Tiqora, including the
+                GenericInterface <code>SessionCreate</code>. Keep integration users out of
+                such providers before you point GenericInterface clients at Tiqora.
+              </p>
+            </div>
+
+            <h3 id="add-ons">OPM add-ons and plugins</h3>
+            <p>
+              Tiqora cannot run Perl OPM packages. The replacement path is Tiqora's own Python
+              plugins: they can add settings, routes, background jobs, MCP tools and UI, their
+              own database tables, and hook into ticket writes, process actions and
+              conditions, channels, dynamic field types, ticket number generators, mail
+              filters, report sources and GenericInterface operations. Admins install signed
+              <code>.tqplugin</code> packages or add package repositories under <em>Admin →
+              Erweiterungen</em> (extensions); on read-only containers plugins are baked into
+              the image instead. Plugins run with full trust inside Tiqora, so the signature
+              checks guard against mistakes, not against a hostile plugin.
+            </p>
+          </div>
+        </section>
+
         <!-- 4. Gaps -->
         <section class="article-section" id="gaps">
           <div class="wrap">
@@ -1094,7 +1264,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               <p>
                 Tiqora covers everyday agent, customer-portal and admin work. Some things are
                 still missing or narrower than in Znuny. Check this list against how your team
-                actually works (as of 1 October 2026):
+                actually works (as of 14 October 2026):
               </p>
             </div>
             <div class="cards gaps">
@@ -1102,33 +1272,32 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                 <span class="chip">Missing</span>
                 <h3>Not built yet</h3>
                 <ul>
-                  <li>Saved searches</li>
-                  <li>Configurable dashboard widgets</li>
-                  <li>Link overview and link-type admin</li>
+                  <li>ITSM change management and work orders (they stay in Znuny)</li>
                   <li>Admin screens for sessions, SQL box, maintenance, system log</li>
                   <li>Calendar admin and appointment rules</li>
                   <li>Portal print view</li>
+                  <li>Process transitions after every ticket change (only after process dialogs)</li>
                 </ul>
               </article>
               <article class="card">
                 <span class="chip">Partial</span>
                 <h3>Narrower than Znuny</h3>
                 <ul>
-                  <li>Statistics: fixed reports, not the Znuny stats framework</li>
+                  <li>Reports: no statistics on ITSM data, no cron expressions in schedules</li>
+                  <li>Dashboards: no customer-info or RSS widget</li>
                   <li>GenericAgent: a subset of search criteria</li>
                   <li>Bulk actions and user preferences</li>
                   <li>GenericInterface edge cases</li>
-                  <li>Process conditions and actions</li>
+                  <li>Process conditions: custom Perl condition modules do not run</li>
                 </ul>
               </article>
               <article class="card">
                 <span class="chip">By design</span>
                 <h3>Out of scope</h3>
                 <ul>
-                  <li>OPM package manager</li>
-                  <li>Process designer (processes run, but are designed elsewhere)</li>
+                  <li>OPM package manager (Tiqora plugins instead)</li>
                   <li>SysConfig edit UI (settings are read from Znuny's SysConfig tables)</li>
-                  <li>GenericInterface webservice editor and requester side</li>
+                  <li>GenericInterface webservice editor (webservices are shown read-only and edited in Znuny; Tiqora runs their invokers)</li>
                 </ul>
               </article>
             </div>
@@ -1136,7 +1305,8 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               <p>
                 The daemon ports also have documented simplifications. Escalation
                 "notify before" uses one fixed window instead of per-SLA percentages.
-                Notifications send by email only and ignore per-agent opt-outs. The postmaster
+                Notifications go out by email (or through transports a plugin adds) and
+                ignore per-agent opt-outs. The postmaster
                 converts HTML mail to plain text more crudely and matches customers by login
                 or email only. The full lists are in the
                 <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">compatibility
@@ -1196,11 +1366,14 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                 <summary>What about my OPM add-ons, or ITSM?</summary>
                 <div class="answer">
                   <p>
-                    Tiqora leaves add-on tables alone, and it has no package manager, so
-                    add-ons do not carry over. It provides no ITSM/CMDB module. The
-                    GenericInterface compatibility layer does not emulate custom operations
-                    such as <code>ConfigItem*</code>, and process actions like
-                    <code>ConfigItemUpdate</code> are logged as unsupported.
+                    Tiqora cannot run Perl OPM packages, so add-ons do not carry over; its own
+                    Python <a href="#add-ons">plugins</a> are the replacement path, and add-on
+                    tables are left alone. Znuny's ITSM is covered: Tiqora reads the CMDB of
+                    Znuny ITSM 6.5 and 7.3 read-only (Mode A), imports it into its own CMDB and
+                    switches to Mode B, with a way back (see <a href="#itsm">ITSM and the
+                    CMDB</a>). The GenericInterface layer answers the <code>ConfigItem*</code>
+                    operations, and the process action <code>ConfigItemUpdate</code> runs in
+                    Mode B. Change management and work orders stay in Znuny.
                   </p>
                   <p>
                     The cutover runbook asks you to list everything your add-ons and custom
@@ -1208,6 +1381,20 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                     running as a separate service. If an add-on changed Znuny's core tables,
                     try Tiqora on a staging copy first. We have not tested specific
                     third-party add-ons, so we cannot promise any of them works.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>Can agents sign in with SAML or OIDC, and can accounts be provisioned with SCIM?</summary>
+                <div class="answer">
+                  <p>
+                    Yes. Identity providers (OIDC, SAML&nbsp;2.0, LDAP/AD) are set up in
+                    Tiqora's admin UI, with just-in-time accounts and role rules that can
+                    replace roles like Znuny's <code>AuthSync</code>. A provider can also
+                    provision agents over SCIM&nbsp;2.0, require a second factor from the IdP
+                    and shorten the session lifetime. Accounts and role assignments are written
+                    to Znuny's own tables, so Znuny sees the same agents and permissions. See
+                    <a href="#sign-in">Sign-in, SSO and provisioning</a>.
                   </p>
                 </div>
               </details>
@@ -1230,8 +1417,8 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                   <p>
                     No. It is an independent reimplementation in Python and React, licensed
                     under AGPL-3.0, with no Znuny or OTRS source code in it. Only the optional
-                    TiqoraSync add-on is Perl, and it runs inside your Znuny during parallel
-                    operation.
+                    TiqoraSync and TiqoraITSM add-ons are Perl, and they run inside your Znuny
+                    during parallel operation.
                   </p>
                 </div>
               </details>
@@ -1274,6 +1461,27 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
             <li>
               <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">Support matrix</a>:
               versions, database engines and test coverage
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/itsm.md">ITSM</a>
+              and <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/itsm-import.md">ITSM import</a>:
+              the modes, the switch, the way back and the TiqoraITSM add-on
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/process-management.md">Process management</a>:
+              designer, deploy while Znuny runs, supported conditions and actions
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/reporting.md">Reporting</a>:
+              Znuny statistics import, schedules and saved searches
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/guide/identity-providers.md">Identity providers</a>:
+              OIDC, SAML, LDAP, SCIM and step-up MFA
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/plugins.md">Plugins</a>:
+              installing, packaging and the extension points
             </li>
           </ul>
 

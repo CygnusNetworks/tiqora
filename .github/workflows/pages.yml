@@ -63,11 +63,19 @@ jobs:
           cp site/ai-audit-sample.pdf _site/assets/ai-audit-sample.pdf
 
           # Screenshots for the landing gallery: every shot it references, in
-          # both light and dark (the gallery has a switch). Fail the build on a
+          # light and dark (the gallery has a switch). A figure marked
+          # data-only="light" / "dark" exists in that theme only (the ITSM/CMDB
+          # shots are light, the wallboard is dark). Fail the build on a
           # missing file instead of publishing a broken image.
-          for f in $(grep -o 'data-shot="[^"]*"' site/index.html | cut -d'"' -f2 | sort -u); do
-            cp "docs/images/$f.png" "_site/assets/screenshots/$f.png"
-            cp "docs/images/$f-dark.png" "_site/assets/screenshots/$f-dark.png"
+          grep -o '<figure data-shot="[^"]*"[^>]*>' site/index.html | sort -u | while read -r fig; do
+            f=$(printf '%s' "$fig" | sed -E 's/.*data-shot="([^"]*)".*/\1/')
+            only=$(printf '%s' "$fig" | sed -nE 's/.*data-only="([^"]*)".*/\1/p')
+            if [ "$only" != "dark" ]; then
+              cp "docs/images/$f.png" "_site/assets/screenshots/$f.png"
+            fi
+            if [ "$only" != "light" ]; then
+              cp "docs/images/$f-dark.png" "_site/assets/screenshots/$f-dark.png"
+            fi
           done
 
           # Interactive demo under /demo/
