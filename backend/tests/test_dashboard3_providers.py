@@ -18,6 +18,7 @@ import pytest
 from sqlalchemy import create_engine, delete, text
 
 from tests._dashboard3_helpers import ADMIN, GROUP_1, Q1, Q2, A, B, Env3, FakeRedis, open_env3
+from tests._dashboard_helpers import run_widget_fn
 from tests._webchat_fixtures import insert_config
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -26,7 +27,6 @@ from tiqora.api.v1.agents import online_key
 from tiqora.config import get_settings
 from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, core_providers
-from tiqora.dashboard.runner import run_widget
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.extensions.registry import Registry
 
@@ -174,7 +174,7 @@ async def env(request: pytest.FixtureRequest) -> AsyncIterator[Env3]:
 
 
 async def data_of(env: Env3, uid: int, widget: W, **kw: Any) -> Any:
-    out = await run_widget(env.factory, registry(), uid, widget, **kw)
+    out = await run_widget_fn(env.factory, registry(), uid, widget, **kw)
     assert out is not None and out.status == "ok", out
     assert out.data is not None
     return out.data
