@@ -382,11 +382,16 @@ async def validate_definition_route(
 def _parse_tiqora_json(text: str) -> list[AttributeDef]:
     try:
         data = json.loads(text)
-        if not isinstance(data, list):
-            raise ValueError("Die Definition muss eine Liste von Attributen sein.")
+    except ValueError as exc:  # json.JSONDecodeError: its text is English, the cause stays chained
+        raise DefinitionParseError("JSON-Definition nicht lesbar: kein gültiges JSON.") from exc
+    if not isinstance(data, list):
+        raise DefinitionParseError("Die Definition muss eine Liste von Attributen sein.")
+    try:
         return parse_attrs(data)
     except (ValueError, TypeError, ValidationError) as exc:
-        raise DefinitionParseError(f"JSON-Definition nicht lesbar: {exc}") from exc
+        raise DefinitionParseError(
+            "JSON-Definition nicht lesbar: Die Attribute passen nicht zum Schema."
+        ) from exc
 
 
 @router.post("/definition-import", response_model=DefinitionImportOut)

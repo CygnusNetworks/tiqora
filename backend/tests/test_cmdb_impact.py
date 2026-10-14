@@ -114,6 +114,23 @@ async def test_graph_undirected_types_follow_both_ways(cmdb_db: CmdbWorld) -> No
     assert [e.propagates for e in down.edges] == [False]
 
 
+async def test_graph_unpointed_target_type_does_not_propagate(cmdb_db: CmdbWorld) -> None:
+    """Znuny's unpointed ``Target`` type reaches nobody, so its edge is not drawn as propagating."""
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, "Cmdb4FlatTgt", "target", pointed=False)
+        await make_link_type(s, "Cmdb4FlatSrc", "source", pointed=False)
+        cid = await make_class(s)
+        a = await make_ci(s, cid, "cmdb4-a")
+        b = await make_ci(s, cid, "cmdb4-b")
+        c = await make_ci(s, cid, "cmdb4-c")
+        await _link(s, a, b, "Cmdb4FlatTgt")
+        await _link(s, a, c, "Cmdb4FlatSrc")
+        acc = await load_access(s, USER_A)
+        out = await impact_graph(s, acc, a, depth=1, direction="both", settings=CmdbSettings())
+    by_type = {e.link_type: e.propagates for e in out.edges}
+    assert by_type == {"Cmdb4FlatTgt": False, "Cmdb4FlatSrc": True}
+
+
 async def test_graph_rejects_unknown_direction(cmdb_db: CmdbWorld) -> None:
     async with cmdb_db.factory() as s:
         cid = await make_class(s)
