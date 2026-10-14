@@ -124,11 +124,30 @@ def test_sigterm_self_signals_own_process(monkeypatch: pytest.MonkeyPatch) -> No
 # ---------------------------------------------------------------- worker
 
 
-def _stub_worker(monkeypatch: pytest.MonkeyPatch, *, set_flag: bool) -> list[str]:
+def _stub_worker(
+    monkeypatch: pytest.MonkeyPatch, *, set_flag: bool, link_types_ready: bool = True
+) -> list[str]:
+    from tiqora.itsm import mode
     from tiqora.plugins import bootstrap
     from tiqora.worker import __main__ as worker
 
     order: list[str] = []
+
+    async def itsm_init(factory: Any) -> bool:
+        order.append("itsm-init")
+        return link_types_ready
+
+    async def itsm_retry(factory: Any) -> bool:
+        order.append("itsm-retry")
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            order.append("itsm-retry-cancelled")
+            raise
+        return True
+
+    monkeypatch.setattr(mode, "init_itsm_mode_at_startup", itsm_init)
+    monkeypatch.setattr(mode, "retry_itsm_mode_init", itsm_retry)
 
     async def init_registry(**kw: Any) -> None:
         order.append(f"init:{kw['role']}")
@@ -159,7 +178,7 @@ def test_worker_exit_code_after_restart(monkeypatch: pytest.MonkeyPatch, calls: 
     with pytest.raises(SystemExit) as e:
         run_worker()
     assert e.value.code == RESTART_EXIT_CODE
-    assert order == ["init:worker", "loops"]
+    assert order == ["init:worker", "itsm-init", "loops"]
     (start,) = calls.starts
     assert start["role"] == "worker"
     # the watch loop's on_exit stops the daemon loops through the shared stop event
@@ -344,3 +363,22 @@ async def test_stop_process_watch_cancels_loop_and_unregisters(
     watch = restart.ProcessWatch("worker:h:1:x", task, "factory")  # type: ignore[arg-type]
     await restart.stop_process_watch(watch)
     assert task.cancelled() and unregistered == ["worker:h:1:x"]
+
+
+def test_worker_retries_the_link_type_seed_until_the_api_migrated(
+    monkeypatch: pytest.MonkeyPatch, calls: _Calls
+) -> None:
+    """REL-LINKTYPE-RACE: link types not seeded at start -> a retry task, cancelled on exit."""
+    from tiqora.worker.__main__ import run_worker
+
+    order = _stub_worker(monkeypatch, set_flag=False, link_types_ready=False)
+
+    async def loops(stop: asyncio.Event) -> None:
+        await asyncio.sleep(0)  # let the retry task start
+        order.append("loops")
+
+    from tiqora.worker import __main__ as worker
+
+    monkeypatch.setattr(worker, "_run_all_loops", loops)
+    run_worker()
+    assert order == ["init:worker", "itsm-init", "itsm-retry", "loops", "itsm-retry-cancelled"]

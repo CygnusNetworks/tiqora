@@ -7,17 +7,20 @@ ITSM link types, the plain Znuny databases only Normal and ParentChild. Seed ban
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete, select, text
 
 from tests._itsm_db import ITSM_PARAMS
 from tests._itsm_mode_helpers import itsm_url, make_factory, plain_url
 from tests._sysconfig_rows import set_sysconfig_rows
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.itsm.link_types import (
     offered_link_types,
     sync_link_type_rows,
@@ -323,3 +326,121 @@ async def test_mode_initialisation_syncs_the_rows_once(itsm: Db) -> None:
     itsm.update("Normal", valid=False)
     await ensure_itsm_mode_initialised(itsm.factory)  # already stored: no second sync
     assert (await itsm.rows())["Normal"].valid is False
+
+
+# ---------------------------------------------------------------- REL-LINKTYPE-RACE
+
+_HIDDEN = "tiqora_itsm_link_type_hidden"
+
+
+@contextmanager
+def _table_hidden(url: str) -> Iterator[Callable[[], None]]:
+    """Simulate "not migrated yet": rename the table away; the yielded callable brings it back.
+
+    A rename (not a drop) keeps the CMDB link table's foreign key intact on both dialects.
+    """
+    engine = create_engine(url)
+    hidden = True
+
+    def restore() -> None:
+        nonlocal hidden
+        if hidden:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {_HIDDEN} RENAME TO tiqora_itsm_link_type"))
+            hidden = False
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(f"ALTER TABLE tiqora_itsm_link_type RENAME TO {_HIDDEN}"))
+        yield restore
+    finally:
+        try:
+            restore()
+        finally:
+            engine.dispose()
+
+
+def _stored_mode(url: str) -> str | None:
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            return conn.execute(
+                select(TiqoraSettings.value).where(TiqoraSettings.key == "itsm.mode")
+            ).scalar()
+    finally:
+        engine.dispose()
+
+
+async def test_mode_stored_before_the_table_existed_heals_on_the_next_start(plain: Db) -> None:
+    """Worker stored the mode before the api migrated; the next start (table there) seeds rows."""
+    from tiqora.itsm.mode import init_itsm_mode_at_startup
+
+    with _table_hidden(plain.url) as restore:
+        assert await init_itsm_mode_at_startup(plain.factory) is False
+        assert _stored_mode(plain.url) == "tiqora"  # the mode is stored, the rows are not
+        restore()
+        assert await plain.rows() == {}
+        # next start (the api after its migration): the mode is stored, the table empty
+        assert await init_itsm_mode_at_startup(plain.factory) is True
+    rows = await plain.rows()
+    assert set(rows) == ITSM_TYPES
+    assert {n for n, r in rows.items() if r.origin == "znuny"} == {"Normal", "ParentChild"}
+
+    # rows present: later starts change nothing, admin edits and deletions stay
+    plain.update("Normal", source_label="Standard", valid=False)
+    async with plain.factory() as session:
+        from tiqora.itsm.link_types import delete_link_type
+
+        await delete_link_type(session, (await plain.rows())["Includes"])
+        await session.commit()
+    assert await init_itsm_mode_at_startup(plain.factory) is True
+    rows = await plain.rows()
+    assert "Includes" not in rows and set(rows) == ITSM_TYPES - {"Includes"}
+    assert (rows["Normal"].source_label, rows["Normal"].valid) == ("Standard", False)
+
+
+async def test_worker_retry_seeds_the_rows_once_the_table_exists(plain: Db) -> None:
+    from tiqora.itsm.mode import retry_itsm_mode_init
+
+    with _table_hidden(plain.url) as restore:
+        ticks: list[float] = []
+
+        async def sleep(seconds: float) -> None:
+            ticks.append(seconds)
+            if len(ticks) == 3:
+                restore()  # the api finished its migration between tick 2 and 3
+
+        assert await retry_itsm_mode_init(
+            plain.factory, interval=5.0, max_seconds=600.0, sleep=sleep
+        )
+    assert ticks == [5.0, 5.0, 5.0]
+    assert set(await plain.rows()) == ITSM_TYPES
+
+
+async def test_worker_retry_gives_up_after_its_budget(plain: Db) -> None:
+    from tiqora.itsm.mode import retry_itsm_mode_init
+
+    now = [0.0]
+
+    async def sleep(seconds: float) -> None:
+        now[0] += seconds
+
+    with _table_hidden(plain.url):
+        assert not await retry_itsm_mode_init(
+            plain.factory, interval=10.0, max_seconds=30.0, sleep=sleep, clock=lambda: now[0]
+        )
+    assert now[0] == 30.0
+    assert await plain.rows() == {}
+
+
+async def test_concurrent_heal_inserts_each_type_once(plain: Db) -> None:
+    """api and worker see the empty table at the same time: one wins, the other rolls back."""
+    from tiqora.itsm.mode import sync_link_types_if_empty
+
+    async def heal() -> bool:
+        async with plain.factory() as session:
+            return await sync_link_types_if_empty(session)
+
+    assert await asyncio.gather(heal(), heal()) == [True, True]
+    rows = await plain.rows()
+    assert set(rows) == ITSM_TYPES and len(rows) == len(ITSM_TYPES)

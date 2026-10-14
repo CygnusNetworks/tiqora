@@ -14,15 +14,18 @@ own session and commits).
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final, Literal
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import insert, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, insert, inspect, select
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.tiqora.models import TiqoraSettings
@@ -272,6 +275,7 @@ async def ensure_itsm_mode_initialised(
     async with session_factory() as session:
         state = await get_itsm_mode(session, fresh=True)
         if state.stored:
+            await sync_link_types_if_empty(session)  # REL-LINKTYPE-RACE: mode stored, rows not
             return state
         mode = auto_default(state.detected)
         now = utc_now()
@@ -289,7 +293,7 @@ async def ensure_itsm_mode_initialised(
         )
         await session.commit()
         log.info("itsm_mode_initialised", mode=mode, source="auto")
-        await _sync_link_types_once(session)
+        await sync_link_types_if_empty(session)
         return ItsmModeState(
             mode=mode,
             source="auto",
@@ -301,25 +305,124 @@ async def ensure_itsm_mode_initialised(
         )
 
 
-async def _sync_link_types_once(session: AsyncSession) -> None:
-    """F3/F31: the link-type rows are created once, with the mode. Never blocks startup."""
+async def _link_type_row_count(session: AsyncSession) -> int | None:
+    """Rows in ``tiqora_itsm_link_type``; ``None`` while the table does not exist yet."""
+    from tiqora.itsm.models import TiqoraItsmLinkType
+
+    def _has_table(sync_session: Any) -> bool:
+        return bool(inspect(sync_session.connection()).has_table(TiqoraItsmLinkType.__tablename__))
+
+    if not await session.run_sync(_has_table):
+        return None
+    count = (await session.execute(select(func.count()).select_from(TiqoraItsmLinkType))).scalar()
+    return int(count or 0)
+
+
+async def sync_link_types_if_empty(session: AsyncSession) -> bool:
+    """Seed the link-type rows while ``tiqora_itsm_link_type`` is empty (REL-LINKTYPE-RACE).
+
+    The rows used to be written only by the process that stored ``itsm.mode``. On a rollout
+    without a start order a worker can store the mode before the api migrated (the settings
+    table is older than the link-type table); its sync then failed and nobody tried again. Now
+    every startup checks: table missing -> ``False`` (try again later); table empty -> the
+    insert-if-absent sync of the admin button (``sync_link_type_rows``); rows present ->
+    nothing. "Empty", not "fewer than expected": an admin may delete a Tiqora type, and that
+    must stay deleted; Znuny-origin rows cannot be deleted, so a synced table is never empty.
+
+    Returns ``True`` once the table exists and holds rows. Never raises.
+    """
     from tiqora.itsm.link_types import sync_link_type_rows
 
-    try:
-        changed = await sync_link_type_rows(session, user_id=1)
-        await session.commit()
-        log.info("itsm_link_types_synced", changed=changed)
-    except Exception as exc:  # noqa: BLE001 - a missing table or a racing sync must not block startup
-        await session.rollback()
-        log.warning("itsm_link_type_sync_failed", error=str(exc), error_type=type(exc).__name__)
+    for attempt in range(1, _HEAL_ATTEMPTS + 1):
+        try:
+            count = await _link_type_row_count(session)
+            if count is None:
+                await session.rollback()
+                log.info("itsm_link_type_sync_deferred", reason="table_missing")
+                return False
+            if count:
+                return True
+            changed = await sync_link_type_rows(session, user_id=1)
+            await session.commit()
+            log.info("itsm_link_types_synced", changed=changed)
+            return True
+        except DBAPIError as exc:
+            await session.rollback()
+            if not _lost_race(exc) or attempt == _HEAL_ATTEMPTS:
+                log.warning(
+                    "itsm_link_type_sync_failed", error=str(exc), error_type=type(exc).__name__
+                )
+                return False
+            # api and worker seeded at the same time: duplicate key, or a MariaDB deadlock
+            # (1213) on the unique index. Look again: the other writer's rows count.
+            log.info("itsm_link_type_sync_raced", attempt=attempt)
+        except Exception as exc:  # noqa: BLE001 - a failing sync must not block startup
+            await session.rollback()
+            log.warning("itsm_link_type_sync_failed", error=str(exc), error_type=type(exc).__name__)
+            return False
+    return False  # pragma: no cover - the loop returns
 
 
-async def init_itsm_mode_at_startup(session_factory: async_sessionmaker[AsyncSession]) -> None:
-    """Startup hook of api and worker: never raises (the DB may not be migrated yet)."""
+_HEAL_ATTEMPTS: Final = 3
+#: MariaDB deadlock / lock wait timeout; PostgreSQL deadlock_detected / serialization_failure
+_RACE_CODES: Final[frozenset[object]] = frozenset({1213, 1205, "40P01", "40001"})
+
+
+def _lost_race(exc: DBAPIError) -> bool:
+    if isinstance(exc, IntegrityError):
+        return True
+    orig = exc.orig
+    code = orig.args[0] if orig is not None and orig.args else None
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    return code in _RACE_CODES or sqlstate in _RACE_CODES
+
+
+async def init_itsm_mode_at_startup(session_factory: async_sessionmaker[AsyncSession]) -> bool:
+    """Startup hook of api and worker: never raises (the DB may not be migrated yet).
+
+    Returns ``True`` when the link-type rows exist afterwards; ``False`` tells the worker to
+    try again (``retry_itsm_mode_init``) because the api has not migrated yet.
+    """
     try:
         await ensure_itsm_mode_initialised(session_factory)
     except Exception as exc:  # noqa: BLE001 - a failing detection must never block startup
         log.warning("itsm_mode_init_failed", error=str(exc), error_type=type(exc).__name__)
+    try:
+        async with session_factory() as session:
+            return await sync_link_types_if_empty(session)
+    except Exception as exc:  # noqa: BLE001 - database unreachable: the retry covers it
+        log.warning("itsm_link_type_sync_failed", error=str(exc), error_type=type(exc).__name__)
+        return False
+
+
+#: worker retry while the api has not migrated yet (the same budget as the plugin boot retry)
+RETRY_INTERVAL_SECONDS: Final[float] = 30.0
+RETRY_MAX_SECONDS: Final[float] = 1800.0
+
+
+async def retry_itsm_mode_init(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    interval: float = RETRY_INTERVAL_SECONDS,
+    max_seconds: float = RETRY_MAX_SECONDS,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> bool:
+    """Worker: repeat ``init_itsm_mode_at_startup`` until the link-type rows exist.
+
+    Started only when the first attempt returned ``False``; the first tick after the api
+    migrated seeds the rows. Returns ``True`` on success, ``False`` after ``max_seconds``.
+    """
+    started = clock()
+    attempt = 0
+    while clock() - started < max_seconds:
+        await sleep(interval)
+        attempt += 1
+        if await init_itsm_mode_at_startup(session_factory):
+            log.info("itsm_link_types_ready", attempt=attempt)
+            return True
+    log.warning("itsm_link_type_sync_gave_up", attempts=attempt)
+    return False
 
 
 async def set_itsm_mode(session: AsyncSession, new: ItsmMode, *, user_id: int) -> ItsmModeState:
@@ -442,7 +545,9 @@ __all__ = [
     "init_itsm_mode_at_startup",
     "is_switched",
     "require_itsm_enabled",
+    "retry_itsm_mode_init",
     "rollback_to_znuny",
     "set_itsm_mode",
     "switch_to_tiqora",
+    "sync_link_types_if_empty",
 ]

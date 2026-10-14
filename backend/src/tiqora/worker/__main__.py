@@ -487,15 +487,21 @@ def run_worker() -> None:
     )
 
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
+    itsm_retry: asyncio.Task[bool] | None = None
     try:
         loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
-        from tiqora.itsm.mode import init_itsm_mode_at_startup
+        from tiqora.itsm.mode import init_itsm_mode_at_startup, retry_itsm_mode_init
 
-        loop.run_until_complete(init_itsm_mode_at_startup(get_session_factory()))
+        if not loop.run_until_complete(init_itsm_mode_at_startup(get_session_factory())):
+            # REL-LINKTYPE-RACE: the api has not migrated yet; seed the link types once it has
+            itsm_retry = loop.create_task(retry_itsm_mode_init(get_session_factory()))
         loop.run_until_complete(_run_all_loops(stop))
     finally:
         plugin_retry.cancel()
         loop.run_until_complete(asyncio.gather(plugin_retry, return_exceptions=True))
+        if itsm_retry is not None:
+            itsm_retry.cancel()
+            loop.run_until_complete(asyncio.gather(itsm_retry, return_exceptions=True))
         loop.run_until_complete(stop_process_watch(process_watch))
         loop.close()
         logger.info("tiqora_worker_stopped")
