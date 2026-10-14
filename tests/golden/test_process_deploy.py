@@ -524,8 +524,16 @@ async def test_new_process_ticket_matches_znuny_history(
         f"history_type sequence differs:\nznuny:  {znuny_history}\ntiqora: {tiqora_history}"
     )
     assert tiqora_history == znuny_history
+    # Ticket.pm::TicketCreate writes ServiceUpdate + SLAUpdate (Ticket::Service) and TypeUpdate
+    # (Ticket::Type) right after NewTicket; the ITSM peers switch both on, the plain peers not.
+    sysconfig = SysConfig(session)
+    create_rows = (
+        ["ServiceUpdate", "SLAUpdate"] if await sysconfig.get_bool("Ticket::Service") else []
+    ) + (["TypeUpdate"] if await sysconfig.get_bool("Ticket::Type") else [])
+    off = len(create_rows)
     assert [t for t, _ in znuny_history] == [
         "NewTicket",
+        *create_rows,
         "TicketDynamicFieldUpdate",  # ProcessManagementProcessID
         "TicketDynamicFieldUpdate",  # ProcessManagementActivityID (start)
         "TicketDynamicFieldUpdate",  # TestDropdownACLProcess
@@ -535,8 +543,8 @@ async def test_new_process_ticket_matches_znuny_history(
         "StateUpdate",  # its TicketStateSet action: new -> open
         "SetPendingTime",  # the non-pending state resets the pending time
     ]
-    assert znuny_history[4] == ("AddNote", "%%Note")  # AgentTicketProcess.pm:5650-5651
-    assert znuny_history[6] == (
+    assert znuny_history[4 + off] == ("AddNote", "%%Note")  # AgentTicketProcess.pm:5650-5651
+    assert znuny_history[6 + off] == (
         "TicketDynamicFieldUpdate",
         _NUMBER_RE.sub(
             "#",
