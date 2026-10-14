@@ -172,7 +172,9 @@ class SkippedActionOut(BaseModel):
 
     module: str
     reason: str  # stable code: ``vetoed``, ``itsm_off``, ``link_refused``, ...
-    detail: str  # German text for the agent
+    #: German text for the agent; ``None`` in the customer portal, which never shows veto
+    #: texts or internal reasons to customers
+    detail: str | None = None
 
 
 class ActivityDialogSubmitOut(BaseModel):

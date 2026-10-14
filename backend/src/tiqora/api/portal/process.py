@@ -10,6 +10,7 @@ Same ``pm_*`` tables and engine as agent ``/api/v1/process``, but:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -39,7 +40,7 @@ from tiqora.process.availability import (
 from tiqora.process.config import ActivityDialogFieldConfig
 from tiqora.process.dialog_form import build_start_form, build_ticket_dialog_form
 from tiqora.process.dump import PROCESS_STATE_NAMES
-from tiqora.process.engine import submit_activity_dialog
+from tiqora.process.engine import SkippedAction, submit_activity_dialog
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
     ActivityDialogNotFound,
@@ -379,9 +380,7 @@ async def create_new_process_ticket(
         ticket_number=result.ticket_number,
         activity_changed=result.transition.activity_changed,
         unsupported_actions=result.transition.unsupported_actions,
-        skipped_actions=[
-            SkippedActionOut.model_validate(a) for a in result.transition.skipped_actions
-        ],
+        skipped_actions=portal_skipped_actions(result.transition.skipped_actions),
         state=state,
     )
 
@@ -412,6 +411,15 @@ async def start_ticket_process(
     except _MAPPED as exc:
         raise _map_exc(exc) from exc
     return await _ticket_process_state_out_customer(session, ticket_id, actor, repository)
+
+
+def portal_skipped_actions(actions: Iterable[SkippedAction]) -> list[SkippedActionOut]:
+    """Skipped actions for the customer: module and reason code only, never ``detail``.
+
+    The detail holds plugin veto texts written for agents and internal reasons (link types
+    from the process configuration, exception text); customers must not see them.
+    """
+    return [SkippedActionOut(module=a.module, reason=a.reason, detail=None) for a in actions]
 
 
 @router.post("/ticket/{ticket_id}/submit", response_model=ActivityDialogSubmitOut)
@@ -446,6 +454,6 @@ async def submit_ticket_activity_dialog(
         new_activity_entity_id=result.new_activity_entity_id,
         transition_entity_id=result.transition_entity_id,
         unsupported_actions=result.unsupported_actions,
-        skipped_actions=[SkippedActionOut.model_validate(a) for a in result.skipped_actions],
+        skipped_actions=portal_skipped_actions(result.skipped_actions),
         state=state,
     )

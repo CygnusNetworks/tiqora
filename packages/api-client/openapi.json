@@ -41055,8 +41055,15 @@
         "description": "A transition action that was skipped on this run (the transition itself went through).",
         "properties": {
           "detail": {
-            "title": "Detail",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
           },
           "module": {
             "title": "Module",
@@ -41069,8 +41076,7 @@
         },
         "required": [
           "module",
-          "reason",
-          "detail"
+          "reason"
         ],
         "title": "SkippedActionOut",
         "type": "object"

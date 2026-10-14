@@ -909,3 +909,45 @@ async def test_customer_enroll_with_group_support_needs_rw_in_the_queue_group(
     allowed = await portal.post(f"{PORTAL}/ticket/{TICKET_OWN}/start", json=body)
     assert allowed.status_code == 200, allowed.text
     assert allowed.json()["process_entity_id"] == process_eid(1)
+
+
+@pytest.mark.db
+async def test_portal_skipped_actions_never_carry_the_detail(
+    portal: AsyncClient, sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review minor 2: a skipped action reaches the customer as module + reason only; the
+    detail (plugin veto text for agents, internal reasons) stays on the agent side."""
+    from tiqora.process.engine import SkippedAction
+
+    real = portal_process.create_process_ticket
+
+    async def with_a_skip(*args: Any, **kwargs: Any) -> Any:
+        result = await real(*args, **kwargs)
+        result.transition.skipped_actions.append(
+            SkippedAction(
+                module="Plugin_example_SetContract",
+                reason="vetoed",
+                detail="Ticket 1: interne Vertragsprüfung fehlgeschlagen",
+            )
+        )
+        return result
+
+    monkeypatch.setattr(portal_process, "create_process_ticket", with_a_skip)
+    _build(sync_url, lambda c: _add_process(c, 1, START))
+    resp = await portal.post(
+        f"{PORTAL}/tickets",
+        json={"process_entity_id": process_eid(1), "field_values": VALUES},
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["skipped_actions"] == [
+        {"module": "Plugin_example_SetContract", "reason": "vetoed", "detail": None}
+    ]
+    assert "Vertragsprüfung" not in resp.text
+
+
+def test_portal_routes_build_skipped_actions_without_detail() -> None:
+    import inspect
+
+    src = inspect.getsource(portal_process)
+    assert "SkippedActionOut.model_validate" not in src
+    assert src.count("portal_skipped_actions(") == 3  # the helper and both routes

@@ -27114,7 +27114,7 @@ export interface components {
          */
         SkippedActionOut: {
             /** Detail */
-            detail: string;
+            detail?: string | null;
             /** Module */
             module: string;
             /** Reason */
