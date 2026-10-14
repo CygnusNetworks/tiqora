@@ -80,7 +80,7 @@ TIQORA_STRICT_DB_LEAKS=1 TIQORA_REQUIRE_SAML_TESTS=1 uv run python -m pytest -q
 The `env OIDC/LDAP unchanged` tests (`test_env_oidc_unchanged_*`, `test_env_ldap_login_unchanged`)
 are the production safety net: re-run them after any change to `identity/sso_routes.py`,
 `identity/login.py` or `api/v1/auth.py`. The JIT account shape is additionally compared with real
-Znuny in `tests/golden/test_identity_jit.py` (golden suite, manual: `GOLDEN=1 just golden-run`).
+Znuny in `tests/golden/test_identity_jit.py`, and the SCIM-created agent in `tests/golden/test_identity_scim.py` (golden suite, manual: `GOLDEN=1 just golden-run`).
 
 ## Optional: Keycloak round trip (OIDC + SAML)
 
@@ -111,6 +111,78 @@ so the test reaches Keycloak as `keycloak.test` (resolver patched to a private a
 | GenericInterface compat conformance (SessionCreate/TicketSearch/StateType/empty-search) | `test_compat_conformance.py` |
 | Compat ops unit/DB (Session\*, Ticket\*, HistoryGet, Owner/Sort, SOAP) | `backend/tests/test_compat_*.py` |
 | `DateChecksum` ticket-number checksum digit | `test_date_checksum.py` |
+
+### Golden tests by area
+
+Every module below lives in `tests/golden/`, is marked `golden` (skipped unless `GOLDEN=1`) and runs
+against the shared golden MariaDB. "Any peer" means any plain peer of `peers.yaml`; the table names the peers
+the maintainers recorded runs on. Run a single module from `backend/`:
+`GOLDEN=1 GOLDEN_PEER=<peer> uv run python -m pytest -q -m golden ../tests/golden/<module>.py`.
+
+| Area | Module | What it proves | Peer and extra prerequisites |
+|---|---|---|---|
+| GenericInterface requester | `test_gi_requester.py` | The invokers over REST and SOAP (webservices `GoldenRequesterREST` / `GoldenRequesterSOAP`, imported once into the peer) send the same requests as Znuny's `Requester->Run` to a recording sink, after masking ids, ticket numbers, timestamps and the `Host`/`Content-Length`/`User-Agent` headers. Tiqora's SSRF guard stays armed; only the injected transport reaches the sink | Plain peer (6.5). Needs the `gisink` service of the compose file (host port 8199, started by `just golden-up`) |
+| GenericInterface mapping and history | `test_gi_mapping.py` | Simple, XSLT and OutOfOffice mappings, the `TicketGet` shape and the GI history rows answer identically over HTTP on both sides (Znuny through Apache, Tiqora through its real ASGI app), after `normalize` | Plain peer (6.5); webservice `GoldenMappingREST` is imported once |
+| GenericInterface ConfigItem operations | `test_gi_config_items.py` | The five `ConfigItem::*` operations of Znuny's `GenericConfigItemConnectorREST` and the `ConfigItemUpdate` process action answer like Tiqora's Mode B CMDB (`itsm.mode = tiqora`, after the importer copied the CIs), modulo ids and times. Read cases first, write cases last; the module restores the Tiqora tables and `itsm.*` settings it touched | **ITSM peer** (`znuny-6.5-itsm` or `znuny-7.3-itsm`): run `just golden-itsm-fetch <peer>` once (add `--record` on the very first fetch) so the `.opm` packages exist, then `GOLDEN_PEER=<peer> just golden-up && just golden-seed` |
+| Identity: JIT | `test_identity_jit.py` | A JIT-provisioned agent (`provision_agent` plus a role grant) is read back by the peer's own `User` / `Group` objects as a normal Znuny agent | Any peer |
+| Identity: SCIM | `test_identity_scim.py` | A SCIM-created agent, a SCIM group whose rule grants a role (`run_scim_role_sync_tick`) and `active=false` (shows as `ValidID 2`) are read back correctly by the peer. Seed band 63395-63399 | Any peer |
+| ITSM Mode A | `test_itsm_mode_a.py` | With Znuny running the ITSM, Tiqora's providers (`ZnunyCiProvider`, `link_objects`, `load_matrix`, ...) agree with the peer's `ITSMConfigItem`, `LinkObject`, `Service` and `ITSMCIPAllocate` on the same database. Documents one known difference: Mode A writes no `configitem_history` row and does not recalculate `cur_inci_state_id` | ITSM peer for most cases; the two setup cases run on a **plain** peer only (the ITSM-peer case proves the seed equals the packages' rows, the plain-peer case that Tiqora's setup writes exactly those rows) |
+| ITSM importer | `test_itsm_import.py` | `run_import` copies a custom class (nested attributes, references, General Catalog values), five CIs with versions, links and an attachment into the Tiqora CMDB; each row equals what Znuny returns (`VersionGet`, `LinkList`, `ConfigItemAttachmentGet`). The cases build on each other in file order (dry run, first import, second run, new version, third run) | ITSM peer and `fetch_itsm_packages.py`, as above. The General Catalog item of the custom class cannot be deleted in Znuny and stays |
+| ITSM peer smoke test | `test_itsm_peer_smoke.py` | The ITSM peer has its packages (`Admin::Package::List`) and core tables; `test_plain_peer_has_no_itsm` proves a plain peer has none | ITSM peer (`-k itsm_peer_smoke`), plus any plain peer for the negative case |
+| TiqoraITSM add-on | `test_tiqoraitsm_addon.py` | The ticket-zoom widget "Betroffene CIs (Tiqora)" (hidden for agents without read access to the CI class's group), the read-only guard (`itsm.znuny_readonly`), the customer page and the optional linking (`AgentTiqoraITSMLink`) work in a real Znuny. The widget stays empty in every mode but Mode B | `znuny-6.5` and `znuny-7.3`; also fine on an ITSM peer. The add-on is copied into the peer with `docker compose cp` |
+| Process deploy | `test_process_deploy.py` | `build_process_dump` equals Znuny's `ProcessDump(HASH)`; the deploy watcher snapshots Znuny deploys of processes and ACLs; `create_process_ticket` writes Znuny's history and dynamic field values | `znuny-6.5` and `znuny-7.3`; creates the two revision tables if missing |
+| Process designer | `test_process_designer.py` | A Znuny export imports into Tiqora and round-trips; a Tiqora edit is a draft in Znuny; a `signal` deploy lands in `ZZZProcessManagement.pm`; Znuny loads the YAML Tiqora wrote; `AppointmentCreate`, `Module` conditions and attachment option keys agree | `znuny-6.5` and `znuny-7.3` |
+| TiqoraSync deploy | `test_tiqorasync_deploy.py` | The add-on's `Run()` writes the heartbeat and executes deploy signals for processes and ACLs like Znuny's Deploy button; deploy signals never reach `Cache->CleanUp`; several signals lead to one dump | Any peer (module copied in; `TIQORASYNC_MODULE` points at another copy) |
+| Statistics import | `test_stats_import.py` | Statistics imported by the peer's `Stats->Import` (fixtures `backend/tests/fixtures/znuny_stats`) map like the export files, so Tiqora reads the `xml_storage` rows the same way as the files | `znuny-6.5`: `GOLDEN=1 GOLDEN_PEER=znuny-6.5 just golden-up && just golden-seed` |
+| Plugin artefacts | `test_plugin_artefacts.py` | An article on a plugin-registered channel and a plugin dynamic field type stay readable for real Znuny (`BackendForArticle`, `Admin::CommunicationChannel::Sync`, `DynamicFieldGet`, `ValueGet`). Seed band 55490-55499 | Any peer; boots the `org.example.points` fixture plugin in-process |
+| Web chat articles | `test_webchat_articles.py` | Chat lines, bot replies and the handoff note written by Tiqora on the `WebChat` channel are normal Znuny articles (Internal backend, body and attachment readable, channel sync keeps the row, ticket delete works). Seed band 54740-54759 | Any peer |
+
+The older modules (`test_ticket_number_interleaving.py`, `test_history_diff.py`, `test_escalation.py`,
+`test_compat_conformance.py`, `test_date_checksum.py`) are listed under "What gets validated" below. One
+session runs one peer; tests marked `itsm_peer` or `plain_peer` skip themselves on the other kind of peer.
+
+### Markers and environment switches
+
+| Marker or variable | Effect |
+|---|---|
+| `db`, `search` | Need Docker (testcontainers MariaDB/PostgreSQL, Meilisearch) |
+| `golden` + `GOLDEN=1` | Golden-master suite (this page); `GOLDEN_PEER` selects the peer |
+| `schema_matrix` + `SCHEMA_MATRIX=1` (`SCHEMA_MATRIX_FULL=1`) | Layer A multi-version DDL |
+| `saml` + `TIQORA_REQUIRE_SAML_TESTS=1` | pysaml2 + `xmlsec1` tests; the variable turns a missing dependency from "skip" into a failure |
+| `keycloak` + `TIQORA_KEYCLOAK_TESTS=1` | Optional Keycloak round trip |
+| `TIQORA_STRICT_DB_LEAKS=1` | A DB test module that leaves rows behind fails (CI sets it) |
+| `TIQORA_REQUIRE_PDF=1` | PDF report tests (`test_report_pdf.py`, `test_reports_export_pdf.py`, `test_report_delivery.py`) |
+
+**PDF tests.** PDF reports use WeasyPrint, which needs native libraries (Pango, HarfBuzz, fontconfig and a
+DejaVu font; see [deployment.md](deployment.md#pdf-reports-and-scheduled-delivery)). Without them the PDF
+tests skip. CI installs the libraries and sets `TIQORA_REQUIRE_PDF=1`, so a missing library fails the run
+instead of silently dropping the tests. Locally, set the variable only after installing the libraries
+(`brew install pango` on macOS).
+
+### Documentation guard tests
+
+A few backend tests read the Markdown under `docs/` and fail when it drifts from the code or from itself. They are
+plain pytest modules (no database, no Docker) and run in the normal `pytest -q`:
+
+- `backend/tests/test_docs_itsm_links.py` - `docs/itsm.md` keeps its owned importer headings (no placeholder
+  text) and every link into that file by heading anchor (in docs, frontend sources and Python) resolves to a real heading.
+- `backend/tests/test_docs_release_v0190.py` - the release and upgrade notes of v0.19.0 state the operator facts
+  (nginx `location /scim/` only for proxies that list their locations, link types written at first start,
+  `service_healthy` recommended, ai-worker rolled out with api/worker/mcp, rollback needs
+  `TIQORA_RUN_MIGRATIONS=0`, the SSO-managed rule names every password path).
+- `backend/tests/test_gi_docs_events.py` - the GenericInterface event list in
+  [compatibility.md](compatibility.md) matches the events the requester really fires; unfired events are not claimed.
+- `backend/tests/test_plugins_docs_ai_worker.py` - `docs/plugins.md` says AI writes run no sync hooks and that all
+  four processes need the plugin image.
+
+Run them alone from `backend/`:
+
+```sh
+uv run python -m pytest tests/test_docs_itsm_links.py tests/test_docs_release_v0190.py \
+    tests/test_gi_docs_events.py tests/test_plugins_docs_ai_worker.py -q
+```
+
+When you edit one of those documents, keep the wording the guard asserts (the assertions are short exact strings).
 
 ## Infrastructure
 

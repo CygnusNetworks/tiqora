@@ -1,7 +1,8 @@
 # Identity-Provider: Anmeldung per OIDC, SAML und LDAP
 
 > **English summary.** Tiqora signs agents and (optionally) portal customers in through
-> *identity providers* configured in the admin UI (`/admin/identity-providers`): any number of
+> *identity providers* configured in the admin UI under **Administration → Identitätsanbieter**
+> (`/admin/identity-providers`; "Identitätsanbieter" is German for "identity providers"): any number of
 > OIDC providers (Microsoft Entra ID, Google Workspace, Keycloak, Authentik, generic), SAML 2.0
 > providers (ADFS and others, SP- and IdP-initiated, single logout) and LDAP/Active Directory
 > directories. Each provider can match users by login or e-mail, create accounts on first login
@@ -16,15 +17,34 @@
 > the IdP creates, updates and deactivates accounts and pushes groups that drive role rules via
 > `scim:groups`), **step-up MFA** (a provider can require proof of a second factor from the IdP, with
 > a Tiqora TOTP/passkey fallback) and a **per-provider session lifetime** (shortens, never extends,
-> the global session TTLs).
+> the global session TTLs). SCIM, step-up and the session lifetime need a provider created in the admin UI
+> (OIDC or SAML; LDAP and environment-configured providers have no such tabs or are read-only). An
+> account that a SCIM provider manages **and** whose provider requires the IdP's second factor can no
+> longer sign in with a password anywhere in Tiqora (local password, LDAP, plugin password providers and the
+> Znuny-compatible GenericInterface `SessionCreate`/`UserLogin`); the refusal looks like a wrong password.
+> The "Admin-Seiten im Überblick" table below lists every tab of the provider page with its English
+> meaning; German UI labels are quoted exactly as they appear.
+>
+> Key UI labels: *Zweiten Faktor vom Anmeldedienst verlangen* = require a second factor from the IdP;
+> *Ohne Bestätigung* = when the IdP gives no proof (fallback: *Zweiten Faktor in Tiqora abfragen* = ask for
+> the Tiqora TOTP/passkey, *Anmeldung ablehnen* = reject, *In Tiqora abfragen oder Einrichtung eines Faktors
+> erlauben* = ask, and let agents without a factor enrol one); *Bereitstellung aktiv* = SCIM enabled;
+> *Vorhandene Konten übernehmen* = adopt existing accounts; *Abmeldung nach Inaktivität (Minuten)* / *Spätestens
+> abmelden nach (Stunden)* = idle / absolute session limit. Defaults: step-up fallback asks for the Tiqora factor;
+> SCIM keys last 365 days (max 730, at most 5 active per provider), 600 requests per 60 s per key, request
+> log kept 180 days; a provider may shorten the idle limit down to 5 minutes and the absolute limit down to
+> 15 minutes. Server-side, these env variables tune SCIM: `TIQORA_SCIM_RATE_LIMIT_ENABLED`,
+> `TIQORA_SCIM_RATE_LIMIT_MAX`, `TIQORA_SCIM_RATE_LIMIT_WINDOW`, `TIQORA_SCIM_AUTH_FAIL_MAX`,
+> `TIQORA_SCIM_AUTH_FAIL_WINDOW`, `TIQORA_SCIM_AUTH_LOCKOUT`, `TIQORA_SCIM_MAX_BODY_BYTES`,
+> `TIQORA_SCIM_MAX_MEMBERS`, `TIQORA_SCIM_ROLE_SYNC_INTERVAL`, `TIQORA_SCIM_EVENT_RETENTION_DAYS`.
 
 Dieses Handbuch beschreibt, wie Administratoren Anmeldeanbieter einrichten. Alle Beispiele
 verwenden erfundene Hosts (`example.org`, `example.com`) und Namen.
 
 ## Überblick
 
-Anbieter werden unter **Verwaltung → Identity-Provider** (`/admin/identity-providers`)
-angelegt. Dort gibt es drei Arten:
+Anbieter werden unter **Administration → Identitätsanbieter** (`/admin/identity-providers`,
+englisch „identity providers“) angelegt. Dort gibt es drei Arten:
 
 | Art | Protokoll | Zielgruppe | Abmeldung |
 |---|---|---|---|
@@ -32,13 +52,34 @@ angelegt. Dort gibt es drei Arten:
 | SAML | SAML 2.0 Web-SSO (SP- und optional IdP-initiiert) | Agenten, Kunden | Single Logout (SP-initiiert und IdP-initiiert) |
 | LDAP | Bind-Search-Bind gegen ein Verzeichnis, Passwort-Eingabe im Tiqora-Loginformular | Agenten, Kunden | lokal |
 
-Pro Anbieter legen Sie fest: **Zielgruppe** (Agenten, Kunden oder beide), **Reihenfolge**
+Pro Anbieter legen Sie fest: **Zielgruppe** (Feld *Gilt für*: Agenten, Kunden oder beide), **Reihenfolge**
 (Sortierung der Buttons; LDAP-Verzeichnisse werden in dieser Reihenfolge probiert, das erste
 erfolgreiche Binden gewinnt), **Zuordnung** (Login oder E-Mail), **Konto-Anlage bei der ersten
 Anmeldung (JIT)** und **Rollen/Gruppen**. Presets (Entra ID, Google Workspace, Keycloak,
 Authentik, ADFS, Generic SAML/OIDC, LDAP, Active Directory) füllen nur Standardwerte vor.
 
-Der Dialog **Testanmeldung** (siehe unten) prüft einen Anbieter, bevor er für alle sichtbar wird.
+Der Tab **Testanmeldung** (siehe unten) prüft einen Anbieter, bevor er für alle sichtbar wird.
+
+### Admin-Seiten im Überblick
+
+Die Liste unter **Administration → Identitätsanbieter** zeigt alle Anbieter (Art, Zielgruppe, Zustand);
+ein Anbieter aus Umgebungsvariablen trägt eine Kennzeichnung und ist schreibgeschützt. Die Detailseite
+eines Anbieters hat diese Tabs (die Namen stehen genau so in der Oberfläche):
+
+| Tab (deutsch) | Englisch | Was dort steht | Abschnitt |
+|---|---|---|---|
+| **Verbindung** | Connection | *Name*, *Kurzname* (Slug), *Gilt für* (Zielgruppe), *Aktiv*, *Beschriftung der Anmeldetaste*, Symbol, *Reihenfolge*; darunter die Verbindungswerte der Anbieterart (OIDC-Issuer/Client, SAML-Metadaten, LDAP-Server) und die URLs zum Kopieren | je Anbieterart oben |
+| **Zuordnung** | Mapping (attribute mapping) | „Welche Werte füllen welches Feld?“ (Anmeldename, E-Mail, Vorname, Nachname, Kundennummer, Mobilnummer), *Anmeldung zuordnen über* (Anmeldename oder E-Mail), *Beim ersten Anmelden automatisch anlegen* (JIT), *Erlaubte E-Mail-Domains*, Rollen und Gruppenrechte für neue Konten, *Namen und E-Mail bei jeder Anmeldung aktualisieren*, Vorschau | [Zuordnung, Anlage (JIT) und Profil](#zuordnung-anlage-jit-und-profil) |
+| **Rollen aus dem Anmeldedienst** | Roles from the sign-in service (role rules) | Regeln „Angabe des Anmeldedienstes + Wert → Rollen/Gruppen“, Abgleichmodus, Liste der verwalteten Zuordnungen | [Rollen und Gruppen](#rollen-und-gruppen-verwaltet-oder-wie-znuny) |
+| **Bereitstellung (SCIM)** | Provisioning (SCIM) | SCIM-Adresse, Schalter, Schlüssel, Konten, Gruppen, Protokoll (nur OIDC/SAML aus der Verwaltung) | [Bereitstellung mit SCIM](#bereitstellung-mit-scim) |
+| **Sitzung & zweiter Faktor** | Session & second factor (step-up) | *Zweiten Faktor vom Anmeldedienst verlangen*, Werte pro Protokoll, Fallback, Sitzungsdauer (nur OIDC/SAML aus der Verwaltung) | [Zweiter Faktor](#zweiter-faktor-vom-anmeldedienst), [Sitzungsdauer](#sitzungsdauer) |
+| **Testanmeldung** | Test sign-in | Probelauf als Agent oder Kunde ohne Nebenwirkung; zeigt Werte, Vorschau und den Nachweis des zweiten Faktors | [Testanmeldung](#testanmeldung) |
+| **Verknüpfungen** | Links (account links) | Konten, die sich über diesen Anbieter angemeldet haben; eine Verknüpfung lässt sich lösen | [Zuordnung, Anlage (JIT) und Profil](#zuordnung-anlage-jit-und-profil) |
+
+Bei **LDAP**-Anbietern fehlen die Tabs *Bereitstellung (SCIM)* und *Sitzung & zweiter Faktor*; ein Link auf
+sie öffnet den Tab *Verbindung*. Pro SCIM-Schlüssel, Konto und Gruppe gibt es keine eigene Seite: alles
+steht im Tab *Bereitstellung (SCIM)*. Die Berechtigung „SSO berechtigt“ pro Agent steht unter
+**Administration → Authentifizierung / 2FA** (`/admin/auth-config`).
 
 ### Vorbereitung auf dem Server
 
@@ -305,8 +346,8 @@ Rollen, ohne dass sich jemand erneut anmelden muss.
 Voraussetzungen:
 
 * Der Anbieter ist ein **OIDC- oder SAML-Anbieter aus der Verwaltung** (nicht LDAP und nicht aus
-  Umgebungsvariablen). Ein Anbieter aus `TIQORA_OIDC_*` zeigt den Tab *Bereitstellung* nur
-  schreibgeschützt; legen Sie ihn in der Verwaltung neu an, wenn Sie SCIM, den zweiten Faktor
+  Umgebungsvariablen). Ein Anbieter aus `TIQORA_OIDC_*` zeigt im Tab *Bereitstellung (SCIM)* (wie im Tab
+  *Sitzung & zweiter Faktor*) nur einen Hinweis; legen Sie ihn in der Verwaltung neu an, wenn Sie SCIM, den zweiten Faktor
   vom Anmeldedienst oder eine eigene Sitzungsdauer nutzen wollen.
 * `TIQORA_PUBLIC_BASE_URL` ist gesetzt. Die SCIM-Adresse lautet
   `https://helpdesk.example.org/scim/v2`.
@@ -317,15 +358,22 @@ Voraussetzungen:
 
 ### Einrichten in Tiqora
 
-1. Öffnen Sie den Anbieter unter **Verwaltung → Identity-Provider** und wechseln Sie in den Tab
-   **Bereitstellung (SCIM)**.
-2. Schalten Sie **Bereitstellung aktiv** ein. Solange der Schalter aus ist, weist Tiqora alle
+1. Öffnen Sie den Anbieter unter **Administration → Identitätsanbieter** und wechseln Sie in den Tab
+   **Bereitstellung (SCIM)** (englisch „Provisioning (SCIM)“).
+2. Schalten Sie **Bereitstellung aktiv** ein (Schalter *Vorhandene Konten übernehmen* siehe unten). Solange der Schalter aus ist, weist Tiqora alle
    SCIM-Anfragen ab.
-3. Erzeugen Sie einen **Schlüssel** (Name, Art *Agenten* oder *Kunden*, Gültigkeit in Tagen; Standard
-   365, höchstens 730). Pro Anbieter sind höchstens fünf gültige Schlüssel möglich. Der Schlüssel
+3. Erzeugen Sie mit **Schlüssel erzeugen** einen Schlüssel (Felder *Name*, *Art* mit *Agenten* oder
+   *Kunden*, *Gültigkeit in Tagen*; Standard 365, höchstens 730; das Formular nennt ihn „Schlüssel“, der Wert
+   ist ein Bearer-Token). Pro Anbieter sind höchstens fünf gültige Schlüssel möglich. Der Schlüssel
    (Präfix `tqscim_`) wird **nur einmal** angezeigt; Tiqora speichert nur einen Hash. Ein Schlüssel
    gilt nur für die gewählte Art: ein Agenten-Schlüssel kann keine Kunden anlegen.
 4. Kopieren Sie die **SCIM-Adresse** aus dem Tab.
+
+Weitere Anzeigen im Tab: Zähler (*Konten*, *davon aktiv*, *Gruppen*, *Rollenabgleich offen*, *Letzte
+Aktivität*), die Tabelle **Schlüssel** (Status *Aktiv*, *Widerrufen* oder *Abgelaufen*, *Gültig bis*,
+*Zuletzt benutzt*; **Widerrufen** wirkt sofort), **Bereitgestellte Konten** (Suche, Kennung beim
+Anmeldedienst, Filter *Gelöschte anzeigen*), **Gruppen vom Anmeldedienst** und das
+**Protokoll**. Fehlt `TIQORA_PUBLIC_BASE_URL`, zeigt der Tab statt der Adresse einen Hinweis.
 
 ### Microsoft Entra ID
 
@@ -385,15 +433,18 @@ Beispielwerte: Domäne `example.okta.test`, Anwendung „Tiqora Support“.
 ### Gruppen und Rollen (`scim:groups`)
 
 SCIM-Gruppen (nur für Agenten) liegen in Tiqora als eigene Gruppen des Anbieters und **vergeben von
-sich aus keine Rechte**. Sie wirken über Regeln im Tab **Rollen aus dem Anmeldedienst**:
+sich aus keine Rechte**. Sie wirken über Regeln im Tab **Rollen aus dem Anmeldedienst** (englisch „Roles from the sign-in service“):
 
 * Attribut `scim:groups`, Wert = Anzeigename der Gruppe (ohne Beachtung der Groß-/Kleinschreibung),
   zum Beispiel `Support Tier 1` → Rolle *Agent*.
 * Attribut `scim:group_ids`, Wert = Kennung beim Anmeldedienst (`externalId`, bei Entra die
   Objekt-ID der Gruppe). Das bleibt stabil, wenn die Gruppe umbenannt wird.
 
+Regeln mit `scim:groups` / `scim:group_ids` lassen sich beim Speichern nicht mit Regeln anderer Attribute
+(OIDC-Claims, SAML-Attribute, `ldap:group_dn`) am selben Anbieter mischen; Tiqora lehnt das ab.
+
 Änderungen der Mitgliedschaft stellt Tiqora in eine Warteschlange; der Dienst **Rollen aus Gruppen der
-Bereitstellung** (Verwaltung → Dienste, Standard alle 15 Sekunden) wendet sie an. Jeder Lauf arbeitet
+Bereitstellung** (**Administration → Dienste**, Kennung `scim_role_sync`, standardmäßig an, Standard alle 15 Sekunden; Konfiguration `TIQORA_SCIM_ROLE_SYNC_INTERVAL`) wendet sie an. Jeder Lauf arbeitet
 die Warteschlange bis zu zehn Sekunden lang ab; die Umbenennung einer großen Gruppe oder eine
 Regeländerung bei vielen Konten kann daher einige Läufe dauern. Ein Eintrag, der nicht angewendet
 werden kann, rückt ans Ende der Warteschlange und wird im nächsten Lauf erneut versucht. Es gilt derselbe
@@ -409,9 +460,25 @@ nächsten Einschalten in der Warteschlange. Eine Gruppe darf bis zu 5000 Mitglie
   für 15 Minuten, Antwort 429). Eine Anfrage mit **gültigem** Schlüssel unterliegt dieser Sperre nie,
   so kann niemand das Bereitstellen oder Sperren durch Raten blockieren. Damit die Sperre den Angreifer
   trifft und nicht den Proxy, muss `TIQORA_TRUSTED_PROXIES` gesetzt sein.
-* Im Tab **Bereitstellung** zeigt **Protokoll** jede Anfrage (Vorgang, Status, Konto), mit dem Filter
-  *Nur Fehler*. Fehlgeschlagene Authentifizierungen erscheinen höchstens einmal je IP und Zeitfenster.
-  Einträge werden nach 180 Tagen gelöscht (`TIQORA_SCIM_EVENT_RETENTION_DAYS`).
+* Im Tab **Bereitstellung (SCIM)** zeigt **Protokoll** jede Anfrage (*Zeit*, *Vorgang*, *Status*, Konto), mit dem Filter
+  *Nur Fehler*. Vorgänge sind zum Beispiel *Angelegt*, *Übernommen*, *Geändert*, *Deaktiviert*, *Reaktiviert*,
+  *Gelöscht*, *Konflikt*, *Abgewiesen*, *Anmeldung fehlgeschlagen*, *Begrenzt* und *Schlüssel erzeugt/widerrufen*. Fehlgeschlagene Authentifizierungen erscheinen höchstens einmal je IP und Zeitfenster.
+  Einträge werden nach 180 Tagen gelöscht (`TIQORA_SCIM_EVENT_RETENTION_DAYS`) und zwar vom Dienst
+  **Bereitstellungsprotokoll aufräumen** (**Administration → Dienste**, Kennung `scim_events_purge`, täglich um 04:40, standardmäßig an). Ein
+  Eintrag enthält nur Kennungen, Vorgang und Status, nie Namen oder E-Mail-Adressen (siehe
+  [gdpr.md](../gdpr.md#scim-provisioning-data)).
+
+### Einstellungen für Betreiber
+
+| Variable | Standard | Wirkung |
+|---|---|---|
+| `TIQORA_SCIM_RATE_LIMIT_ENABLED` | `true` | Anfragelimit je Schlüssel ein/aus |
+| `TIQORA_SCIM_RATE_LIMIT_MAX` / `TIQORA_SCIM_RATE_LIMIT_WINDOW` | 600 / 60 s | Anfragen je Schlüssel und Fenster, danach 429 |
+| `TIQORA_SCIM_AUTH_FAIL_MAX` / `TIQORA_SCIM_AUTH_FAIL_WINDOW` / `TIQORA_SCIM_AUTH_LOCKOUT` | 10 / 600 s / 900 s | Fehlversuche mit falschem Schlüssel je IP, Fenster, Sperrdauer |
+| `TIQORA_SCIM_MAX_BODY_BYTES` | 2097152 | größtes SCIM-Dokument |
+| `TIQORA_SCIM_MAX_MEMBERS` | 5000 | Mitglieder je Gruppe und Anfrage |
+| `TIQORA_SCIM_ROLE_SYNC_INTERVAL` | 15 s | Takt des Dienstes „Rollen aus Gruppen der Bereitstellung“ (im Admin überschreibbar) |
+| `TIQORA_SCIM_EVENT_RETENTION_DAYS` | 180 | Aufbewahrung des Protokolls |
 
 ### Fehlersuche
 
@@ -423,24 +490,27 @@ nächsten Einschalten in der Warteschlange. Eine Gruppe darf bis zu 5000 Mitglie
 | 409 `uniqueness` | Konto mit diesem Namen oder dieser E-Mail existiert und wird nicht verwaltet | *Vorhandene Konten übernehmen* oder Konto bereinigen |
 | 400 `invalidValue` | E-Mail ungültig oder Domain nicht erlaubt, Name fehlt | Attribute im Anmeldedienst prüfen |
 | 400 `invalidFilter` | Filter nicht unterstützt (nur `eq`, kein `and`/`or`) | betrifft nur eigene Aufrufe, die Standardfilter von Entra und Okta werden verstanden |
-| Rolle kommt nicht an | Regel mit `scim:groups` fehlt oder Dienst „Rollen aus Gruppen der Bereitstellung“ ist aus | Reiter *Rollen*, Verwaltung → Dienste |
+| Rolle kommt nicht an | Regel mit `scim:groups` fehlt oder Dienst „Rollen aus Gruppen der Bereitstellung“ ist aus | Tab *Rollen aus dem Anmeldedienst*, **Administration → Dienste** |
 | Person wird nach Löschung wieder angelegt | der Anmeldedienst ordnet sie noch zu | zuerst dort entziehen |
 
 ## Zweiter Faktor vom Anmeldedienst
 
-Ein Anbieter kann **Nachweis eines zweiten Faktors vom Anmeldedienst verlangen** (Tab *Sitzung*,
+Ein Anbieter kann **Nachweis eines zweiten Faktors vom Anmeldedienst verlangen** (Tab *Sitzung & zweiter Faktor*,
 Schalter *Zweiten Faktor vom Anmeldedienst verlangen*). Tiqora wertet dafür nur das aus, was der Anbieter
 in der **geprüften** Antwort liefert (bei OIDC das ID-Token, bei SAML die signierte Assertion). Ein bloßer
 Claim namens `amr` aus dem Userinfo-Aufruf zählt nicht.
 
-Die Werte stehen im Tab *Sitzung*; Treffer sind exakt und unterscheiden Groß- und Kleinschreibung:
+Die Werte stehen im selben Tab; Treffer sind exakt und unterscheiden Groß- und Kleinschreibung. Jede Liste
+nimmt höchstens 20 Einträge mit je höchstens 300 Zeichen. Bei OIDC genügt ein Treffer in den *amr-Werten*
+(Standard `mfa`) **oder** in den *acr-Werten* (Standard leer); bei SAML ein Treffer bei den Klassen **oder**
+im MFA-Attribut:
 
 | Anbieter | Einstellung | Hinweis |
 |---|---|---|
 | Entra ID (OIDC) | `amr`-Werte `mfa` (Standard) | Entra meldet den Faktor nur, wenn bedingter Zugriff MFA verlangt; sonst fehlt `mfa` |
 | Okta (OIDC) | `amr`-Werte `mfa`, `otp` | die Richtlinie der Anwendung muss einen Faktor fordern |
 | Keycloak (OIDC) | `acr`-Werte `2` (oder höher) | Step-up-Flows mit Level-of-Assurance; im Mapper „Authentication Context Class Reference (ACR)“ die Stufen auf `acr` abbilden. Unter *acr_values anfordern* kann Tiqora die gewünschte Stufe mitschicken |
-| AD FS und Entra (SAML) | Klassen `urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken` und Attribut `http://schemas.microsoft.com/claims/authnmethodsreferences` mit Wert `http://schemas.microsoft.com/claims/multipleauthn` | bei AD FS in der Anspruchsregel den Anspruch `authnmethodsreferences` ausgeben; optional *Authentifizierungsklasse anfordern* |
+| AD FS und Entra (SAML) | *Authentifizierungsklassen*: Standardliste `http://schemas.microsoft.com/claims/multipleauthn`, `https://refeds.org/profile/mfa`, `urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract`, `urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken`; *MFA-Attribut* `http://schemas.microsoft.com/claims/authnmethodsreferences` mit *Werten des MFA-Attributs* `http://schemas.microsoft.com/claims/multipleauthn` | bei AD FS in der Anspruchsregel den Anspruch `authnmethodsreferences` ausgeben; optional *Authentifizierungsklasse anfordern* (sendet `RequestedAuthnContext` mit den Klassen, Vergleich `minimum`; Standard aus). Jede der beiden Prüfungen (Klasse oder Attributwert) genügt |
 
 Ohne Nachweis hängt der Ausgang von **Ohne Bestätigung** ab:
 
@@ -450,11 +520,14 @@ Ohne Nachweis hängt der Ausgang von **Ohne Bestätigung** ab:
   Agenten wie Kunden gleichermaßen.
 * **Anmeldung ablehnen** (`reject`): jeder ohne Nachweis wird abgewiesen.
 * **In Tiqora abfragen oder Einrichtung eines Faktors erlauben** (`local_second_factor_or_enroll`): wie
-  der Standard, aber wer noch keinen Faktor hat, darf ihn einrichten. Das ermöglicht die Ersteinrichtung
+  der Standard, aber ein **Agent** ohne Faktor darf ihn einrichten. Für **Kunden** gilt die Einrichtung
+  nicht: ein Kunde ohne Faktor wird auch hier mit `mfa_required` abgewiesen. Das ermöglicht die Ersteinrichtung
   ohne Nachweis, kostet aber Sicherheit: wer nur das Kennwort des Anmeldedienstes kennt, kann dann einen
   Faktor registrieren. Wählen Sie das nur bewusst und zeitlich begrenzt.
 
-Eine abgewiesene Anmeldung ändert nichts (kein Konto, keine Verknüpfung, keine Rollen). Die Testanmeldung zeigt das Ergebnis der Prüfung
+Wer in Tiqora einen Faktor eingerichtet hat, den der Anmeldedienst nicht bestätigt hat, bestätigt ihn nach
+der Anmeldung (ausstehende Sitzung, siehe Kunden-Portal oben). Die Entscheidung fällt, bevor etwas
+geschrieben wird. Eine abgewiesene Anmeldung ändert nichts (kein Konto, keine Verknüpfung, keine Rollen). Die Testanmeldung zeigt das Ergebnis der Prüfung
 und die Werte, die der Anmeldedienst geliefert hat. Ist der Nachweis erbracht, überspringt die Anmeldung den
 Tiqora-Faktor wie bisher.
 
@@ -488,7 +561,7 @@ Konten ohne SCIM-Zuordnung melden sich mit Kennwort an wie bisher.
 **Ausweg, wenn der Anmeldedienst ausfällt**: Eine einzelne SCIM-Zuordnung lässt sich in der Verwaltung
 nicht löschen. Die Kennwortanmeldung kommt nur für alle Konten eines Anbieters zurück:
 
-* Schalter *Zweiten Faktor vom Anmeldedienst verlangen* ausschalten (Tab *Sitzung*): die Konten melden
+* Schalter *Zweiten Faktor vom Anmeldedienst verlangen* ausschalten (Tab *Sitzung & zweiter Faktor*): die Konten melden
   sich wieder mit Kennwort an, die Anmeldung über den Anmeldedienst bleibt möglich, aber ohne Nachweis.
 * den Anbieter abschalten (Schalter *Aktiv*): Kennwortanmeldung wieder möglich, die Anmeldung über diesen
   Anmeldedienst ist bis zum Wiedereinschalten gesperrt.
@@ -508,10 +581,13 @@ Anmeldedienst nicht erreichbar, bleibt dieser Notzugang:
 
 ## Sitzungsdauer
 
-Im Tab *Sitzung* kann jeder Anbieter die Sitzungsdauer seiner Anmeldungen **verkürzen**:
+Im Tab *Sitzung & zweiter Faktor* (Abschnitt *Sitzungsdauer*) kann jeder Anbieter die Sitzungsdauer seiner Anmeldungen **verkürzen**:
 *Abmeldung nach Inaktivität (Minuten)* und *Spätestens abmelden nach (Stunden)*. Die allgemeinen
 Einstellungen (`TIQORA_SESSION_TTL`, `TIQORA_SESSION_ABSOLUTE_TTL`) sind die
-Obergrenze; „Allgemeine Einstellung verwenden“ lässt den Wert unberührt. Zusätzlich:
+Obergrenze (Standard 60 Minuten Inaktivität, 12 Stunden insgesamt); „Allgemeine Einstellung verwenden“ lässt
+den Wert unberührt. Der Anbieter darf die Inaktivität auf mindestens 5 Minuten und die Gesamtdauer auf
+mindestens 15 Minuten verkürzen; Werte außerhalb dieses Bereichs und eine Inaktivitätsdauer, die länger ist als die Gesamtdauer, lehnt Tiqora beim Speichern ab. Die Dauer gilt
+für Agenten und Kunden, die sich über diesen Anbieter anmelden. Zusätzlich:
 
 * Eine SAML-Assertion mit `SessionNotOnOrAfter` verkürzt die absolute Dauer der Sitzung weiter. Liegt
   der Zeitpunkt schon fast erreicht, gilt eine Mindestdauer von 60 Sekunden, damit die Anmeldung nicht
@@ -530,7 +606,7 @@ Der Wert `1` ist der alte SPNEGO-Sammelfehler.
 | `no_subject` | IdP lieferte keine Subjekt-Kennung | Attribut-/NameID-Konfiguration prüfen |
 | `no_match` | Kein Konto passt, JIT aus | Konto anlegen oder JIT aktivieren, Zuordnung prüfen |
 | `user_invalid` | Konto ist gesperrt/ungültig | Konto in Znuny/Tiqora wieder gültig setzen |
-| `sso_not_enabled` | Agent nicht für SSO freigegeben | unter *Anmeldung* freigeben |
+| `sso_not_enabled` | Agent nicht für SSO freigegeben | unter **Administration → Authentifizierung / 2FA** in der Spalte *SSO berechtigt* freigeben |
 | `email_unverified` | OIDC-E-Mail nicht bestätigt | Verifizierung beim IdP oder Schalter am Anbieter |
 | `ambiguous_email` | E-Mail passt auf mehrere Konten | E-Mails bereinigen oder per Login zuordnen |
 | `login_taken` | JIT: Login schon vergeben | vorhandenes Konto zuordnen |

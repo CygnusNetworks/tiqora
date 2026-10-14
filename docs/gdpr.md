@@ -167,20 +167,25 @@ empty selector matches nothing (it never means "everyone"):
   headers/structure preserved), `article_data_mime_attachment` (filename
   replaced, content emptied, size 0) and `article_search_index`.
 - `tiqora_telegram_message` rows for those articles are deleted.
+- The ITSM problem and major-incident records of those tickets
+  (`tiqora_itsm_problem`, `tiqora_itsm_major_incident` and its updates; root cause, workaround and update
+  texts) are deleted whole, with backup. The web chat rows of the tickets go the same way (see
+  [Web chat](#web-chat)).
 
 **`delete`** — hard-deletes the customer *master* rows (`customer_user`,
 `customer_preferences`, `customer_user_customer`, `group_customer_user`) and
 the `customer_company` if no other customer_user remains in it (otherwise the
 company is anonymized as above). Tickets are kept: `customer_user_id` and
 `customer_id` are replaced by stable tokens, and articles are scrubbed as in
-anonymize mode. Ticket titles, `ticket_history` and dynamic-field values are
-**not** scrubbed in this mode.
+anonymize mode (the ITSM and web chat rows of the tickets are removed as there). Ticket titles,
+`ticket_history` and dynamic-field values are **not** scrubbed in this mode.
 
 **`delete` + `delete_tickets`** — additionally hard-deletes the customers'
 tickets and every FK-linked row (articles and their mime/plain/attachment
-data, flags, `mail_queue`, `tiqora_telegram_message`, `article_search_index`,
-`time_accounting`, `ticket_history`, watchers, index rows, calendar links,
-dynamic-field values) in FK-safe order. Tables missing on an install are
+data, flags, `mail_queue`, `tiqora_telegram_message`, the web chat and ITSM
+problem/major-incident rows, `article_search_index`, `time_accounting`,
+`ticket_history`, watchers, index rows, calendar links, dynamic-field values)
+in FK-safe order. Tables missing on an install are
 skipped.
 
 Every mode invalidates the Znuny customer-user/-company caches and the
@@ -232,6 +237,72 @@ Each apply, rollback and manual purge writes a `tiqora_gdpr_audit` row
   services page), and needs no ownership gate.
 - `gdpr.customer_extra_pii_columns` — optional JSON list of extra
   `customer_user` columns to treat as PII.
+
+### Other Tiqora data of an erased customer
+
+Besides tickets and Znuny's customer tables, an erasure (apply) also cleans these Tiqora-owned
+rows of the selected customers. "No backup" means the data is gone for good: a rollback of the job
+does not bring it back.
+
+| Data | Anonymize | Delete | Backup / rollback |
+|---|---|---|---|
+| Znuny/GenericInterface sessions of the customer (they hold name, e-mail and login) | deleted | deleted | no |
+| Starred customers of agents (`tiqora_customer_favorite`) | follows the new login | deleted | rollback of an anonymize job renames them back; deleted stars are not restored |
+| AI pause of the customer (`tiqora_ai_customer_pause`, scope `user`) | follows the new login | deleted | same as above |
+| SSO subject links (`tiqora_identity_link`, customer kind) | deleted | deleted | no; recreated by the next SSO login |
+| SCIM mapping and group memberships | deleted | deleted | no; see [SCIM provisioning data](#scim-provisioning-data) |
+| Customer portal TOTP secret and passkeys (`tiqora_customer_totp`, `tiqora_customer_passkey`) | deleted | deleted | no; an anonymized account must not keep a working authenticator |
+| Uploaded customer photo (`tiqora_avatar`, matched by e-mail) and the cached Gravatar picture | deleted | deleted | the photo row is backed up and restored by a rollback, the cache is not |
+| ITSM problem / major-incident records of the customer's tickets | deleted | deleted | yes |
+| Web chat sessions and messages of the customer's tickets | deleted | deleted | yes |
+| `tiqora_telegram_message` rows of the tickets' articles | deleted | deleted | yes |
+| GenericInterface debugger entries of the tickets | deleted | deleted | no; see [below](#genericinterface-debugger) |
+| Saved searches, saved reports, scheduled-report parameters and recipients | rewritten | rewritten | yes, except deleted recipient rows |
+| CMDB links and attribute values | see [CMDB](#cmdb-mode-b) | | yes |
+
+### SCIM provisioning data
+
+When the identity provider provisions accounts through SCIM
+([guide](guide/identity-providers.md#bereitstellung-mit-scim)), Tiqora keeps an id mapping per account
+(`tiqora_scim_user`: the user name the IdP sent, usually the UPN or e-mail address, plus the IdP's external id),
+the memberships of groups (`tiqora_scim_group_member`), a re-sync queue for role changes
+(`tiqora_scim_pending_sync`) and an audit log (`tiqora_scim_event`).
+
+- **Customers (admin erasure).** In both modes the erasure deletes the `tiqora_scim_user` rows of the erased
+  customers and their `tiqora_scim_group_member` rows, in the same transaction, without backup. A rollback
+  of the job does not restore them: the next sync from the IdP creates the mapping again if the IdP still
+  assigns the person. Remove the person at the IdP first, otherwise the next sync can create the customer
+  account again (the identity guide says the same for deprovisioning in general).
+- **Request log stays.** `tiqora_scim_event` holds only opaque ids (SCIM id, account id, token id), the
+  operation, the HTTP status and a short machine code, never a name or e-mail address, and is purged by the
+  worker after `TIQORA_SCIM_EVENT_RETENTION_DAYS` (default 180). The erasure does not touch it.
+- **Agents.** The admin erasure selects customers only. An agent is not erased by this tool. When an
+  administrator deletes an agent account for good (possible only when nothing in the system references the
+  account any more; otherwise the agent is only set invalid), the delete takes the agent's SCIM mapping, the
+  group memberships and the re-sync queue rows along with the 2FA, SSO link and preference rows. An agent who
+  is merely invalidated keeps the SCIM mapping (it records that the account is managed by the IdP).
+- **Customer 2FA.** The portal TOTP and passkey tables are cleaned by the erasure only (see the table above),
+  not when the customer account is deleted by other means.
+- The CLI `tiqora gdpr anonymize-customer` and the retention policies do not touch SCIM data.
+
+### GenericInterface debugger
+
+The debugger of the GenericInterface ([compatibility.md](compatibility.md#debugger)) stores request and
+response payloads, which can contain customer names, addresses and ticket text.
+
+- **Tiqora entries.** In every mode of the admin erasure (also without `delete_tickets`), Tiqora's own entries
+  (`tiqora_gi_debug_entry` with their content lines) that belong to one of the customer's tickets are deleted
+  in the erasure transaction. The count is reported as `gi_debug_entries_deleted` in the job counts. Debug logs
+  are treated as disposable: there is no backup and a rollback does not restore them.
+- **Which entries belong to a ticket.** The entry carries the ticket id when the call names exactly one
+  `TicketID` or created a ticket (`TicketCreate`). Provider calls without a ticket id (for example a
+  `TicketSearch` over several tickets) are only removed by the retention clean-up.
+- **Retention.** The worker service **Webservice-Protokoll aufräumen** (`gi_debug_cleanup`, daily at 03:02, always on, not switchable)
+  deletes Tiqora entries older than `gi.debugger.retention_days` (default 14, minimum 1).
+- **Znuny's rows.** Tiqora never writes or deletes Znuny's own `gi_debugger_*` tables, so the erasure does not
+  reach them (the debugger view only reads them and masks secrets). While Znuny's debugger rows exist, they
+  follow Znuny's own clean-up. With Znuny stopped, remove them there if they matter for your erasure policy.
+- `tiqora gdpr anonymize-customer` and the retention policies do not touch debugger entries.
 
 ### Reporting data
 
@@ -350,9 +421,10 @@ mode also erases it (`tiqora.cmdb.erasure`), with backups for the rollback:
 - **Scope is by ticket customer.** Only tickets whose `customer_user_id` is
   one of the selected logins are touched. The customer's address or name in
   other customers' tickets is not scrubbed, and Tiqora-owned tables other
-  than `tiqora_telegram_message`, the saved searches/reports (see above), the
-  report facts and the web chat tables (e.g. AI drafts/audit, mail log, Telegram
-  contacts) are not touched; see [Web chat](#web-chat).
+  than those listed under
+  [Other Tiqora data of an erased customer](#other-tiqora-data-of-an-erased-customer),
+  the saved searches/reports, the report facts and the web chat tables (e.g. AI
+  drafts/audit, mail log, Telegram contacts) are not touched; see [Web chat](#web-chat).
 - **Anonymize rollback of related tables** recomputes the replacement login
   from the job's `seed`, so it depends on `ValueMapper` producing the same
   output as at apply time.
