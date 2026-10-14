@@ -53,3 +53,23 @@ def test_httpx_request_log_hides_the_telegram_bot_token(monkeypatch: pytest.Monk
     assert "TEST-token_value" not in first
     assert "https://api.telegram.org/bot***/getUpdates" in first
     assert second == "HTTP Request: POST https://llm.example/v1/chat/completions"
+
+
+def test_reconfiguring_keeps_cached_loggers_capturable() -> None:
+    """A second configure_logging must not strand loggers cached after the first one.
+
+    Order-dependent failure this pins: a module calls configure_logging (worker entry
+    point), a later test uses ``tiqora.channels.email.smtp``'s logger (cached on first use
+    with the processor list of that moment), another module calls configure_logging again,
+    and ``capture_logs`` in test_smtp_envelope then missed ``mail_recipient_invalid_tld``.
+    """
+    import structlog
+    from structlog.testing import capture_logs
+
+    configure_logging(get_settings())
+    cached = structlog.get_logger("tiqora.tests.logging_cache_probe")
+    cached.debug("probe_first_use")  # caches the bound logger with the current list
+    configure_logging(get_settings())
+    with capture_logs() as logs:
+        cached.info("probe_after_reconfigure", n=1)
+    assert [e["event"] for e in logs] == ["probe_after_reconfigure"]

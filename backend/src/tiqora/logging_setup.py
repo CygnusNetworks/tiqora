@@ -36,19 +36,27 @@ def configure_logging(settings: Settings) -> None:
     if not any(isinstance(f, _RedactTelegramToken) for f in httpx_logger.filters):
         httpx_logger.addFilter(_RedactTelegramToken())
 
+    # Fill the processor list that is already configured instead of passing a new one:
+    # with cache_logger_on_first_use a module logger keeps the list *instance* it saw
+    # first. A second configure_logging in the same process (api lifespan, worker and
+    # ai-worker entry points in tests) used to swap the list, so loggers cached in between
+    # kept a stale chain, and structlog.testing.capture_logs, which edits the current list
+    # in place, no longer saw their events (order-dependent test failures).
+    processors = structlog.get_config()["processors"]
+    processors[:] = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer(),
+    ]
     structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.PositionalArgumentsFormatter(),
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer(),
-        ],
+        processors=processors,
         wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
