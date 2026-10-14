@@ -29,7 +29,8 @@ can migrate gradually.
 
 The five `ConfigItem*` operations follow ITSMConfigurationManagement 6.5.4 and 7.3.5, which are identical
 for these operations, so the answer shape does not depend on the Znuny version you migrate from. Notes per
-operation below ([ConfigItemSearch](#configitemsearch), [ConfigItemCreate / ConfigItemUpdate](#configitemcreate--configitemupdate),
+operation in [ConfigItem operations](#configitem-operations) ([ConfigItemSearch](#configitemsearch),
+[ConfigItemCreate / ConfigItemUpdate](#configitemcreate--configitemupdate),
 [ConfigItemDelete](#configitemdelete)); transports are the same two as for tickets, SOAP included.
 
 Both transports Znuny documents for these operations are supported:
@@ -484,16 +485,16 @@ the ticket, so a slow or dead remote system cannot block an agent.
 | OAuth2 token (`AuthType: OAuth2Token`, `OAuth2TokenConfigID`; the token replaces `<OTRS_OAUTH2_TOKEN>` in `AdditionalHeaders`) | yes | n/a |
 | Proxy with `ProxyUser`/`ProxyPassword` | yes | yes |
 | `AdditionalHeaders` (REST) | yes | n/a |
-| JWT | **nein** (configuration error) | n/a |
-| NTLM | n/a | **nein** (configuration error) |
+| JWT | **no** (configuration error) | n/a |
+| NTLM | n/a | **no** (configuration error) |
 
-### Not fired / not supported ("nein")
+### Not fired / not supported
 
 | Item | Behaviour |
 |---|---|
-| `OTRS_TicketArticleCreateEvent` response action | **nein**: shown in the debugger as an error; no event is raised |
-| Ticket events not in the fired list above: `Escalation*` (`EscalationResponseTimeStart/Stop/NotifyBefore`, `EscalationUpdateTime*`, `EscalationSolutionTime*`), `TicketFlagSet`/`TicketFlagDelete`, `TicketDelete`, `TicketUnlockTimeoutUpdate` and every `Article*` event other than `ArticleCreate` | **nein**: never fired, although Znuny writes the escalation events to `ticket_history`; invokers bound to them never run |
-| Events of objects other than tickets (`Appointment`, `ConfigItem`, `CustomerUser`, `User`, ... event object types) | **nein**: not fired, the webservice page marks such invokers "wird von Tiqora noch nicht ausgelöst" |
+| `OTRS_TicketArticleCreateEvent` response action | **no**: shown in the debugger as an error; no event is raised |
+| Ticket events not in the fired list above: `Escalation*` (`EscalationResponseTimeStart/Stop/NotifyBefore`, `EscalationUpdateTime*`, `EscalationSolutionTime*`), `TicketFlagSet`/`TicketFlagDelete`, `TicketDelete`, `TicketUnlockTimeoutUpdate` and every `Article*` event other than `ArticleCreate` | **no**: never fired, although Znuny writes the escalation events to `ticket_history`; invokers bound to them never run |
+| Events of objects other than tickets (`Appointment`, `ConfigItem`, `CustomerUser`, `User`, ... event object types) | **no**: not fired, the webservice page marks such invokers "wird von Tiqora noch nicht ausgelöst" (not triggered by Tiqora yet) |
 | `Module` conditions | never match (Tiqora cannot load Perl modules) |
 | `jq#` condition fields | never match (Znuny without Jq behaves the same) |
 | JWT, NTLM | see matrix |
@@ -531,20 +532,39 @@ provider calls, such as a `TicketSearch` over several tickets, are only covered 
 retention. Znuny's own `gi_debugger_*` rows, which the view also shows, are never erased by
 Tiqora; Znuny's debugger cleanup removes them.
 
-## What is not emulated (and why)
+## ConfigItem operations
 
-The `/znuny-compat` routes are a **Provider-side bridge** for the GenericTicketConnector surface
-and a few core ops. The **Requester** side (Tiqora calling external systems) is a separate
-subsystem, see [Requester and invokers](#requester-and-invokers-tiqora-calls-external-systems).
-Items below are intentionally incomplete or out of scope.
+The five `ConfigItem*` operations are the GenericInterface face of the ITSM CMDB. They follow
+ITSMConfigurationManagement 6.5.4 and 7.3.5, which are identical for these operations, so the answer shape
+does not depend on the Znuny version you migrate from. Check order, error codes and error texts follow the
+Perl `Run()` of each operation; transports are the same two as for tickets (REST and SOAP). They are
+available since v0.18.0.
 
-### Out of scope (product / architecture)
+What answers depends on the ITSM mode (Admin "ITSM", see [itsm.md](itsm.md)). The mode is looked at after
+authentication, so an anonymous caller does not learn it.
 
-| Gap | Why deferred |
-|-----|----------------|
-| Custom OPM operations | Installation-specific; no stable core wire contract (the ITSM `ConfigItem*` operations are implemented, see [ConfigItemSearch](#configitemsearch)) |
-| Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
-| WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
+| Operation | Mode B (`tiqora`) | Mode A (`znuny_readthrough`) | Off (`off`) |
+|---|---|---|---|
+| `ConfigItemGet` | Tiqora CMDB | Read from Znuny's `configitem*` tables | `Operation.NotImplemented` |
+| `ConfigItemSearch` | Tiqora CMDB | Read from Znuny's tables | `Operation.NotImplemented` |
+| `ConfigItemCreate` | Tiqora CMDB | `ConfigItemCreate.NotAvailable` | `Operation.NotImplemented` |
+| `ConfigItemUpdate` | Tiqora CMDB | `ConfigItemUpdate.NotAvailable` | `Operation.NotImplemented` |
+| `ConfigItemDelete` | Tiqora CMDB | `ConfigItemDelete.NotAvailable` | `Operation.NotImplemented` |
+
+In Mode A the CMDB is kept in Znuny, so Tiqora never writes it (`NotAvailable`: "Die CMDB wird in Znuny
+geführt (Modus A)"). Routes without a webservice configuration: `POST /znuny-compat/ConfigItem` (create),
+`GET|PATCH|DELETE /znuny-compat/ConfigItem/{id}` (get, update, delete) and `GET|POST
+/znuny-compat/ConfigItemSearch`; see [Canonical fallback](#canonical-fallback-always-available). Access
+needs the class' group right, as in Znuny: `ro` for get and search, `rw` for create, update and delete (the
+permission setting per operation is `GenericInterface::Operation::<Op>###Permission`); a caller without the
+right gets `AccessDenied`, and an unknown id looks the same.
+
+### ConfigItemGet
+
+`ConfigItemGet` takes `ConfigItemID` as a single id, a comma separated string or a list (at most **500**
+ids, Tiqora-only bound; Znuny has none) and answers the CI with its current version: header, `CIXMLData`
+and, with `Attachments: 1`, the attachments. An unknown id and a missing right both answer `AccessDenied`
+("Can not get configuration item!").
 
 ### ConfigItemSearch
 
@@ -599,6 +619,21 @@ named by `ConfigItemID`, a comma separated string, a list or a single number (at
 | Partial failure (verbatim from `ConfigItemDelete.pm`) | The ids are processed in order, each in its own transaction. The first `AccessDenied` or `DeleteError` ends the call with that error; ids deleted before it **stay deleted**, later ids are not touched. There is no all-or-nothing mode |
 | Links, history, attachments | Removed with the item (CMDB semantics); neighbours' derived incident states are recomputed |
 | Import map | The importer's id map (`tiqora_itsm_import_map`) is not touched: running the Znuny import again would recreate a deleted item. After the switch the importer refuses to run, so this only matters before it |
+
+## What is not emulated (and why)
+
+The `/znuny-compat` routes are a **Provider-side bridge** for the GenericTicketConnector surface
+and a few core ops. The **Requester** side (Tiqora calling external systems) is a separate
+subsystem, see [Requester and invokers](#requester-and-invokers-tiqora-calls-external-systems).
+Items below are intentionally incomplete or out of scope.
+
+### Out of scope (product / architecture)
+
+| Gap | Why deferred |
+|-----|----------------|
+| Custom OPM operations | Installation-specific; no stable core wire contract (the ITSM `ConfigItem*` operations are implemented, see [ConfigItem operations](#configitem-operations)) |
+| Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
+| WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
 
 ### TicketCreate / TicketUpdate
 
@@ -982,7 +1017,7 @@ bug. Znuny's own chat engine is not used.
 
 ## Znuny features not implemented
 
-*Last reviewed: 2026-10-01. This is the single maintained parity list — update
+*Last reviewed: 2026-10-14. This is the single maintained parity list — update
 the row when a gap is closed (and mirror the summary in the README if the
 headline changes).*
 
@@ -1004,11 +1039,11 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Major incident | partial | Banner on linked tickets, timeline and one update for all linked tickets (internal / note / customer reply, reply off by default). Customer reply is always e-mail, also for plugin channels |
 | Znuny CMDB (read-only, Mode A) | partial | CI search, detail, versions and attributes from `configitem*` for Znuny ITSM 6.5 and 7.3, link to tickets; no CI edit, no attachments, no CI history entry for links made in Tiqora. See [ITSM](itsm.md) chapter 5 and [ITSM schema survey](itsm-import.md) |
 | Znuny ITSM changes (not shown, phase 3) | missing | Changes, work orders and the change calendar of `ITSMChangeManagement` are not shown; the CI detail links to Znuny. A read-only legacy archive follows in ITSM phase 3 |
-| ITSM configuration management (`ITSMConfigurationManagement`): classes and definitions | yes | Ja (Tiqora CMDB, Modus B): typed, versioned attribute definitions with designer and templates, import of Znuny class definitions (YAML 6.5 / 7.x); see [cmdb.md](cmdb.md) |
-| ITSM CIs: versions, deployment / incident states | yes | Ja (Tiqora CMDB, Modus B): every change is a version with note, diff and history; incident state derived along the link types (cycle-safe, bounded); optional version archive |
-| ITSM CIs: links, search, bulk edit | yes | Ja (Tiqora CMDB, Modus B): links to CIs, tickets, services, customers, KB articles; attribute search and saved searches; bulk edit of states and a link as a background job; impact graph and affected objects |
-| ITSM CIs: customer portal view | yes | Ja (Tiqora CMDB, Modus B): "Meine Geräte und Systeme", portal-flagged attributes only, ticket form with system picker |
-| ITSM ImportExport (CI CSV/XLSX) | yes | Ja (Tiqora CMDB, Modus B): wizard with column mapping (`attr:NIC[2].IPAddress[1]`), dry run, mapping templates, CSV/XLSX export as background jobs. Znuny's own ImportExport mapping objects are not read; transferring a Znuny CMDB is the job of the ITSM import (see [itsm.md](itsm.md)) |
+| ITSM configuration management (`ITSMConfigurationManagement`): classes and definitions | yes | Yes (Tiqora CMDB, Mode B): typed, versioned attribute definitions with designer and templates, import of Znuny class definitions (YAML 6.5 / 7.x); see [cmdb.md](cmdb.md) |
+| ITSM CIs: versions, deployment / incident states | yes | Yes (Tiqora CMDB, Mode B): every change is a version with note, diff and history; incident state derived along the link types (cycle-safe, bounded); optional version archive |
+| ITSM CIs: links, search, bulk edit | yes | Yes (Tiqora CMDB, Mode B): links to CIs, tickets, services, customers, KB articles; attribute search and saved searches; bulk edit of states and a link as a background job; impact graph and affected objects |
+| ITSM CIs: customer portal view | yes | Yes (Tiqora CMDB, Mode B): "Meine Geräte und Systeme", portal-flagged attributes only, ticket form with system picker |
+| ITSM ImportExport (CI CSV/XLSX) | yes | Yes (Tiqora CMDB, Mode B): wizard with column mapping (`attr:NIC[2].IPAddress[1]`), dry run, mapping templates, CSV/XLSX export as background jobs. Znuny's own ImportExport mapping objects are not read; transferring a Znuny CMDB is the job of the ITSM import (see [itsm.md](itsm.md)) |
 | Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV/PDF export, import of Znuny statistics (from `xml_storage` or an exported XML file; the four dynamic objects and `StateAction`, with a list of what was approximated or dropped) and scheduled delivery by e-mail (daily to yearly, several reports per mail, PDF/XLSX/CSV, run history). Not taken over: ITSM stats, dynamic-field axes, cron expressions. See [Reporting differences](#reporting-differences-to-znuny-stats), [Importing Znuny statistics](#importing-znuny-statistics) and [Scheduled reports](#scheduled-reports-vs-the-statistic-reports-add-on) |
 | Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
@@ -1020,7 +1055,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Znuny feature | Status | Note |
 |---|---|---|
 | SysConfig edit/deploy UI | by design | Settings are read from `sysconfig_*`; change them in Znuny or via `Admin::Config::Update` |
-| Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness, web installer | by design | OPM itself is by design (Perl packages cannot run). Tiqora plugins replace OPM add-ons (phase 1: settings, routes, ticket events, scheduled tasks, background jobs, MCP tools and four UI slots; phase 2a, SDK 0.2.0: sync hooks, transition actions and conditions, placeholders, ticket number generators, dynamic field types, mail filters, notification transports, channels, password providers, customer sources, GenericInterface operations, invokers and mappings, report sources and built-in reports, write services; phase 2b: installing signed packages from the web UI or package sources, plugin database tables and a coordinated restart); see [plugins.md](plugins.md). |
+| Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness, web installer | by design | OPM itself is by design (Perl packages cannot be installed or run); there is no Package Manager screen for `.opm` files. Tiqora plugins replace OPM add-ons (phase 1: settings, routes, ticket events, scheduled tasks, background jobs, MCP tools and four UI slots; phase 2a, SDK 0.2.0: sync hooks, transition actions and conditions, placeholders, ticket number generators, dynamic field types, mail filters, notification transports, channels, password providers, customer sources, GenericInterface operations, invokers and mappings, report sources and built-in reports, write services; phase 2b: installing signed packages from the web UI or package sources, plugin database tables and a coordinated restart); see [plugins.md](plugins.md). |
 | Sessions, SelectBox SQL, performance log, maintenance windows | missing | A user's sessions can be revoked from user admin |
 | General system log / communication log | missing | Mail log and AI audit exist |
 | Calendar admin, ticket appointment rules (queue/SLA) | missing | Agent calendar exists; only the calendar name is set on queue/SLA |
@@ -1031,7 +1066,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 
 | Znuny feature | Status | Note |
 |---|---|---|
-| Webservice admin / editor | by design | Webservices are loaded from the database; no editor |
+| Webservice admin / editor | partial | Admin "Webservices" lists the webservices, shows invokers, connection, error handling and the debugger log, offers a dry run ("Probelauf") and resend, and stores Tiqora-only egress settings; see [guide/webservices.md](guide/webservices.md). The pages are read-only for the webservice definition itself: webservices are created and edited in Znuny (or its database), there is no editor in Tiqora |
 | Requester side / invokers | partial | Ticket-event invokers (`Invoker::Ticket::Generic`) over REST and SOAP, retries, conditions, response actions and a debugger; see [Requester and invokers](#requester-and-invokers-tiqora-calls-external-systems). Off until the takeover flag is set ([parallel-operation.md](parallel-operation.md#taking-over-genericinterface-invokers)) |
 | Mappings `Simple`, `XSLT`, `OutOfOffice` | yes | `Znuny` and `Test` mappings are not supported, see [Mappings](#mappings) |
 | Hot reload of webservice configs | yes | Polling, no restart, see [Hot reload](#hot-reload) |
@@ -1078,7 +1113,15 @@ narrower than Znuny), **by design** (deliberate platform choice).
 |---|---|---|
 | Hybrid (vector + keyword) retrieval for KB/RAG | missing | Planned |
 
-## Upgrade notes (next release)
+## Upgrade notes (v0.18.0)
+
+These notes shipped with v0.18.0 (12 October 2026, waves 0 to 3) and apply when you upgrade from v0.17.x or
+earlier. Later releases are described in [releases/](releases/).
+
+- **New compat surface.** The five `ConfigItem*` operations answer on the provider side
+  ([ConfigItem operations](#configitem-operations)); the requester (Tiqora calling external systems) exists
+  but stays off until you set the takeover flag
+  ([Requester and invokers](#requester-and-invokers-tiqora-calls-external-systems)).
 
 - **Process and ACL revisions.** New tables `tiqora_process_revision` and
   `tiqora_acl_revision` come with the regular Tiqora migration. Processes and

@@ -167,7 +167,9 @@ reporting is its own `TimeAccounting` change (written like Znuny, see
 tables, so Znuny is unaffected; its own stats module keeps working and may show
 slightly different figures (see
 [Reporting differences](compatibility.md#reporting-differences-to-znuny-stats)).
-Run exactly one worker so the incremental loop has a single writer.
+Run exactly one worker so the incremental loop has a single writer. The loop is the worker service
+`report_facts` (setting `daemon.report_facts.enabled`, on by default; poll interval
+`TIQORA_REPORT_FACTS_INTERVAL`, default 60 seconds).
 
 Saved reports and saved searches live in `tiqora_*` tables only. Znuny's own
 saved searches (`search_profile`) are **read only** for Tiqora: it never writes,
@@ -1027,11 +1029,23 @@ ticket links through the existing link service; what Znuny sees of that and what
 in [itsm.md](itsm.md) chapter 5. The switch to Tiqora-led ITSM (Mode B) happens only through the
 importer; the runbook is chapter 7 of [itsm.md](itsm.md) and [itsm-import.md](itsm-import.md).
 
-### ITSM: Modus A und B
+### ITSM: Mode A and Mode B
 
 Which side maintains the CIs, what agents and customers see in each mode, the switch runbook, the
 rollback and the known gaps (Generic Interface, console and ImportExport of Znuny are not blocked) are
-described in [itsm.md](itsm.md#koexistenz-mit-znuny).
+described in [itsm.md](itsm.md#koexistenz-mit-znuny) (in German).
+
+What the mode means for the integration surfaces that exist next to the UI:
+
+| Surface | Mode A (`znuny_readthrough`) | Mode B (`tiqora`) | Off |
+|---|---|---|---|
+| GenericInterface `ConfigItemGet` / `ConfigItemSearch` | Read from Znuny's tables | Tiqora CMDB | `Operation.NotImplemented` |
+| GenericInterface `ConfigItemCreate` / `Update` / `Delete` | `<Op>.NotAvailable` (the CMDB is kept in Znuny) | Tiqora CMDB | `Operation.NotImplemented` |
+| Process action `LinkAdd` with a CI end | Stored as a Znuny link (`link_relation`) | Tiqora CMDB link service | Skipped |
+| Process action `ConfigItemUpdate` | Logged as unsupported | Tiqora CMDB | Logged as unsupported |
+
+Details: [compatibility.md](compatibility.md#configitem-operations) and
+[process-management.md](process-management.md).
 
 ## Schema ownership
 

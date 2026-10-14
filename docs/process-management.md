@@ -317,6 +317,49 @@ that were filled with that rule now behave like in Znuny.)
   and queue permissions, and rendered by the shared form component in the
   agent interface and the portal.
 
+### Working with typed dialogs (agents)
+
+A dialog on a ticket (panel "Prozess", process) and the start dialogs render as
+a typed form: every field has the widget of its type. UI labels are German by
+default; the English gloss is in brackets.
+
+- **"Bisheriger Weg" (path so far).** Below the current step, the process panel
+  has a collapsible "Bisheriger Weg" toggle. It lists the steps the ticket has
+  taken through the process, oldest first: step name, time, "von {name}" (by
+  whom) and a badge "Aktuell" (current) on the active step. A step that no
+  longer exists in the deployed process shows "(gelöscht)" (deleted); a ticket
+  that has not moved yet shows "Noch keine Schritte aufgezeichnet." (no steps
+  recorded). The path is read from the ticket history (at most 200 steps, since
+  the latest start of the process on this ticket) and loaded only when the
+  toggle is opened.
+- **Dependent selects (option refresh).** When a field changes that a select
+  depends on, the form asks the server again for that select's options after
+  a pause of about 0.3 s and shows "Auswahl wird aktualisiert …" (options are
+  being refreshed). A failed refresh keeps the options the field already had.
+  Nothing is requested when the form opens.
+- **Buttons and errors.** The submit button shows the dialog's own button text
+  if the process defines one, otherwise "Absenden" (submit); "Abbrechen"
+  cancels. A mandatory field is marked `*` and, if empty, says "Dieses Feld ist
+  erforderlich."; "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder
+  ein Wert ist ungültig." means the server rejected the values.
+- **"Dateien" (files for the article).** A dialog with an `Article` field has an
+  attach button, with the same limits as the reply dialog (up to 10 files;
+  "Die Dateien sind zu groß." if they exceed the size limit).
+- **"Anhänge aus dem Ticket" (existing attachments).** The dialog field
+  `Attachments` lets an agent pick attachments that already exist on the
+  ticket's articles; the actions `ArticleSend` and `TicketArticleCreate` then
+  mail or store them. The field exists for agents on an existing ticket only
+  (not on a start dialog, not in the customer portal). "Das Ticket hat keine
+  Anhänge." appears if there is nothing to choose from.
+- **"Zeitaufwand" (time units).** A time field for the article, shown to agents
+  only while the SysConfig `Ticket::Frontend::AccountTime` is on and the
+  dialog's `Article` field config sets `TimeUnits` (`2` = mandatory, other
+  truthy values = optional). The value is booked as time accounting on the new
+  article. The customer portal never shows it.
+- A field type the form cannot render shows "Dieses Feld kann hier noch nicht
+  ausgefüllt werden." (cannot be filled in here yet) or a plain text input with
+  a note.
+
 ## PendingTime
 
 `field_values["PendingTime"]` is an ISO 8601 datetime with offset (like
@@ -434,10 +477,18 @@ read-only.
   reproduces the deployed checksum.
 - **Extension points.** `TRANSITION_ACTIONS` (module name to handler plus
   parameter specs) and `CONDITION_MODULES` (Perl module path to a Python
-  predicate; `ValidateDemo` ships) are core-only registries
-  (`sdk_stable=False`, no plugin exposure yet). The designer's action forms are
-  generated from the parameter specs, so an action module added to the
-  registry shows up in the designer without frontend work.
+  predicate; `ValidateDemo` ships) are registries in the core. Both are
+  `sdk_stable=True` and, since SDK 0.2.0, plugins can add to them
+  (`backend/src/tiqora/plugins/process_points.py`): a plugin registers
+  `transition_action(...)` and `condition_module(...)`, and they appear in the
+  designer as `Plugin_<short_id>_<Name>`. A plugin action runs in a savepoint
+  within a shared 20 s budget per dialog submit; when a plugin vetoes the ticket
+  write an action makes, only that action is skipped (see `skipped_actions`
+  below). See
+  [plugins.md](plugins.md#process-transition-actions-and-condition-modules).
+  The designer's action forms are generated from the parameter specs, so an
+  action module added to a registry shows up in the designer without frontend
+  work.
 - **API.** `/api/v1/admin/process-designer/*` (admin only, see the OpenAPI
   document): `catalog`, `processes`, `entities/{type}`,
   `entities/{type}/{id}`, per-process
@@ -552,10 +603,39 @@ with its Znuny source lines.
 
 `ConfigItemUpdate` changes CIs of the Tiqora CMDB as the acting user (`UserID` overrides), without a class permission check, like Znuny. It acts only in ITSM mode `tiqora`; in any other mode it is logged, collected into `unsupported_actions`, and the designer warns (`action_module_inactive_in_mode`). A CI that cannot be updated (unknown number or state, invalid value) is logged and skipped; the transition always fires.
 
-An unsupported action does not abort the submission: the transition still
-fires and the activity still advances, but that one action is skipped and
-its short module name is reported in `ActivityDialogSubmitResult.
-unsupported_actions` so callers/tests can assert on skip behaviour.
+`LinkAdd` is a port of Znuny's `LinkAdd`: `SourceObject` / `SourceKey` /
+`TargetObject` / `TargetKey`, `Type` (default `Normal`), `State` (`Valid` or
+`Temporary`) and `UserID` (overrides the acting user); without them it links
+the current ticket to `TargetTicketID`. When one end is an `ITSMConfigItem`, the
+action follows the ITSM mode (see [itsm.md](itsm.md)):
+
+| ITSM mode | Link with a CI end |
+|---|---|
+| `tiqora` (Mode B) | Stored by Tiqora's CMDB link service as the process actor, under the same rule as the UI: `rw` on the ticket's queue and `ro` on the CI's class (CI to CI needs `rw` on both classes). The other end can be a `Ticket` or a `Service`; the link type must exist. |
+| `znuny_readthrough` | Stored as a Znuny `link_relation` row, like any other link object. |
+| `off` | Skipped (`itsm_off`); no link is created. |
+
+A link between two non-CI objects (for example two tickets) does not depend on
+the ITSM mode. A refused link never stops the transition: as in Znuny, the
+refusal is logged and the process goes on.
+
+Two lists tell callers which actions did not run on a dialog submit. Both are
+part of `ActivityDialogSubmitResult` and of the submit response of the agent
+and portal APIs. Neither aborts the submission: the transition still fires and
+the activity still advances.
+
+- `unsupported_actions`: the short module names of actions Tiqora does not run
+  (deferred modules, or `ConfigItemUpdate` outside ITSM mode `tiqora`).
+- `skipped_actions`: actions Tiqora supports that did not take effect on this
+  pass. Each entry has `module` (short name), `reason` (a stable code) and
+  `detail` (a German text for the agent). Every action runs in its own
+  savepoint, so a skipped action leaves nothing behind. Reasons: `vetoed` (a
+  plugin refused the ticket write the action makes), `itsm_off` (`LinkAdd` to
+  a CI while ITSM is off) and `link_refused` (`LinkAdd` to a CI that the CMDB
+  link service refused). The customer portal returns `module` and `reason`
+  only and leaves `detail` empty, because it can hold plugin veto texts and
+  internal reasons. The agent UI does not show the list; use it from API
+  clients and tests.
 
 ### Other simplifications (see `engine.py`'s module docstring for the authoritative list)
 

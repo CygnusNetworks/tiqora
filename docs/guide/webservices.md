@@ -6,6 +6,12 @@ ein **Protokoll** aller ein- und ausgehenden Aufrufe und einige Einstellungen, d
 ist schreibgeschützt: Webservices werden weiterhin in Znuny angelegt und bearbeitet. Technische Hintergründe
 stehen in [compatibility.md](../compatibility.md#requester-and-invokers-tiqora-calls-external-systems).
 
+**Eingehende Aufrufe (Provider).** Die Seite zeigt nur, ob ein Webservice eingehende Aufrufe annimmt. Tiqora
+beantwortet sie unter `/znuny-compat/...` mit den Ticket-Operationen und, je nach ITSM-Modus, auch mit den
+fünf CMDB-Operationen `ConfigItemGet`, `ConfigItemSearch`, `ConfigItemCreate`, `ConfigItemUpdate` und
+`ConfigItemDelete`. Welche Operation in welchem Modus antwortet, steht in
+[compatibility.md](../compatibility.md#configitem-operations).
+
 ## Ausgehende Aufrufe einschalten
 
 Tiqora sendet ausgehende Aufrufe erst, wenn Sie die Übernahme ausdrücklich einschalten. Bis dahin sendet nur
@@ -28,8 +34,12 @@ Zwischenzeit werden von keiner Seite gesendet. Details: [parallel-operation.md](
 ausgehenden Aufrufe (Invoker) und wie viele davon durch Ereignisse ausgelöst werden. Ein Hinweis erscheint, wenn
 der Dienst für ausgehende Aufrufe ausgeschaltet ist.
 
-**Übersicht.** Transport (REST oder SOAP), Ziel-Adresse und Warnungen, etwa bei nicht unterstützter
-Anmeldung (JWT bei REST, NTLM bei SOAP).
+Die Detailseite hat vier Reiter: **Übersicht**, **Ausgehende Aufrufe**, **Protokoll (Debugger)** und
+**Einstellungen**.
+
+**Übersicht.** Verbindung für ausgehende Aufrufe: Transport (REST oder SOAP), Adresse, Anmeldung, Proxy und
+Client-Zertifikat, dazu die Fehlerbehandlung (Wiederholungen), die Protokollstufe und Warnungen, etwa bei nicht
+unterstützter Anmeldung (JWT bei REST, NTLM bei SOAP).
 
 **Ausgehende Aufrufe.** Je Invoker: Typ, Ereignisse mit „sofort“ oder „im Hintergrund“, ein Abzeichen
 „Bedingung“, wenn eine Bedingung gesetzt ist, und das Abzeichen „wird von Tiqora noch nicht ausgelöst“ für Ereignisse
@@ -42,7 +52,7 @@ Wunsch mit Artikel. Tiqora baut den Aufruf nach, zeigt Methode, Adresse, Kopfzei
 Richtung, Quelle, Zeitraum und IP-Adresse filtern. Ein Klick auf eine Zeile öffnet die einzelnen Protokollzeilen.
 Passwörter, Tokens und Authorization-Kopfzeilen sind maskiert; bei Zeilen aus Znuny steht „Von Tiqora maskiert“.
 Mit **Erneut senden** wird ein Aufruf mit den gespeicherten Ereignisdaten und den **aktuellen** Ticketdaten noch
-einmal gesendet (nach einer Rückfrage). Einträge werden nach 14 Tagen gelöscht.
+einmal gesendet (nach einer Rückfrage). Einträge werden nach 14 Tagen gelöscht (Voreinstellung; der Betrieb kann die Frist mit der Einstellung `gi.debugger.retention_days` ändern, mindestens 1 Tag).
 
 **Einstellungen.** Gelten nur in Tiqora:
 
@@ -51,6 +61,18 @@ einmal gesendet (nach einer Rückfrage). Einträge werden nach 14 Tagen gelösch
   (169.254.x.x), Multicast und reservierte Adressen sind nie erlaubt, auch nicht, wenn sie hier stehen.
 - **Unsichere TLS-Verbindung erlauben**: Nur wirksam, wenn der Webservice in Znuny `SSLNoHostnameVerification`
   verwendet. Ohne diesen Schalter prüft Tiqora das Zertifikat immer.
+
+## Webservices aus Prozessen aufrufen
+
+Die Prozess-Aktion `ExecuteInvoker` (Prozessverwaltung, siehe
+[process-management.md](../process-management.md)) stellt einen
+Invoker-Aufruf in die Warteschlange. `Webservice` ist der **Name** des Webservice, `Invoker` der Name des
+Invokers. Der Aufruf wird in derselben Transaktion wie das Absenden des Dialogs eingereiht und immer im
+Hintergrund gesendet (`Asynchronous` wird angenommen und ignoriert), der Dialog wartet also nie auf das
+Fremdsystem. Die Aktion funktioniert auch **ohne** den Schalter „Ausgehende Webservice-Aufrufe“ unter
+**Admin → Dienste**: dieser Schalter betrifft nur Ereignis-Invoker. Fehlt `Webservice` oder `Invoker`, oder gibt es den Webservice nicht, geschieht nichts außer einem Eintrag im
+Server-Log; der Prozessschritt läuft trotzdem weiter. Die gesendeten Aufrufe stehen im Reiter **Protokoll
+(Debugger)**.
 
 ## Was anders ist als in Znuny
 

@@ -27,6 +27,15 @@ to the native `/api/v1` (or MCP) at your own pace.
 | `TicketHistoryGet` | Ticket history lines (agent) |
 | `TimeAccountingGet` | Accounted time for a user/date range |
 | `OutOfOffice` | Set agent out-of-office prefs (admin) |
+| `ConfigItemGet` | CI with its current version (ITSM mode `tiqora`: Tiqora CMDB; `znuny_readthrough`: read from Znuny's tables; `off`: `Operation.NotImplemented`) |
+| `ConfigItemSearch` | Search CIs of one class (same modes as `ConfigItemGet`) |
+| `ConfigItemCreate` | Create a CI (mode `tiqora`; `znuny_readthrough`: `ConfigItemCreate.NotAvailable`; `off`: `Operation.NotImplemented`) |
+| `ConfigItemUpdate` | New CI version (mode `tiqora`; `znuny_readthrough`: `ConfigItemUpdate.NotAvailable`; `off`: `Operation.NotImplemented`) |
+| `ConfigItemDelete` | Delete CIs (mode `tiqora`; `znuny_readthrough`: `ConfigItemDelete.NotAvailable`; `off`: `Operation.NotImplemented`) |
+
+The `ConfigItem*` operations follow ITSMConfigurationManagement 6.5.4 and 7.3.5 and answer according to the
+ITSM mode (Admin "ITSM"); parameters, error codes and limits are in
+[ConfigItem operations](../compatibility.md#configitem-operations).
 
 Both the REST-style (`HTTP::REST`) and SOAP (`HTTP::SOAP`) GenericInterface
 transports are emulated for these operations — see
@@ -59,6 +68,11 @@ webservice configured:
 | GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
 | GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
 | POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
+| POST | `/znuny-compat/ConfigItem` | ConfigItemCreate |
+| GET | `/znuny-compat/ConfigItem/{id}` | ConfigItemGet |
+| PATCH | `/znuny-compat/ConfigItem/{id}` | ConfigItemUpdate |
+| DELETE | `/znuny-compat/ConfigItem/{id}` | ConfigItemDelete |
+| GET, POST | `/znuny-compat/ConfigItemSearch` | ConfigItemSearch |
 
 Matching follows Znuny: the first route (operations in name order) whose
 method list and pattern accept the raw path wins, and **URI and query values
@@ -144,6 +158,18 @@ Protokoll, direction "Eingehend"), next to the entries Znuny wrote itself. Rows 
 operation, remote IP and the request and response lines with secrets (passwords, session ids,
 tokens, `Authorization`) masked. Entries older than `gi.debugger.retention_days` (default 14)
 are removed. See [compatibility.md](../compatibility.md#debugger).
+
+## Requester and invokers (outbound)
+
+`/znuny-compat` is the provider side (others call Tiqora). Tiqora can also call
+external systems from webservices defined in Znuny: ticket-event invokers over
+REST and SOAP, with retries, conditions, response actions, a debugger and the
+process action `ExecuteInvoker`. Event invokers are off until the takeover flag
+is set; the admin pages (Admin "Webservices", backed by
+`/api/v1/admin/webservices`) show them read-only; see
+[Requester and invokers](../compatibility.md#requester-and-invokers-tiqora-calls-external-systems),
+[parallel-operation.md](../parallel-operation.md#taking-over-genericinterface-invokers)
+and the admin guide [guide/webservices.md](../guide/webservices.md).
 
 ## What is not emulated
 
