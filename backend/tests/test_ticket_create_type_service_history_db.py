@@ -203,3 +203,28 @@ async def test_missing_type_uses_ticket_type_default(sync_url: str) -> None:
     finally:
         await engine.dispose()
         _cleanup(sync_url, ids, mark)
+
+
+async def test_invalid_default_type_falls_back_to_type_1(sync_url: str) -> None:
+    """Znuny offers only valid types (TypeList Valid => 1): an invalid default type is skipped."""
+    mark = _seed(sync_url)
+    engine = create_async_engine(_async_url(sync_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    ids: list[int] = []
+    try:
+        sync_engine = create_engine(sync_url)
+        with sync_engine.begin() as conn:
+            conn.execute(text("UPDATE ticket_type SET valid_id = 2 WHERE id = :i"), {"i": TYPE_ID})
+        sync_engine.dispose()
+        cfg = _sysconfig({"Ticket::Type": "1", "Ticket::Type::Default": "R3Type"})
+        tid, rows = await _create(factory, cfg)
+        ids.append(tid)
+        async with factory() as session:
+            stored = (
+                await session.execute(text("SELECT type_id FROM ticket WHERE id = :t"), {"t": tid})
+            ).scalar()
+        assert stored == 1
+        assert rows[-1][0] == "TypeUpdate" and rows[-1][1].endswith("%%1")
+    finally:
+        await engine.dispose()
+        _cleanup(sync_url, ids, mark)

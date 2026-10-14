@@ -486,12 +486,13 @@ async def create_ticket(
     type_id = params.type_id if params.type_id is not None else 1
     if params.type_id is None:
         # Ticket.pm::TicketCreate: no Type/TypeID -> Ticket::Type::Default if that type
-        # exists, else TypeID 1.
+        # exists among the VALID types (TicketTypeList -> TypeList, Valid => 1), else TypeID 1.
         default_type = await sysconfig.get_str("Ticket::Type::Default", "")
         if default_type:
             hit = (
                 await session.execute(
-                    text("SELECT id FROM ticket_type WHERE name = :n LIMIT 1"), {"n": default_type}
+                    text("SELECT id FROM ticket_type WHERE name = :n AND valid_id = 1 LIMIT 1"),
+                    {"n": default_type},
                 )
             ).first()
             if hit is not None:
