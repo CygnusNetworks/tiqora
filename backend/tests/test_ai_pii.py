@@ -242,6 +242,42 @@ def test_pii_never_mask_keeps_ticket_number_readable() -> None:
     )
 
 
+def test_never_mask_cannot_exempt_an_email_address() -> None:
+    """Prod audit 2026-10-13: a customer login that is the customer's own
+    address was exempted run-wide and reached the provider in every header,
+    quote and signature — and came out half-masked once its local part
+    matched a known name."""
+    pii = PiiMapper(
+        never_mask={"anna.meyer@example.com", "z90003"},
+        known_names=["Anna Meyer", "Meyer"],
+    )
+    masked = pii.mask("Von: Anna Meyer <anna.meyer@example.com>, Kd z90003")
+    assert masked == "Von: [NAME_1] <[EMAIL_1]>, Kd z90003"
+    assert pii.unmask("[EMAIL_1]") == "anna.meyer@example.com"
+
+
+def test_ticket_header_masks_email_customer_ids_like_the_articles() -> None:
+    from tiqora.ai.context import TicketSnapshot, pii_never_mask, render_ticket_header
+
+    ticket = TicketSnapshot(
+        ticket_id=1,
+        queue_id=1,
+        customer_id="anna.meyer@example.com",
+        customer_user_id="anna.meyer@example.com",
+        title="network",
+        ticket_number="2026010510000011",
+    )
+    pii = PiiMapper(never_mask=pii_never_mask(ticket))
+    header = render_ticket_header(ticket, pii.mask)
+    assert "example.com" not in header
+    assert "CustomerID: [EMAIL_1] | CustomerUser: [EMAIL_1]" in header
+    assert "number 2026010510000011" in header
+    # Same token in the article text, so the model can tie the two together.
+    assert pii.mask("From: anna.meyer@example.com") == "From: [EMAIL_1]"
+    # Masking off: the header stays as it was.
+    assert "CustomerUser: anna.meyer@example.com" in render_ticket_header(ticket)
+
+
 # ---------------------------------------------------------------------------
 # Linear time (docs/superpowers/specs/2026-09-19-pii-mask-linear-time-design.md)
 #

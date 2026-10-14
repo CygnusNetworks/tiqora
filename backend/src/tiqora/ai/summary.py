@@ -584,7 +584,7 @@ async def summarize_ticket(
     attachment_context = run.attachment_context
     attachment_blocks = attachment_context.blocks
 
-    header = render_ticket_header(ticket)
+    header = render_ticket_header(ticket, pii.mask if mask else None)
     effective_detail = detail or policy.summary_detail
     has_previous = state.summary_body is not None and state.last_summary_upto_article_id is not None
     if has_previous:
@@ -746,7 +746,8 @@ async def custom_summarize_ticket(
     rendered = _render_articles(
         articles, pii=run.pii, mask=mask, attachment_blocks=attachment_blocks, with_time=True
     )
-    user_message = f"{render_ticket_header(ticket)}\n\n--- full conversation ---\n{rendered}"
+    header = render_ticket_header(ticket, run.pii.mask if mask else None)
+    user_message = f"{header}\n\n--- full conversation ---\n{rendered}"
     agent_instruction = instruction.strip()[:CUSTOM_INSTRUCTION_MAX_CHARS]
     if mask:
         agent_instruction = run.pii.mask(agent_instruction)

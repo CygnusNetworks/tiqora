@@ -647,7 +647,7 @@ def _build_user_message(
     reply_language_line: str | None = None,
     disclosure_footer: str | None = None,
 ) -> str:
-    lines = [render_ticket_header(ticket)]
+    lines = [render_ticket_header(ticket, pii.mask if mask else None)]
     if reply_language_line:
         lines.append(reply_language_line)
     lines.append("")

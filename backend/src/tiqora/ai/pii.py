@@ -203,7 +203,15 @@ class PiiMapper:
         never_mask: frozenset[str] | set[str] | None = None,
         known_names: Sequence[str] | None = None,
     ) -> None:
-        self._never_mask = frozenset(v for v in (never_mask or ()) if v)
+        # An e-mail address is never exempt, whoever asks: a customer login is
+        # often the customer's own address, and an exemption is global — it
+        # left the address in clear in every header, quote and signature of
+        # the run (and half-masked as "[NAME_1].x@…" once its local part
+        # matched a known name). Tools unmask their arguments, so the token
+        # works wherever the model has to pass the id on.
+        self._never_mask = frozenset(
+            v for v in (never_mask or ()) if v and not _EMAIL_RE.fullmatch(v)
+        )
         self._token_by_value: dict[str, str] = {}
         self._value_by_token: dict[str, str] = {}
         self._counters: dict[str, int] = {}
@@ -238,8 +246,8 @@ class PiiMapper:
         """Replace structured identifiers with stable ``[KIND_n]`` tokens.
 
         Values in ``never_mask`` (exact string match against the matched
-        span) are left untouched — e.g. the ticket number, the customer_id
-        itself (still needed by MCP tools), configured infrastructure
+        span) are left untouched — e.g. the ticket number or a non-mail
+        customer_id (never an e-mail address, see ``__init__``), configured infrastructure
         IPs/domains.
         """
         if not text:
