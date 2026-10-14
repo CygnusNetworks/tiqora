@@ -21,6 +21,7 @@
 | [development.md](development.md) | Local development workflow + release checklist |
 | [testing.md](testing.md) | Test suite layout, golden-master tests, testcontainers |
 | [deployment.md](deployment.md) | Production-oriented deployment notes |
+| [releases/v0.19.0.md](releases/v0.19.0.md) | Release notes of v0.19.0 (wave 4); upgrade steps in [deployment.md](deployment.md#upgrading-to-v0190-wave-4) |
 | [deploy/docker-compose.md](deploy/docker-compose.md) | Full Docker Compose walkthrough: services, env vars, external DB, reverse proxy, TLS, MCP streaming |
 
 ## API reference
