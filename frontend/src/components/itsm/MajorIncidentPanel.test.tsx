@@ -131,6 +131,26 @@ describe("MajorIncidentPanel", () => {
     expect(await screen.findByTestId("major-update-job")).toBeTruthy();
   });
 
+  it("lists the tickets a plugin vetoed, with the veto text", async () => {
+    ticketItsm.mockResolvedValue(makeItsm({ role: "major_incident", major_incident: major() }));
+    get.mockResolvedValue(major());
+    postUpdate.mockResolvedValue({ update: major().timeline[1], job_id: 13 });
+    jobGet.mockResolvedValue({
+      id: 13, status: "succeeded", progress_done: 2, progress_total: 2, progress_message: null,
+      cancel_requested: false, error: null, files: [],
+      result: { done: [5], skipped: [{ ticket_id: 6, reason: "vetoed", detail: "Gesperrt bis zur Freigabe" }] },
+    });
+    renderPanel();
+    await screen.findByTestId("major-update-form");
+    await typeUpdate("Neuer Stand");
+    const submit = screen.getByTestId("major-update-submit") as HTMLButtonElement;
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    fireEvent.click(submit);
+    const list = await screen.findByTestId("major-update-skipped");
+    expect(list.textContent).toContain("Gesperrt bis zur Freigabe");
+    expect(list.textContent).toContain(i18n.t("itsm.linkedNote.reasons.vetoed"));
+  });
+
   it("an ended incident has no update form; without rw there are no controls at all", async () => {
     ticketItsm.mockResolvedValue(makeItsm({ role: "major_incident", major_incident: major({ active: false }) }));
     get.mockResolvedValue(major({ active: false }));

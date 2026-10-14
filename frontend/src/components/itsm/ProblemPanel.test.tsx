@@ -152,6 +152,21 @@ describe("ProblemPanel", () => {
     expect(result.textContent).toContain(i18n.t("itsm.problem.close.done", { count: 2 }));
   });
 
+  it("close with workaround lists vetoed tickets with the veto text", async () => {
+    closeIncidents.mockResolvedValue({ job_id: 78, status: "queued" });
+    jobGet.mockResolvedValue({
+      id: 78, status: "succeeded", progress_done: 2, progress_total: 2, progress_message: null,
+      cancel_requested: false, error: null, files: [],
+      result: { done: [9], skipped: [{ ticket_id: 10, reason: "vetoed", detail: "Change-Freeze aktiv" }] },
+    });
+    renderPanel();
+    fireEvent.click(await screen.findByTestId("problem-close-incidents"));
+    fireEvent.click(screen.getByTestId("problem-close-submit"));
+    const list = await screen.findByTestId("problem-close-skipped");
+    expect(list.textContent).toContain("Change-Freeze aktiv");
+    expect(list.textContent).toContain("#10");
+  });
+
   it("links incidents found by search (already linked ones are not selectable)", async () => {
     vi.spyOn(api, "searchTickets").mockResolvedValue([
       { ticket_id: 9, tn: "202607010009", title: "Schon da" },

@@ -130,7 +130,7 @@ const MATRIX: PriorityMatrix = {
 const LINK_TYPES: LinkTypeOption[] = [
   { name: "Normal", origin: "znuny", pointed: false, propagation: "none", source_name: "Normal", target_name: "Normal", source_label: "Normal", target_label: "Normal" },
   { name: "ParentChild", origin: "znuny", pointed: true, propagation: "none", source_name: "Parent", target_name: "Child", source_label: "Übergeordnet", target_label: "Untergeordnet" },
-  { name: "DependsOn", origin: "znuny", pointed: true, propagation: "source", source_name: "Depends on", target_name: "Dependency of", source_label: "Hängt ab von", target_label: "Voraussetzung für" },
+  { name: "DependsOn", origin: "znuny", pointed: true, propagation: "both", source_name: "Depends on", target_name: "Dependency of", source_label: "Hängt ab von", target_label: "Voraussetzung für" },
 ];
 
 const PROBLEM: Problem = {

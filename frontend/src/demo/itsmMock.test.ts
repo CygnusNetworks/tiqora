@@ -20,6 +20,11 @@ describe("itsm demo mock (Mode A data)", () => {
     expect(resolveItsmData("/api/v1/tickets/100/major-incident/updates", "POST")).toMatchObject({ job_id: DEMO_ITSM_JOB_ID });
   });
 
+  it("declares DependsOn with the backend default propagation (both)", () => {
+    const types = resolveItsmData("/api/v1/itsm/link-types", "GET") as { name: string; propagation: string }[];
+    expect(types.find((t) => t.name === "DependsOn")?.propagation).toBe("both");
+  });
+
   it("answers /itsm/status from the demo mode", () => {
     expect((resolveItsmData("/api/v1/itsm/status", "GET") as ItsmStatus).mode).toBe("tiqora");
     localStorage.setItem(DEMO_ITSM_MODE_KEY, "znuny_readthrough");
