@@ -625,8 +625,9 @@ list before rolling out; every item has a failure mode that is silent until some
    The compose examples in this repository ship this. The production compose file lives outside the
    repository; the change is optional there. Without it, roll out the api first and the other roles once it
    is healthy (a Watchtower recreate starts all of them at once, whatever compose says). What happens when a
-   role boots before the migration finished: it starts with the core only and retries the plugin load and
-   the ITSM link-type seed for up to 30 minutes, so both catch up by themselves; a plugin with pending
+   role boots before the migration finished: it starts with the core only and retries the plugin load for up
+   to 30 minutes (worker, mcp, ai-worker), and the worker likewise retries the ITSM link-type seed, so both
+   catch up by themselves; a plugin with pending
    database changes stays "failed" until its next restart (the coordinated restart after a runtime install
    covers that case; a plain stack start does not).
 4. **Plugin packages and `max_allowed_packet`.** Plugin packages uploaded in the admin UI or fetched from a
