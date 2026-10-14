@@ -21,10 +21,10 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 
 | Process | Image / command | Responsibility |
 |---|---|---|
-| `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1`, compat routes, `/health`, `/ready`, `/metrics` |
+| `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1` (including the unauthenticated wallboard route `/api/v1/kiosk`), compat routes, the public web chat API `/api/chat/v1` and widget files `/chat/v1/`, SCIM 2.0 `/scim/v2`, plugin routes `/api/plugins/<id>/`, `/health`, `/ready`, `/metrics` (surface overview: [api/README.md](api/README.md)) |
 | `tiqora-worker` | `worker` | Plain asyncio tick loops (no external scheduler or task queue): Znuny-write poller, outbox drain, background-job runner (`tiqora.jobs`), postmaster/escalation/notifications/GA/unlock-timeout/pending-check (feature-flagged), Telegram poller, housekeeping |
-| `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: new-ticket triage (queue routing), auto-reply worker + auto-summary scan, isolated so a hung LLM call never stalls the main worker. Inert unless `daemon.ai_worker.enabled`; triage and auto-reply additionally require `operation_mode=tiqora_primary` (auto-reply is exempt on Tiqora-only channels, currently Telegram) |
-| `tiqora-mcp` | `mcp` | FastMCP over streamable HTTP; imports `domain/` directly (no second business layer) |
+| `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: new-ticket triage (queue routing), auto-reply worker + auto-summary scan, the web chat assistant loop, isolated so a hung LLM call never stalls the main worker. It loads the plugin registry too, so AI sends pass the same plugin hooks. Inert unless `daemon.ai_worker.enabled`; triage and auto-reply additionally require `operation_mode=tiqora_primary` (auto-reply is exempt on Tiqora-only channels, currently Telegram) |
+| `tiqora-mcp` | `mcp` | FastMCP over streamable HTTP (core tools, read-only CMDB tools, tools of active plugins); imports `domain/` directly (no second business layer) |
 
 All four share the same container image with a switchable entrypoint.
 
@@ -571,8 +571,11 @@ are replaced by a catalogue of 25 built-in reports over typed sources.
   windows shift by the zone's UTC offset (`reporting.time_zone`, default the
   Znuny zone) in the compiler.
 - **API**: `api/v1/reports.py` (catalogue, inline run, background run, export
-  jobs, polling), `api/v1/admin/reporting.py` (status, rebuild) and the thin
-  `/api/v1/stats/*` wrappers (`api/v1/stats.py`) that run built-ins.
+  jobs, saved reports, report files, Znuny statistics import),
+  `api/v1/report_schedules.py`, `api/v1/saved_searches.py`,
+  `api/v1/admin/reporting.py` (status, rebuild) and the legacy `/api/v1/stats/*`
+  wrappers (`api/v1/stats.py`) that run built-ins. Job polling is the generic
+  `/api/v1/jobs`; guided examples in [api/rest-v1.md](api/rest-v1.md#reports).
 - **Frontend**: `/agent/reports` (overview, catalogue), `/agent/reports/$reportKey`
   (viewer with filters, previous-period compare, export) and the
   time-accounting report; hand-rolled SVG charts in `components/agent/stats/`
@@ -648,10 +651,13 @@ User guide: [dashboards.md](dashboards.md).
 - **Providers** (`dashboard/providers/`): the extension point `core.dashboard.providers`
   (`DASHBOARD_PROVIDERS`, filled by `register_core`) maps a widget `type_key` to a
   `DashboardProvider` (settings model, `run`, timeout). Core providers: counter, ticket list,
-  escalations, reminders, calendar agenda, team presence; sources (preset, saved search, own filter)
+  escalations, reminders, calendar agenda, team presence, queue overview, chat queue, AI status and
+  the report widgets (`core.report`, SLA gauge, backlog aging, heatmap; `providers/report.py`);
+  sources (preset, saved search, own filter)
   are resolved in `providers/sources.py` and always evaluated for the viewer's queue scope. Widgets
-  without a provider (notes, links, queue overview, recent views, plugin widgets) are absent from
-  data responses and render from their settings or their own routes.
+  without a provider (notes, links, recent views, plugin widgets) are absent from
+  data responses and render from their settings or their own routes. `GET
+  /dashboard-widget-types` lists the 16 core types.
 - **Batched data endpoint**: `GET /dashboards/{id}/data` runs all providers of a dashboard (or the
   `widgets` list asked for) in one request and answers `{widgets: {id: {status, data|error}}}` with
   per-widget status `ok`, `pending`, `error` or `forbidden`, so one slow or failing widget never
@@ -698,7 +704,7 @@ User guide: [dashboards.md](dashboards.md).
     templates.
   - *Kiosk.* `tiqora_dashboard_kiosk_token` and `tiqora_dashboard_kiosk_item` (hash of a random token, rotation,
     details flag, expiry, revocation, and the dashboards of the link; migration `20261010_0075`). `/api/v1/kiosk/*` is unauthenticated
-    (`/api/v1/kiosk` is in `_UNSCOPED_EXEMPT_PREFIXES`), reads the token from `X-Tiqora-Kiosk`, answers
+    (its routes have no `CurrentUser` dependency, so neither a session nor the API-key scope gate runs), reads the token from `X-Tiqora-Kiosk`, answers
     one 404 for every failure, always sends `Cache-Control: no-store` and `Referrer-Policy: no-referrer`,
     and is rate limited per address (240/min) and per misses (30/10 min) through Redis; behind a proxy
     `trusted_proxies` decides the address. Widgets run as the link creator, but only types with a rule
@@ -769,7 +775,7 @@ catalogue (`calendar.*` keys in all 49 locales — see [i18n.md](./i18n.md)).
 `ticket_state.py` for the two-Dynamic-Field ticket<->process link,
 `engine.py` for execution — transitions, conditions, TransitionActions,
 activity dialog submission) plus `api/v1/process.py`
-(`/api/v1/process/*`, 9 endpoints). Reuses Znuny's **existing** `pm_process`
+(`/api/v1/process/*`, 12 endpoints). Reuses Znuny's **existing** `pm_process`
 / `pm_activity` / `pm_activity_dialog` / `pm_transition` /
 `pm_transition_action` tables verbatim (`db/legacy/process_management.py`)
 — same shared-schema, no-migration approach as Calendar above.
@@ -822,8 +828,11 @@ codes), `exchange.py` (YAML import/export), `revisions.py` (diff, restore as
 draft). Two core extension points sit beside it: `TRANSITION_ACTIONS`
 (`process/actions/registry.py`: handler plus parameter specs, the designer
 builds its action forms from them) and `CONDITION_MODULES`
-(`process/condition_modules.py`). Both are `sdk_stable=False`; plugins cannot
-register into them yet.
+(`process/condition_modules.py`). Both are `sdk_stable=True` since SDK 0.2.0, so
+plugins can register their own transition actions and condition modules
+(`plugins/process_points.py`, see [plugins.md](plugins.md)); an action a plugin
+vetoes or that cannot run in the current ITSM mode is reported as a
+`skipped_actions` entry in the API answer instead of failing the transition.
 
 **Deploy handshake** (parallel operation, TiqoraSync 1.2.0): designer saves write
 draft rows and `pm_entity_sync` rows; the admin presses "Bereitstellen";
@@ -900,7 +909,12 @@ use them; the plugin loader (below) calls the same
 Admin view: `GET /api/v1/admin/extensions`. The frontend has a counterpart,
 `frontend/src/extensions/registry.ts` (e.g. the `FIELD_KINDS` point).
 
-**Plugins** (`tiqora.plugins`, `tiqora_sdk`; user guide: [plugins.md](plugins.md)).
+#### Plugins (`tiqora.plugins`, `tiqora_sdk`)
+
+User and developer guide: [plugins.md](plugins.md) (installing and updating, safe mode,
+SDK reference, packaging and signing). This section is the architecture view: how plugins
+are discovered, loaded per process role, isolated and installed at runtime.
+
 Tier-1 extensions are Python distributions with an entry point in group
 `tiqora.plugins`, a `tiqora-plugin.toml` manifest and optionally a built
 frontend (`web/`, `i18n/`). They run in-process with full trust. They are
@@ -1036,8 +1050,9 @@ leaves the stored ciphertext untouched, `""` or an explicit `null` removes it
 therefore omits untouched secrets from the PUT, sends `""` for "remove" and
 the string for a new value. `save_section_values` only flushes (the route commits), unlike the legacy
 `settings_store.set_setting`, which commits by itself. API:
-`/api/v1/admin/settings-sections`. Registered sections: `jobs`, `avatars`
-(the latter keeps `/api/v1/admin/avatars` and its old keys).
+`/api/v1/admin/settings-sections`. Core sections: `jobs`, `avatars`
+(keeps `/api/v1/admin/avatars` and its old keys), `process` (deploy from Tiqora),
+`reporting`, `itsm` and `cmdb`; every plugin with settings adds `plugins.<id>`.
 
 **Background jobs** (`tiqora.jobs`). Long-running work (first consumer:
 ticket CSV export, `core.ticket_export`) runs as a `tiqora_job` row executed by
@@ -1097,9 +1112,11 @@ the filter can only narrow, never widen (an `any` branch or a queue the agent
 may not read changes nothing). Relative times are computed in Python against
 UTC, never with the database clock. `filters.ticket_params` bridges the
 existing `GET /tickets` list parameters to a filter (parity-tested) and
-`/api/v1/ticket-filters` exposes the field catalog, validation and counting.
-Moving the main ticket list onto the compiler, saved searches and a
-filter-builder UI are later work.
+`/api/v1/ticket-filters` exposes the field catalog and counting.
+`POST /api/v1/tickets/query` lists the tickets of a filter, saved searches
+(see "Stats / reporting" above) store filters, and dashboards and reports reuse
+the same language. The main ticket list still uses the parameter-based
+`GET /api/v1/tickets` (parity-tested against the compiler).
 
 **Field engine** (`frontend/src/components/fields`). One typed field system for
 forms: `FieldDef` + `FieldKind` (a registry point, so new kinds can be
@@ -1137,7 +1154,8 @@ The ITSM core lives in `tiqora.itsm` (user-facing description: [itsm.md](itsm.md
 - **CI provider contract** (`ci_provider.py`, `providers.py`): one `CiProvider` protocol (classes, search, get,
   versions, ticket links, service incident states, `is_empty`) with a registry (`CI_PROVIDERS`,
   `get_ci_provider`) keyed by mode. Mode A
-  registers `ZnunyCiProvider`; Mode B is registered by the CMDB plan. The contract kit
+  registers `ZnunyCiProvider`, Mode B the CMDB's `TiqoraCiProvider` (`cmdb/provider.py`),
+  both from `register_core`. The contract kit
   `tests/itsm_provider_contract.py` runs against every provider.
 - **Znuny adapter** (`znuny_adapter/`): read-only SQL on `configitem*`, `general_catalog`,
   `cip_allocate` and the extra `service` columns, per schema profile (`profiles.py`; 6.5 and 7.3
@@ -1240,7 +1258,11 @@ shows them. The queue tree is sorted case-insensitively.
   `run_ticket_agent` with the queue's auto-reply policy and writes the answer through `deliver_bot_chat_reply`
   (an agent article on the `WebChat` channel by the policy's service user plus a transcript line). The database is
   the truth and a 15 s rescan repairs lost wake-ups. Every limit ends in `hand_off_chat` (to the waiting list, or
-  to the e-mail prompt when nobody is there), never in silence. Details: [webchat.md](webchat.md).
+  to the e-mail prompt when nobody is there), never in silence. A visitor can ask for a human
+  (`POST /api/chat/v1/sessions/{id}/handoff`, 3 per minute and chat, `409 not_bot` unless the AI is
+  answering), and an agent can take a `bot` chat over by `accept` or by replying
+  (`handoff_reason = "takeover"`); the agent inbox lists such chats in a third section. Details:
+  [webchat.md](webchat.md), routes: [api/rest-v1.md](api/rest-v1.md#web-chat).
 - **Identity paths.** A visitor is recognised by a signed website token (`Tiqora.chat.identify`, verified against the
   chat's encrypted secret), by a short portal assertion issued from the portal session cookie on Tiqora's own
   origin, or not at all. All paths resolve a customer user and set `identity_source`; the token is never stored.
@@ -1279,7 +1301,7 @@ Uses `fastmcp.http_app(transport="streamable-http")`.
 `Authorization: Bearer` header validated on every request via `TiqoraBearerAuth`
 middleware. The `user_id` is injected into `request.state.user_id` for tools.
 
-**Tools (40):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`,
+**Tools (43):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`,
 `ticket_history`, `list_attachments`, `get_attachment_meta`), ticket write
 (`ticket_create`, `ticket_reply`, `ticket_note`, `ticket_forward`, `ticket_bounce`,
 `ticket_update_state`/`queue`/`priority`/`owner`, `ticket_set_title`/`customer`/
@@ -1287,9 +1309,20 @@ middleware. The `user_id` is injected into `request.state.user_id` for tools.
 `ticket_watch`/`unwatch`, `ticket_archive`/`unarchive`, `ticket_merge`, `ticket_link`), reference/discovery (`list_queues`,
 `list_states`, `list_priorities`, `list_agents`), knowledge base (`kb_search`,
 `kb_get_article`, `kb_list`, `kb_upsert_article`, `kb_publish_article`), and
-`customer_lookup`. Full catalogue: [`api/mcp.md`](api/mcp.md).
+`customer_lookup` (these are the 40 tools of `mcp_server/server.py`), plus three read-only CMDB
+tools in `mcp_server/cmdb_tools.py` (`cmdb_search`, `cmdb_get`, `cmdb_impact`: they resolve the
+ITSM mode first, use the Tiqora CMDB in Mode B and the read-only Znuny adapter in Mode A, and
+filter by the class groups of the key's user). Full catalogue: [`api/mcp.md`](api/mcp.md).
 
-MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
+**Plugin tools.** After the plugin registry is built, `register_plugin_mcp_tools` binds the
+`MCP_TOOLS` of active plugins as `<short_id>_<name>`; names in `CORE_MCP_TOOL_NAMES` are reserved.
+Each call goes through a wrapper that looks the tool up in the live registry, checks the key's
+`tool:` allowlist and, for `write=True` tools, `mcp:rw`, applies the tool's timeout and maps any
+failure to a generic message. The MCP process also takes part in the coordinated plugin
+restart ([plugins.md](plugins.md)).
+
+MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR (the read-only CMDB
+tools are the one addition beyond tickets and the knowledge base).
 
 **Constraints:** All tool handlers are `async`. No sync SQLAlchemy, no `requests`,
 no `time.sleep` anywhere in `mcp_server/`. Unavoidable sync operations (none currently)
@@ -1366,7 +1399,13 @@ Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
   implementations — REST and SOAP share the same handlers. Scope and
   deferred gaps: `docs/compatibility.md` (incl. SOAP transport section).
 
-## Non-goals (V1)
+## Non-goals and out of scope
 
-- Znuny package manager (OPM): Perl packages cannot run; Tiqora has its own plugin system ([plugins.md](plugins.md)) (except the small TiqoraSync addon)
-- Shipping any Znuny source code in this repository
+- Znuny's package manager (OPM): Perl packages cannot run inside Tiqora. Tiqora has its own plugin system
+  ([plugins.md](plugins.md)); the only Perl code that ships is the add-ons that run **inside Znuny** during
+  parallel operation (TiqoraSync, TiqoraITSM).
+- Shipping any Znuny source code in this repository.
+- Custom OPM operations of a Znuny installation as GenericInterface operations: there is no stable wire
+  contract to implement (see [compatibility.md](compatibility.md)).
+- ITSM change management and work orders (the change ticket types are only recognised) and reporting over
+  CIs: not part of the current ITSM core, planned for a later wave.

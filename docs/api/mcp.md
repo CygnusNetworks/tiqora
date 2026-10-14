@@ -1,8 +1,9 @@
 # MCP server
 
 Tiqora ships a [Model Context Protocol](https://modelcontextprotocol.io)
-server (`tiqora.mcp_server`) that exposes ticket, article, and
-knowledge-base operations as structured tools for LLM agents. This is the
+server (`tiqora.mcp_server`) that exposes ticket, article, knowledge-base and
+(read-only) configuration-item operations as structured tools for LLM agents,
+and the tools that installed [plugins](../plugins.md#mcp-tools) add. This is the
 primary interface for AI automation — see
 [`../ai-integration.md`](../ai-integration.md) for the full integration
 contract (webhooks + MCP, recommended agent patterns, prompt-injection
@@ -38,6 +39,14 @@ Every request requires `Authorization: Bearer <tiqora_api_key>`.
   subsequent tool call in that connection — MCP actions run with that
   agent's own ticket permissions (queue/group ACLs enforced identically to a
   human agent via `tiqora.permissions.engine`).
+- API-key scopes decide what the key may do over MCP (full table in the
+  [API overview](README.md#authentication-summary)): the area `mcp` with
+  `mcp:ro` opens a session and runs read-only tools, `mcp:rw` is needed for
+  every tool that changes data (the legacy token `mcp` means `mcp:rw`; the
+  legacy `write` token covers REST only). Scopes `tool:<tool_name>` (for example
+  `tool:ticket_search,tool:cmdb_get`) restrict the key to exactly those tools;
+  a key without any `tool:` entry may run all of them, plugin tools included.
+  An unrestricted key (no scopes) may do everything.
 - There is no separate MCP-level authorization tier. **Issue a dedicated
   service-account API key per automation**, scoped to only the queues/groups
   it needs, rather than reusing a human agent's key — least-privilege the
@@ -65,12 +74,15 @@ missing trailing slash in a way that breaks concurrent MCP session setup;
 see the reverse-proxy notes in
 [`../deploy/docker-compose.md`](../deploy/docker-compose.md).)
 
-## Tools (~40)
+## Tools (43)
 
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR —
-those stay on REST. Source of truth: `@mcp.tool` handlers in
-`tiqora.mcp_server.server`. Mutations go through `TicketWriteService` (same
-permission gates and, for agent email replies, SMTP outbound as REST).
+those stay on REST; the one addition beyond tickets and the knowledge base is
+the read-only [CMDB](#cmdb-read-only) trio. The 43 core tools are the 40
+`@mcp.tool` handlers in `tiqora.mcp_server.server` plus the three in
+`tiqora.mcp_server.cmdb_tools`; installed plugins add more
+([Plugin tools](#plugin-tools)). Mutations go through `TicketWriteService`
+(same permission gates and, for agent email replies, SMTP outbound as REST).
 
 Optional **tool allowlist** on the API key: scopes may include
 `tool:ticket_search`, `tool:ticket_reply`, … — if any `tool:…` tokens are set,
@@ -93,7 +105,7 @@ only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
 | Tool | Purpose |
 |---|---|
 | `ticket_create` | Create a new ticket. Returns `TicketID` and `TicketNumber`. |
-| `ticket_reply` | Post a customer-visible reply article (**agent email channel sends SMTP**, REST parity). Into a **waiting** web chat it returns `{"error": "chat_not_accepted"}` (there is no MCP tool to accept a chat; a human accepts first). Replies into an active chat reach the visitor with the next stream heartbeat, at most 25 s later. |
+| `ticket_reply` | Post a customer-visible reply article (**agent email channel sends SMTP**, REST parity). Into a web chat that is **waiting**, or that the AI assistant is still answering, it returns `{"error": "chat_not_accepted"}` (there is no MCP tool to accept or take over a chat; a human does that first, in the UI or with `POST /api/v1/chat/sessions/{id}/accept`). Replies into an active chat reach the visitor with the next stream heartbeat, at most 25 s later. |
 | `ticket_note` | Post an internal (agent-only, not customer-visible) note article. |
 | `ticket_update_state` | Change ticket state by state ID. |
 | `ticket_update_queue` | Move ticket to a different queue by queue ID. |
@@ -137,9 +149,60 @@ only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
 |---|---|
 | `customer_lookup` | Look up a customer user by login. |
 
+### CMDB (read-only)
+
+Three tools expose configuration items (see [`../cmdb.md`](../cmdb.md) for the
+CMDB itself, in German). All three are annotated `readOnlyHint`, so a key with
+`mcp:ro` may run them, and all three honour the key's `tool:` allowlist
+(`tool:cmdb_search`, `tool:cmdb_get`, `tool:cmdb_impact`). They run as the key's
+user: a CI of a class that user may not read is answered like an unknown CI
+(`CI not found (or not readable for this API key's user)`), so MCP cannot be
+used to find out whether a CI exists. Unlike the ticket tools, CMDB tools
+report problems as MCP tool errors, not as an `{"error": …}` result body.
+
+| Tool | Purpose and limits |
+|---|---|
+| `cmdb_search` | Search CIs by number or name. `query` (empty = no text filter), `class_key`, `deployment_state` and `incident_state` (state keys), `limit` (default 20, clamped to 1-100). Returns `ci_id`, `number`, `name`, `class` (display name), `deployment_state`, `incident_state` (names). Only readable classes are searched. |
+| `cmdb_get` | One CI by `ci_id` or exact `number`: the search fields plus `version_id`, `changed`, `attributes` (labels from the class definition, catalogue values as names, groups joined with ` / `, repeated values as lists; at most 200 values, then `"truncated": true`) and `links` (`kind`, `key`, `link_type`, `direction`; Tiqora CMDB only, ends the user cannot read are left out). |
+| `cmdb_impact` | Impact analysis of a CI: `ci`, `services`, `customers`, `open_tickets`, `cis` (dependent CIs) and `truncated`. `max_depth` default 4, clamped to 1-5. Only readable CIs and queues contribute. |
+
+Behaviour per ITSM mode: in Mode B (`tiqora`) all three use the Tiqora CMDB. In
+Mode A (`znuny_readthrough`) `cmdb_search` and `cmdb_get` read Znuny's CMDB
+through the read-only adapter (no `links`), while `cmdb_impact` fails with a hint
+to use search and get, because the analysis needs the Tiqora CMDB. While ITSM is
+off (`itsm.mode = off`) every CMDB tool fails with "ITSM is switched off on this
+site". The API-key area `cmdb` is not needed for MCP; `mcp` is.
+
+```json
+{"name": "cmdb_search", "arguments": {"query": "mail", "class_key": "server", "limit": 10}}
+{"name": "cmdb_impact", "arguments": {"ci_id": 12, "max_depth": 3}}
+```
+
+### Plugin tools
+
+Active [plugins](../plugins.md#mcp-tools) can register further tools. They
+appear in the same tool list next to the core tools and are named
+`<short_id>_<name>` (for a plugin with `short_id = "hello"`, `hello_title`); the
+core tool names above are reserved and a plugin tool that tries to take one is
+not bound. The MCP process loads plugins itself (so a plugin must be enabled
+and healthy in the `mcp` role), and a plugin that is disabled later answers
+"Dieses Werkzeug ist nicht verfügbar" (this tool is not available).
+
+The same gates as for core tools apply: the key's `tool:` allowlist must name
+the tool when the key has one, and a tool its plugin declares with `write=True`
+needs `mcp:rw`. That flag is declared by the plugin and trusted, not enforced.
+A key **without** a `tool:` allowlist may call every tool of every active
+plugin, so restrict MCP keys with `tool:` entries when a plugin tool must not
+be open to every MCP client. Permissions on tickets are the plugin's own duty
+(it receives the calling agent's id). A plugin tool has a timeout (60 s unless
+the plugin sets another); on a timeout or any error the client sees only a
+generic message ("Zeitlimit von N Sekunden überschritten" or "Das Werkzeug ist
+fehlgeschlagen") and the details go to the MCP process log. Writing such a
+tool: [`../plugins.md`](../plugins.md#mcp-tools).
+
 Every tool's exact parameter list and docstring lives in the source of
-truth, `tiqora.mcp_server.server` (each `@mcp.tool`-decorated function) — the
-tables above are a summary. State/queue/priority/owner IDs match
+truth, `tiqora.mcp_server.server` and `tiqora.mcp_server.cmdb_tools` (each
+`@mcp.tool`-decorated function) — the tables above are a summary. State/queue/priority/owner IDs match
 `/api/v1/reference/*` and admin reference data (see
 [`rest-v1.md`](rest-v1.md#admin-crud-overview)).
 
@@ -195,7 +258,8 @@ agent: [`../ai-integration.md`](../ai-integration.md).
   customer-group permissions.
 - Changes made through MCP are attributed to the key's user in ticket
   history; which API key made the call is not recorded.
-- Tool failures are returned as `{"error": "…"}` in the result body rather
-  than as MCP protocol errors — check for the key.
+- Ticket, knowledge-base and customer tool failures are returned as
+  `{"error": "…"}` in the result body rather than as MCP protocol errors —
+  check for the key. CMDB and plugin tools raise MCP tool errors instead.
 - Authentication is API-key only (by design): session tokens and OAuth
   scopes are not accepted.

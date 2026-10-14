@@ -1,14 +1,42 @@
 # Tiqora API reference
 
-Tiqora exposes four distinct API surfaces, all served by the same `tiqora-api`
-process (default port `8000`) unless noted otherwise.
+Tiqora exposes several distinct API surfaces. All of them except the MCP
+server are served by the same `tiqora-api` process (default port `8000`).
 
 | Surface | Prefix | Audience | Auth |
 |---|---|---|---|
 | **Agent/admin API** | `/api/v1` | The Tiqora agent UI, and any first-party automation | Session cookie or `Authorization: Bearer <api-key>` |
 | **Customer portal API** | `/api/portal` | The customer-facing self-service portal (opt-in: `TIQORA_PORTAL_ENABLED=true`) | Separate portal session cookie |
-| **Compatibility layer** | `/znuny-compat` | Existing Znuny GenericInterface REST clients | Znuny-style `SessionID`, or `Authorization: Bearer <api-key>` |
+| **Compatibility layer** | `/znuny-compat` | Existing Znuny GenericInterface REST/SOAP clients | Znuny-style `SessionID`, or `Authorization: Bearer <api-key>` |
 | **MCP server** | separate process, default port `8001` | LLM agents / AI automation | `Authorization: Bearer <api-key>` (streamable-HTTP) |
+| **SCIM 2.0** | `/scim/v2` (`api/scim/`) | An identity provider that provisions agents, customers and groups | Bearer token of one identity provider (`tqscim_…`, created per provider by an admin); never a session or API key |
+| **Public web chat API** | `/api/chat/v1` | The chat widget frame on visitors' browsers | No login; `X-Chat-Token` header per chat session |
+| **Wallboard (kiosk) data** | `/api/v1/kiosk` | A wallboard screen without login | Secret link token in the `X-Tiqora-Kiosk` header |
+| **Plugin routes** | `/api/plugins/<plugin id>/…` | Whatever an installed plugin offers | Session or API key with the `plugins` area; only routes a plugin registers as public skip it |
+
+Notes on the three public-facing rows:
+
+- **SCIM** answers `application/scim+json` documents (also for errors), is not part
+  of `openapi.json` (the router is excluded from the schema) and sits outside
+  `/api` on purpose so the browser CSRF check never applies. Setup, token
+  handling, rate limits and the group-to-role mapping are in the
+  [identity guide](../guide/identity-providers.md#bereitstellung-mit-scim)
+  ("Bereitstellung mit SCIM", provisioning with SCIM). The admin side
+  (`/api/v1/admin/identity-providers/{id}/scim/*`) is listed in
+  [`rest-v1.md`](rest-v1.md#admin-crud-overview).
+- **Web chat** has no cookie and no CORS; unsafe methods must carry a
+  same-origin `Origin`. The route table is in
+  [`rest-v1.md`](rest-v1.md#web-chat), the product guide is
+  [`../guide/webchat.md`](../guide/webchat.md). The widget files
+  (`/chat/v1/loader.js`, `/chat/v1/frame`) are static routes, not API.
+- **Kiosk** is the only unauthenticated part of the dashboards: it ignores
+  cookies and bearer tokens, answers one identical `404` for every invalid link
+  and is rate limited per address. Details in
+  [`rest-v1.md`](rest-v1.md#dashboards-and-wallboards).
+- **Plugin routes** are mounted per active plugin by the plugin loader after
+  start-up. A plugin that is disabled, quarantined or not installed answers a
+  JSON `404`. They are not part of `openapi.json`. See
+  [`../plugins.md`](../plugins.md#http-routes).
 
 See also: `/health`, `/ready`, `/metrics` (Prometheus) on the main API process
 — these are unauthenticated and should be kept off any public-facing
@@ -19,9 +47,11 @@ listener (see [`../deploy/docker-compose.md`](../deploy/docker-compose.md)).
 | I want to... | Read |
 |---|---|
 | Get the exhaustive, generated schema (every field, every response shape) | [`openapi.json`](openapi.json) — load it into Swagger UI, Redoc, Postman, or any OpenAPI-aware client. Also served live at `GET /openapi.json` on a running instance, with interactive docs at `GET /docs`. |
-| Learn how to actually call the agent/admin API, with curl examples | [`rest-v1.md`](rest-v1.md) |
+| Learn how to actually call the agent/admin API, with curl examples (tickets, jobs, reports, saved searches, dashboards, processes, ITSM, CMDB, admin resources, web chat) | [`rest-v1.md`](rest-v1.md) |
 | Point an existing Znuny GenericInterface REST client at Tiqora | [`compat.md`](compat.md) |
-| Wire an LLM agent up via MCP | [`mcp.md`](mcp.md) |
+| Wire an LLM agent up via MCP (ticket, knowledge base and read-only CMDB tools, plugin tools) | [`mcp.md`](mcp.md) |
+| Provision users with SCIM | [identity guide](../guide/identity-providers.md#bereitstellung-mit-scim) |
+| Write a plugin that adds HTTP routes or MCP tools | [`../plugins.md`](../plugins.md) |
 
 ## Regenerating `openapi.json`
 
@@ -36,8 +66,10 @@ This does **not** require a live database, Redis, or Meilisearch connection —
 `tiqora openapi` builds `create_app()` and calls `app.openapi()`, which only
 inspects the route table (routes are registered at import time; the app's
 `lifespan` — which does need those dependencies — never runs). Re-run this
-after adding or changing any `/api/v1`, `/api/portal`, or `/znuny-compat`
-route and commit the updated file. Copy the same output to
+after adding or changing any `/api/v1`, `/api/portal`, `/api/chat/v1` or
+`/znuny-compat` route and commit the updated file. Two surfaces are
+deliberately absent from the schema: `/scim/v2` (`include_in_schema=False`)
+and `/api/plugins/*` (sub-apps mounted at runtime). Copy the same output to
 `packages/api-client/openapi.json` as well — the frontend's typed client
 (`schema.d.ts`) is generated from that copy, and CI's frontend type-check
 fails when it lags behind the backend.
@@ -51,15 +83,64 @@ surface is documented by hand in [`mcp.md`](mcp.md) from the tool registry in
 - **Session cookie** (`/api/v1`, agent UI): `POST /api/v1/auth/login` sets an
   httpOnly cookie (name configurable via `TIQORA_SESSION_COOKIE`, default
   `tiqora_session`). Subsequent requests just need the cookie.
-- **API key** (`/api/v1`, `/znuny-compat`, MCP): `Authorization: Bearer
-  <key>`. Lifecycle:
+- **API key** (`/api/v1`, `/znuny-compat`, MCP, `/api/plugins`):
+  `Authorization: Bearer <key>`. Keys start with `tiqora_`; anything else in
+  the `Bearer` header is ignored, so a **session token is not accepted as a
+  bearer token** (use the session cookie for that). Keys are rate limited
+  (`TIQORA_API_KEY_RATE_LIMIT_*`, `429` with `Retry-After`). Lifecycle:
   - REST admin API (requires admin session): `GET/POST /api/v1/admin/api-keys`,
     `GET/PATCH/DELETE /api/v1/admin/api-keys/{key_id}` (`POST` returns the
     raw key once; `PATCH` can soft-revoke via `valid: false`).
   - CLI: `tiqora api-key create|list|revoke|delete` (create prints the raw
     key once; revoke soft-disables; delete hard-removes the row).
-  An existing session token can also be passed as a bearer token for
-  CLI/automation convenience.
+- **API-key scopes** (the `scopes` CSV of a key; empty or `null` =
+  unrestricted, i.e. all privileges of the bound user): `<area>:ro` allows
+  `GET`/`HEAD`/`OPTIONS`, `<area>:rw` every method. Queue and group
+  permissions of the bound user stay in force on top. The areas and the paths
+  they cover:
+
+  | Area | Covers |
+  |---|---|
+  | `tickets` | `/api/v1/tickets`, `queues`, `reference`, `templates`, `search`, `integrations`, `ticket-filters`, `saved-searches`, `avatars`, **`chat`** (agent web chat), **`jobs`** (shared with `stats`) |
+  | `customers` | `/api/v1/customers`, `customer-directory` |
+  | `kb` | `/api/v1/kb` |
+  | `calendar` | `/api/v1/calendar` |
+  | `stats` | `/api/v1/stats`, **`reports`**, `reporting`, **`report-schedules`**, **`report-runs`**, **`jobs`** (shared with `tickets`) |
+  | `ai` | `/api/v1/ai` |
+  | `process` | `/api/v1/process` (agent processes) |
+  | `channels` | `/api/v1/channels` |
+  | `events` | `/api/v1/events`, `phone`, `sse` |
+  | `agents` | `/api/v1/agents` |
+  | `cmdb` | **`/api/v1/cmdb`** and **`/api/v1/itsm`** (one area "CMDB / ITSM"); ticket sub-resources such as `/tickets/{id}/cis` stay in `tickets`, `/admin/itsm` stays in `admin` |
+  | `admin` | `/api/v1/admin` |
+  | `mcp` | opening an MCP session (`mcp:ro`) and mutating MCP tools (`mcp:rw`) |
+  | `compat` | `/znuny-compat` |
+  | `plugins` | `/api/plugins` (routes of third-party plugin code) |
+
+  Things that trip people up:
+  - Running a report is a `POST /api/v1/reports/run`, so a key that only runs
+    reports needs `stats:rw`; polling its job (`/api/v1/jobs/{id}`) works with
+    `stats` or `tickets`, and a key without `tickets` only sees report job kinds.
+  - `POST /api/v1/tickets/query` is a `POST`, hence `tickets:rw`.
+  - Paths that belong to no area (for example `/api/v1/dashboards`,
+    `/api/v1/dashboard-widget-types`, `/api/v1/plugins/frontend`) answer `403`
+    to every **restricted** key; only unrestricted keys reach them.
+  - `/api/v1/auth/*`, `/health` and `/metrics` stay open to any valid key for
+    reads; state-changing auth calls need an unrestricted key.
+  - The legacy tokens `read` (every REST area as `:ro`), `write` (every REST
+    area as `:rw`), `mcp` (`mcp:rw`) and `*` still work. `read`/`write` do
+    **not** cover `mcp`, `compat` or `plugins`; those always need an explicit
+    grant, so existing integration keys never gain access to plugin code.
+  - `tool:<mcp_tool_name>` tokens restrict an MCP key to listed tools, see
+    [`mcp.md`](mcp.md#auth).
+- **Wallboard link token** (`/api/v1/kiosk`): the secret of a link created
+  under **Verwaltung → Wallboard-Links** (Administration, wallboard links;
+  `POST /api/v1/admin/dashboard-kiosk-links`, the secret is returned once), sent as
+  `X-Tiqora-Kiosk`.
+- **Chat session token** (`/api/chat/v1`): returned when a chat session is
+  created, sent as `X-Chat-Token`; only its SHA-256 is stored.
+- **SCIM bearer token** (`/scim/v2`): one per identity provider, created with
+  `POST /api/v1/admin/identity-providers/{id}/scim/tokens` (shown once).
 - **Portal session cookie** (`/api/portal`): separate cookie
   (`TIQORA_CUSTOMER_SESSION_COOKIE`, default `tiqora_customer_session`) from
   `POST /api/portal/auth/login`, scoped to a `customer_user`, not a `users`
