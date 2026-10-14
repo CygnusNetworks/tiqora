@@ -422,9 +422,11 @@ server {
     # see docs/deployment.md, "Upgrading to v0.19.0").
 
     # SAML: the ACS endpoint receives the IdP's signed response as a POST body
-    # (up to ~1 MB); nginx's default client_max_body_size of 1m is too tight.
+    # (up to ~1 MB); nginx's default client_max_body_size of 1m is too tight. Plugin
+    # packages are uploaded here too: keep the limit above TIQORA_PLUGINS_MAX_PACKAGE_MB
+    # (default 15, max 25).
     location /api/ {
-        client_max_body_size 2m;
+        client_max_body_size 25m;
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

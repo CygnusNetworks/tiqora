@@ -263,9 +263,10 @@ Public URL and SAML:
 * The image ships `xmlsec1` and the `saml` extra (pysaml2). A custom image
   without them answers SAML logins with `sso_error=saml_unavailable`.
 * The reverse proxy must pass SAML ACS POST bodies of up to 1 MB (Tiqora's cap
-  is 2 MB per response): nginx `client_max_body_size 2m;` on the `/api/`
+  is 2 MB per response): nginx `client_max_body_size 2m;` or more on the `/api/`
   location (the nginx default of 1 MB rejects large signed responses with
-  `413`). Do not buffer-reject large headers either (IdP redirects can carry
+  `413`; with plugin package uploads, v0.19.0, the limit must exceed
+  `TIQORA_PLUGINS_MAX_PACKAGE_MB`, for example `25m`). Do not buffer-reject large headers either (IdP redirects can carry
   long query strings; raise `large_client_header_buffers` if needed).
 * The OIDC back-channel logout URL
   (`/api/v1/auth/oidc/<slug>/backchannel-logout`, for `env-oidc`:
@@ -278,8 +279,10 @@ Public URL and SAML:
 ### SCIM provisioning
 
 Identity providers can push accounts and groups to `/scim/v2` (guide:
-[guide/identity-providers.md](guide/identity-providers.md#bereitstellung-mit-scim)). **Deploy blockers**
-for the Puppet-managed nginx (not inspectable from this repository, so a checklist item):
+[guide/identity-providers.md](guide/identity-providers.md#bereitstellung-mit-scim)). A reverse proxy whose
+`location /` goes to `tiqora-api` (the standard setup, and the production nginx) already forwards `/scim/`;
+check that `GET /scim/v2/ServiceProviderConfig` without a token answers 401 JSON. **Only a proxy that lists
+its locations explicitly** and does not send `/` to the api needs its own block:
 
 ```nginx
 location /scim/ {
@@ -295,7 +298,8 @@ location /scim/ {
 }
 ```
 
-Without this block `/scim/` is not reachable (the IdP's "test connection" fails with 404 or an HTML page).
+On such a proxy, without this block `/scim/` is not reachable (the IdP's "test connection" fails with 404
+or an HTML page).
 `TIQORA_TRUSTED_PROXIES` (and `TIQORA_FORWARDED_ALLOW_IPS`) must be set as well: the failed-token lockout is
 per client IP, so behind an unconfigured proxy every bad token counts against the proxy address.
 A request with a valid token is never subject to that lockout.
@@ -311,8 +315,8 @@ A request with a valid token is never subject to that lockout.
 | `TIQORA_SCIM_ROLE_SYNC_INTERVAL` | `15` | seconds between role-sync ticks (daemon `scim_role_sync`) |
 | `TIQORA_SCIM_EVENT_RETENTION_DAYS` | `180` | audit retention (daemon `scim_events_purge`) |
 
-Release checklist: the `/scim/` nginx block exists, `TIQORA_TRUSTED_PROXIES` is set, `TIQORA_PUBLIC_BASE_URL`
-is set. Each SCIM request is bounded work on `tiqora_scim_*` tables; Znuny role writes happen in the
+Release checklist: `/scim/` reaches the api (401 JSON without a token; a `/scim/` block only where the proxy
+lists its locations), `TIQORA_TRUSTED_PROXIES` is set, `TIQORA_PUBLIC_BASE_URL` is set. Each SCIM request is bounded work on `tiqora_scim_*` tables; Znuny role writes happen in the
 `scim_role_sync` worker, so no request approaches the 90 s limit.
 
 ## Kerberos / SPNEGO configuration
@@ -594,20 +598,22 @@ Operator notes for the release that adds the ITSM core, the CMDB, the ITSM impor
 plugin extension points (release notes: [releases/v0.19.0.md](releases/v0.19.0.md)). Work through the
 list before rolling out; every item has a failure mode that is silent until somebody needs the feature.
 
-1. **nginx: add `location /scim/`.** Identity providers push to `/scim/v2`, which is **not** under `/api/`.
-   A reverse proxy that lists its locations explicitly (the Puppet-managed nginx in front of production
-   does) answers 404 or an HTML page there until a `/scim/` block proxies to `tiqora-api`, exactly like
-   `/api/`. The block, `TIQORA_TRUSTED_PROXIES` and `TIQORA_PUBLIC_BASE_URL` are listed under
-   [SCIM provisioning](#scim-provisioning). A proxy that sends `/` to the api (the example in
-   [deploy/docker-compose.md](deploy/docker-compose.md#nginx-example)) needs no change.
+1. **nginx and `/scim/`: usually nothing to do.** Identity providers push to `/scim/v2`, which is **not**
+   under `/api/`. The standard setup sends `location /` to `tiqora-api` (the example in
+   [deploy/docker-compose.md](deploy/docker-compose.md#nginx-example), and the production nginx), so
+   `/scim/` already reaches the api; check that `GET /scim/v2/ServiceProviderConfig` without a token
+   answers 401 JSON, not the HTML of the web interface. Only a proxy that lists its locations explicitly
+   and does not send `/` to the api needs a `location /scim/` block that proxies to `tiqora-api` exactly
+   like `/api/`. The block, `TIQORA_TRUSTED_PROXIES` and `TIQORA_PUBLIC_BASE_URL` are listed under
+   [SCIM provisioning](#scim-provisioning).
 2. **Roll out `tiqora-ai-worker` together with api, worker and mcp.** All four roles load the same code: the
    ai-worker now hosts plugins (SDK 0.2.0) and runs the web chat assistant against the new schema. Use the same
    image (and, with plugins, the same plugin image and volume) for all four and restart the ai-worker in the
    same step. An ai-worker left on the old image does not load plugins and may fail against the new tables.
    Order: `tiqora-api` first (it migrates), then worker, mcp and ai-worker.
-3. **Compose: wait for a healthy api.** Only the api container runs the migrations (and, once plugin
-   installation from packages is used, the migrations of plugins). Worker, mcp and ai-worker must therefore
-   start after the api is *healthy*, not merely started:
+3. **Compose: wait for a healthy api (recommended, not required).** Only the api container runs the
+   migrations (and, once plugin installation from packages is used, the migrations of plugins). Worker, mcp
+   and ai-worker should therefore start after the api is *healthy*, not merely started:
 
    ```yaml
    tiqora-worker:      # and tiqora-ai-worker, tiqora-mcp
@@ -617,9 +623,12 @@ list before rolling out; every item has a failure mode that is silent until some
    ```
 
    The compose examples in this repository ship this. The production compose file lives outside the
-   repository and needs the change by hand. Without it a role that boots before the migration finished keeps
-   a plugin with pending database changes in the state "failed" until its next restart (the coordinated
-   restart after a runtime install covers that case; a plain stack start does not).
+   repository; the change is optional there. Without it, roll out the api first and the other roles once it
+   is healthy (a Watchtower recreate starts all of them at once, whatever compose says). What happens when a
+   role boots before the migration finished: it starts with the core only and retries the plugin load and
+   the ITSM link-type seed for up to 30 minutes, so both catch up by themselves; a plugin with pending
+   database changes stays "failed" until its next restart (the coordinated restart after a runtime install
+   covers that case; a plain stack start does not).
 4. **Plugin packages and `max_allowed_packet`.** Plugin packages uploaded in the admin UI or fetched from a
    package repository are stored in the database. `TIQORA_PLUGINS_MAX_PACKAGE_MB` (default 15, maximum 25) is the
    size limit per package; MariaDB's `max_allowed_packet` must be **larger** than that limit, or the upload
@@ -631,8 +640,8 @@ list before rolling out; every item has a failure mode that is silent until some
 5. **Migrations 0077 to 0082.** `20261010_0077` (ITSM link types), `0078` (ITSM core), `0079` (CMDB),
    `0080` (SCIM; also adds columns to `tiqora_identity_provider`), `0081` (ITSM import) and `0082` (plugin
    packages and repositories). They only create `tiqora_*` tables or add columns to existing `tiqora_*` tables;
-   no Znuny table is altered, indexed or backfilled. The new tables start empty apart from a few seeded catalog
-   and link-type rows. The run takes seconds. Znuny keeps running during the upgrade
+   no Znuny table is altered, indexed or backfilled. The new tables start empty apart from the 15 CMDB catalog
+   rows that `0079` seeds. The run takes seconds. Znuny keeps running during the upgrade
    and stays unchanged; the migration is additive, so rolling back the image leaves unused tables behind
    without harm. The API entrypoint runs them (`TIQORA_RUN_MIGRATIONS=1`); with `TIQORA_RUN_MIGRATIONS=0` run
    `tiqora migrate upgrade` once before starting the roles.
@@ -640,7 +649,12 @@ list before rolling out; every item has a failure mode that is silent until some
    for the tables `general_catalog` **and** `cip_allocate` (the ITSM core of Znuny). Found: mode **Znuny führt
    das ITSM** (Mode A, read-only). Not found: mode **Tiqora führt das ITSM** (Mode B). The result is stored in
    `itsm.mode` (source "automatisch erkannt") and never re-detected. A site without Znuny ITSM tables, such as
-   production with Znuny 6.5 and `Ticket::Type=0`, `Ticket::Service=0`, therefore starts in Mode B. The mode can be switched off in Admin, ITSM. See
+   production with Znuny 6.5 and `Ticket::Type=0`, `Ticket::Service=0`, therefore starts in Mode B. An admin
+   can set the mode to "Aus" in Admin, ITSM. **Link types are written at the first start, not by a
+   migration:** the Znuny types from SysConfig (`LinkObject::Type###*`) and the five Tiqora types
+   (`DependsOn`, `Includes`, `ConnectedTo`, `AlternativeTo`, `RelevantTo`) go into `tiqora_itsm_link_type`.
+   Every start of api and worker seeds them again while that table is empty, so a racy roll-out does not
+   leave a gap; "Aus Znuny aktualisieren" in the link-type table does the same by hand. See
    [itsm.md](itsm.md#wie-der-modus-gewählt-wird). The detection lives in `itsm/mode.py` (`ZNUNY_ITSM_MARKER_TABLES`)
    and is also documented for the importer in [itsm-import.md](itsm-import.md).
 7. **Znuny add-on `TiqoraITSM` 1.0.0** (German only) is optional and only for sites whose CIs moved to Tiqora
@@ -649,7 +663,8 @@ list before rolling out; every item has a failure mode that is silent until some
    See [itsm-import.md](itsm-import.md).
 8. **Check afterwards.** `tiqora migrate current` shows `20261010_0082 (head)`. `GET /scim/v2/ServiceProviderConfig`
    with a SCIM token answers 200 through the public host name (not 404). Admin, Erweiterungen lists all plugins
-   in "Aktiv" on all four processes. Admin, ITSM shows the stored mode.
+   in "Aktiv" on all four processes. Admin, ITSM shows the stored mode, and its link-type table lists the
+   Znuny types plus the five Tiqora types.
 
 ## Reverse proxy sketch
 
@@ -868,5 +883,5 @@ Known examples:
 - [ ] Network isolation: DB not public
 - [ ] MCP API keys rotated and scoped
 - [ ] AGPL obligations understood for network-facing deployments
-- [ ] SCIM: nginx `location /scim/` ([SCIM provisioning](#scim-provisioning)), `TIQORA_TRUSTED_PROXIES` set
+- [ ] SCIM: `/scim/v2` reaches the api (`location /` covers it; a `location /scim/` block only for proxies that list their locations, see [SCIM provisioning](#scim-provisioning)), `TIQORA_TRUSTED_PROXIES` set
 - [ ] Web chat: `TIQORA_PUBLIC_BASE_URL`, `TIQORA_TRUSTED_PROXIES` set; [post-deploy check](#post-deploy-check-run-once-on-production) done
