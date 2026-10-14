@@ -580,7 +580,7 @@
                 </tr>
                 <tr>
                   <th scope="row">REST API / GenericInterface</th>
-                  <td class="col-tiqora"><span class="badge badge-ok">REST</span> <span class="badge badge-partial">GI compat</span><small>REST <code>/api/v1</code>, webhooks. GenericInterface REST/SOAP as provider (ticket, session and <code>ConfigItem*</code> operations) and requester (ticket-event invokers, debugger, dry run); webservices are still edited in Znuny; documented gaps</small></td>
+                  <td class="col-tiqora"><span class="badge badge-ok">REST</span> <span class="badge badge-ok">GI compat</span><small>REST <code>/api/v1</code>, webhooks. Wire-compatible GenericInterface (REST and SOAP): provider with the GenericTicketConnector, session and <code>ConfigItem*</code> operations, requester with ticket-event invokers, debugger and dry run; existing Znuny clients keep working unchanged. Webservice configurations are still created in Znuny (no editor in Tiqora yet); edge cases are documented</small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Native GenericInterface (REST/SOAP)</small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Web services; some depend on contract tier<sup class="ref"><a href="#s13">13</a></sup></small></td>
                   <td><span class="badge badge-ok">REST</span><small>Own REST API, no GI compatibility</small></td>
