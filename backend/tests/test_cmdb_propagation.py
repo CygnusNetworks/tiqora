@@ -689,6 +689,65 @@ async def test_recompute_all_does_not_overwrite_a_ci_saved_mid_run(
     assert seen[-1][0] == 8 and seen[-1][1] == 8
 
 
+async def test_recompute_all_reruns_when_an_already_scanned_ci_is_saved(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Senior review I1: the CI saved mid-run is the head of the chain, whose batch was already
+    written; no later batch meets it. Its neighbours, warned by the save path, sit in later
+    batches and were judged against the old incident set. The pass must notice the save after
+    its last batch and run again. Both dialects."""
+    from tiqora.cmdb import propagation
+
+    monkeypatch.setattr(propagation, "_CHUNK", 1)
+    async with cmdb_db.factory() as s:
+        ids = await _chain(s, [f"cmdb4-h{i}" for i in range(4)])
+    cmdb_db.sql(
+        "UPDATE tiqora_cmdb_ci SET changed_at = '2020-01-01 00:00:00' WHERE id >= :m", m=min(ids)
+    )
+    saved = False
+
+    async def progress(done: int, total: int | None) -> None:
+        nonlocal saved
+        if (done, total) == (1, 4) and not saved:  # batch 1 (ids[0]) is written
+            saved = True
+            async with cmdb_db.factory() as s:
+                await _set_own_incident(s, ids[0], "incident")
+                assert await _cur(s, ids) == ["incident"] + ["warning"] * 3
+
+    await recompute_all(cmdb_db.factory, settings=CmdbSettings(), progress=progress)
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, ids) == ["incident"] + ["warning"] * 3
+
+
+async def test_recompute_all_reruns_when_a_link_is_added_mid_run(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A link added during the pass moves the graph without touching ``changed_at``: the pass
+    compares ``(count, max id)`` of ``tiqora_itsm_link`` and runs again. Both dialects."""
+    from tiqora.cmdb import propagation
+
+    monkeypatch.setattr(propagation, "_CHUNK", 1)
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s, key="cmdb4srv")
+        ids = [await make_ci(s, cid, f"cmdb4-l{i}") for i in range(4)]
+        await _link(s, ids[0], ids[1])
+        await _set_own_incident(s, ids[0], "incident")
+        assert await _cur(s, ids) == ["incident", "warning", "operational", "operational"]
+    added = False
+
+    async def progress(done: int, total: int | None) -> None:
+        nonlocal added
+        if (done, total) == (1, 4) and not added:
+            added = True
+            async with cmdb_db.factory() as s:
+                await _link(s, ids[1], ids[2])  # the link path warns ids[2] from fresh data
+                assert await _cur(s, ids) == ["incident", "warning", "warning", "operational"]
+
+    await recompute_all(cmdb_db.factory, settings=CmdbSettings(), progress=progress)
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, ids) == ["incident", "warning", "warning", "operational"]
+
+
 async def test_recompute_all_stops_after_three_passes_and_warns(cmdb_db: CmdbWorld) -> None:
     """Bounded like the reindex: a shape that changes during every pass ends after three."""
     import structlog

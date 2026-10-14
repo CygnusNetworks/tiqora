@@ -292,9 +292,11 @@ async def recompute_all(
 
     A CI saved while a pass runs was recomputed by the save path from fresh data, but the pass
     still holds the incident set it read at its start. The pass therefore leaves CIs alone whose
-    ``changed_at`` is newer than the latest save before its start, and runs once more when it
-    met any, because the neighbours of such a CI were judged against the old picture
-    (CMDB-RECOMPUTE-VS-SAVE).
+    ``changed_at`` is newer than the latest save before its start, and runs once more when any
+    CI was saved during it (met by a later batch, or found by a check after the last batch: a
+    CI whose batch was already written), because the neighbours of such a CI were judged
+    against the old picture (CMDB-RECOMPUTE-VS-SAVE). A link added or removed during the pass
+    (``(count, max id)`` of ``tiqora_itsm_link`` differs) also runs another pass.
 
     Progress is monotone across passes: an extra pass continues after the rows the earlier
     ones scanned instead of restarting at 0.
@@ -334,6 +336,7 @@ async def _recompute_pass(
         # the newest save before this pass: data, not the clock, so the dialects' DATETIME
         # precision and any clock skew between app and database do not matter
         watermark = (await session.execute(select(func.max(TiqoraCmdbCi.changed_at)))).scalar()
+        links_at_start = await _link_mark(session)
         shape = await _shape(session)
         props, states = shape
         graph = _Graph(session, props)
@@ -389,7 +392,32 @@ async def _recompute_pass(
             done += len(batch)
         if progress is not None:
             await progress(base + done, base + max(total, done))
+    if not saved_during:
+        # A CI saved after its own batch was written is never met by a later batch, but the save
+        # path warned neighbours that the pass then judged against its old picture; a link
+        # added or removed during the pass moves the graph without touching changed_at. Both
+        # need another pass (senior review I1).
+        async with session_factory() as session:
+            saved_during = await _saved_since(session, watermark) or (
+                await _link_mark(session) != links_at_start
+            )
     return shape, updated, done, saved_during
+
+
+async def _link_mark(session: AsyncSession) -> tuple[int, int]:
+    """``(count, max id)`` of ``tiqora_itsm_link``: differs after any add or delete."""
+    count, top = (
+        await session.execute(select(func.count(TiqoraItsmLink.id), func.max(TiqoraItsmLink.id)))
+    ).one()
+    return int(count or 0), int(top or 0)
+
+
+async def _saved_since(session: AsyncSession, watermark: object) -> bool:
+    """A CI was saved (or created) after ``watermark``; with no watermark: any CI exists now."""
+    stmt = select(TiqoraCmdbCi.id).limit(1)
+    if watermark is not None:
+        stmt = stmt.where(TiqoraCmdbCi.changed_at > watermark)
+    return (await session.execute(stmt)).first() is not None
 
 
 async def run_propagation_job(ctx: JobContext, payload: PropagationPayload) -> dict[str, int]:
