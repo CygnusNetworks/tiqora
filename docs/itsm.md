@@ -46,7 +46,8 @@ installiert, bekommt nicht plötzlich Modus A.
 Erlaubte Wechsel:
 
 - Jeder Modus lässt sich auf **Aus** stellen. Aus kehrt in den vorherigen Modus zurück, nicht in
-  eine neu erkannte Vorgabe. Wurde per Import auf Tiqora umgestellt, führt Aus nur zurück zu
+  eine neu erkannte Vorgabe; nur wenn kein vorheriger Modus gespeichert ist, in die aktuell erkannte
+  Vorgabe. Wurde per Import auf Tiqora umgestellt, führt Aus nur zurück zu
   Tiqora.
 - **Tiqora führt → Znuny führt** ist nur möglich, solange die Tiqora-CMDB leer ist und Znuny ITSM
   erkannt wird (sonst Fehler `mode_transition_not_allowed`).
@@ -573,7 +574,7 @@ Die Prozess-Aktion `LinkAdd` richtet sich nach dem ITSM-Modus, sobald ein Ende `
 
 | Modus | Verhalten |
 |---|---|
-| `tiqora` | Die Verknüpfung läuft über den CMDB-Link-Dienst, mit denselben Rechten wie die API: `rw` auf der Queue des Tickets und `ro` auf der CI-Klasse, geprüft für den Prozess-Benutzer (`UserID` der Aktion, sonst der Agent). |
+| `tiqora` | Die Verknüpfung läuft über den CMDB-Link-Dienst, mit denselben Rechten wie die API: `rw` auf der Queue des Tickets und `ro` auf der CI-Klasse; jede andere Verknüpfung (etwa CI zu CI) verlangt `rw` auf der Klasse jedes CI-Endes; geprüft für den Prozess-Benutzer (`UserID` der Aktion, sonst der Agent). |
 | `znuny_readthrough` | Wie bisher: Znuny-Verknüpfung (`link_relation`). Lehnt Znunys Regel die Verknüpfung ab, wird das wie in Znuny nur protokolliert; die Aktion steht nicht in `skipped_actions`. |
 | `off` | Die Aktion wird übersprungen (Grund `itsm_off`), Ticket-zu-Ticket-Verknüpfungen funktionieren weiter. |
 

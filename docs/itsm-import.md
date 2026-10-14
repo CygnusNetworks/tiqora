@@ -715,7 +715,7 @@ aktiv ist. Der Worker muss laufen, sonst wartet der Befehl.
 | `GET /runs?limit=` und `GET /runs/{id}` | Läufe (1 bis 100, Vorgabe 20) und ein Lauf mit Bericht |
 | `POST /switch` | Umstellung auf Tiqora: `confirm` = `UMSTELLEN`, `addon_installed`, `edits_stopped`, `without_ci_data`; verlangt einen erfolgreichen Import (außer bei `without_ci_data`) und entweder die Erweiterung oder die Bestätigung, dass in Znuny nichts mehr bearbeitet wird; `without_ci_data` nur bei nicht lesbarer Version (sonst 409); falsches Bestätigungswort: 400 |
 | `POST /rollback` | Zurück zu Modus A: `confirm` = `ZURÜCK` (auch `ZURUECK`); falsches Bestätigungswort: 400 |
-| `POST /release-lock` | „Sperre aufheben“: löscht eine hängende Schreibsperre, nicht während eines Auftrags und nicht nach der Umstellung |
+| `POST /release-lock` | „Sperre aufheben“: hebt eine hängende Schreibsperre auf (`itsm.znuny_readonly` = `0`), nicht während eines Auftrags und nicht nach der Umstellung |
 
 Über Seite und API sind ein Probelauf und ein Import nur im Modus „Znuny führt das ITSM“ (Modus A,
 `znuny_readthrough`) möglich. Die Befehlszeile prüft nur Umstellung und aktiven Lauf; Modus und

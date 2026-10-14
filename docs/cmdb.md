@@ -344,7 +344,7 @@ Treffer und keinen Fehler. `query` durchsucht in Modus A zusätzlich Attributwer
 | Modus | `cmdb_search`, `cmdb_get` | `cmdb_impact` |
 |---|---|---|
 | B (`tiqora`) | aus der Tiqora-CMDB | aus der Tiqora-CMDB |
-| A (`znuny_readthrough`) | über den schreibgeschützten Znuny-Durchgriff | Fehler: die Analyse braucht die Tiqora-CMDB, verwenden Sie `cmdb_search` und `cmdb_get` |
+| A (`znuny_readthrough`) | schreibgeschützt aus den ITSM-Tabellen von Znuny (Modus „Znuny führt das ITSM“) | Fehler: die Analyse braucht die Tiqora-CMDB, verwenden Sie `cmdb_search` und `cmdb_get` |
 | aus (`off`) | Fehler „ITSM is switched off on this site“ | Fehler, wie links |
 
 **Rechte.** Die Sichtbarkeit folgt der Znuny-Gruppe der Klasse (siehe „Berechtigungen“): Der
