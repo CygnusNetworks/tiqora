@@ -960,11 +960,11 @@ async def test_pii_ner_enabled_masks_third_party_name_mentioned_in_body(
 async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
     mariadb_znuny_url: str,
 ) -> None:
-    """In production, an invalidated placeholder customer_user ("Invalid User")
-    and the queue's own sender display name ("Netadmin CampusNet Nord") became
+    """An invalidated placeholder customer_user ("Invalid User") and the
+    queue's own sender display name ("Support Example Campus") used to become
     name-masking candidates, so every "user" (including the ``"user": {`` key
-    of a diagnose_connection result and the KB text about it), "CampusNet" and
-    "Bonn" reached the model as [NAME_n] — and the ticket number as [PHONE_n].
+    of a diagnose_connection result and the KB text about it), "Example" and
+    "Campus" reached the model as [NAME_n] — and the ticket number as [PHONE_n].
     A real person's From-header name must still be masked."""
     seed = _seed_ticket(mariadb_znuny_url, ns=17)
     sys_addr_id = 9717
@@ -978,7 +978,7 @@ async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
             text(
                 "INSERT INTO system_address (id, value0, value1, queue_id, valid_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (:id, :addr, 'Netadmin CampusNet Nord', :qid, 1, :t, 1, :t, 1)"
+                " VALUES (:id, :addr, 'Support Example Campus', :qid, 1, :t, 1, :t, 1)"
             ),
             {"id": sys_addr_id, "addr": sys_addr, "qid": seed["queue_id"], "t": NOW},
         )
@@ -1003,10 +1003,10 @@ async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
         mariadb_znuny_url,
         ticket_id=seed["ticket_id"],
         sender_type="agent",
-        a_from=f"Netadmin CampusNet Nord <{sys_addr}>",
+        a_from=f"Support Example Campus <{sys_addr}>",
         subject=f"[Cygnus#{seed['tn']}] Re: network",
         body=(
-            f"Ref [Cygnus#{seed['tn']}]. CampusNet Nord: diagnose shows"
+            f"Ref [Cygnus#{seed['tn']}]. Example Campus: diagnose shows"
             ' "user": {"active": 0, "free_traffic": 6597069766656}'
         ),
     )
@@ -1029,7 +1029,7 @@ async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
         assert sent is not None
         assert "Lin Mei" not in sent
         assert '"user": {"active": 0' in sent
-        assert "CampusNet Nord" in sent
+        assert "Example Campus" in sent
         assert f"[Cygnus#{seed['tn']}]" in sent
         assert "6597069766656" in sent
     finally:
@@ -1042,7 +1042,7 @@ async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
 
 
 def test_length_guidance_counts_the_whole_conversation_on_incremental_runs() -> None:
-    """Prod ticket 40005: a two-character "Ja" as the only new article used to
+    """A production ticket: a two-character "Ja" as the only new article used to
     cap the whole summary at three sentences, run after run."""
     from tiqora.ai.context import ArticleSnapshot
     from tiqora.ai.summary import _length_guidance

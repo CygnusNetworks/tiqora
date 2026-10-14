@@ -253,8 +253,8 @@ def _length_guidance(
     # The sentence budget is for the whole summary, so it is measured on the
     # whole conversation: measured on an incremental run's new articles alone,
     # a two-character "Ja" squeezed the entire summary into three sentences,
-    # and run by run the customer's original problem dropped out (prod ticket
-    # 40005). Documents still count only for this run's new blocks — earlier
+    # and run by run the customer's original problem dropped out (seen on a
+    # production ticket). Documents still count only for this run's new blocks — earlier
     # ones are carried over by the system prompt's rule.
     conversation = conversation_articles if conversation_articles is not None else rendered_articles
     mail_chars = sum(len(a.body or "") for a in conversation)

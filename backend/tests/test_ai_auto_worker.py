@@ -522,7 +522,7 @@ async def test_ticket_cap_hands_the_waiting_customer_to_a_human(
     ns: int,
     state_kwargs: dict[str, int],
 ) -> None:
-    """Prod ticket 40006: after two clarifying questions the AI stopped
+    """A production ticket: after two clarifying questions the AI stopped
     answering ("max_clarifications"), but nothing marked the ticket, so the
     customer's next messages sat unanswered while the queue's "Escalated"
     filter showed 0. A per-ticket cap is a handoff: flag it and leave a note."""

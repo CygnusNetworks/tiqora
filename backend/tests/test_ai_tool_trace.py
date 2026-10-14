@@ -83,12 +83,12 @@ def test_parse_tool_trace_carries_call_arguments() -> None:
                 "tool_call_id": "a",
                 "name": "kb_search",
                 "content": "3 Treffer",
-                "arguments": '{"query": "IPTV CampusNet"}',
+                "arguments": '{"query": "IPTV Campus"}',
             }
         ]
     )
     (step,) = parse_tool_trace(raw)
-    assert step.arguments == '{"query": "IPTV CampusNet"}'
+    assert step.arguments == '{"query": "IPTV Campus"}'
 
 
 def test_parse_tool_trace_reads_traces_recorded_before_arguments_existed() -> None:
@@ -150,7 +150,7 @@ def test_encode_tool_trace_leaves_a_small_trace_alone() -> None:
 
 
 def test_encode_tool_trace_keeps_real_runs_whole() -> None:
-    """Prod ticket 2026010110000003: the ~18,000-character diagnose_connection
+    """A production ticket: the ~18,000-character diagnose_connection
     result was cut to 4,000 characters for the old 64 KiB TEXT column, so it
     showed up mid-object and could not be rendered as JSON. Real runs (here:
     eleven full KB articles plus a big JSON result) are stored unchanged."""

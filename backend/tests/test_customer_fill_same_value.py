@@ -18,8 +18,8 @@ from tiqora.domain.customer_fill import differing_fields, same_value
         ("first_name", "Anna  Maria", "Anna Maria", True),
         ("last_name", "Beispiel", "Muster", False),
         ("email", "Anna@Example.org", "anna@example.org", True),
-        ("phone", "0228 5550121", "+49 228 401200", True),
-        ("phone", "0049 228 401200", "+49 (228) 401-200", True),
+        ("phone", "0228 5550121", "+49 228 5550121", True),
+        ("phone", "0049 228 5550121", "+49 (228) 555-0121", True),
         ("mobile", "+49 170 1234567", "+49 171 1234567", False),
         # Too short to tell a trunk prefix from a different number.
         ("phone", "123", "49123", False),

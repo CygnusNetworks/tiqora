@@ -3,10 +3,10 @@ import { validateDialSearch } from "./dialSearch";
 
 describe("validateDialSearch", () => {
   it("accepts a numeric number (JSON-parsed query value)", () => {
-    expect(validateDialSearch({ number: 491717630944 }).number).toBe("491717630944");
+    expect(validateDialSearch({ number: 491715550199 }).number).toBe("491715550199");
   });
   it("keeps an E.164 string unchanged and trims", () => {
-    expect(validateDialSearch({ number: "+491717630944" }).number).toBe("+491717630944");
+    expect(validateDialSearch({ number: "+491715550199" }).number).toBe("+491715550199");
     expect(validateDialSearch({ number: " +49 " }).number).toBe("+49");
   });
   it("defaults number to empty", () => {

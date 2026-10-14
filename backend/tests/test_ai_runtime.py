@@ -388,7 +388,7 @@ def test_resolve_reply_language_returns_the_bare_code_for_the_identity_exchange(
 
 
 def test_identity_system_prompt_carries_the_language_line_after_the_tone() -> None:
-    """Prod ticket 40005: the German Telegram tone addendum alone made the
+    """A production ticket: the German Telegram tone addendum alone made the
     model ask an English-writing customer for their identity in German."""
     fields = parse_clarify_schema(
         TiqoraAiQueuePolicy(
@@ -2948,7 +2948,7 @@ _CLARIFY_SCHEMA_PHONE_ZIP = (
 async def test_identity_exchange_sees_values_split_over_several_messages(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Prod ticket 40006: a Telegram customer sent the WP number and the PKZ as
+    """A production ticket: a Telegram customer sent the WP number and the PKZ as
     two messages. The exchange only saw the latest one, so it asked for both
     again after each message; only "<wpn> and <pkz>" in one message passed."""
     seed = _seed_ticket(mariadb_znuny_url, ns=87)
@@ -3570,7 +3570,7 @@ async def _run_no_reply(
 
 
 async def test_no_reply_resolved_closes_the_ticket(mariadb_znuny_url: str) -> None:
-    """Prod ticket 2026010110000002: the AI reply closed the ticket, the
+    """A production ticket: the AI reply closed the ticket, the
     customer's "resolved now, thanks" reopened it, and the run ended in
     no_reply_needed — leaving an open ticket with nothing left to do."""
     state_id = await _run_no_reply(

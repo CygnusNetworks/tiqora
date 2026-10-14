@@ -19,7 +19,7 @@ describe("parseKeyed / isFilterComposition", () => {
     expect(isFilterComposition("q")).toBe(true);
     expect(isFilterComposition("que")).toBe(true);
     expect(isFilterComposition("queue")).toBe(true);
-    expect(isFilterComposition("queue:stw")).toBe(true);
+    expect(isFilterComposition("queue:bsp")).toBe(true);
     expect(isFilterComposition("kunde")).toBe(true);
   });
 
@@ -51,7 +51,7 @@ describe("matchQueues / uniqueQueueMatch", () => {
   });
 
   it("returns null when ambiguous", () => {
-    expect(uniqueQueueMatch(queues, "stw")).toBeNull();
+    expect(uniqueQueueMatch(queues, "bsp")).toBeNull();
   });
 });
 
@@ -99,8 +99,8 @@ describe("detectQueryType", () => {
   it("returns null for empty input and while a filter token is composed", () => {
     expect(detectQueryType("")).toBeNull();
     expect(detectQueryType("   ")).toBeNull();
-    // "queue:stw" belongs to the chip typeahead, not to type detection.
-    expect(detectQueryType("queue:stw")).toBeNull();
+    // "queue:bsp" belongs to the chip typeahead, not to type detection.
+    expect(detectQueryType("queue:bsp")).toBeNull();
   });
 
   it("falls back to free text", () => {

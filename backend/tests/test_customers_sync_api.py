@@ -118,19 +118,19 @@ async def test_create_without_email_and_first_name(mariadb_znuny_url: str) -> No
         resp = await client.post(
             "/api/v1/customers",
             json={
-                "login": _PREFIX + "tel-491717630944",
-                "last_name": "Kettler",
-                "customer_id": _PREFIX + "tel-491717630944",
-                "mobile": "+491717630944",
+                "login": _PREFIX + "tel-491715550199",
+                "last_name": "Mustermann",
+                "customer_id": _PREFIX + "tel-491715550199",
+                "mobile": "+491715550199",
                 "comments": "Angelegt vom KI-Sekretariat, ungeprüft",
             },
         )
     await engine.dispose()
     assert resp.status_code == 201, resp.text
     assert resp.json()["email"] == ""
-    row = _row(mariadb_znuny_url, _PREFIX + "tel-491717630944")
+    row = _row(mariadb_znuny_url, _PREFIX + "tel-491715550199")
     assert row["first_name"] == ""
-    assert row["mobile"] == "+491717630944"
+    assert row["mobile"] == "+491715550199"
     assert row["comments"] == "Angelegt vom KI-Sekretariat, ungeprüft"
 
 
@@ -155,12 +155,12 @@ async def test_create_with_existing_email_is_409_with_login(mariadb_znuny_url: s
 async def test_create_company_and_conflict(mariadb_znuny_url: str) -> None:
     _seed(mariadb_znuny_url)
     client, engine = await _client(mariadb_znuny_url)
-    body = {"customer_id": "CUSTSYNC Studierendenwerk", "name": "CUSTSYNC Studierendenwerk"}
+    body = {"customer_id": "CUSTSYNC Beispiel-Werk", "name": "CUSTSYNC Beispiel-Werk"}
     async with client:
         first = await client.post("/api/v1/customers/companies", json=body)
         second = await client.post("/api/v1/customers/companies", json=body)
         found = await client.get(
-            "/api/v1/reference/customer-search", params={"q": "CUSTSYNC Studierendenwerk"}
+            "/api/v1/reference/customer-search", params={"q": "CUSTSYNC Beispiel-Werk"}
         )
     await engine.dispose()
     sync = create_engine(mariadb_znuny_url)
@@ -173,7 +173,7 @@ async def test_create_company_and_conflict(mariadb_znuny_url: str) -> None:
     assert first.status_code == 201, first.text
     assert first.json() == body
     assert second.status_code == 409
-    assert [c["customer_id"] for c in found.json()["companies"]] == ["CUSTSYNC Studierendenwerk"]
+    assert [c["customer_id"] for c in found.json()["companies"]] == ["CUSTSYNC Beispiel-Werk"]
 
 
 async def test_patch_fills_only_empty_fields(mariadb_znuny_url: str) -> None:

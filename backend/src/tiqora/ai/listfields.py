@@ -2,7 +2,7 @@
 
 ``kb_tags`` / ``kb_category_ids`` / ``mcp_client_ids`` are Text columns whose
 canonical format is a JSON array, but the admin frontend has historically
-saved comma-separated strings (``"21,22"`` / ``"campusnet, netz"``) and prod
+saved comma-separated strings (``"21,22"`` / ``"campus, netz"``) and production
 rows exist in both shapes. ``json.loads`` on those either crashes
 (``JSONDecodeError`` on ``"a,b"``) or silently yields a scalar
 (``json.loads("2") == 2`` → ``.in_(2)`` → SQLAlchemy ArgumentError), which

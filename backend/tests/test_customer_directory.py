@@ -393,9 +393,9 @@ _EDIT_BODY = {
     "customer_id": "CUSTDIR-GX",
     "phone": "0228 555 0100",
     "mobile": "",
-    "street": "Am Hof 1",
-    "zip": "53113",
-    "city": "Bonn",
+    "street": "Beispielstr. 1",
+    "zip": "12345",
+    "city": "Musterstadt",
     "comments": "",
 }
 
@@ -427,7 +427,7 @@ async def test_edit_customer_overwrites_and_clears(seeded: str) -> None:
     assert body["email"] == "laura.new@custdir.example"
     assert body["customer_id"] == "CUSTDIR-GX"
     assert body["company_name"] == "Custdir Globex"
-    assert body["city"] == "Bonn"
+    assert body["city"] == "Musterstadt"
     # Empty optional fields clear the column (the seed had no mobile; phone replaced).
     assert body["phone"] == "0228 555 0100"
     assert body["mobile"] is None

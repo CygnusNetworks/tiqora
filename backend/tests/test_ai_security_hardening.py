@@ -273,7 +273,7 @@ def test_strip_markdown_bold_removes_markers_keeps_bullets() -> None:
 def test_strip_hallucinated_signoff_keeps_english_closing_drops_placeholder() -> None:
     body = (
         "Please try this: connect your router directly to the wall socket.\n\n"
-        "Best regards,\n[Your Name]\nCampus Nord – CampusNet Support"
+        "Best regards,\n[Your Name]\nSupport Example Campus"
     )
     assert strip_hallucinated_signoff(body) == (
         "Please try this: connect your router directly to the wall socket.\n\nBest regards,"
@@ -285,8 +285,8 @@ def test_strip_hallucinated_signoff_keeps_with_best_regards_drops_queue_footer()
         "Please use a router from the tested list.\n\n"
         "With best regards\n\n"
         "--\n"
-        "Alex Example - NetAdmin CampusNet Nord - netadmin@campus.example.org\n"
-        "CampusNet Hotline 0228-1234567"
+        "Alex Example - NetAdmin Support Example Campus - netadmin@campus.example.org\n"
+        "Support Hotline 030 5550100"
     )
     assert strip_hallucinated_signoff(body) == (
         "Please use a router from the tested list.\n\nWith best regards"
@@ -347,8 +347,8 @@ async def test_propose_customer_message_strips_hallucinated_signoff() -> None:
             "kind": "reply",
             "body": (
                 "Hi Christina,\n\nI've checked your connection and there's no port "
-                "lock in place.\n\nBest regards,\n[Your Name]\nCampus Nord – CampusNet "
-                "Support"
+                "lock in place.\n\nBest regards,\n[Your Name]\nSupport Example "
+                "Campus"
             ),
         },
     )

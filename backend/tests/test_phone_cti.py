@@ -231,14 +231,14 @@ async def test_hangup_ends_call_and_keeps_number_and_users() -> None:
 async def test_click_to_dial_call_follows_the_dialplan_events() -> None:
     redis = _FakeRedis()
     registered = await cti.register_dialed_call(
-        cast(Any, redis), call_id="tiqora-1", user_id=7, extension="100", number="01717630944"
+        cast(Any, redis), call_id="tiqora-1", user_id=7, extension="100", number="01715550199"
     )
     assert registered.click_to_dial is True
     assert registered.state == "ringing"
     assert registered.ringing_at is None
 
     # Agent picked up the desk phone, the PBX dials out.
-    await _event(redis, "ringing", call_id="tiqora-1", number="01717630944")
+    await _event(redis, "ringing", call_id="tiqora-1", number="01715550199")
     # The trunk leg answers: its extension maps to nobody.
     await _event(redis, "answered", call_id="tiqora-1", ext="", at=T0 + timedelta(seconds=8))
     result = await _event(
@@ -259,7 +259,7 @@ async def test_click_to_dial_call_follows_the_dialplan_events() -> None:
 async def test_click_to_dial_hung_up_before_answer_has_no_answered_at() -> None:
     redis = _FakeRedis()
     await cti.register_dialed_call(
-        cast(Any, redis), call_id="tiqora-2", user_id=7, extension="100", number="01717630944"
+        cast(Any, redis), call_id="tiqora-2", user_id=7, extension="100", number="01715550199"
     )
     await _event(redis, "ringing", call_id="tiqora-2")
     await _event(redis, "hangup", call_id="tiqora-2", ext=None, at=T0 + timedelta(seconds=20))

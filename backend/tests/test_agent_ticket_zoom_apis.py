@@ -332,8 +332,8 @@ async def test_agent_create_customer_user(mariadb_znuny_url: str) -> None:
         "last_name": "Customer",
         "customer_id": "ZOOMAPI",
         "phone": "+49 30 123",
-        "street": "Am Hof 1",
-        "city": "Bonn",
+        "street": "Beispielstr. 1",
+        "city": "Musterstadt",
         "zip": "  ",
     }
     async with client:
@@ -361,7 +361,7 @@ async def test_agent_create_customer_user(mariadb_znuny_url: str) -> None:
     assert login in logins
     assert dup_resp.status_code == 409
     detail = detail_resp.json()
-    assert (detail["street"], detail["city"]) == ("Am Hof 1", "Bonn")
+    assert (detail["street"], detail["city"]) == ("Beispielstr. 1", "Musterstadt")
     # Blank optional fields are stored as NULL.
     assert detail["zip"] is None
 

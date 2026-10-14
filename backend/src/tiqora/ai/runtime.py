@@ -802,7 +802,7 @@ def _build_identity_system_prompt(
         parts.append(tone_prompt)
     if reply_language_line:
         # Without it the model follows the (German) Telegram tone addendum
-        # and asks an English-writing customer in German (prod ticket 40005).
+        # and asks an English-writing customer in German (seen in production).
         # Last, so it wins over the tone, which only describes style.
         parts.append(
             f"{reply_language_line}\nWrite the message in this language; the tone "
@@ -822,7 +822,7 @@ def _build_identity_user_message(articles: list[ArticleSnapshot], chat_id: int |
     the latest customer message plus up to
     :data:`_IDENTITY_EARLIER_MESSAGES` earlier ones from the same chat
     (``<chat_id>@telegram.invalid`` sender). The earlier ones are there
-    because customers send the fields one per message (prod ticket 40006)."""
+    because customers send the fields one per message (seen in production)."""
     customer = [a for a in articles if a.sender_type == "customer"]
     latest = customer[-1] if customer else None
     parts: list[str] = []
@@ -1933,7 +1933,7 @@ async def run_ticket_agent(
             await session.commit()
             # "Thanks, works now" reopens a ticket the AI reply had closed
             # (Znuny follow-up). Without this it stays open with nothing left
-            # to do (prod ticket 2026010110000002). Same policy gate as after
+            # to do (seen in production). Same policy gate as after
             # a sent reply; Manual Assist never changes the state.
             if (
                 outcome.no_reply_resolved

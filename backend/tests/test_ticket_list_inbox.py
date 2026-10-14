@@ -399,7 +399,7 @@ async def test_facet_counts(url_fixture: str, request: pytest.FixtureRequest) ->
 async def test_escalated_filter_includes_ai_handoffs(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
-    """Prod ticket 40006: the AI handed a Telegram chat to a human, but the
+    """A production ticket: the AI handed a Telegram chat to a human, but the
     queue's "Escalated" chip only knew SLA deadlines and showed 0. A ticket
     the AI handed over needs a human just as much, so the chip and its
     filter count it too."""

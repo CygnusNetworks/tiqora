@@ -195,9 +195,9 @@ def test_zulu_timestamps_in_tool_results_are_not_masked_as_ipv6() -> None:
     ):
         assert mapper.mask(text) == text
     # A real IPv6 next to a Zulu timestamp is still masked.
-    masked = mapper.mask('{"at": "2026-09-10T14:36:36Z", "ip": "2001:db8:4d5c::1"}')
+    masked = mapper.mask('{"at": "2026-09-10T14:36:36Z", "ip": "2001:db8::1"}')
     assert "2026-09-10T14:36:36Z" in masked
-    assert "2001:db8:4d5c::1" not in masked
+    assert "2001:db8::1" not in masked
 
 
 def test_json_number_values_are_not_masked_as_phone() -> None:

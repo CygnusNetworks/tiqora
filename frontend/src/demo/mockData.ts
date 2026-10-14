@@ -1360,7 +1360,7 @@ const COMPANY_NAMES: Record<string, string> = { ACME: "Acme Corporation", NORTHW
 const adminCustomerUsers = CUSTOMERS.map((c, i) => ({ id: i + 1, login: c.login, email: c.login, customer_id: c.cid, company_name: COMPANY_NAMES[c.cid] ?? null, title: null, first_name: c.name.split(" ")[0], last_name: c.name.split(" ")[1], phone: `+49 228 401 2${i}0`, valid_id: 1, create_time: t0, change_time: t0 }));
 const directoryEntries = [...adminCustomerUsers]
   .sort((a, b) => a.last_name.localeCompare(b.last_name))
-  .map((c) => ({ login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name, title: null, first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: null, city: "Bonn", valid_id: 1 }));
+  .map((c) => ({ login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name, title: null, first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: null, city: "Musterstadt", valid_id: 1 }));
 // Customer keys: only Jane Doe has one, like the rare real case.
 const demoCustomerCryptoKeys = (login: string) => ({
   pgp_enabled: true,
@@ -1382,7 +1382,7 @@ const demoCustomerDetail = (login: string) => {
     login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name,
     first_name: c.first_name, last_name: c.last_name, title: c.customer_id === "ACME" ? "IT-Leitung" : null,
     phone: c.phone, mobile: c.login.startsWith("j.doe") ? "+49 171 555 2210" : null,
-    street: "Am Hof 1", zip: "53113", city: "Bonn", country: null, comments: null, valid_id: 1,
+    street: "Beispielstr. 1", zip: "12345", city: "Musterstadt", country: null, comments: null, valid_id: 1,
   };
 };
 const shortlistEntry = (login: string, minutesAgo: number, channel: string, count: number) => {
@@ -1416,8 +1416,8 @@ const customerShortlist = {
   ],
 };
 const demoCompanyDetail = (customerId: string) => ({
-  customer_id: customerId, name: COMPANY_NAMES[customerId] ?? customerId, street: "Am Hof 1", zip: "53113",
-  city: "Bonn", country: null, url: null, comments: null, valid_id: 1,
+  customer_id: customerId, name: COMPANY_NAMES[customerId] ?? customerId, street: "Beispielstr. 1", zip: "12345",
+  city: "Musterstadt", country: null, url: null, comments: null, valid_id: 1,
   contact_count: adminCustomerUsers.filter((c) => c.customer_id === customerId).length,
 });
 

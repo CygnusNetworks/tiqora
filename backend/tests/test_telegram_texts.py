@@ -20,7 +20,7 @@ def test_normalize_language_keeps_the_primary_subtag() -> None:
 
 
 def test_customer_language_prefers_what_the_customer_wrote() -> None:
-    # Prod ticket 40005: an English message from a German-configured setup.
+    # A production ticket: an English message from a German-configured setup.
     english = "i have activated my internet access via my router but am unable to connect"
     assert customer_language(english, "de") == "en"
     assert customer_language("Ich habe kein Internet mehr, bitte helft mir", "en") == "de"

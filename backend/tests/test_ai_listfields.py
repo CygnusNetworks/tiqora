@@ -36,16 +36,16 @@ def test_parse_int_list_empty_and_garbage() -> None:
 
 
 def test_parse_str_list_json_array() -> None:
-    assert parse_str_list('["campusnet", "netz"]') == ["campusnet", "netz"]
+    assert parse_str_list('["campus", "netz"]') == ["campus", "netz"]
 
 
 def test_parse_str_list_csv() -> None:
-    assert parse_str_list("campusnet, netz") == ["campusnet", "netz"]
+    assert parse_str_list("campus, netz") == ["campus", "netz"]
 
 
 def test_parse_str_list_single_word() -> None:
     # A bare word is not valid JSON — must fall back to CSV, not crash.
-    assert parse_str_list("campusnet") == ["campusnet"]
+    assert parse_str_list("campus") == ["campus"]
 
 
 def test_parse_str_list_empty() -> None:

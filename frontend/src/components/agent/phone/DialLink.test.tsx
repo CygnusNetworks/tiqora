@@ -32,13 +32,13 @@ describe("DialLink click-to-dial", () => {
   it("dials through the PBX when originate is on", async () => {
     const dialSpy = vi
       .spyOn(phoneApi, "dial")
-      .mockResolvedValue({ extension: "60", number: "01717630944", ring_timeout: 30 });
+      .mockResolvedValue({ extension: "60", number: "01715550199", ring_timeout: 30 });
     const onDial = vi.fn();
     renderLink(
       {
-        number: "+49 171 7630944",
+        number: "+49 171 5550199",
         testId: "d",
-        name: "Kettler",
+        name: "Mustermann",
         ticketId: 5,
         onDial,
       },
@@ -46,9 +46,9 @@ describe("DialLink click-to-dial", () => {
     );
     fireEvent.click(screen.getByTestId("d"));
     expect(dialSpy).toHaveBeenCalledWith({
-      number: "+49 171 7630944",
+      number: "+49 171 5550199",
       ticket_id: 5,
-      name: "Kettler",
+      name: "Mustermann",
     });
     expect(await screen.findByTestId("d-status")).toHaveTextContent("60");
     expect(onDial).toHaveBeenCalled();

@@ -91,15 +91,15 @@ async def _dial(app: Any, body: dict[str, Any]) -> Any:
 async def test_dial_rings_the_agents_extension(monkeypatch: pytest.MonkeyPatch) -> None:
     orig = AsyncMock(return_value=None)
     app = _app(monkeypatch, originate=orig)
-    resp = await _dial(app, {"number": "+49 171 7630944", "name": "Kettler"})
+    resp = await _dial(app, {"number": "+49 171 5550199", "name": "Mustermann"})
     assert resp.status_code == 202, resp.text
     assert resp.json() == {
         "extension": "60",
-        "number": "01717630944",
+        "number": "01715550199",
         "call_id": None,
         "ring_timeout": 30,
     }
-    orig.assert_awaited_once_with(CFG, "60", "01717630944", "Kettler", channel_id=None)
+    orig.assert_awaited_once_with(CFG, "60", "01715550199", "Mustermann", channel_id=None)
 
 
 async def test_dial_tracks_the_call_with_originate_cti(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -107,7 +107,7 @@ async def test_dial_tracks_the_call_with_originate_cti(monkeypatch: pytest.Monke
     orig = AsyncMock(return_value=None)
     cfg = dataclasses.replace(CFG, track_calls=True)
     app = _app(monkeypatch, config=cfg, originate=orig, redis_client=redis)
-    resp = await _dial(app, {"number": "01717630944", "ticket_id": 5})
+    resp = await _dial(app, {"number": "01715550199", "ticket_id": 5})
     assert resp.status_code == 202, resp.text
     call_id = resp.json()["call_id"]
     assert call_id.startswith("tiqora-")
@@ -128,23 +128,23 @@ async def test_dial_untracked_when_the_call_state_store_fails(
 ) -> None:
     cfg = dataclasses.replace(CFG, track_calls=True)
     app = _app(monkeypatch, config=cfg, redis_client=_Redis(fail_calls=True))
-    resp = await _dial(app, {"number": "01717630944"})
+    resp = await _dial(app, {"number": "01715550199"})
     assert resp.status_code == 202
     assert resp.json()["call_id"] is None
 
 
 async def test_dial_rejects_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
-    resp = await _dial(_app(monkeypatch, auth_method="api_key"), {"number": "01717630944"})
+    resp = await _dial(_app(monkeypatch, auth_method="api_key"), {"number": "01715550199"})
     assert resp.status_code == 403
 
 
 async def test_dial_404_when_switched_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    resp = await _dial(_app(monkeypatch, config=None), {"number": "01717630944"})
+    resp = await _dial(_app(monkeypatch, config=None), {"number": "01715550199"})
     assert resp.status_code == 404
 
 
 async def test_dial_409_without_extension(monkeypatch: pytest.MonkeyPatch) -> None:
-    resp = await _dial(_app(monkeypatch, extensions=[]), {"number": "01717630944"})
+    resp = await _dial(_app(monkeypatch, extensions=[]), {"number": "01715550199"})
     assert resp.status_code == 409
 
 
@@ -158,15 +158,15 @@ async def test_dial_429_within_five_seconds(monkeypatch: pytest.MonkeyPatch) -> 
 
     app = _app(monkeypatch)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        first = await client.post("/api/v1/phone/dial", json={"number": "01717630944"})
-        second = await client.post("/api/v1/phone/dial", json={"number": "01717630944"})
+        first = await client.post("/api/v1/phone/dial", json={"number": "01715550199"})
+        second = await client.post("/api/v1/phone/dial", json={"number": "01715550199"})
     assert first.status_code == 202
     assert second.status_code == 429
 
 
 async def test_dial_502_when_ari_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     orig = AsyncMock(side_effect=OriginateError("ARI 400: Endpoint not found"))
-    resp = await _dial(_app(monkeypatch, originate=orig), {"number": "01717630944"})
+    resp = await _dial(_app(monkeypatch, originate=orig), {"number": "01715550199"})
     assert resp.status_code == 502
 
 
@@ -177,8 +177,8 @@ async def test_dial_502_frees_the_rate_limit_slot(monkeypatch: pytest.MonkeyPatc
     orig = AsyncMock(side_effect=[OriginateError("ARI 400: Endpoint not found"), None])
     app = _app(monkeypatch, originate=orig, redis_client=redis)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        failed = await client.post("/api/v1/phone/dial", json={"number": "01717630944"})
+        failed = await client.post("/api/v1/phone/dial", json={"number": "01715550199"})
         assert "tiqora:dial:7" not in redis.keys
-        retry = await client.post("/api/v1/phone/dial", json={"number": "01717630944"})
+        retry = await client.post("/api/v1/phone/dial", json={"number": "01715550199"})
     assert failed.status_code == 502
     assert retry.status_code == 202

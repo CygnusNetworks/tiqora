@@ -58,7 +58,7 @@ def same_value(name: str, current: str, incoming: str) -> bool:
     """Whether two values of field *name* mean the same.
 
     Case and spacing never count; phone numbers compare by digits, and
-    "0228 5550121" equals "+49 228 401200" (the shorter, without its trunk
+    "0228 5550121" equals "+49 228 5550121" (the shorter, without its trunk
     zero, ends the longer one).
     """
     if name in ("phone", "mobile"):

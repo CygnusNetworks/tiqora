@@ -431,7 +431,7 @@ describe("AiQueuePolicyEditorPage", () => {
 
     expect(screen.getByTestId("admin-ai-queue-form-enabled_triage")).not.toBeChecked();
     fireEvent.change(screen.getByTestId("admin-ai-queue-form-routing_description"), {
-      target: { value: "Mentoren-Team" },
+      target: { value: "Gremienbetreuung" },
     });
     fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
 
@@ -439,7 +439,7 @@ describe("AiQueuePolicyEditorPage", () => {
       expect(updateQueuePolicy).toHaveBeenCalledWith(
         1,
         expect.objectContaining({
-          routing_description: "Mentoren-Team",
+          routing_description: "Gremienbetreuung",
           enabled_triage: false,
         }),
       );

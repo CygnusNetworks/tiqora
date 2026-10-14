@@ -300,9 +300,9 @@ def test_single_sample_uses_self_report_alone() -> None:
 
 
 def test_reason_comes_from_a_winning_vote() -> None:
-    votes = [_vote("q_57", 90, ""), _vote("q_57", 90, "netzkoordinator-thema")]
+    votes = [_vote("q_57", 90, ""), _vote("q_57", 90, "orga-thema")]
     _winner, _confidence, reason, _dist = aggregate_votes(votes, OFFERED)
-    assert reason == "netzkoordinator-thema"
+    assert reason == "orga-thema"
 
 
 # --------------------------------------------------------------------------

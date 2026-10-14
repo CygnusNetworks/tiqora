@@ -119,7 +119,7 @@ async def _customer_message(sync_url: str, seed: dict[str, Any], body: str) -> i
 async def test_release_answers_n_messages_then_hands_over(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Prod ticket 40006: the clarification cap stopped the AI. A release of 2
+    """A production ticket: the clarification cap stopped the AI. A release of 2
     answers the next two customer messages despite the cap, the third goes to
     the team with a note, and the release is gone."""
     ns = 60

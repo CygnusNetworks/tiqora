@@ -155,7 +155,7 @@ async def _hand_off_capped_ticket(
     """A per-ticket cap ends automation for this ticket while the customer
     still waits for an answer: flag the handoff (so the ticket shows up as
     escalated in the lists) and tell the agents why. Before, the AI just went
-    silent (prod ticket 40006). Later messages skip as ``escalated_to_human``
+    silent (seen on a production ticket). Later messages skip as ``escalated_to_human``
     until someone switches the autopilot back on, so this runs once per
     handoff. ``grant_used``: the release an agent granted is spent."""
     if reason == "grant_used":

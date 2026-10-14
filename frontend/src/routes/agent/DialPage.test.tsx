@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/api";
 import { phoneApi } from "@/lib/phoneApi";
 import { DialPage } from "./DialPage";
 
-let search: { number: string; ticket?: number } = { number: "+491717630944", ticket: 42 };
+let search: { number: string; ticket?: number } = { number: "+491715550199", ticket: 42 };
 
 vi.mock("@tanstack/react-router", () => ({
   useSearch: () => search,
@@ -29,10 +29,10 @@ function renderPage() {
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  search = { number: "+491717630944", ticket: 42 };
+  search = { number: "+491715550199", ticket: 42 };
   vi.spyOn(phoneApi, "phoneConfig").mockResolvedValue({ dial_scheme: "tel", originate: true });
   vi.spyOn(phoneApi, "callerLookup").mockResolvedValue({
-    number_normalized: "491717630944",
+    number_normalized: "491715550199",
     customers: [],
     open_tickets: [],
   });
@@ -40,12 +40,12 @@ beforeEach(() => {
 
 describe("DialPage", () => {
   it("does not dial on load, dials on click", async () => {
-    const dialSpy = vi.spyOn(phoneApi, "dial").mockResolvedValue({ extension: "60", number: "01717630944", ring_timeout: 30 });
+    const dialSpy = vi.spyOn(phoneApi, "dial").mockResolvedValue({ extension: "60", number: "01715550199", ring_timeout: 30 });
     renderPage();
     const button = await screen.findByTestId("dial-page-call");
     expect(dialSpy).not.toHaveBeenCalled();
     fireEvent.click(button);
-    expect(dialSpy).toHaveBeenCalledWith({ number: "+491717630944", ticket_id: 42, name: "" });
+    expect(dialSpy).toHaveBeenCalledWith({ number: "+491715550199", ticket_id: 42, name: "" });
     expect(await screen.findByTestId("dial-page-status")).toBeInTheDocument();
   });
 
@@ -60,7 +60,7 @@ describe("DialPage", () => {
     vi.spyOn(phoneApi, "phoneConfig").mockResolvedValue({ dial_scheme: "tel", originate: false });
     renderPage();
     const link = await screen.findByRole("link", { name: "Call with the phone app" });
-    expect(link).toHaveAttribute("href", "tel:+491717630944");
+    expect(link).toHaveAttribute("href", "tel:+491715550199");
     expect(screen.queryByTestId("dial-page-call")).toBeNull();
   });
 

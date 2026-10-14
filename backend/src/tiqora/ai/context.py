@@ -350,7 +350,7 @@ def _is_generic_name(candidate: str) -> bool:
 
 async def _system_addresses(session: AsyncSession) -> frozenset[str]:
     """Lower-cased addresses of every configured ``system_address`` — our own
-    queue senders, whose display names ("Netadmin CampusNet Nord") name the
+    queue senders, whose display names ("Support Example Campus") name the
     organisation, not a person."""
     rows = await session.execute(text("SELECT value0 FROM system_address"))
     return frozenset(str(r[0]).strip().lower() for r in rows if r[0])
@@ -417,7 +417,7 @@ async def collect_known_names(
 
     Two sources are excluded because the mapper masks every candidate as a
     whole word across the entire prompt: From-headers of our own
-    ``system_address`` senders (organisation names like "CampusNet", "Nord"),
+    ``system_address`` senders (organisation names like "Example", "Campus"),
     and candidates made only of generic words (placeholder customer_user
     "Invalid User", role labels) — see :func:`_is_generic_name`.
     """

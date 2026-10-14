@@ -4,9 +4,8 @@ A reply to our own (German) mail arrives as ``new text`` + ``On <date>, X
 wrote:`` + the whole earlier mail, each line prefixed with ``>``. For the
 model and for the reply-language detector only the new text is the
 customer's voice: the quote is our own earlier answer, so it adds nothing but
-tokens — and it votes for the *previous* language (prod, ticket
-2026000000000001: an English follow-up under a quoted German reply was
-detected as German).
+tokens — and it votes for the *previous* language (a production ticket:
+an English follow-up under a quoted German reply was detected as German).
 
 Deliberately conservative: only the *trailing* quote is removed (attribution
 line + a body that is predominantly ``>`` lines, or an "Original Message"

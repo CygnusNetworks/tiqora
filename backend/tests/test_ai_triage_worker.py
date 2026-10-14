@@ -75,9 +75,9 @@ def _cleanup_triage_settings() -> Any:
         engine.dispose()
 
 
-NETZKOORDINATOR_DESC = (
-    "Organisatorische Betreuung der Mentoren-Team: Wahl, Rechenschaftsberichte, "
-    "Koordination, Konferenz."
+ORGA_DESC = (
+    "Organisatorische Betreuung der Gremien: Wahlen, Rechenschaftsberichte, "
+    "Koordination, Vollversammlung."
 )
 NETADMIN_DESC = (
     "Technischer Support: Anschluss, Router, Sperren, Account, WLAN-Technik, "
@@ -251,7 +251,7 @@ def _seed(sync_url: str, *, ns: int, created: datetime | None = None) -> dict[st
                 {"uid": i["agent_id"], "gid": i["group_id"], "k": key, "t": NOW},
             )
         for qid, name in (
-            (i["source_queue_id"], f"cn-nord-netzkoordinator-86{ns}"),
+            (i["source_queue_id"], f"cn-nord-orga-86{ns}"),
             (i["target_queue_id"], f"cn-nord-86{ns}"),
         ):
             conn.execute(
@@ -371,7 +371,7 @@ async def _setup_policies(
     customer_fix: bool = False,
     customer_fix_threshold: int = 100,
     delay_reply: bool = False,
-    source_description: str = NETZKOORDINATOR_DESC,
+    source_description: str = ORGA_DESC,
     target_description: str | None = NETADMIN_DESC,
 ) -> None:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
@@ -980,8 +980,7 @@ Mit freundlichen Gruessen
 async def test_real_world_tickets_route_to_netadmin_queue(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, ns: int, body: str, subject: str
 ) -> None:
-    """The two production tickets that motivated the feature, both
-    technical and both mis-filed.
+    """Two typical technical tickets, both filed in the wrong queue.
 
     The model is scripted, so this does not test the model's judgement. What
     it does test is that the prompt actually carries the subject and every
@@ -1015,7 +1014,7 @@ async def test_real_world_tickets_route_to_netadmin_queue(
         assert NETADMIN_DESC in prompt, "target routing_description missing from the prompt"
         # The source queue's own description sits under the "stay" option,
         # so staying is argued for as concretely as moving.
-        assert NETZKOORDINATOR_DESC in prompt, "source routing_description missing"
+        assert ORGA_DESC in prompt, "source routing_description missing"
         assert queue_key(ids["target_queue_id"]) in prompt
         assert body.splitlines()[2] in prompt
     finally:
@@ -1187,7 +1186,7 @@ def _ticket_customer(sync_url: str, ticket_id: int) -> tuple[str | None, str | N
 async def test_forwarded_mail_sets_the_original_sender_as_customer(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The shape of a production ticket: a caretaker forwards a
+    """A common ticket shape: a caretaker forwards a
     student's mail, so the postmaster files the caretaker as the customer."""
     ns = 30
     ids = _seed(mariadb_znuny_url, ns=ns, created=datetime.now())
@@ -1197,7 +1196,9 @@ async def test_forwarded_mail_sets_the_original_sender_as_customer(
     llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=95)
     _patch_llm(monkeypatch, llm)
     try:
-        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE")
+        _add_customer_user(
+            mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE"
+        )
         async with factory() as session:
             await _setup_policies(
                 session, ids=ids, auto_threshold=80, customer_fix=True, customer_fix_threshold=90
@@ -1243,7 +1244,9 @@ async def test_ambiguous_email_leaves_the_customer_alone(
     llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=95)
     _patch_llm(monkeypatch, llm)
     try:
-        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE")
+        _add_customer_user(
+            mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE"
+        )
         _add_customer_user(
             mariadb_znuny_url, login=f"twin-{address}", email=address, customer_id="OTHER"
         )
@@ -1332,7 +1335,9 @@ async def test_customer_fix_disabled_records_but_never_writes(
     llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=95)
     _patch_llm(monkeypatch, llm)
     try:
-        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE")
+        _add_customer_user(
+            mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE"
+        )
         async with factory() as session:
             await _setup_policies(session, ids=ids, auto_threshold=80, customer_fix=False)
         await _reset_watermark(factory, mariadb_znuny_url)
@@ -1374,7 +1379,9 @@ async def test_customer_fix_disabled_does_not_open_a_proposal(
     llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=30)
     _patch_llm(monkeypatch, llm)
     try:
-        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE")
+        _add_customer_user(
+            mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE"
+        )
         async with factory() as session:
             await _setup_policies(
                 session, ids=ids, auto_threshold=80, suggest_threshold=50, customer_fix=False
@@ -1419,7 +1426,9 @@ async def test_auto_applied_customer_keeps_the_queue_proposal_open(
     llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=60)
     _patch_llm(monkeypatch, llm)
     try:
-        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE")
+        _add_customer_user(
+            mariadb_znuny_url, login=address, email=address, customer_id="UNI-EXAMPLE"
+        )
         async with factory() as session:
             await _setup_policies(
                 session,

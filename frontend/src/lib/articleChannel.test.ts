@@ -36,7 +36,7 @@ describe("senderDisplayName", () => {
   });
 
   it("strips quotes from a single-quoted display name", () => {
-    expect(senderDisplayName("'Netadmin CampusNet Nord' <n@y.de>")).toBe("Netadmin CampusNet Nord");
+    expect(senderDisplayName("'Support Example Campus' <n@y.de>")).toBe("Support Example Campus");
   });
 
   it("falls back to the bare address when there is no display name", () => {
@@ -59,7 +59,7 @@ describe("initialsFor", () => {
   });
 
   it("takes the first letters of a quoted multi-word name", () => {
-    expect(initialsFor(article("'Netadmin CampusNet Nord' <n@y.de>"))).toBe("NC");
+    expect(initialsFor(article("'Support Example Campus' <n@y.de>"))).toBe("SE");
   });
 
   it("falls back to the local-part of a bare address", () => {
@@ -189,8 +189,8 @@ describe("formatFromAddress / formatToAddresses", () => {
 
   it("re-renders each recipient in a comma-joined To header without quotes", () => {
     expect(
-      formatToAddresses('"Muster, Erika" <l@x.de>, \'Netadmin CampusNet Nord\' <n@y.de>'),
-    ).toBe("Muster, Erika <l@x.de>, Netadmin CampusNet Nord <n@y.de>");
+      formatToAddresses('"Muster, Erika" <l@x.de>, \'Support Example Campus\' <n@y.de>'),
+    ).toBe("Muster, Erika <l@x.de>, Support Example Campus <n@y.de>");
   });
 
   it("stays unquoted where formatRecipient would quote for the wire", () => {

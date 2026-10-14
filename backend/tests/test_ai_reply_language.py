@@ -109,10 +109,10 @@ _QUOTED_GERMAN_REPLY = (
 
 
 def test_english_followup_under_quoted_german_reply_is_english() -> None:
-    """Prod ticket 2026000000000001: the quoted German AI answer and the German
+    """A production ticket: the quoted German AI answer and the German
     subject outvoted the customer's new English text."""
     lang = detect_reply_language(
-        "Re: [Cygnus#2026000000000001] Re: Keine Internetverbindung im Wohnheim - Bitte um Hilfe",
+        "Re: [Ticket#2026000000000001] Re: Keine Internetverbindung im Wohnheim - Bitte um Hilfe",
         _QUOTED_GERMAN_REPLY,
         candidates=list(LANGUAGE_PROFILES),
         default="de",

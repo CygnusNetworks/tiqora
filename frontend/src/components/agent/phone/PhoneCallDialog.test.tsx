@@ -93,7 +93,7 @@ function dialEvent(event: CallEventName, overrides: Partial<ActiveCall> = {}) {
       call: {
         call_id: "tiqora-1",
         state: "ringing",
-        number: "01717630944",
+        number: "01715550199",
         extension: "60",
         direction: "outbound",
         user_ids: [7],
@@ -226,7 +226,7 @@ describe("PhoneCallDialog", () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] });
     vi.setSystemTime(DIALLED.at);
     dialEvent("ringing");
-    renderDialog({ initialDirection: "outbound", callerNumber: "01717630944", dialled: DIALLED });
+    renderDialog({ initialDirection: "outbound", callerNumber: "01715550199", dialled: DIALLED });
     expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "pickup");
     act(() => {
       vi.advanceTimersByTime(10_000);
