@@ -511,4 +511,12 @@ Die Prozess-Aktion `LinkAdd` richtet sich nach dem ITSM-Modus, sobald ein Ende `
 Eine abgelehnte Verknüpfung (unbekanntes CI oder Typ, fehlende Rechte) bricht den Prozessübergang nicht ab. Die Aktion
 steht dann in `skipped_actions` der Antwort (`module`, `reason`, `detail`). Dasselbe gilt für Schreibzugriffe von
 Erweiterungs-Aktionen, die ein Plugin per Hook ablehnt (Grund `vetoed`, `detail` ist der Text des Plugins). Die
-Aktion hinterlässt dann nichts in der Datenbank.
+Aktion hinterlässt dann nichts in der Datenbank. Im Kundenportal enthält `skipped_actions` nur `module` und
+`reason`; `detail` bleibt leer, weil Veto-Texte und interne Gründe für Agenten geschrieben sind.
+
+**Prozesse aus dem Kundenportal.** Dort läuft der Prozess als Benutzer 1 (der Systembenutzer, mit dem das Portal
+Tickets anlegt). Ein `LinkAdd` mit CI-Ende prüft in Modus B die Rechte dieses Benutzers: `rw` auf der Queue des
+Tickets, ohne Admin-Abkürzung. Hat Benutzer 1 dieses Recht in der Queue nicht, wird die Aktion übersprungen
+(Grund `link_refused`) und der Übergang läuft weiter. Znunys `LinkAdd` prüft keine Rechte; wer CIs aus
+Portal-Prozessen verknüpfen will, gibt Benutzer 1 `rw` auf den betroffenen Queues oder setzt `UserID` in der
+Aktion auf einen Agenten mit diesen Rechten.

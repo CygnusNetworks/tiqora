@@ -43,3 +43,18 @@ def test_service_healthy_recommended_not_required() -> None:
 def test_ai_worker_rolled_out_with_the_others() -> None:
     assert "ai-worker moves together with api, worker and mcp" in _flat(NOTES)
     assert "Roll out `tiqora-ai-worker` together with api, worker and mcp" in _flat(UPGRADE)
+
+
+def test_rollback_needs_run_migrations_off() -> None:
+    """Senior review I2: the old entrypoint fails on revision 0082; the docs must say so."""
+    upgrade = _flat(UPGRADE)
+    assert "rolling back the image leaves unused tables behind without harm" not in upgrade
+    assert "`TIQORA_RUN_MIGRATIONS=0` in `.env`" in upgrade
+    assert "pause Watchtower" in upgrade
+    assert "`TIQORA_RUN_MIGRATIONS=0` in `.env`" in _flat(NOTES)
+
+
+def test_sso_managed_rule_names_every_password_path() -> None:
+    notes = _flat(NOTES)
+    assert "every Tiqora password path refuses it" in notes
+    assert "plugin password providers skip SCIM accounts" not in notes

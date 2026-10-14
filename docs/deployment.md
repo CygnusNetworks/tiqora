@@ -642,9 +642,19 @@ list before rolling out; every item has a failure mode that is silent until some
    packages and repositories). They only create `tiqora_*` tables or add columns to existing `tiqora_*` tables;
    no Znuny table is altered, indexed or backfilled. The new tables start empty apart from the 15 CMDB catalog
    rows that `0079` seeds. The run takes seconds. Znuny keeps running during the upgrade
-   and stays unchanged; the migration is additive, so rolling back the image leaves unused tables behind
-   without harm. The API entrypoint runs them (`TIQORA_RUN_MIGRATIONS=1`); with `TIQORA_RUN_MIGRATIONS=0` run
+   and stays unchanged. The API entrypoint runs them (`TIQORA_RUN_MIGRATIONS=1`); with `TIQORA_RUN_MIGRATIONS=0` run
    `tiqora migrate upgrade` once before starting the roles.
+
+   **Rollback.** The migrations are additive and the old code ignores the new tables and columns, **but the
+   v0.18.x entrypoint runs `tiqora migrate upgrade` under `set -e` and fails on the unknown revision
+   `20261010_0082`, so an api on the old image crash-loops.** To roll back:
+   1. pause Watchtower (otherwise it pulls the new image again);
+   2. set `TIQORA_RUN_MIGRATIONS=0` in `.env`;
+   3. point all four roles back to the previous image (tag it before the upgrade, for example `:pre-0.19.0`)
+      and `docker compose up -d`.
+
+   The new tables stay behind unused; leave them, the next upgrade finds them in place. Remove
+   `TIQORA_RUN_MIGRATIONS=0` again when you move forward to v0.19.0 or later.
 6. **ITSM mode is detected once.** On the first start after the migration Tiqora looks in the Znuny database
    for the tables `general_catalog` **and** `cip_allocate` (the ITSM core of Znuny). Found: mode **Znuny führt
    das ITSM** (Mode A, read-only). Not found: mode **Tiqora führt das ITSM** (Mode B). The result is stored in
