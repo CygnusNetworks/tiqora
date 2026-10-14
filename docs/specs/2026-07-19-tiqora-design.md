@@ -41,8 +41,8 @@ never committed.
 | MCP | V1 full agent access, API keys, same permission layer as UI (FastMCP, own process) |
 | Auth | Reuse Znuny password hashes (`BCRYPT:`, sha256/512, md5-crypt), OIDC, Kerberos/SPNEGO (Linux KDC), optional TOTP; Redis server sessions (no JWT) |
 | V1 scope | Full agent workflow, customer portal, admin core, ACL engine, GenericAgent, **new knowledge base** (LLM/RAG-ready, `tiqora_kb_*`) |
-| Shipped since V1 | Process management (import + execution, no designer), calendar, stats (fixed reports + CSV), PGP/S-MIME, SOAP transport |
-| Still open | Package/plugin system, process designer, reporting builder — planned in `docs/superpowers/specs/2026-10-08-competitive-parity-roadmap-design.md` |
+| Shipped since V1 | Process management (import + execution), calendar, stats (fixed reports + CSV), PGP/S-MIME, SOAP transport. **v0.18.0** (competitive-parity waves 0-3): process designer, report builder with saved reports, Znuny statistics import, PDF reports and scheduled delivery, SAML 2.0 / OIDC identity providers, GenericInterface requester, widget dashboards and wallboards, web chat with AI first line, plugin system. **v0.19.0** (wave 4): ITSM core and CMDB, ITSM importer and the `TiqoraITSM` add-on, SCIM 2.0, plugin SDK 0.2.0 with signed packages and repositories. See [docs/README.md](../README.md) for the current documentation. |
+| Still open (at the time of writing, historical) | Package/plugin system, process designer, reporting builder: all delivered, see the previous row. Not delivered: ITSM change management and work orders, reporting over CIs (planned wave 5 in `docs/superpowers/specs/2026-10-08-competitive-parity-roadmap-design.md`) |
 | Channels | Plugin interface; V1: email + web; planned: phone/SMS, WhatsApp Business |
 | License | AGPL-3.0 |
 

@@ -227,6 +227,8 @@ in [`../parallel-operation.md`](../parallel-operation.md)):
    first and wait until Znuny's scheduler has no `GenericInterface` tasks
    left; with both sides active every call is sent twice. Verify with
    "Probelauf" and one real ticket change in the webservice's Protokoll tab.
+   Tiqora also runs `ExecuteInvoker` process actions and the `ConfigItem*` operations of the provider side
+   ([`../compatibility.md`](../compatibility.md#requester-and-invokers-tiqora-calls-external-systems)).
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-genericinterface-invokers)
 6. **Postmaster (inbound mail) — last.** This is the highest-risk takeover:
    getting it wrong risks duplicate-processed or (for POP3/IMAP
@@ -252,10 +254,9 @@ function's own "Rollback" subsection in `parallel-operation.md` for
 function-specific caveats (e.g. mail left on the server, notification
 watermark preservation).
 
-**ITSM (only if the site runs Znuny ITSM):** *ITSM übernehmen und umstellen* is an
-independent track that can run at any point after Stage 1, as long as Znuny is still in use. It is
-described in [`../itsm.md`](../itsm.md#koexistenz-mit-znuny): dry run, import (repeatable), install
-the TiqoraITSM add-on, repoint `ConfigItem*` webservices, then "Auf Tiqora umstellen".
+**Alongside the daemon takeovers** there are three independent tracks that need no flag and can run at any
+point after Stage 1 while Znuny is still in use: [reports and saved searches](#reports-and-saved-searches),
+[ITSM](#itsm-and-the-cmdb-only-if-the-site-runs-znuny-itsm) and [processes and ACLs](#processes-and-acls-while-znuny-is-still-in-use).
 
 ---
 
@@ -298,6 +299,49 @@ is the authoritative, checklist-driven version of this summary, including
 the exact SQL/CLI commands and Prometheus metric names to watch.
 
 ---
+
+## Reports and saved searches
+
+Nothing here touches Znuny; each step copies, and Znuny stays as it is.
+
+1. **Znuny statistics.** Agents with the save right (Reports, "Statistiken aus Znuny übernehmen" = import
+   statistics from Znuny) copy Znuny statistics either from the Znuny database (`xml_storage`, read-only) or
+   from an exported `Stats.*.xml` file. A preview lists every statistic with the issues found; "Übernehmen"
+   (apply) creates saved reports and saved searches. Every mapping decision is reported as dropped
+   ("Nicht übernommen") or approximated ("Angepasst"); ITSM statistics, dynamic-field axes and Znuny's cron
+   generation are never taken over. Details: [`../compatibility.md`](../compatibility.md#importing-znuny-statistics).
+2. **Search profiles.** Each agent imports their own Znuny search profiles in the saved-searches sidebar
+   ("Suchvorlagen aus Znuny übernehmen"). One-way and read-only; full-text and future-relative times are not
+   taken over. See [`../compatibility.md`](../compatibility.md#search-profiles).
+3. **Scheduled mails from the Statistic Reports add-on.** Third-party add-ons that mail Znuny statistics on a
+   schedule have no equivalent to import. Recreate each one as a Tiqora schedule (Reports, "Zeitpläne" =
+   schedules): bundles of up to 10 reports, PDF/XLSX/CSV, daily to yearly recurrence, run history. Compare the
+   behaviour in [`../compatibility.md`](../compatibility.md#scheduled-reports-vs-the-statistic-reports-add-on).
+   Retire the add-on's cron job only after the first Tiqora run arrived.
+4. **Report data.** The worker service `report_facts` builds the report tables from `ticket_history` and
+   enqueues a backfill on its first start (minutes to hours on a large database; reports show a hint until it is
+   done). See [`../deployment.md`](../deployment.md#reporting-data).
+
+## ITSM and the CMDB (only if the site runs Znuny ITSM)
+
+*ITSM übernehmen und umstellen* (take over and switch ITSM) is an independent track. Without any action, Tiqora
+detects Znuny's ITSM tables on first start and runs in **Mode A**: it reads the CIs from Znuny
+(read-only; supported for Znuny ITSM 6.5.x and 7.3.x, see [`../support-matrix.md`](../support-matrix.md#znuny-itsm-versions-mode-a-and-the-itsm-importer)).
+The route to Tiqora's own CMDB (**Mode B**) is described in
+[`../itsm.md`](../itsm.md#itsm-daten-aus-znuny-übernehmen) (German):
+
+1. Admin, "ITSM", "Import aus Znuny": **"Probelauf"** (dry run, writes nothing), read the report.
+2. **"Übernehmen"** (import): repeatable, copies catalog, classes, CIs with all versions, links, attachments
+   (database storage only), the priority matrix and service ITSM data. Also available as `tiqora itsm import`
+   (the worker must run).
+3. Install the optional Znuny add-on **TiqoraITSM 1.0.0** (`packages/znuny-addon/TiqoraITSM`; inert until the
+   switch) and point any Znuny webservice that calls `ConfigItemCreate/Update/Delete` at `/znuny-compat`,
+   because Znuny's GenericInterface cannot be locked.
+4. **"Auf Tiqora umstellen"** (switch to Tiqora): locks Znuny's CI screens, imports a last time, switches to
+   Mode B. The way back is part of the same page.
+
+ITSM change management and work orders are counted by the importer but not taken over. For cutover see the
+[ITSM rows in `cutover.md`](../cutover.md#inventory-every-remaining-responsibility).
 
 ## Processes and ACLs while Znuny is still in use
 

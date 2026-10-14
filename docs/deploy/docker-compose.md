@@ -17,7 +17,7 @@ cp docker-compose.example.yml docker-compose.yml
 | `meilisearch` | `getmeili/meilisearch:v1.11` | Ticket + knowledge-base full-text search index. |
 | `tiqora-api` | `ghcr.io/cygnusnetworks/tiqora:latest` (`command: ["api"]`) | The FastAPI HTTP server (`/api/v1`, `/api/portal`, `/znuny-compat`) **and the web UI (SPA) at `/`** — one image ships backend + frontend. Port `8000`. Set `TIQORA_SERVE_FRONTEND=0` to disable and front the UI with a separate static host. |
 | `tiqora-worker` | same image (`command: ["worker"]`) | Background poller: Znuny-write detection, search indexing, webhooks, daemon takeovers (postmaster/escalation/notifications/GenericAgent). No exposed port. |
-| `tiqora-ai-worker` | same image (`command: ["ai-worker"]`) | Runs the AI subsystem (auto-reply worker, auto-summary scan) in its **own** process so a hung LLM call never stalls postmaster/outbox/indexing. Inert until `operation_mode=tiqora_primary` **and** `daemon.ai_worker.enabled`. No exposed port. |
+| `tiqora-ai-worker` | same image (`command: ["ai-worker"]`) | Runs the AI subsystem (auto-reply worker, auto-summary scan) and the web chat assistant loop in its **own** process so a hung LLM call never stalls postmaster/outbox/indexing; it also loads plugins (SDK 0.2.0). The AI tick stays inert until `operation_mode=tiqora_primary` **and** `daemon.ai_worker.enabled`. No exposed port. |
 | `tiqora-mcp` | same image (`command: ["mcp"]`) | The MCP server for AI/LLM integrations (see [`../api/mcp.md`](../api/mcp.md)). Port `8001`. |
 | `mailpit` (optional, commented out) | `axllent/mailpit` | SMTP catch-all for non-production environments — never enable against a mailbox real customers use. |
 
@@ -28,6 +28,14 @@ whichever your registry access/pull-through cache prefers.
 Note that `tiqora-api`, `tiqora-worker`, `tiqora-ai-worker`, and `tiqora-mcp`
 are the **same image** running different entrypoint subcommands — there is one
 artifact to pull and version, not four.
+
+**Start order and upgrades.** Only `tiqora-api` runs the migrations. In
+[`docker-compose.example.yml`](../../docker-compose.example.yml) `tiqora-worker`, `tiqora-ai-worker` and
+`tiqora-mcp` therefore declare `depends_on: tiqora-api: condition: service_healthy`, so they start once the api
+is healthy and the migrations are through. Roll out all four roles with the same image, api first; the
+ai-worker is part of the roll-out (it hosts plugins and runs the web chat assistant against the current
+schema). If you keep your own compose file, add the same `depends_on` block. Details and what happens when a
+role starts early: [deployment.md](../deployment.md#upgrading-to-v0190-wave-4).
 
 ## Environment variable reference
 
@@ -298,8 +306,16 @@ those flags.
 
 ### Plugins
 
-Plugins are baked into the image (see [deployment.md](../deployment.md#erweiterungen-einbauen-plugins)
-and [plugins.md](../plugins.md)); use the same image for api, worker and mcp.
+Plugins can be baked into the image (see [deployment.md](../deployment.md#erweiterungen-einbauen-plugins))
+or installed at runtime from signed packages in the admin UI, "Erweiterungen" (extensions; see
+[deployment.md](../deployment.md#erweiterungen-zur-laufzeit-installieren) and [plugins.md](../plugins.md)).
+Since v0.19.0 **all four roles** (`tiqora-api`, `tiqora-worker`, `tiqora-ai-worker`, `tiqora-mcp`) load plugins
+(SDK 0.2.0): run them from the **same image and the same plugin volume**, and restart the ai-worker in the same
+step as the others. [`docker-compose.example.yml`](../../docker-compose.example.yml) mounts the named volume
+`tiqora_plugins` at `/var/lib/tiqora/plugins` into all four. The packages themselves live in the database;
+the volume is only the unpacked working copy, so it may be shared or per container. It must be writable for
+runtime installs (with `read_only: true` mount it read-write, or set `TIQORA_PLUGINS_RUNTIME_INSTALL=0` and
+bake the plugins into the image).
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -311,6 +327,17 @@ and [plugins.md](../plugins.md)); use the same image for api, worker and mcp.
 | `TIQORA_PLUGIN_EVENTS_INTERVAL_SECONDS` | `5` | Worker tick for plugin ticket events (5-300). |
 | `TIQORA_PLUGIN_EVENTS_GAP_HOLD_SECONDS` | `60` | Hold for a missing `ticket_history` id (5-3600). |
 | `TIQORA_PLUGIN_TASKS_INTERVAL_SECONDS` | `15` | Worker tick for scheduled plugin tasks (5-300). |
+| `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS` | `300` | Limit for one plugin's boot migration, which runs in a subprocess (1-3600). |
+| `TIQORA_PLUGINS_DIR` | `/var/lib/tiqora/plugins` | Working directory for unpacked plugin packages (the `tiqora_plugins` volume). |
+| `TIQORA_PLUGINS_RUNTIME_INSTALL` | `true` | `0`: no installation from packages in the admin UI; bake plugins into the image. |
+| `TIQORA_PLUGINS_ALLOW_UNSIGNED` | `false` | Accept packages without a trusted signature. |
+| `TIQORA_PLUGINS_TRUSTED_KEYS` | *(empty)* | Comma list of `ed25519:<base64>` publisher keys. |
+| `TIQORA_PLUGINS_MAX_PACKAGE_MB` | `15` | Size limit per package (1-25). MariaDB `max_allowed_packet` and the nginx body limit for `/api/` must be larger. |
+| `TIQORA_PLUGINS_COORDINATED_RESTART` | `true` | After an install the processes exit with code 75 and rely on the restart policy (`restart: unless-stopped`); `0` to restart by hand. |
+| `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS` | `180` | How long the coordinated restart waits for the processes (30-1800). |
+| `TIQORA_PLUGIN_REPOSITORIES` | *(empty)* | JSON list of plugin repositories configured by the operator. |
+| `TIQORA_PLUGIN_REPOSITORY_FILE_ROOT` | `/var/lib/tiqora/plugin-repository` | Root directory for file-based repositories. |
+| `TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS` | `21600` | Interval of the repository index refresh (900-604800). |
 
 ## Volumes
 
@@ -321,9 +348,10 @@ and [plugins.md](../plugins.md)); use the same image for api, worker and mcp.
 | `tiqora_redis` | `redis` | Redis RDB/AOF persistence. |
 | `tiqora_meili` | `meilisearch` | Search index data. |
 
+| `tiqora_plugins` | `tiqora-api`, `tiqora-worker`, `tiqora-ai-worker`, `tiqora-mcp` | Unpacked working copy of installed plugin packages (`/var/lib/tiqora/plugins`); the packages themselves are stored in the database. See [Plugins](#plugins). |
 | *(bind mounts)* | `tiqora-api`, `tiqora-worker` | Only when PGP/S-MIME is used: gpg keyring, S/MIME certificate and private-key directories — see [PGP / S/MIME](#pgp--smime-key-stores-shared-with-znuny). |
 
-Apart from those optional key stores, the
+Apart from the plugin working copy and those optional key stores, the
 `tiqora-api`/`tiqora-worker`/`tiqora-ai-worker`/`tiqora-mcp` containers are
 stateless — no application-data volume is needed for them.
 

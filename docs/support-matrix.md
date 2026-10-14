@@ -46,6 +46,39 @@ tests/ops: `TIQORA_LEGACY_SCHEMA_PROFILE=<profile_id>`.
 
 ---
 
+## Znuny add-ons shipped with Tiqora
+
+Both are optional OPM packages (GPL-3.0, Perl, sources under
+[`packages/znuny-addon/`](../packages/znuny-addon/README.md)). They declare
+`<Framework>` `6.0.x` to `6.5.x` and `7.0.x` to `7.3.x`, so they install on every peer in the table above.
+
+| Package | Version | Frameworks | Purpose | Install |
+|---------|---------|------------|---------|---------|
+| **TiqoraSync** | 1.2.0 | `6.0.x`-`7.3.x` | Clears Znuny's in-process caches for rows Tiqora wrote (heartbeat on every run). **Since 1.2.0** it also deploys processes and ACLs for Tiqora: when an admin presses "Bereitstellen" (deploy) in Tiqora while Znuny still runs, Znuny dumps the processes / ACLs through its own mechanism and reports `ok` or `error` back. Without 1.2.0 deploying in Tiqora is only possible after cutover or with the setting "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)". | [install README](../packages/znuny-addon/TiqoraSync/install/README.md); [process deploy](process-management.md#deploy-in-parallel-operation-signal-mode) |
+| **TiqoraITSM** | 1.0.0 | `6.0.x`-`7.3.x` | Only for sites whose CMDB moved to Tiqora (ITSM Mode B): shows "Betroffene CIs (Tiqora)" (affected CIs) in the Znuny ticket zoom, refuses Znuny's own CI-changing screens after the switch (read-only guard), optional customer page and optional ticket-to-CI linking through the Tiqora API. Texts are **German only** (`Kernel/Language/de_TiqoraITSM.pm`). It reads two Tiqora views and two `tiqora_settings` rows and never writes to the database; inert before the switch. | [install README](../packages/znuny-addon/TiqoraITSM/install/README.md); [itsm.md](itsm.md#znuny-erweiterung-tiqoraitsm) (German) |
+
+---
+
+## Znuny ITSM versions (Mode A and the ITSM importer)
+
+Tiqora reads the CMDB of Znuny's ITSM packages (ITSM "Mode A", read-through) and can copy it into its own
+CMDB (the ITSM importer, then "Mode B"). Both depend on the **ITSM package versions**, not only on the
+framework. Only two lines are surveyed against real installations and golden-tested; every other ITSM
+version is reported as `unsupported_znuny_itsm_version` instead of being read blindly.
+
+| ITSM profile | Znuny | Surveyed ITSM packages | Golden peer |
+|---|---|---|---|
+| `itsm-6` | 6.5.x | ITSM bundle 6.5.3: GeneralCatalog 6.5.3, ITSMCore 6.5.5, ITSMIncidentProblemManagement 6.5.2, ITSMConfigurationManagement 6.5.4, ImportExport 6.5.4, ITSMChangeManagement 6.5.2, ITSMServiceLevelManagement 6.5.1 | `znuny-6.5-itsm` |
+| `itsm-7` | 7.3.x | GeneralCatalog 7.3.1, ITSMCore 7.3.3, ITSMIncidentProblemManagement 7.3.2, ITSMConfigurationManagement 7.3.5, ImportExport 7.3.3, ITSMChangeManagement 7.3.4, ITSMServiceLevelManagement 7.3.1 | `znuny-7.3-itsm` |
+
+Znuny 6.0 to 6.4 and 7.0 to 7.2 are **not surveyed** for ITSM. Tiqora itself (tickets, parallel operation) is
+unaffected on those peers; ITSM Mode A / import simply is not offered with CI data
+(the importer can still "switch without CI data"). Details, table survey and the exact mapping:
+[itsm-import.md](itsm-import.md#unterstützte-versionen) (German) and [itsm.md](itsm.md) (German).
+ITSM change management and work orders are not taken over (planned later).
+
+---
+
 ## Out of scope: pre-6.0 and other forks
 
 | Product | Parallel-op | Guidance |
@@ -84,6 +117,13 @@ Layer A CI: `.github/workflows/schema-matrix.yml` (release tags, nightly,
 | Mail account OAuth columns (6.3+) | Load-only adapter on 6.0–6.2 |
 | State/priority **color** (7.0+) | Admin creates inject default `#FFFFFF` |
 | TiqoraSync OPM cache invalidation | Multi-Framework `6.0.x`–`7.3.x` |
+| TiqoraSync 1.2.0 process / ACL deploy | Supported on `6.0.x`-`7.3.x` (golden-tested against a real Znuny peer, `tests/golden/test_tiqorasync_deploy.py`); see [above](#znuny-add-ons-shipped-with-tiqora) |
+| ITSM on a fresh install (no Znuny) | Supported: Mode B (Tiqora CMDB) is chosen automatically, see [itsm.md](itsm.md#wie-der-modus-gewählt-wird) |
+| ITSM Mode A (read Znuny CMDB) and ITSM importer | Supported for Znuny ITSM **6.5.x** and **7.3.x** only; other ITSM versions: `unsupported_znuny_itsm_version` |
+| ITSM Mode B (Tiqora CMDB) in parallel operation | Supported on all profiles above; the CMDB lives in `tiqora_*` tables. After an import switch the optional `TiqoraITSM` add-on guards Znuny's CI screens |
+| GenericInterface `ConfigItem*` operations (provider) | Supported (REST + SOAP), behaviour depends on the ITSM mode: [compatibility.md](compatibility.md#configitemsearch) |
+| ITSMChangeManagement (changes, work orders) | Deferred: counted by the importer, not shown or imported |
+| Plugins (SDK 0.2.0), identity providers (SAML / OIDC / SCIM), web chat, reporting, dashboards | Tiqora-only features in `tiqora_*` tables; independent of the peer profile |
 | Fresh-install bootstrap (`tiqora bootstrap`) | Still seeds **Znuny 6.5** base DDL (standalone greenfield) |
 | Schema ownership / `versions_owned/` | Only after cutover — not multi-version parallel-op |
 | Heavily custom OPM tables | Unknown profile → startup refuse (or explicit override) |

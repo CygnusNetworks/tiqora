@@ -88,6 +88,45 @@ Questions, ideas, war stories from your OTRS migration:
   popup fed by a PBX webhook, caller lookup, click-to-call and a compact phone
   ticket form.
 - **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
+- **Single sign-on and provisioning** — **SAML 2.0 and OIDC** for agents **and
+  customers**, several identity providers side by side, just-in-time account
+  creation, attribute mapping and **role sync** (managed by the provider, or "like
+  Znuny"), **SCIM 2.0** provisioning (per-provider tokens, groups to roles), **step-up
+  MFA** from the provider's `amr`/`acr`/AuthnContext with Tiqora's own second factor
+  as fallback, per-provider session lifetime —
+  [guide](./docs/guide/identity-providers.md) (German, English summary).
+- **Web chat with an AI first line** — an embeddable website widget (offline form,
+  uploads, topics routed to queues), a chat inbox for agents, an AI assistant that answers first and
+  **hands off** to your team, **recognised visitors** (signed website sign-in or the
+  customer-portal session), and chat in the customer portal. Every chat is a ticket —
+  [guide](./docs/guide/webchat.md) (German), [internals](./docs/webchat.md).
+- **ITSM and CMDB** — incident, problem / known error and **major incident**
+  handling, criticality x impact **priority matrix**, services with ITSM data, link
+  types with delete, notes to linked tickets and a link graph, and a versioned
+  **CMDB** with a class designer, impact analysis, CSV/XLSX import and export and a
+  customer view of "my devices and systems". **Mode A** reads the CIs of an existing
+  Znuny ITSM (6.5 / 7.3) read-only, **Mode B** is Tiqora's own CMDB; an **importer**
+  (dry run, repeatable, reversible switch) moves the data over, and the **TiqoraITSM**
+  Znuny add-on keeps Znuny agents informed — [ITSM](./docs/itsm.md), [CMDB](./docs/cmdb.md)
+  (German, English summary).
+- **Dashboards and wallboards** — several widget dashboards per agent (drag/resize,
+  filters, report widgets, SLA gauge, backlog aging, heatmap, drill-down to tickets),
+  role templates for admins, TV mode and public read-only **wallboard links** —
+  [dashboards](./docs/dashboards.md) (German, English summary).
+- **Reporting** — a report **builder** with saved and shared reports, **25 built-in
+  reports** (volume, backlog, SLA, quality, agents, time accounting, customers, patterns),
+  runtime parameters, XLSX / CSV / **PDF** export, **import of Znuny statistics** and
+  search profiles, and **scheduled delivery** by e-mail with run history —
+  [reporting](./docs/reporting.md), [differences to Znuny stats](./docs/compatibility.md#reporting-differences-to-znuny-stats).
+- **Process designer** — a visual designer for Znuny BPM processes and ACLs (canvas,
+  validation, Znuny YAML import/export, versions with diff and restore); deploy
+  from Tiqora even while Znuny runs, through the TiqoraSync add-on —
+  [process management](./docs/process-management.md).
+- **Plugin system** — extend Tiqora with Python plugins (SDK 0.2.0): ticket events,
+  sync hooks, transition actions, channels, password providers, report sources,
+  dashboard widgets and more; install **signed packages** from the admin UI or from
+  package **repositories** — [plugins](./docs/plugins.md) (German admin part,
+  English developer guide).
 - **Modern design** — light, dark and system themes, compact cobalt design system.
 - **49 UI languages** — full Znuny language catalogue (48 Znuny `.po` codes +
   English source), RTL included; agent preference syncs with Znuny
@@ -96,9 +135,10 @@ Questions, ideas, war stories from your OTRS migration:
   (optional small Znuny OPM addon only if you co-run Znuny for cache coherence).
 - **Customer portal & knowledge base** — self-service tickets (opt-in via
   `TIQORA_PORTAL_ENABLED`) and Markdown KB.
-- **Integration-friendly** — REST `/api/v1`, GenericInterface REST/SOAP compatibility,
-  webhooks, channel plugins (email, SMS, WhatsApp, Telegram, phone/CTI).
-- **Modern auth** — legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO (with
+- **Integration-friendly** — REST `/api/v1`, GenericInterface REST/SOAP compatibility
+  (provider **and requester**: outgoing calls on ticket events, `ConfigItem*`), webhooks,
+  channel plugins (email, SMS, WhatsApp, Telegram, phone/CTI), MCP, plugins.
+- **Modern auth** — legacy password hashes, SAML 2.0, OIDC, LDAP/AD, Kerberos/SPNEGO (with
   **seamless re-auth** when a session expires), enforceable TOTP, and passkeys.
 
 ## Live product site & demo
@@ -146,6 +186,19 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 | ![Search](./docs/images/agent-search.png) | ![Reporting](./docs/images/agent-stats.png) | ![Calendar](./docs/images/agent-calendar.png) |
 | **Knowledge base** | | |
 | ![Knowledge base](./docs/images/agent-kb.png) | | |
+
+</details>
+
+<details>
+<summary><b>Dashboards, ITSM &amp; CMDB</b> — dashboard filters, incident ticket, CIs, class designer, ITSM setup (8)</summary>
+
+| Dashboard with filters | Incident in the ticket view | CI detail |
+|---|---|---|
+| ![Dashboard filters](./docs/images/agent-dashboard-filters.png) | ![ITSM ticket zoom](./docs/images/itsm-ticket-zoom.png) | ![CI detail](./docs/images/itsm-ci-detail.png) |
+| **CMDB list** | **CI with versions and links** | **Impact graph** |
+| ![CMDB list](./docs/images/agent-cmdb-list.png) | ![CMDB CI](./docs/images/agent-cmdb-ci.png) | ![CMDB graph](./docs/images/agent-cmdb-graph.png) |
+| **CMDB class designer** | **ITSM administration** | |
+| ![CMDB class editor](./docs/images/admin-cmdb-class-editor.png) | ![ITSM admin](./docs/images/admin-itsm.png) | |
 
 </details>
 
@@ -201,8 +254,8 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 | Area | Notes |
 |---|---|
 | Ticket write path + Znuny invariants | Golden-master multi-peer matrix (OTRS/Znuny 6.0–7.3) |
-| GenericInterface compatibility | Session*, TicketCreate/Update/Get/Search/HistoryGet, TimeAccountingGet, OutOfOffice; REST + SOAP |
-| MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
+| GenericInterface compatibility | Provider: Session*, TicketCreate/Update/Get/Search/HistoryGet, TimeAccountingGet, OutOfOffice, `ConfigItemGet/Search/Create/Update/Delete` (depending on the ITSM mode); REST + SOAP. Requester: invokers on ticket events with retries, conditions, response actions and a debugger, `ExecuteInvoker` process action — [docs/compatibility.md](./docs/compatibility.md), [docs/guide/webservices.md](./docs/guide/webservices.md) |
+| MCP tools | `ticket_*`, customer lookup, KB, read-only CMDB (`cmdb_search`, `cmdb_get`, `cmdb_impact`), plus tools from plugins — see [docs/api/mcp.md](./docs/api/mcp.md), [docs/ai-integration.md](./docs/ai-integration.md) |
 | AI assistance subsystem | Draft replies, summaries, triage, refine (diff review, call notes), auto-reply worker, human handoff, per-ticket pause, 🤖 origin traces, attachment/vision, PII masking, model catalog/profiles/task routing, per-subject ACL, cost budgets & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
 | Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
@@ -213,7 +266,15 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 | Integrations endpoint | Per-customer ticket history for external tools (`/api/v1/integrations/customer-tickets`) |
 | SSE realtime + agent presence | Live updates on ticket zoom |
 | CSV ticket export | Permission-filtered streaming export |
-| TiqoraSync Znuny addon | Optional OPM for cache coherence during parallel op |
+| ITSM and CMDB | Incident / problem / major incident, priority matrix, link types, Tiqora CMDB (Mode B), read-only Znuny CMDB (Mode A), ITSM importer, `tiqora itsm` CLI — [docs/itsm.md](./docs/itsm.md), [docs/cmdb.md](./docs/cmdb.md), [docs/itsm-import.md](./docs/itsm-import.md) |
+| Reporting | Report builder, 25 built-in reports, saved reports, Znuny stats import, PDF / XLSX / CSV, schedules, report data backfill (`tiqora report`) — [docs/reporting.md](./docs/reporting.md) |
+| Dashboards and wallboards | Widget dashboards, role templates, TV mode, public wallboard links — [docs/dashboards.md](./docs/dashboards.md) |
+| Web chat | Website widget, chat inbox, AI first line with handoff, recognised visitors, portal chat — [docs/guide/webchat.md](./docs/guide/webchat.md) |
+| Plugins | SDK 0.2.0, signed `.tqplugin` packages, repositories, safe mode, `tiqora plugins` CLI — [docs/plugins.md](./docs/plugins.md) |
+| Identity providers | SAML 2.0, OIDC, LDAP, customer SSO, JIT, role sync, SCIM 2.0, step-up MFA — [docs/guide/identity-providers.md](./docs/guide/identity-providers.md) |
+| Saved searches | Saved ticket searches with sharing and sidebar counts, import of Znuny search profiles |
+| TiqoraSync Znuny addon | Optional OPM (1.2.0) for cache coherence during parallel op; deploys processes and ACLs for Tiqora while Znuny runs |
+| TiqoraITSM Znuny addon | Optional OPM (1.0.0, German only) for sites whose CMDB moved to Tiqora: affected CIs in the Znuny ticket zoom, read-only guard for Znuny's CI screens — [docs/support-matrix.md](./docs/support-matrix.md#znuny-add-ons-shipped-with-tiqora) |
 
 ## Architecture overview
 
@@ -439,19 +500,24 @@ explicit operator action — see [docs/cutover.md](./docs/cutover.md).
 
 ### Znuny feature parity
 
-Day-to-day agent, customer-portal and admin work is covered. What is still
-missing or narrower than Znuny (last reviewed 2026-10-01):
+Day-to-day agent, customer-portal and admin work is covered, and since v0.18.0 / v0.19.0
+also what used to be on the gap list: saved searches, widget dashboards, the statistics
+framework (builder, import, schedules), the process designer, the GenericInterface
+requester, SAML, web chat, ITSM / CMDB and a plugin system as the replacement for Perl OPM
+add-ons. The maintained, detailed list with every status (and what is only partial) is
+[docs/compatibility.md](./docs/compatibility.md#znuny-features-not-implemented). Still
+not implemented:
 
-- **Missing:** saved searches, configurable dashboard widgets, admin screens for sessions / SQL box / maintenance /
-  system log, calendar admin and appointment rules, portal print view.
-- **Partial:** statistics (fixed reports instead of the Znuny stats framework),
-  GenericAgent execution, bulk actions, user preferences, GenericInterface
-  edge cases, process conditions/actions.
-- **By design:** Package Manager (OPM), SysConfig edit UI,
-  GenericInterface webservice editor/requester.
-
-The maintained, detailed list lives in
-[docs/compatibility.md](./docs/compatibility.md#znuny-features-not-implemented).
+| Znuny feature | Status |
+|---|---|
+| Admin screens: sessions, SQL box, maintenance windows, system log | missing |
+| Calendar admin and ticket appointment rules (queue/SLA) | missing |
+| Customer portal print view | missing |
+| Follow-up as a new ticket (`queue.follow_up_id == 3`) | missing (behaves like reopen) |
+| Process transitions after every ticket change | missing (evaluated after process dialogs and new process tickets) |
+| ITSM change management (changes, work orders), service catalogue, approvals | planned (wave 5) |
+| SysConfig edit/deploy UI | by design (settings are read from `sysconfig_*`) |
+| Perl OPM packages / Package Manager | by design (replaced by [plugins](./docs/plugins.md)) |
 
 ## Documentation
 
@@ -465,12 +531,27 @@ Full index: **[docs/README.md](./docs/README.md)**
 | [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment — services, env vars, reverse proxy |
 | [docs/support-matrix.md](./docs/support-matrix.md) · [docs/parallel-operation.md](./docs/parallel-operation.md) · [docs/cutover.md](./docs/cutover.md) | Peer support matrix, parallel-op invariants, cutover runbook |
 | [docs/development.md](./docs/development.md) · [docs/testing.md](./docs/testing.md) | Local dev, seeding/anonymizing, test suites |
+| [docs/guide/fresh-install.md](./docs/guide/fresh-install.md) | Greenfield install, then the optional building blocks (ITSM mode, reports, SSO, web chat, plugins) |
+| [docs/deployment.md](./docs/deployment.md) | Production notes, upgrade notes per release ([v0.19.0](./docs/releases/v0.19.0.md)) |
+
+**Feature areas** (guides marked *German* have an English summary block unless noted)
+
+| Document | Content |
+|---|---|
+| [docs/itsm.md](./docs/itsm.md) · [docs/cmdb.md](./docs/cmdb.md) · [docs/itsm-import.md](./docs/itsm-import.md) | ITSM modes, incident / problem / major incident, priority matrix, link types; CMDB; Znuny ITSM import and survey (*German*) |
+| [docs/reporting.md](./docs/reporting.md) | Reports: catalogue, builder, saved reports, Znuny stats import, PDF, schedules |
+| [docs/dashboards.md](./docs/dashboards.md) | Widget dashboards, role templates, wallboards (*German*) |
+| [docs/guide/identity-providers.md](./docs/guide/identity-providers.md) | SAML, OIDC, LDAP, customer SSO, SCIM, step-up MFA (*German*) |
+| [docs/guide/webchat.md](./docs/guide/webchat.md) · [docs/webchat.md](./docs/webchat.md) | Web chat: administrators and agents (*German*, no summary); internals (English) |
+| [docs/plugins.md](./docs/plugins.md) | Plugin system: admin part (*German*), developer guide (English) |
+| [docs/process-management.md](./docs/process-management.md) · [docs/guide/webservices.md](./docs/guide/webservices.md) | Processes and the designer; outgoing GenericInterface calls (*German*, no summary) |
+| [docs/crypto.md](./docs/crypto.md) · [docs/channels.md](./docs/channels.md) · [docs/i18n.md](./docs/i18n.md) | PGP / S/MIME, channels, UI languages |
 
 **API & integrations**
 
 | Document | Content |
 |---|---|
-| [docs/api/README.md](./docs/api/README.md) | API surfaces overview (v1 / portal / compat / MCP) |
+| [docs/api/README.md](./docs/api/README.md) | API surfaces overview (v1 / portal / compat / MCP and the further public endpoints) |
 | [docs/api/rest-v1.md](./docs/api/rest-v1.md) | Guided `/api/v1` reference with curl examples |
 | [docs/api/openapi.json](./docs/api/openapi.json) | Generated OpenAPI spec (`tiqora openapi`) |
 | [docs/api/compat.md](./docs/api/compat.md) | GenericInterface compatibility layer |
