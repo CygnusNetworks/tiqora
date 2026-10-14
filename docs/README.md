@@ -61,7 +61,7 @@
 | [reporting.md](reporting.md) | Reports: built-in catalogue, report builder, saved reports and sharing, Znuny statistics import, PDF and schedules, report data and rights (English) |
 | [plugins.md](plugins.md) | Plugin system: install and operate (Part 1, **German**), developer guide for SDK 0.2.0, signed packages and repositories (Part 2, English), limits (Part 3, **German**) |
 | [guide/identity-providers.md](guide/identity-providers.md) | Sign-in with OIDC, SAML 2.0 and LDAP, multi-IdP, JIT provisioning, role sync, customer SSO, SCIM 2.0, step-up MFA, session lifetime (**German**, English summary) |
-| [guide/webchat.md](guide/webchat.md) | Web chat for administrators and agents: set-up, embedding, AI first line, recognised visitors, portal chat, data protection (**German**) |
+| [guide/webchat.md](guide/webchat.md) | Web chat for administrators and agents: set-up, embedding, AI first line, recognised visitors, portal chat, data protection (**German**, English summary) |
 | [webchat.md](webchat.md) | Web chat internals: assistant loop, claims and handoff, identity paths (English) |
 
 ## Design and specs
@@ -84,8 +84,8 @@ reference directly.
 developer material. Some user and admin guides are written in **German**
 because the UI default language is German and the guard tests pin the German
 headings: they are marked "(German)" in the tables above, and each of them
-starts with an English summary block, except [guide/webchat.md](guide/webchat.md)
-and [guide/webservices.md](guide/webservices.md), which are German only.
+starts with an English summary block, except
+[guide/webservices.md](guide/webservices.md), which is German only.
 [plugins.md](plugins.md) is mixed (Parts 1 and 3 German, Part 2 English). When
 a guide describes the UI it quotes the exact German label and adds an English
 gloss. Existing German guides are extended in German with an English summary

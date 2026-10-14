@@ -19,7 +19,7 @@
 > a Tiqora TOTP/passkey fallback) and a **per-provider session lifetime** (shortens, never extends,
 > the global session TTLs). SCIM, step-up and the session lifetime need a provider created in the admin UI
 > (OIDC or SAML; LDAP and environment-configured providers have no such tabs or are read-only). An
-> account that a SCIM provider manages **and** whose provider requires the IdP's second factor can no
+> account that a SCIM provider manages **and** whose provider is enabled and requires the IdP's second factor can no
 > longer sign in with a password anywhere in Tiqora (local password, LDAP, plugin password providers and the
 > Znuny-compatible GenericInterface `SessionCreate`/`UserLogin`); the refusal looks like a wrong password.
 > The "Admin-Seiten im Überblick" table below lists every tab of the provider page with its English
@@ -33,7 +33,7 @@
 > abmelden nach (Stunden)* = idle / absolute session limit. Defaults: step-up fallback asks for the Tiqora factor;
 > SCIM keys last 365 days (max 730, at most 5 active per provider), 600 requests per 60 s per key, request
 > log kept 180 days; a provider may shorten the idle limit down to 5 minutes and the absolute limit down to
-> 15 minutes. Server-side, these env variables tune SCIM: `TIQORA_SCIM_RATE_LIMIT_ENABLED`,
+> 15 minutes (0.25 in the hours field). Server-side, these env variables tune SCIM: `TIQORA_SCIM_RATE_LIMIT_ENABLED`,
 > `TIQORA_SCIM_RATE_LIMIT_MAX`, `TIQORA_SCIM_RATE_LIMIT_WINDOW`, `TIQORA_SCIM_AUTH_FAIL_MAX`,
 > `TIQORA_SCIM_AUTH_FAIL_WINDOW`, `TIQORA_SCIM_AUTH_LOCKOUT`, `TIQORA_SCIM_MAX_BODY_BYTES`,
 > `TIQORA_SCIM_MAX_MEMBERS`, `TIQORA_SCIM_ROLE_SYNC_INTERVAL`, `TIQORA_SCIM_EVENT_RETENTION_DAYS`.
@@ -58,22 +58,23 @@ erfolgreiche Binden gewinnt), **Zuordnung** (Login oder E-Mail), **Konto-Anlage 
 Anmeldung (JIT)** und **Rollen/Gruppen**. Presets (Entra ID, Google Workspace, Keycloak,
 Authentik, ADFS, Generic SAML/OIDC, LDAP, Active Directory) füllen nur Standardwerte vor.
 
-Der Tab **Testanmeldung** (siehe unten) prüft einen Anbieter, bevor er für alle sichtbar wird.
+Der Tab **Testanmeldung** (siehe unten) prüft einen Anbieter, bevor er für alle sichtbar wird (nicht für
+LDAP: dort nur ein Hinweis, Test über die Anmeldeseite).
 
 ### Admin-Seiten im Überblick
 
-Die Liste unter **Administration → Identitätsanbieter** zeigt alle Anbieter (Art, Zielgruppe, Zustand);
+Die Liste unter **Administration → Identitätsanbieter** zeigt alle Anbieter (Spalten *Name*, *Art*, *Gilt für*, *Zustand*);
 ein Anbieter aus Umgebungsvariablen trägt eine Kennzeichnung und ist schreibgeschützt. Die Detailseite
 eines Anbieters hat diese Tabs (die Namen stehen genau so in der Oberfläche):
 
 | Tab (deutsch) | Englisch | Was dort steht | Abschnitt |
 |---|---|---|---|
-| **Verbindung** | Connection | *Name*, *Kurzname* (Slug), *Gilt für* (Zielgruppe), *Aktiv*, *Beschriftung der Anmeldetaste*, Symbol, *Reihenfolge*; darunter die Verbindungswerte der Anbieterart (OIDC-Issuer/Client, SAML-Metadaten, LDAP-Server) und die URLs zum Kopieren | je Anbieterart oben |
-| **Zuordnung** | Mapping (attribute mapping) | „Welche Werte füllen welches Feld?“ (Anmeldename, E-Mail, Vorname, Nachname, Kundennummer, Mobilnummer), *Anmeldung zuordnen über* (Anmeldename oder E-Mail), *Beim ersten Anmelden automatisch anlegen* (JIT), *Erlaubte E-Mail-Domains*, Rollen und Gruppenrechte für neue Konten, *Namen und E-Mail bei jeder Anmeldung aktualisieren*, Vorschau | [Zuordnung, Anlage (JIT) und Profil](#zuordnung-anlage-jit-und-profil) |
+| **Verbindung** | Connection | *Name*, *Kurzname* (Slug), *Gilt für* (audience), *Aktiv*, *Beschriftung der Anmeldetaste*, *Symbol der Anmeldetaste* (button icon), *Reihenfolge*; darunter die Verbindungswerte der Anbieterart (OIDC-Issuer/Client, SAML-Metadaten, LDAP-Server) und die URLs zum Kopieren | je Anbieterart oben |
+| **Zuordnung** | Mapping (attribute mapping) | „Welche Werte füllen welches Feld?“ (Anmeldename, E-Mail, Vorname, Nachname, Kundennummer, Mobilnummer), *Anmeldung zuordnen über* (Anmeldename oder E-Mail), *Beim ersten Anmelden automatisch anlegen* (JIT), *Erlaubte E-Mail-Domains*, *Rollen für neue Konten (Agenten)*, *Gruppenrechte für neue Konten (Agenten)*, *Feste Kundennummer für neue Kunden* (fixed customer ID when the IdP sends none), *Namen und E-Mail bei jeder Anmeldung aktualisieren*, Vorschau | [Zuordnung, Anlage (JIT) und Profil](#zuordnung-anlage-jit-und-profil) |
 | **Rollen aus dem Anmeldedienst** | Roles from the sign-in service (role rules) | Regeln „Angabe des Anmeldedienstes + Wert → Rollen/Gruppen“, Abgleichmodus, Liste der verwalteten Zuordnungen | [Rollen und Gruppen](#rollen-und-gruppen-verwaltet-oder-wie-znuny) |
 | **Bereitstellung (SCIM)** | Provisioning (SCIM) | SCIM-Adresse, Schalter, Schlüssel, Konten, Gruppen, Protokoll (nur OIDC/SAML aus der Verwaltung) | [Bereitstellung mit SCIM](#bereitstellung-mit-scim) |
 | **Sitzung & zweiter Faktor** | Session & second factor (step-up) | *Zweiten Faktor vom Anmeldedienst verlangen*, Werte pro Protokoll, Fallback, Sitzungsdauer (nur OIDC/SAML aus der Verwaltung) | [Zweiter Faktor](#zweiter-faktor-vom-anmeldedienst), [Sitzungsdauer](#sitzungsdauer) |
-| **Testanmeldung** | Test sign-in | Probelauf als Agent oder Kunde ohne Nebenwirkung; zeigt Werte, Vorschau und den Nachweis des zweiten Faktors | [Testanmeldung](#testanmeldung) |
+| **Testanmeldung** | Test sign-in | Probelauf als Agent oder Kunde ohne Nebenwirkung; zeigt Werte, Vorschau und den Nachweis des zweiten Faktors (nicht für LDAP: dort nur ein Hinweis, Test über die Anmeldeseite) | [Testanmeldung](#testanmeldung) |
 | **Verknüpfungen** | Links (account links) | Konten, die sich über diesen Anbieter angemeldet haben; eine Verknüpfung lässt sich lösen | [Zuordnung, Anlage (JIT) und Profil](#zuordnung-anlage-jit-und-profil) |
 
 Bei **LDAP**-Anbietern fehlen die Tabs *Bereitstellung (SCIM)* und *Sitzung & zweiter Faktor*; ein Link auf
@@ -450,7 +451,8 @@ Regeländerung bei vielen Konten kann daher einige Läufe dauern. Ein Eintrag, d
 werden kann, rückt ans Ende der Warteschlange und wird im nächsten Lauf erneut versucht. Es gilt derselbe
 Modus wie bei der Anmeldung (*managed* oder *Wie Znuny*, siehe oben). Eine Rolle fällt damit auch dann
 weg, wenn sich die Person nie wieder anmeldet. Ist der Dienst abgeschaltet, bleiben Änderungen bis zum
-nächsten Einschalten in der Warteschlange. Eine Gruppe darf bis zu 5000 Mitglieder haben.
+nächsten Einschalten in der Warteschlange. Eine einzelne Anfrage darf bis zu 5000 Mitglieder übertragen
+(`TIQORA_SCIM_MAX_MEMBERS`); über mehrere Anfragen kann eine Gruppe größer werden.
 
 ### Schlüssel, Drosselung und Protokoll
 
@@ -460,8 +462,9 @@ nächsten Einschalten in der Warteschlange. Eine Gruppe darf bis zu 5000 Mitglie
   für 15 Minuten, Antwort 429). Eine Anfrage mit **gültigem** Schlüssel unterliegt dieser Sperre nie,
   so kann niemand das Bereitstellen oder Sperren durch Raten blockieren. Damit die Sperre den Angreifer
   trifft und nicht den Proxy, muss `TIQORA_TRUSTED_PROXIES` gesetzt sein.
-* Im Tab **Bereitstellung (SCIM)** zeigt **Protokoll** jede Anfrage (*Zeit*, *Vorgang*, *Status*, Konto), mit dem Filter
-  *Nur Fehler*. Vorgänge sind zum Beispiel *Angelegt*, *Übernommen*, *Geändert*, *Deaktiviert*, *Reaktiviert*,
+* Im Tab **Bereitstellung (SCIM)** zeigt **Protokoll** jede schreibende Anfrage sowie abgewiesene Schlüssel
+  und Begrenzungen (Spalten *Zeit*, *Anfrage*, *Vorgang*, *Konto*, *Status*), mit dem Filter *Nur Fehler*;
+  Lesezugriffe (GET) werden nicht protokolliert. Vorgänge sind zum Beispiel *Angelegt*, *Übernommen*, *Geändert*, *Deaktiviert*, *Reaktiviert*,
   *Gelöscht*, *Konflikt*, *Abgewiesen*, *Anmeldung fehlgeschlagen*, *Begrenzt* und *Schlüssel erzeugt/widerrufen*. Fehlgeschlagene Authentifizierungen erscheinen höchstens einmal je IP und Zeitfenster.
   Einträge werden nach 180 Tagen gelöscht (`TIQORA_SCIM_EVENT_RETENTION_DAYS`) und zwar vom Dienst
   **Bereitstellungsprotokoll aufräumen** (**Administration → Dienste**, Kennung `scim_events_purge`, täglich um 04:40, standardmäßig an). Ein
@@ -472,11 +475,11 @@ nächsten Einschalten in der Warteschlange. Eine Gruppe darf bis zu 5000 Mitglie
 
 | Variable | Standard | Wirkung |
 |---|---|---|
-| `TIQORA_SCIM_RATE_LIMIT_ENABLED` | `true` | Anfragelimit je Schlüssel ein/aus |
+| `TIQORA_SCIM_RATE_LIMIT_ENABLED` | `true` | Anfragelimit je Schlüssel und Sperre für falsche Schlüssel je IP ein/aus |
 | `TIQORA_SCIM_RATE_LIMIT_MAX` / `TIQORA_SCIM_RATE_LIMIT_WINDOW` | 600 / 60 s | Anfragen je Schlüssel und Fenster, danach 429 |
 | `TIQORA_SCIM_AUTH_FAIL_MAX` / `TIQORA_SCIM_AUTH_FAIL_WINDOW` / `TIQORA_SCIM_AUTH_LOCKOUT` | 10 / 600 s / 900 s | Fehlversuche mit falschem Schlüssel je IP, Fenster, Sperrdauer |
 | `TIQORA_SCIM_MAX_BODY_BYTES` | 2097152 | größtes SCIM-Dokument |
-| `TIQORA_SCIM_MAX_MEMBERS` | 5000 | Mitglieder je Gruppe und Anfrage |
+| `TIQORA_SCIM_MAX_MEMBERS` | 5000 | Mitglieder je Anfrage (POST/PUT/PATCH einer Gruppe) |
 | `TIQORA_SCIM_ROLE_SYNC_INTERVAL` | 15 s | Takt des Dienstes „Rollen aus Gruppen der Bereitstellung“ (im Admin überschreibbar) |
 | `TIQORA_SCIM_EVENT_RETENTION_DAYS` | 180 | Aufbewahrung des Protokolls |
 
@@ -509,7 +512,7 @@ im MFA-Attribut:
 |---|---|---|
 | Entra ID (OIDC) | `amr`-Werte `mfa` (Standard) | Entra meldet den Faktor nur, wenn bedingter Zugriff MFA verlangt; sonst fehlt `mfa` |
 | Okta (OIDC) | `amr`-Werte `mfa`, `otp` | die Richtlinie der Anwendung muss einen Faktor fordern |
-| Keycloak (OIDC) | `acr`-Werte `2` (oder höher) | Step-up-Flows mit Level-of-Assurance; im Mapper „Authentication Context Class Reference (ACR)“ die Stufen auf `acr` abbilden. Unter *acr_values anfordern* kann Tiqora die gewünschte Stufe mitschicken |
+| Keycloak (OIDC) | `acr`-Werte `2` (jede weitere zulässige Stufe einzeln eintragen, z. B. `2`, `3`) | Step-up-Flows mit Level-of-Assurance; im Mapper „Authentication Context Class Reference (ACR)“ die Stufen auf `acr` abbilden. Unter *acr_values anfordern* kann Tiqora die gewünschte Stufe mitschicken |
 | AD FS und Entra (SAML) | *Authentifizierungsklassen*: Standardliste `http://schemas.microsoft.com/claims/multipleauthn`, `https://refeds.org/profile/mfa`, `urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract`, `urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken`; *MFA-Attribut* `http://schemas.microsoft.com/claims/authnmethodsreferences` mit *Werten des MFA-Attributs* `http://schemas.microsoft.com/claims/multipleauthn` | bei AD FS in der Anspruchsregel den Anspruch `authnmethodsreferences` ausgeben; optional *Authentifizierungsklasse anfordern* (sendet `RequestedAuthnContext` mit den Klassen, Vergleich `minimum`; Standard aus). Jede der beiden Prüfungen (Klasse oder Attributwert) genügt |
 
 Ohne Nachweis hängt der Ausgang von **Ohne Bestätigung** ab:
@@ -525,8 +528,8 @@ Ohne Nachweis hängt der Ausgang von **Ohne Bestätigung** ab:
   ohne Nachweis, kostet aber Sicherheit: wer nur das Kennwort des Anmeldedienstes kennt, kann dann einen
   Faktor registrieren. Wählen Sie das nur bewusst und zeitlich begrenzt.
 
-Wer in Tiqora einen Faktor eingerichtet hat, den der Anmeldedienst nicht bestätigt hat, bestätigt ihn nach
-der Anmeldung (ausstehende Sitzung, siehe Kunden-Portal oben). Die Entscheidung fällt, bevor etwas
+Hat der Anmeldedienst keinen Nachweis geliefert und hat die Person in Tiqora TOTP oder einen Passkey
+eingerichtet, bestätigt sie diesen Faktor nach der Anmeldung (ausstehende Sitzung, siehe Kunden-Portal oben). Die Entscheidung fällt, bevor etwas
 geschrieben wird. Eine abgewiesene Anmeldung ändert nichts (kein Konto, keine Verknüpfung, keine Rollen). Die Testanmeldung zeigt das Ergebnis der Prüfung
 und die Werte, die der Anmeldedienst geliefert hat. Ist der Nachweis erbracht, überspringt die Anmeldung den
 Tiqora-Faktor wie bisher.
@@ -586,7 +589,7 @@ Im Tab *Sitzung & zweiter Faktor* (Abschnitt *Sitzungsdauer*) kann jeder Anbiete
 Einstellungen (`TIQORA_SESSION_TTL`, `TIQORA_SESSION_ABSOLUTE_TTL`) sind die
 Obergrenze (Standard 60 Minuten Inaktivität, 12 Stunden insgesamt); „Allgemeine Einstellung verwenden“ lässt
 den Wert unberührt. Der Anbieter darf die Inaktivität auf mindestens 5 Minuten und die Gesamtdauer auf
-mindestens 15 Minuten verkürzen; Werte außerhalb dieses Bereichs und eine Inaktivitätsdauer, die länger ist als die Gesamtdauer, lehnt Tiqora beim Speichern ab. Die Dauer gilt
+mindestens 15 Minuten (im Feld in Stunden: 0,25) verkürzen; Werte außerhalb dieses Bereichs und eine Inaktivitätsdauer, die länger ist als die Gesamtdauer, lehnt Tiqora beim Speichern ab. Die Dauer gilt
 für Agenten und Kunden, die sich über diesen Anbieter anmelden. Zusätzlich:
 
 * Eine SAML-Assertion mit `SessionNotOnOrAfter` verkürzt die absolute Dauer der Sitzung weiter. Liegt

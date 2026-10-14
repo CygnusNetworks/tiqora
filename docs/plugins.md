@@ -140,7 +140,7 @@ Das Feld `problem` nennt, warum eine Erweiterung nicht laufen kann
 
 ## 3. Ein- und ausschalten, Zustände
 
-Unter **Verwaltung → Erweiterungen** steht jede eingebaute Erweiterung mit
+Unter **Administration → Erweiterungen** steht jede eingebaute Erweiterung mit
 Schalter, Zustand und (unter "Details") den Angaben aus ihrem Manifest, den
 Prozessen, in denen sie läuft, und ihren automatischen Abläufen.
 
@@ -353,7 +353,7 @@ diesem Kanal antworten. KI-Antworten laufen in Tiqora über denselben Kanal.
 
 Erweiterungen können ein externes Kundenverzeichnis anbinden. Treffer
 erscheinen beim Anlegen eines Tickets ("Neues Ticket", Feld für den Kunden) unter
-"Aus Kundenverzeichnis" (Aus dem Kundenverzeichnis), sobald Sie mindestens drei
+"Aus Kundenverzeichnis" (From customer directory), sobald Sie mindestens drei
 Zeichen getippt haben. "Übernehmen" legt den
 Kunden einmal in Tiqora an; ein bestehender Kunde wird nie überschrieben.
 Gehört die E-Mail-Adresse schon einem anderen Kunden, bricht die Übernahme ab.
@@ -392,7 +392,7 @@ Erweiterungen erscheinen im Berichtskatalog mit eigenen Titeln.
 ## 7. Erweiterungen über die Oberfläche installieren
 
 Seit Ausbaustufe 2b müssen Sie für eine neue Erweiterung kein Image mehr
-bauen. Unter **Verwaltung → Erweiterungen** laden Sie ein Paket mit der
+bauen. Unter **Administration → Erweiterungen** laden Sie ein Paket mit der
 Endung `.tqplugin` hoch (Schaltfläche "Paket hochladen") oder holen es aus
 einer Paketquelle (Abschnitt 8). Die Seite hat drei Reiter: "Installiert"
 (Installed), "Verfügbar" (Available, der Katalog der Paketquellen) und
@@ -414,7 +414,8 @@ liegen (eine gerade laufende Installation könnte sie eben erst angelegt haben).
 2. **Dialog "Erweiterung installieren".** Er zeigt Name, Version, Herausgeber,
    Vertrauensstufe (unten), die Änderungen gegenüber der installierten Version,
    "Was diese Erweiterung angibt" (Erweiterungspunkte, aufgerufene Hosts,
-   Oberflächenstellen, neue Tabellen) sowie **Hinweise** ("Hinweise") und **Kann nicht installiert werden**. Die Überschrift nennt die Aktion: "Neu installieren",
+   Oberflächenstellen, neue Tabellen) sowie **Hinweise** (Notes) und **Kann nicht installiert werden**. Die Überschrift lautet immer "Erweiterung
+   installieren"; unter Name und Version nennt der Dialog die Aktion: "Neu installieren",
    "Aktualisieren von … auf …", "Erneut installieren" (gleiche Version) oder
    "Zurückstufen von … auf …" (wird abgelehnt, siehe unten). Die Angaben beschreiben, was die Erweiterung von
    sich sagt. Sie sind keine Absicherung: Es gibt keine Sandbox (Abschnitt 1).
@@ -1922,8 +1923,8 @@ Never ship the private key in an image or a package.
 
 All subcommands run through the container entrypoint (`tiqora plugins …`, see
 [Deployment](deployment.md#erweiterungen-einbauen-plugins)). Messages are
-printed in German. Exit codes are listed per command; `2` always means a usage
-or file error (for example "file exists"), `1` a failed check.
+printed in German. Exit codes differ per command (see the table); argparse usage
+errors exit with `2`.
 
 | Command | Purpose | Flags | Exit code |
 |---|---|---|---|

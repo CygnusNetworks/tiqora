@@ -448,7 +448,7 @@ All paths are below `/api/v1`.
 | Znuny statistics import | `GET /reports/import/znuny`, `POST /reports/import/znuny/file`, `POST /reports/import/znuny/apply` |
 | Schedules | `GET/POST /report-schedules`, `GET/PUT/DELETE /report-schedules/{id}`, `POST /report-schedules/preview-recurrence`, `POST /report-schedules/{id}/run`, `GET /report-schedules/{id}/runs`, `GET /report-runs/{run_id}/files/{file_id}` |
 | Saved searches | `GET/POST /saved-searches`, `GET /saved-searches/counts`, `GET/PUT/DELETE /saved-searches/{id}`, `PUT /saved-searches/{id}/prefs`, `GET/POST /saved-searches/import/znuny` |
-| Ticket filter | `POST /tickets/query` |
+| Ticket filter | `POST /tickets/query`, `GET /ticket-filters/fields` (field catalogue), `POST /ticket-filters/count` |
 | Admin | `GET /admin/reporting/status`, `POST /admin/reporting/backfill` (`since`, `restart`, `snapshots`) |
 
 Validation errors answer 422 with `detail.message` and `detail.path`; a stale `version` answers 409.

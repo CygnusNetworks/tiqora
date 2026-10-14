@@ -112,7 +112,7 @@
             "name": "Can agents sign in with SAML or OIDC, and can accounts be provisioned with SCIM?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Identity providers (OIDC, SAML 2.0, LDAP/AD) are set up in Tiqora's admin UI, with just-in-time accounts and role rules that can replace roles like Znuny's AuthSync. A provider can also provision agents over SCIM 2.0, require a second factor from the IdP and shorten the session lifetime. Accounts and role assignments are written to Znuny's own tables, so Znuny sees the same agents and permissions."
+              "text": "Yes. Identity providers (OIDC, SAML 2.0, LDAP/AD) are set up in Tiqora's admin UI, with just-in-time accounts and role rules that can replace roles like Znuny's AuthSync. A provider can also provision agents and customers over SCIM 2.0 (groups for agents), require a second factor from the IdP and shorten the session lifetime. Accounts and role assignments are written to Znuny's own tables, so Znuny sees the same agents and permissions."
             }
           },
           {
@@ -699,7 +699,7 @@
               <code>znuny-6.5</code> or <code>znuny-7.3</code>) and adjusts to it. If it
               cannot recognise the schema, it <strong>refuses to start</strong> instead of
               failing later in production. The detected profile is shown under
-              <em>Admin → System-Info</em>.
+              <em>Administration → System-Info</em>.
             </p>
             <div class="callout callout-info">
               <span class="callout-title">Preferred starting point</span>
@@ -826,7 +826,7 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
               <p>
                 <code>tiqora migrate upgrade</code> only creates <code>tiqora_*</code> tables.
                 The migrations that may touch Znuny's tables sit in a separate chain that
-                stays locked until phase 5. Check <em>Admin → System-Info</em> to confirm the
+                stays locked until phase 5. Check <em>Administration → System-Info</em> to confirm the
                 detected schema profile matches your Znuny version.
               </p>
               <p>
@@ -917,7 +917,7 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
               <p>
                 Each background duty moves on its own. Every Tiqora worker job has a flag in
                 <code>tiqora_settings</code>, off by default, which you switch under
-                <em>Admin → Dienste</em> (services). The worker picks up the change on its next tick
+                <em>Administration → Dienste</em> (services). The worker picks up the change on its next tick
                 without a restart. Run each duty on <strong>one</strong> side only, or work
                 gets done twice: two tickets for one mail, notifications sent twice.
                 <strong>Always switch Znuny's side off first</strong>, then turn Tiqora's on.
@@ -987,7 +987,7 @@ docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre
                 <code>Ticket::<wbr />EventModulePost###<wbr />9900-GenericInterface</code> invalid,
                 wait until Znuny's scheduler has no <code>GenericInterface</code> tasks left, then
                 switch on the service “Ausgehende Webservice-Aufrufe” (outbound webservice calls)
-                under <em>Admin → Dienste</em>. The webservices themselves stay defined in
+                under <em>Administration → Dienste</em>. The webservices themselves stay defined in
                 Znuny; Tiqora shows them read-only with a debugger log and a dry run.
               </p>
               <p>A cron task is switched off in Znuny like this:</p>
@@ -1072,7 +1072,7 @@ bin/znuny.Console.pl Maint::Daemon::Summary</code></pre>
                 </li>
                 <li>
                   <strong>Monitor.</strong> Watch error rates and per-service status under
-                  <em>Admin → Dienste</em> (services) for at least an hour, or a business day for a
+                  <em>Administration → Dienste</em> (services) for at least an hour, or a business day for a
                   cautious rollout.
                 </li>
                 <li>
@@ -1130,7 +1130,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
             <p>
               Tiqora has incident and problem management, major incidents, a priority matrix
               and its own CMDB. Who holds the configuration items is set by the “ITSM-Modus”
-              (ITSM mode) under <em>Admin → ITSM</em>, and the mode is chosen automatically
+              (ITSM mode) under <em>Administration → ITSM</em>, and the mode is chosen automatically
               at the first start: if Znuny's ITSM tables are in the database, it is
               <strong>Mode A</strong>, “Znuny führt das ITSM (nur lesen)” (Znuny leads the
               ITSM, read-only); otherwise <strong>Mode B</strong>, “Tiqora führt das ITSM”
@@ -1146,7 +1146,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                 version Tiqora shows no CI data.
               </li>
               <li>
-                <strong>Import, as often as you like.</strong> <em>Admin → ITSM-Import</em>
+                <strong>Import, as often as you like.</strong> <em>Administration → ITSM-Import</em>
                 (page “ITSM-Daten aus Znuny übernehmen”, take over ITSM data from Znuny):
                 “Probelauf” (dry run) reads and counts and writes nothing; “Übernehmen”
                 (import) copies the catalog, classes, CIs with all versions, links,
@@ -1216,7 +1216,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
 
             <h3 id="sign-in">Sign-in, SSO and provisioning</h3>
             <p>
-              Identity providers are set up under <em>Admin → Identitätsanbieter</em> (identity
+              Identity providers are set up under <em>Administration → Identitätsanbieter</em> (identity
               providers): OIDC (for example Microsoft Entra ID, Google Workspace, Keycloak),
               SAML&nbsp;2.0 (for example ADFS) and LDAP/Active Directory, for agents and, if
               you want, for portal customers. Znuny's <code>AuthSyncModule</code> settings have a
@@ -1225,8 +1225,8 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               Znuny's <code>AuthSync</code> does.
             </p>
             <p>
-              A provider can also provision agents over <strong>SCIM&nbsp;2.0</strong>
-              (<code>/scim/v2</code>, bearer tokens per provider), require proof of a second factor
+              A provider can also provision agents and customers over <strong>SCIM&nbsp;2.0</strong>
+              (<code>/scim/v2</code>, bearer tokens per provider; groups for agents), require proof of a second factor
               from the IdP and shorten the session lifetime. Accounts and role assignments land
               in Znuny's own tables, so Znuny sees the same agents and permissions. A SCIM
               deactivation sets the account invalid in Znuny and ends its Tiqora sessions.
@@ -1248,10 +1248,11 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               own database tables, and hook into ticket writes, process actions and
               conditions, channels, dynamic field types, ticket number generators, mail
               filters, report sources and GenericInterface operations. Admins install signed
-              <code>.tqplugin</code> packages or add package repositories under <em>Admin →
+              <code>.tqplugin</code> packages (unsigned ones only when explicitly allowed) or add package repositories under <em>Administration →
               Erweiterungen</em> (extensions); on read-only containers plugins are baked into
-              the image instead. Plugins run with full trust inside Tiqora, so the signature
-              checks guard against mistakes, not against a hostile plugin.
+              the image instead. Plugins run with full trust inside Tiqora: signatures show who
+              published a package and that it was not altered; they do not make a plugin's
+              code safe.
             </p>
           </div>
         </section>
@@ -1391,7 +1392,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                     Yes. Identity providers (OIDC, SAML&nbsp;2.0, LDAP/AD) are set up in
                     Tiqora's admin UI, with just-in-time accounts and role rules that can
                     replace roles like Znuny's <code>AuthSync</code>. A provider can also
-                    provision agents over SCIM&nbsp;2.0, require a second factor from the IdP
+                    provision agents and customers over SCIM&nbsp;2.0 (groups for agents), require a second factor from the IdP
                     and shorten the session lifetime. Accounts and role assignments are written
                     to Znuny's own tables, so Znuny sees the same agents and permissions. See
                     <a href="#sign-in">Sign-in, SSO and provisioning</a>.

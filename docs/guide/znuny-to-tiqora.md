@@ -324,13 +324,13 @@ Nothing here touches Znuny; each step copies, and Znuny stays as it is.
 
 ## ITSM and the CMDB (only if the site runs Znuny ITSM)
 
-*ITSM übernehmen und umstellen* (take over and switch ITSM) is an independent track. Without any action, Tiqora
+Taking over the ITSM data and switching to Tiqora's CMDB ([`../itsm.md`](../itsm.md), „ITSM-Daten aus Znuny übernehmen“) is an independent track. Without any action, Tiqora
 detects Znuny's ITSM tables on first start and runs in **Mode A**: it reads the CIs from Znuny
 (read-only; supported for Znuny ITSM 6.5.x and 7.3.x, see [`../support-matrix.md`](../support-matrix.md#znuny-itsm-versions-mode-a-and-the-itsm-importer)).
 The route to Tiqora's own CMDB (**Mode B**) is described in
 [`../itsm.md`](../itsm.md#itsm-daten-aus-znuny-übernehmen) (German):
 
-1. Admin, "ITSM", "Import aus Znuny": **"Probelauf"** (dry run, writes nothing), read the report.
+1. Admin, "ITSM-Import" (page "ITSM-Daten aus Znuny übernehmen"): **"Probelauf"** (dry run, writes nothing), read the report.
 2. **"Übernehmen"** (import): repeatable, copies catalog, classes, CIs with all versions, links, attachments
    (database storage only), the priority matrix and service ITSM data. Also available as `tiqora itsm import`
    (the worker must run).

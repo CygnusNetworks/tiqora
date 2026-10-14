@@ -706,14 +706,14 @@
                   <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Runs Znuny processes (agent and portal); designer with validation, Znuny YAML import/export and versions; no test run, desktop only</small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Process designer in core<sup class="ref"><a href="#s6">6</a></sup></small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Process engine; ready-made ITSM processes<sup class="ref"><a href="#s13">13</a></sup></small></td>
-                  <td><span class="badge badge-partial">Partial</span><small>No process engine; core workflows adjust form fields, triggers automate<sup class="ref"><a href="#s20c">20</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>Core workflows adjust form fields (show/hide, mandatory, options); triggers automate actions; no process designer documented<sup class="ref"><a href="#s20c">20</a></sup><sup class="ref"><a href="#s20e">20</a></sup></small></td>
                   <td><span class="badge badge-addon">Add-on</span><small>Workflows module<sup class="ref"><a href="#s32">32</a></sup></small></td>
                   <td><span class="badge badge-partial">Partial</span><small>SLAs, help topics, tasks, routing filters<sup class="ref"><a href="#s40">40</a></sup></small></td>
                 </tr>
                 <tr>
                   <th scope="row">ITSM / CMDB</th>
                   <td class="col-tiqora"><span class="badge badge-partial">Partial</span><small>Incident, problem, major incident, priority matrix; own CMDB with versioned classes and impact analysis, or read Znuny's CMDB; importer from Znuny ITSM 6.5/7.3. No change management</small></td>
-                  <td><span class="badge badge-addon">Add-on</span><small>Free ITSM bundle with CMDB, change, incident/problem<sup class="ref"><a href="#s6c">6</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Free ITSM bundle with CMDB, change, incident/problem<sup class="ref"><a href="#s6c">6</a></sup><sup class="ref"><a href="#s6d">6</a></sup><sup class="ref"><a href="#s6e">6</a></sup></small></td>
                   <td><span class="badge badge-ok">Yes</span><small>IT Service Management, CMDB<sup class="ref"><a href="#s13">13</a></sup></small></td>
                   <td><span class="badge badge-no">No ITSM</span><small>i-doit CMDB integration<sup class="ref"><a href="#s22">22</a></sup></small></td>
                   <td><span class="badge badge-no">No</span><sup class="ref"><a href="#s32">32</a></sup></td>
@@ -731,7 +731,7 @@
                 <tr>
                   <th scope="row">Dashboards &amp; wallboards</th>
                   <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Several widget dashboards per agent, report widgets, role templates, sharing; TV mode and read-only wallboard links</small></td>
-                  <td><span class="badge badge-ok">Yes</span><small>One dashboard per agent: widgets on/off, reorder, per-widget settings<sup class="ref"><a href="#s7b">7</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Agent dashboard: widgets on/off, drag to reorder, per-widget settings<sup class="ref"><a href="#s7b">7</a></sup></small></td>
                   <td><span class="badge badge-ok">Yes</span><small>Dashboard widgets (feature list names a news widget)<sup class="ref"><a href="#s13">13</a></sup></small></td>
                   <td><span class="badge badge-partial">Partial</span><small>Personal stats dashboard, updated every 30 minutes<sup class="ref"><a href="#s20d">20</a></sup></small></td>
                   <td>—</td>
@@ -906,7 +906,9 @@
               <h3>You need ITSM change management</h3>
               <p>
                 Changes and work orders: stay on <strong>Znuny</strong> with
-                its free ITSM packages, or look at <strong>OTRS</strong>. Tiqora has
+                its free ITSM packages<sup class="ref"><a href="#s6e">6</a></sup>, or look at
+                <strong>OTRS</strong>, whose feature list names IT service management and
+                ready-made ITIL processes<sup class="ref"><a href="#s13">13</a></sup>. Tiqora has
                 incidents, problems and a CMDB, and can read Znuny's CMDB while Znuny
                 keeps the changes, but no change management of its own yet.
               </p>
@@ -932,8 +934,8 @@
             <article class="card">
               <h3>You need social channels</h3>
               <p>
-                Facebook or X: <strong>Zammad</strong> covers Facebook out of the box,
-                <strong>FreeScout</strong> sells modules for both. Tiqora has web chat,
+                Facebook or X: <strong>Zammad</strong> covers Facebook out of the box<sup class="ref"><a href="#s20">20</a></sup>,
+                <strong>FreeScout</strong> sells modules for both<sup class="ref"><a href="#s32">32</a></sup>. Tiqora has web chat,
                 Telegram, SMS and WhatsApp, but no social channels.
               </p>
             </article>
@@ -992,7 +994,7 @@
                 <li id="s3"><a href="https://www.znuny.com/en/blog/znuny-built-in-saml-authentication">Znuny 7.3 — built-in SAML authentication</a>; <span id="s3b"><a href="https://www.znuny.com/en/product/add-ons/scim-identity-provisioning">SCIM Identity Provisioning add-on</a></span></li>
                 <li id="s4"><a href="https://www.znuny.com/en/blog/znuny-llm">Znuny-LLM add-on</a></li>
                 <li id="s5"><a href="https://github.com/znuny/Znuny">Znuny on GitHub</a> (license, language, <code>i18n/Znuny</code>)</li>
-                <li id="s6"><a href="https://github.com/znuny/Znuny/tree/dev/Kernel/Modules">Znuny core modules</a> (AdminPGP, AdminSMIME, AdminProcessManagement, AdminPackageManager, AgentDashboard, AgentStatistics); <span id="s6b"><a href="https://github.com/znuny/FAQ">FAQ package</a></span>; <span id="s6c"><a href="https://github.com/znuny/ITSMCore">ITSM Core</a></span></li>
+                <li id="s6"><a href="https://github.com/znuny/Znuny/tree/dev/Kernel/Modules">Znuny core modules</a> (AdminPGP, AdminSMIME, AdminProcessManagement, AdminPackageManager, AgentDashboard, AgentStatistics); <span id="s6b"><a href="https://github.com/znuny/FAQ">FAQ package</a></span>; <span id="s6c"><a href="https://github.com/znuny/ITSMCore">ITSM Core</a></span>; <span id="s6d"><a href="https://github.com/znuny/ITSMConfigurationManagement">ITSM Configuration Management</a></span>; <span id="s6e"><a href="https://github.com/znuny/ITSMChangeManagement">ITSM Change Management</a></span></li>
                 <li id="s7"><a href="https://doc.znuny.org/znuny/admin/usermanagement/user_backends/index.html">Znuny docs — user backends</a>; <span id="s7b"><a href="https://doc.znuny.org/znuny/agentinterface/dashboards/index.html">agent dashboards</a></span></li>
                 <li id="s8"><a href="https://codeberg.org/wolkig-it/znuny_mcp">znuny_mcp (community MCP server)</a></li>
                 <li id="s9"><a href="https://www.znuny.com/en">Znuny GmbH — services</a>; <span id="s9b"><a href="https://www.znuny.com/en/product/add-ons">add-ons</a></span></li>
@@ -1014,7 +1016,7 @@
               <ol start="18">
                 <li id="s18"><a href="https://zammad.com/en/product/artificial-intelligence">Zammad AI</a></li>
                 <li id="s19"><a href="https://zammad.com/en/product/releases/7-0">Zammad 7.0 release</a></li>
-                <li id="s20"><a href="https://admin-docs.zammad.org/en/latest/">Zammad admin documentation</a> (channels, knowledge base); <span id="s20b"><a href="https://admin-docs.zammad.org/en/latest/system/packages.html">packages</a></span>; <span id="s20c"><a href="https://admin-docs.zammad.org/en/latest/system/core-workflows.html">core workflows</a></span>; <span id="s20d"><a href="https://user-docs.zammad.org/en/latest/extras/dashboard.html">dashboard (user docs)</a></span></li>
+                <li id="s20"><a href="https://admin-docs.zammad.org/en/latest/">Zammad admin documentation</a> (channels, knowledge base); <span id="s20b"><a href="https://admin-docs.zammad.org/en/latest/system/packages.html">packages</a></span>; <span id="s20c"><a href="https://admin-docs.zammad.org/en/latest/system/core-workflows.html">core workflows</a></span>; <span id="s20d"><a href="https://user-docs.zammad.org/en/latest/extras/dashboard.html">dashboard (user docs)</a></span>; <span id="s20e"><a href="https://admin-docs.zammad.org/en/latest/manage/trigger.html">triggers</a></span></li>
                 <li id="s21"><a href="https://admin-docs.zammad.org/en/latest/settings/security/third-party.html">Zammad third-party authentication</a></li>
                 <li id="s22"><a href="https://admin-docs.zammad.org/en/latest/system/integrations.html">Zammad integrations</a></li>
                 <li id="s23"><a href="https://admin-docs.zammad.org/en/latest/system/data-privacy.html">Zammad data privacy</a></li>

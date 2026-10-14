@@ -45,7 +45,7 @@ function DeclareDialog({
           <input
             className={inputCls}
             value={summary}
-            maxLength={2000}
+            maxLength={500}
             onChange={(e) => setSummary(e.target.value)}
             data-testid="major-declare-summary"
           />

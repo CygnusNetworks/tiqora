@@ -278,7 +278,9 @@ Die Architektur (Tabellen, Provider, Datenendpunkt, Layout-Engine) steht in
   Pydantic-Modell. Ein Provider liest Ticketdaten nur, schreibt höchstens eigene `tiqora_*`-Hilfsdaten
   (etwa den Tageswert einer Kennzahl) und committet nie selbst; er wirft `ProviderForbidden`, wenn
   die Berechtigung fehlt.
-- **Dashboards per API.** `GET /api/v1/dashboards` (Reiter), `POST /api/v1/dashboards` (anlegen),
+- **Dashboards per API.** `GET /api/v1/dashboards` (Reiter),
+  `GET /api/v1/dashboard-widget-types` (Widget-Arten der Galerie),
+  `POST /api/v1/dashboard-widget-types/{key}/data` (Vorschau ungespeicherter Einstellungen), `POST /api/v1/dashboards` (anlegen),
   `POST /api/v1/dashboards/ensure-start` (legt „Mein Start“ an), `PUT /api/v1/dashboards/order`
   (Reihenfolge), `GET/PUT/DELETE /api/v1/dashboards/{id}`, `PATCH /api/v1/dashboards/{id}/filters`,
   `PUT /api/v1/dashboards/{id}/share`, `GET/POST /api/v1/dashboards/{id}/template-update`,

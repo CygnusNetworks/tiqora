@@ -9,8 +9,8 @@
 > a customer-portal view ("Meine Geräte und Systeme"). Access follows a Znuny group per class
 > (`ro` reads, `rw` writes). Everything lives in `tiqora_*` tables; the CMDB answers only in
 > Mode B (`itsm.mode = tiqora`). Two SQL views (`tiqora_v1_itsm_ci`, `tiqora_v1_itsm_ci_links`)
-> serve the Znuny add-on. REST: `/api/v1/cmdb` and `/api/v1/admin/cmdb` (API-key area `cmdb`),
-> portal: `/api/portal/config-items`. Read-only AI tools for the MCP server (`cmdb_search`,
+> serve the Znuny add-on. REST: `/api/v1/cmdb` (API-key area `cmdb`) and `/api/v1/admin/cmdb`
+> (area `admin`), portal: `/api/portal/config-items`. Read-only AI tools for the MCP server (`cmdb_search`,
 > `cmdb_get`, `cmdb_impact`) are described in "KI-Werkzeuge (MCP)" below.
 >
 > **API-key scopes in short.** `cmdb:ro` / `cmdb:rw` cover `/api/v1/cmdb` and the mode-agnostic
@@ -321,6 +321,10 @@ brauchen deshalb keinen Schreibzugriff (`mcp:rw`) auf dem Schlüssel.
 | `cmdb_get` | ein CI mit Status, aktueller Version, Attributen und Verknüpfungen holen | `ci_id` oder `number` (eines von beiden; `number` wird exakt gesucht) |
 | `cmdb_impact` | Auswirkungsanalyse eines CI | `ci_id`, `max_depth` (Vorgabe 4, 1 bis 5) |
 
+In Modus A sind `class_key`, `deployment_state` und `incident_state` die numerischen Znuny-IDs
+(Klassen-ID bzw. `general_catalog.id`) als Text; Schlüssel wie `production` liefern dort keine
+Treffer und keinen Fehler. `query` durchsucht in Modus A zusätzlich Attributwerte ab 3 Zeichen.
+
 **Antworten.**
 
 - `cmdb_search` liefert je Treffer `ci_id`, `number`, `name`, `class` (Anzeigename),
@@ -366,12 +370,14 @@ einem Zugriffsfehler. Schlüssel ohne `tool:`-Eintrag dürfen alle Werkzeuge.
   modusunabhängige `/api/v1/itsm`; die Admin-Endpunkte unter `/api/v1/admin/cmdb` verlangen den
   bestehenden Bereich `admin`, Ticket-Unterressourcen (`/tickets/{id}/cis`) den Bereich `tickets`. Bekannte Folge: `POST /cmdb/cis/search` braucht `cmdb:rw`,
   und ein reiner `cmdb`-Schlüssel kann `/api/v1/jobs` nicht abfragen, braucht dafür also
-  zusätzlich `tickets:ro`.
+  zusätzlich `tickets:ro` oder `stats:ro`.
 - Die OpenAPI-Beschreibung steht in `docs/api/openapi.json`.
-- Die Prozess-Aktion `ConfigItemUpdate` gehört zum Znuny-Import
-  (siehe [itsm.md](itsm.md), Kapitel 7); sie ändert CIs über `CiService` (als handelnder
-  Benutzer, ohne Klassenrechte-Prüfung) und wirkt nur im Modus `tiqora`. Für den Import
-  liefert die CMDB die Schnittstelle `tiqora.cmdb.importer_api`.
+- Die Prozess-Aktion `ConfigItemUpdate` ist eine Portierung der gleichnamigen Znuny-TransitionAction
+  (siehe [process-management.md](process-management.md), Abschnitt „TransitionAction modules“);
+  sie ändert CIs über `CiService` (als handelnder Benutzer, ohne Klassenrechte-Prüfung) und wirkt
+  nur im Modus `tiqora`. In jedem anderen Modus wird sie protokolliert und in
+  `unsupported_actions` gemeldet. Für den ITSM-Import liefert die CMDB die Schnittstelle
+  `tiqora.cmdb.importer_api`.
 
 ## Nicht enthalten (Welle 5)
 

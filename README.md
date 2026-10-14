@@ -99,7 +99,7 @@ Questions, ideas, war stories from your OTRS migration:
   uploads, topics routed to queues), a chat inbox for agents, an AI assistant that answers first and
   **hands off** to your team, **recognised visitors** (signed website sign-in or the
   customer-portal session), and chat in the customer portal. Every chat is a ticket —
-  [guide](./docs/guide/webchat.md) (German), [internals](./docs/webchat.md).
+  [guide](./docs/guide/webchat.md) (German, English summary), [internals](./docs/webchat.md).
 - **ITSM and CMDB** — incident, problem / known error and **major incident**
   handling, criticality x impact **priority matrix**, services with ITSM data, link
   types with delete, notes to linked tickets and a link graph, and a versioned
@@ -124,7 +124,7 @@ Questions, ideas, war stories from your OTRS migration:
   [process management](./docs/process-management.md).
 - **Plugin system** — extend Tiqora with Python plugins (SDK 0.2.0): ticket events,
   sync hooks, transition actions, channels, password providers, report sources,
-  dashboard widgets and more; install **signed packages** from the admin UI or from
+  dashboard widgets and more; install **signed packages** (unsigned only when explicitly allowed) from the admin UI or from
   package **repositories** — [plugins](./docs/plugins.md) (German admin part,
   English developer guide).
 - **Modern design** — light, dark and system themes, compact cobalt design system.
@@ -542,7 +542,7 @@ Full index: **[docs/README.md](./docs/README.md)**
 | [docs/reporting.md](./docs/reporting.md) | Reports: catalogue, builder, saved reports, Znuny stats import, PDF, schedules |
 | [docs/dashboards.md](./docs/dashboards.md) | Widget dashboards, role templates, wallboards (*German*) |
 | [docs/guide/identity-providers.md](./docs/guide/identity-providers.md) | SAML, OIDC, LDAP, customer SSO, SCIM, step-up MFA (*German*) |
-| [docs/guide/webchat.md](./docs/guide/webchat.md) · [docs/webchat.md](./docs/webchat.md) | Web chat: administrators and agents (*German*, no summary); internals (English) |
+| [docs/guide/webchat.md](./docs/guide/webchat.md) · [docs/webchat.md](./docs/webchat.md) | Web chat: administrators and agents (*German*, English summary); internals (English) |
 | [docs/plugins.md](./docs/plugins.md) | Plugin system: admin part (*German*), developer guide (English) |
 | [docs/process-management.md](./docs/process-management.md) · [docs/guide/webservices.md](./docs/guide/webservices.md) | Processes and the designer; outgoing GenericInterface calls (*German*, no summary) |
 | [docs/crypto.md](./docs/crypto.md) · [docs/channels.md](./docs/channels.md) · [docs/i18n.md](./docs/i18n.md) | PGP / S/MIME, channels, UI languages |

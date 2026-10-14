@@ -10,14 +10,13 @@
 > otherwise Mode B) and stores the result once. A -> B is possible only through the ITSM import
 > (chapter 7, [itsm-import.md](itsm-import.md)). The process action `LinkAdd` with a CI end follows
 > the mode (Mode B: CMDB link service with the same rights as the API; Mode A: Znuny link; off:
-> skipped as `itsm_off`), and a refused link or a plugin veto never aborts the process transition: the
-> action is reported in `skipped_actions`. API-key area: `cmdb` for `/api/v1/itsm`, `tickets` for the
+> skipped as `itsm_off`), and a refused link or a plugin veto never aborts the process transition. In
+> Mode B, when off and on a plugin veto the action is reported in `skipped_actions`; in Mode A a link
+> that Znuny's rules refuse is only logged, as in Znuny. API-key area: `cmdb` for `/api/v1/itsm`, `tickets` for the
 > ticket sub-routes, `admin` for `/api/v1/admin/itsm`. UI labels below are the German defaults.
 
 Dieses Dokument beschreibt die ITSM-Funktionen von Tiqora: Incident und Problem, Services und
-Prioritätsmatrix, Verknüpfungen, die CMDB und den Betrieb neben Znuny. Die Kapitel werden mit den
-Wave-4-Plänen gefüllt; jedes Kapitel hat genau einen zuständigen Plan (ITSM-Kern: Kapitel 1–5,
-CMDB: Kapitel 6, ITSM-Import: Kapitel 7 und die Kapitel danach).
+Prioritätsmatrix, Verknüpfungen, die CMDB und den Betrieb neben Znuny.
 
 ## 1 Überblick und Modi
 
@@ -86,7 +85,7 @@ erscheinen nur für erlaubte Wechsel; die Seite zeigt außerdem die in Znuny gef
 Znuny installiert“) und die Quelle der Entscheidung („automatisch erkannt“, „vom Administrator“,
 „durch den Import“).
 
-![Admin, Seite „ITSM“: Modus, Einrichtung und Prioritätsmatrix (Demo, Modus A)](images/admin-itsm.png)
+![Admin, Seite „ITSM“: Modus, Einrichtung und Prioritätsmatrix (Demo, Modus A, englische Oberfläche)](images/admin-itsm.png)
 
 ### Berechtigungen und API
 
@@ -139,7 +138,8 @@ verknüpfte Tickets“ in Kapitel 4).
 ### Großstörung (Major Incident)
 
 Im Ticket zeigt der Block „Major Incident“ die Schaltfläche „Major Incident ausrufen“ (Dialog mit
-optionaler „Zusammenfassung“, höchstens 500 Zeichen; sie ist bei Antworten der Betreff). Sie setzt den
+optionaler „Zusammenfassung“, höchstens 500 Zeichen; sie wird mit „Major Incident:“ davor zum Betreff
+der Kundenantworten, ohne Zusammenfassung steht dort der Ticket-Titel). Sie setzt den
 Ticket-Typ auf `Incident::Major` und legt einen Eintrag mit Zeitleiste („Ausgerufen“, „Update“,
 „Beendet“) an. Jedes verknüpfte Ticket, das der Agent lesen darf, zeigt ein Banner „Mit einem aktiven
 Major Incident verknüpft:“. „Update senden“ (Dialog „Update an alle Betroffenen“, Feld „Zustellung“)
@@ -231,7 +231,8 @@ abgeleiteten Vorfallstatus im Hintergrund neu (Job `core.cmdb_propagation`, sieh
 (`ITSMConfigItem`) ist, richtet sie sich nach dem ITSM-Modus: In Modus B läuft sie über den
 CMDB-Link-Dienst mit denselben Rechten wie die API, in Modus A über die Znuny-Verknüpfung, bei „Aus“
 wird sie übersprungen (`itsm_off`). Eine abgelehnte Verknüpfung oder ein Veto eines Plugins bricht den
-Prozessübergang nicht ab, die Aktion steht in `skipped_actions` (Einzelheiten im Abschnitt „Prozess-Aktion
+Prozessübergang nicht ab. In Modus B, bei „Aus“ und bei einem Veto steht die Aktion in `skipped_actions`;
+in Modus A wird eine nach Znunys Regeln abgelehnte Verknüpfung wie in Znuny nur protokolliert (Einzelheiten im Abschnitt „Prozess-Aktion
 LinkAdd und der ITSM-Modus“ in Kapitel 7).
 
 ### Notizen an verknüpfte Tickets
@@ -267,8 +268,8 @@ In Modus A bleibt Znuny die Quelle der CMDB; Tiqora liest dessen Tabellen und sc
 ITSM-Tabelle von Znuny (`configitem*`, `general_catalog`, `cip_allocate`, `service`-Spalten). Der
 Adapter ist auf die Linien 6.5 (ITSMCore 6.5.5, ITSMConfigurationManagement 6.5.4) und 7.3 (7.3.3 /
 7.3.5) vermessen (`docs/itsm-import.md`, Abschnitte „Schema je Version“ und „Behaviour“); beide
-Linien verhalten sich gleich. Eine andere Paketversion zeigt „Diese Znuny-ITSM-Version wird noch
-nicht unterstützt“.
+Linien verhalten sich gleich. Paketversionen außerhalb dieser Linien (jede 6.5.x- und 7.3.x-Version
+wird angenommen) zeigen „Diese Znuny-ITSM-Version wird nicht unterstützt (…)“.
 
 In Modus A zeigt die CI-Seite (Menü „CMDB“ in der Seitenleiste) Liste, Suche
 (Nummer und Name, Attributwerte ab 3 Zeichen), Detail mit Attributen, Versionen und verknüpften Tickets,
@@ -289,7 +290,7 @@ den Hinweis „Nur-Lese-Ansicht der Znuny-CMDB“ und den Verweis „In Znuny be
 | Service: Typ, Kritikalität | aus Znuny, schreibgeschützt | bearbeitbar | nein |
 | Vorfallstatus des Services | aus Znunys CIs berechnet | aus der Tiqora-CMDB | nein |
 | Problem, bekannter Fehler, Großstörung | ja (Daten in `tiqora_*`) | ja | nein |
-| Znuny-Changes und Arbeitsaufträge | nicht gezeigt (Phase 3), Verweis nach Znuny | nicht gezeigt (Phase 3) | nein |
+| Znuny-Changes und Arbeitsaufträge | nicht gezeigt ([Welle 5](cmdb.md#nicht-enthalten-welle-5)), Verweis nach Znuny | nicht gezeigt (Welle 5) | nein |
 | Notiz an verknüpfte Tickets, Verknüpfung löschen, Grafik | ja | ja | ja |
 
 ### Wer welche CIs sieht
@@ -378,7 +379,7 @@ Weg läuft ausschließlich über den Import (siehe oben, Kapitel 1).
 CMDB-Seiten antworten mit „Die CMDB wird in Znuny geführt“ (`409 cmdb_in_znuny`). Nichts von dem, was
 Sie importieren, ist sichtbar, bevor Sie umgestellt haben; auch das übernommene Zwischenergebnis bleibt
 verborgen. In Znuny ändert sich nichts. Die Erweiterung TiqoraITSM ist inaktiv und zeigt nichts an.
-Admin, ITSM, „Import aus Znuny“ ist die Seite, von der aus Sie umstellen.
+Admin, „ITSM-Import“ (Seite „ITSM-Daten aus Znuny übernehmen“) ist die Seite, von der aus Sie umstellen.
 
 **Modus B.**
 
@@ -406,7 +407,8 @@ der CI-IDs speichert, ordnet sie über die Zuordnung des Imports (Znuny-ID zu Ti
 Die Umstellung braucht keinen Stillstand. Bis zum letzten Schritt können Sie wiederholen und
 abbrechen, Znuny bleibt führend.
 
-1. **Probelauf, Bericht lesen.** Admin, ITSM, „Import aus Znuny“, Schaltfläche „Probelauf“. Er liest und
+1. **Probelauf, Bericht lesen.** Admin, „ITSM-Import“ (Seite „ITSM-Daten aus Znuny übernehmen“),
+   Schaltfläche „Probelauf“. Er liest und
    zählt, schreibt aber nichts. Lesen Sie den Bericht (Abschnitt „ITSM-Daten aus Znuny übernehmen“) und
    beheben Sie, was in Znuny zu korrigieren ist (z. B. Attribut-Schlüssel mit Leerzeichen).
 2. **Übernehmen, beliebig oft wiederholen.** „Übernehmen“ kopiert Katalog, Klassen, CIs mit allen
@@ -452,14 +454,14 @@ Tiqora diesen Weg ab (`409`), denn dann gilt der Ablauf mit Import.
 | CI mit Ticket verknüpfen (Verknüpfen-Maske) | gesperrt, soweit ein CI beteiligt ist; in Tiqora am Ticket („Betroffene CIs“) oder, wenn eingeschaltet, über die Verknüpfungsaktion der Erweiterung |
 | Klassen-Definition (Admin) | Ansicht bleibt (nur lesen); Ändern gesperrt; in Tiqora: CMDB, Klassen, Designer |
 | Import/Export von CIs | bleibt, wird aber nicht gesperrt (siehe Bekannte Lücken); in Tiqora: CMDB, Import und Export |
-| Change- und Arbeitsauftrag-Masken | bleiben unverändert in Znuny; in Tiqora entfällt (siehe Phase 3), die Daten werden nur gezählt |
+| Change- und Arbeitsauftrag-Masken | bleiben unverändert in Znuny; in Tiqora entfällt (siehe [Welle 5](cmdb.md#nicht-enthalten-welle-5)), die Daten werden nur gezählt |
 | Kundenansicht der CIs in Znuny | bleibt (nur lesen); in Tiqora: Kundenportal, „Meine Geräte und Systeme“; optional die Seite der Erweiterung |
 | Service-Zoom | bleibt unverändert (wird nicht gesperrt); in Tiqora: Services, ITSM-Angaben |
-| ITSM-Statistiken (CI, Change) | entfällt (siehe Phase 3); Tiqoras Berichte kennen die Znuny-ITSM-Auswertungen nicht |
+| ITSM-Statistiken (CI, Change) | entfällt (siehe [Welle 5](cmdb.md#nicht-enthalten-welle-5)); Tiqoras Berichte kennen die Znuny-ITSM-Auswertungen nicht |
 
 ### Zurück zu Modus A
 
-Auf der Seite „Import aus Znuny“ führt „Zurück zu Znuny (Modus A)“ zum alten Zustand: Znuny ist wieder
+Auf der Seite „ITSM-Daten aus Znuny übernehmen“ führt „Zurück zu Znuny (Modus A)“ zum alten Zustand: Znuny ist wieder
 führend, die Sperre der CI-Bildschirme ist aufgehoben, Tiqora liest die CIs wieder aus Znuny. Sie müssen das
 Wort im Dialog zur Bestätigung eingeben („ZURÜCK“, ersatzweise „ZURUECK“; beim Umstellen „UMSTELLEN“).
 
@@ -489,7 +491,8 @@ vollständig nach Tiqora holen, löschen Sie die betroffenen CIs in Tiqora vor d
 
 ## ITSM-Daten aus Znuny übernehmen
 
-Die Seite finden Sie unter Admin, ITSM, „Import aus Znuny“ („ITSM-Import öffnen“ auf der Seite „ITSM“).
+Die Seite finden Sie unter Admin, „ITSM-Import“ (Seite „ITSM-Daten aus Znuny übernehmen“; auch über
+„ITSM-Import öffnen“ auf der Seite „ITSM“).
 Sie zeigt den Modus, die gefundene Znuny-ITSM-Version, die Zahl der CIs, Klassen, Changes und
 Arbeitsaufträge in Znuny, den letzten Lauf und die Läufe als Liste mit ihrem Bericht.
 
@@ -515,8 +518,10 @@ tiqora itsm import --page-size 200 --json
 tiqora itsm status             # Modus und letzter Lauf (mit --json maschinenlesbar)
 ```
 
-`tiqora itsm import` startet den Auftrag und wartet auf den Worker; der Worker muss laufen. Es gelten
-dieselben Sperren wie auf der Seite. Alle Unterbefehle und Optionen (`--dry-run`, `--page-size`,
+`tiqora itsm import` startet den Auftrag und wartet auf den Worker; der Worker muss laufen. Die
+Befehlszeile prüft vorab nur Umstellung und aktiven Lauf; Modus und hängende Sperre prüft nur die
+Seite beziehungsweise die API. Fehlt Znuny ITSM oder ist die Version nicht unterstützt, scheitert der
+Lauf erst im Worker (mit der Meldung im Lauf). Alle Unterbefehle und Optionen (`--dry-run`, `--page-size`,
 `--json`) stehen in [itsm-import.md](itsm-import.md), Abschnitt „Befehlszeile und Schnittstelle“. Die
 Umstellung auf Modus B und der Rückweg gibt es nur auf der Seite beziehungsweise über die
 Admin-API, nicht in der Befehlszeile.
@@ -569,11 +574,11 @@ Die Prozess-Aktion `LinkAdd` richtet sich nach dem ITSM-Modus, sobald ein Ende `
 | Modus | Verhalten |
 |---|---|
 | `tiqora` | Die Verknüpfung läuft über den CMDB-Link-Dienst, mit denselben Rechten wie die API: `rw` auf der Queue des Tickets und `ro` auf der CI-Klasse, geprüft für den Prozess-Benutzer (`UserID` der Aktion, sonst der Agent). |
-| `znuny_readthrough` | Wie bisher: Znuny-Verknüpfung (`link_relation`). |
+| `znuny_readthrough` | Wie bisher: Znuny-Verknüpfung (`link_relation`). Lehnt Znunys Regel die Verknüpfung ab, wird das wie in Znuny nur protokolliert; die Aktion steht nicht in `skipped_actions`. |
 | `off` | Die Aktion wird übersprungen (Grund `itsm_off`), Ticket-zu-Ticket-Verknüpfungen funktionieren weiter. |
 
-Eine abgelehnte Verknüpfung (unbekanntes CI oder Typ, fehlende Rechte) bricht den Prozessübergang nicht ab. Die Aktion
-steht dann in `skipped_actions` der Antwort (`module`, `reason`, `detail`). Dasselbe gilt für Schreibzugriffe von
+Eine abgelehnte Verknüpfung (unbekanntes CI oder Typ, fehlende Rechte) bricht den Prozessübergang nicht ab. In Modus B
+und bei „Aus“ steht die Aktion dann in `skipped_actions` der Antwort (`module`, `reason`, `detail`). Dasselbe gilt für Schreibzugriffe von
 Erweiterungs-Aktionen, die ein Plugin per Hook ablehnt (Grund `vetoed`, `detail` ist der Text des Plugins). Die
 Aktion hinterlässt dann nichts in der Datenbank. Im Kundenportal enthält `skipped_actions` nur `module` und
 `reason`; `detail` bleibt leer, weil Veto-Texte und interne Gründe für Agenten geschrieben sind.

@@ -7,8 +7,9 @@
 > is mapped where, repeat and conflict rules, the report (11 steps plus the class-definition counters,
 > the issue codes, the CSV file) and the interfaces: the admin page, the REST API under
 > `/api/v1/admin/itsm/import` (API-key area `admin`) and the `tiqora itsm import|status` commands. The
-> importer only reads Znuny, writes only `tiqora_*` tables, can run any number of times and is possible
-> only while Mode A is active and before the switch to Tiqora. Changes and workorders are counted, not
+> importer only reads Znuny, writes only `tiqora_*` tables, can run any number of times and runs
+> before the switch to Tiqora; the admin page and API also require Mode A (the CLI checks only the
+> switch and a running job). Changes and workorders are counted, not
 > imported. Operational steps are in [itsm.md](itsm.md), chapter 7.
 
 Dieses Dokument beschreibt, wie Znuny sein ITSM speichert, und ist die Grundlage für den Adapter
@@ -16,8 +17,7 @@ im Mode A (Znuny führt das ITSM, Tiqora liest) und für den Importer in den Mod
 ITSM). Alle Angaben stammen aus einer Vermessung echter Znuny-Instanzen mit installierten
 ITSM-Paketen (`tests/golden/itsm_survey.py`); die erzeugten Dateien liegen unter
 `backend/tests/fixtures/znuny-itsm/<profil>/` (siehe dortige `README.md`). Nichts davon ist von
-Hand geschrieben oder aus der Dokumentation übernommen. Kapitel zum Importer-Ablauf, zur Zuordnung
-und zum Bericht folgen mit dem ITSM-Import-Plan.
+Hand geschrieben oder aus der Dokumentation übernommen.
 
 ## Unterstützte Versionen
 
@@ -38,8 +38,9 @@ Die Erkennung liest die Paketversionen aus `package_repository` (Status „insta
 vorhanden sein und, falls installiert, auch `ITSMConfigurationManagement`; beide müssen derselben
 Linie angehören (`>=6.5,<6.6` für `itsm-6`, `>=7.3,<7.4` für `itsm-7`). Maßgeblich ist also die
 Version der ITSM-Pakete, nicht die des Znuny-Kerns; Pakete verschiedener Linien werden nie gemischt.
-Ohne `ITSMCore` (Tabellen `general_catalog` und `cip_allocate` fehlen) meldet Tiqora „kein ITSM
-gefunden“, mit unbekannter Paketversion „nicht unterstützt“. Ist nur ITSMCore ohne das CMDB-Paket
+Fehlen die Tabellen `general_catalog` und `cip_allocate`, meldet Tiqora „kein ITSM gefunden“ („In der
+Datenbank wurde kein Znuny ITSM gefunden.“); sind sie vorhanden, aber `ITSMCore` fehlt in
+`package_repository` oder hat eine unbekannte Version, lautet das Ergebnis „nicht unterstützt“. Ist nur ITSMCore ohne das CMDB-Paket
 installiert, importiert Tiqora Katalog, Prioritätsmatrix und Service-Angaben ohne Klassen und CIs.
 
 Unterschiede in den Konfigurationseinstellungen (`sysconfig.json`): 7.3 liefert zusätzlich die
@@ -593,7 +594,7 @@ ergänzen, dann das Verhalten messen.
 
 ## Importer: Zuordnung und Bericht
 
-Der Importer (Verwaltung, ITSM, „Import aus Znuny“) kopiert das ITSM aus der Znuny-Datenbank nach Tiqora.
+Der Importer (Admin, „ITSM-Import“, Seite „ITSM-Daten aus Znuny übernehmen“) kopiert das ITSM aus der Znuny-Datenbank nach Tiqora.
 Er liest Znuny nur und schreibt ausschließlich in Tiqora-Tabellen. Gestartet wird er als Hintergrundauftrag
 (`core.itsm_import`); der Fortschritt erscheint in der Verwaltung, der Bericht steht nach dem Lauf als
 Übersicht und als CSV-Datei bereit. Die Schemata der Quelle sind oben in diesem Dokument beschrieben,
@@ -710,14 +711,17 @@ aktiv ist. Der Worker muss laufen, sonst wartet der Befehl.
 | Aufruf | Zweck |
 |---|---|
 | `GET /status` | Modus, gefundene Znuny-ITSM-Version (`profile`), Zähler in Znuny (CIs, Klassen, Changes, Arbeitsaufträge), Umstellung, Sperre, letzter Lauf, aktiver Auftrag, `can_import`, `can_switch`, `blocked_reason`, Drift-Zähler |
-| `POST /runs` mit `{"dry_run": bool}` | Probelauf oder Übernahme; 202 mit Auftrags-ID, 409 mit Grund, wenn blockiert (nach der Umstellung, Auftrag läuft, kein Znuny-ITSM, nicht unterstützte Version, hängende Sperre, Modus nicht „Znuny-Durchgriff“) |
+| `POST /runs` mit `{"dry_run": bool}` | Probelauf oder Übernahme; 202 mit Auftrags-ID, 409 mit Grund, wenn blockiert (nach der Umstellung, Auftrag läuft, kein Znuny-ITSM, nicht unterstützte Version, hängende Sperre, Modus nicht „Znuny führt das ITSM“) |
 | `GET /runs?limit=` und `GET /runs/{id}` | Läufe (1 bis 100, Vorgabe 20) und ein Lauf mit Bericht |
-| `POST /switch` | Umstellung auf Tiqora: `confirm` = `UMSTELLEN`, `addon_installed`, `edits_stopped`, `without_ci_data`; verlangt einen erfolgreichen Import (außer bei `without_ci_data`) und entweder die Erweiterung oder die Bestätigung, dass in Znuny nichts mehr bearbeitet wird |
-| `POST /rollback` | Zurück zu Modus A: `confirm` = `ZURÜCK` (auch `ZURUECK`) |
+| `POST /switch` | Umstellung auf Tiqora: `confirm` = `UMSTELLEN`, `addon_installed`, `edits_stopped`, `without_ci_data`; verlangt einen erfolgreichen Import (außer bei `without_ci_data`) und entweder die Erweiterung oder die Bestätigung, dass in Znuny nichts mehr bearbeitet wird; `without_ci_data` nur bei nicht lesbarer Version (sonst 409); falsches Bestätigungswort: 400 |
+| `POST /rollback` | Zurück zu Modus A: `confirm` = `ZURÜCK` (auch `ZURUECK`); falsches Bestätigungswort: 400 |
 | `POST /release-lock` | „Sperre aufheben“: löscht eine hängende Schreibsperre, nicht während eines Auftrags und nicht nach der Umstellung |
 
-Ein Probelauf und ein Import sind nur im Modus „Znuny-Durchgriff“ (Modus A) möglich. Es läuft immer
-nur ein Import- oder Umstellungsauftrag.
+Über Seite und API sind ein Probelauf und ein Import nur im Modus „Znuny führt das ITSM“ (Modus A,
+`znuny_readthrough`) möglich. Die Befehlszeile prüft nur Umstellung und aktiven Lauf; Modus und
+hängende Sperre prüft nur Seite/API. Eine fehlende oder nicht unterstützte Znuny-ITSM-Version lässt
+auch einen von der Befehlszeile gestarteten Lauf scheitern, aber erst im Worker. Es läuft immer nur
+ein Import- oder Umstellungsauftrag.
 
 ## Importer und GI gegen Znuny: Golden-Abgleich (`tests/golden/test_itsm_import.py`, `test_gi_config_items.py`)
 

@@ -117,13 +117,13 @@ Layer A CI: `.github/workflows/schema-matrix.yml` (release tags, nightly,
 | Mail account OAuth columns (6.3+) | Load-only adapter on 6.0–6.2 |
 | State/priority **color** (7.0+) | Admin creates inject default `#FFFFFF` |
 | TiqoraSync OPM cache invalidation | Multi-Framework `6.0.x`–`7.3.x` |
-| TiqoraSync 1.2.0 process / ACL deploy | Supported on `6.0.x`-`7.3.x` (golden-tested against a real Znuny peer, `tests/golden/test_tiqorasync_deploy.py`); see [above](#znuny-add-ons-shipped-with-tiqora) |
+| TiqoraSync 1.2.0 process / ACL deploy | Declared for `6.0.x`-`7.3.x` (`<Framework>` in `TiqoraSync.sopm`); golden-tested against a real Znuny peer (`tests/golden/test_tiqorasync_deploy.py`, default peer `znuny-6.5`); see [above](#znuny-add-ons-shipped-with-tiqora) |
 | ITSM on a fresh install (no Znuny) | Supported: Mode B (Tiqora CMDB) is chosen automatically, see [itsm.md](itsm.md#wie-der-modus-gewählt-wird) |
 | ITSM Mode A (read Znuny CMDB) and ITSM importer | Supported for Znuny ITSM **6.5.x** and **7.3.x** only; other ITSM versions: `unsupported_znuny_itsm_version` |
 | ITSM Mode B (Tiqora CMDB) in parallel operation | Supported on all profiles above; the CMDB lives in `tiqora_*` tables. After an import switch the optional `TiqoraITSM` add-on guards Znuny's CI screens |
 | GenericInterface `ConfigItem*` operations (provider) | Supported (REST + SOAP), behaviour depends on the ITSM mode: [compatibility.md](compatibility.md#configitemsearch) |
 | ITSMChangeManagement (changes, work orders) | Deferred: counted by the importer, not shown or imported |
-| Plugins (SDK 0.2.0), identity providers (SAML / OIDC / SCIM), web chat, reporting, dashboards | Tiqora-only features in `tiqora_*` tables; independent of the peer profile |
+| Plugins (SDK 0.2.0), identity providers (SAML / OIDC / SCIM), web chat, reporting, dashboards | Configuration in `tiqora_*` tables, plugin data in `tqp_<short_id>_*`; accounts and role/group assignments created by SSO/SCIM are written to Znuny's own user and permission tables (`users`, `customer_user`, `role_user`, `group_user`); independent of the peer profile |
 | Fresh-install bootstrap (`tiqora bootstrap`) | Still seeds **Znuny 6.5** base DDL (standalone greenfield) |
 | Schema ownership / `versions_owned/` | Only after cutover — not multi-version parallel-op |
 | Heavily custom OPM tables | Unknown profile → startup refuse (or explicit override) |

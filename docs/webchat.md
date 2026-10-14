@@ -53,13 +53,13 @@ availability check then reports `worker_down`, so new chats go to humans, and th
 whose visitor line has waited longer than 60 s ([Orphaned bot chats](#orphaned-bot-chats)). Setting `operation_mode`
 to `parallel` does not block the loop: `webchat` is a Tiqora-only channel.
 
-**Redis client (v0.19.0).** The loop uses its own Redis client (`make_bot_redis`) whose socket timeout
+**Redis client (since v0.18.1).** The loop uses its own Redis client (`make_bot_redis`) whose socket timeout
 (`BOT_BLPOP_TIMEOUT` 5 s + 2 s grace + 1 s = 8 s) is longer than the server-side `BLPOP` wait. Before, the shared
 client's default 5 s socket timeout equalled the `BLPOP` timeout, so every idle poll ended in a `TimeoutError`. Each
 `BLPOP` is also wrapped in `asyncio.wait_for(5 s + 2 s)`, so a half-open connection cannot stall the 15 s rescan.
 Identical failures (`webchat_bot_enabled_check_failed`, `webchat_bot_alive_refresh_failed`,
 `webchat_bot_rescan_failed`, `webchat_bot_queue_pop_failed`) are logged once per distinct error and then at most every
-10 minutes, with the exception text. These changes ship with v0.19.0 (commit `976ada44a`).
+10 minutes, with the exception text. These changes ship since v0.18.1 (commit `976ada44a`).
 
 The Redis list is an accelerator only. The database is the truth, so a lost push, a Redis restart or a crashed
 worker costs at most one rescan interval (15 s).
