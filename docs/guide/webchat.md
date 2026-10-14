@@ -1,5 +1,18 @@
 # Web-Chat
 
+> **English summary.** The web chat is an embeddable chat widget for websites (and, optionally, the customer portal).
+> Every chat becomes a ticket; the messages are articles on the `WebChat` channel. Admins set it up under **Admin, Web-Chat**:
+> master switch, one or more chats with topics (each mapped to a queue), opening hours, pre-chat form, look, abuse
+> limits, upload rules and an embed snippet (`<script src=".../chat/v1/loader.js" data-tiqora-chat="...">`).
+> A topic can be answered first by the **AI assistant** (the same auto-reply AI as for e-mail, run by `tiqora-ai-worker`):
+> it announces itself as an AI, the visitor can press "talk to a human" at any time, and every limit or failure ends in a
+> hand-off to the team, never in silence. Agents accept chats in the **Chats** inbox, take over chats the AI is
+> answering, and end them. A website can pass a signed token (`Tiqora.chat.identify`) so that known customers are
+> recognised ("Identität bestätigt"); the portal does this automatically. Sections below are in German, with exact UI
+> labels; operator and developer details are in [deployment.md](../deployment.md#web-chat) and
+> [webchat.md](../webchat.md), the AI side in [ai-integration.md](../ai-integration.md#web-chat-assistant),
+> the REST/public API in [rest-v1.md](../api/rest-v1.md).
+
 Mit dem Web-Chat können Besucher Ihrer Website direkt mit Ihrem Team schreiben. Jeder Chat wird als Ticket in
 Tiqora geführt: Die Nachrichten des Besuchers und Ihre Antworten sind Artikel dieses Tickets, auch wenn der Chat
 längst beendet ist. Auf Wunsch beantwortet zuerst ein KI-Assistent die Nachrichten und übergibt bei Bedarf an Ihr
@@ -21,7 +34,8 @@ unter `https://helpdesk.example.org`.
 Öffnen Sie im Admin-Bereich **Web-Chat**. Oben auf der Seite steht der Schalter **Web-Chat eingeschaltet**. Er
 gilt für alle Chats und alle Websites gemeinsam und ist ab Werk aus. Solange er aus ist, erscheint der Chat auf
 keiner Website, und Besucher können keine neuen Nachrichten schicken. Laufende Unterhaltungen können Besucher noch
-beenden; ihren Verlauf sehen sie weiterhin.
+beenden; ihren Verlauf sehen sie weiterhin. Der Schalter gilt auch für den KI-Assistenten: Solange er aus ist, beantwortet
+der KI-Dienst keine Chats.
 
 Sie können einen Chat in Ruhe vorbereiten, bevor Sie den Schalter umlegen: Die Vorschau im Reiter **Aussehen**
 funktioniert auch für ausgeschaltete oder noch unvollständige Chats.
@@ -56,12 +70,15 @@ Wählen Sie **Neuer Chat**. Die Einstellungen sind auf Reiter verteilt; ein Reit
 - **Wenn niemand da ist**: **Nachrichtenformular** (der Besucher hinterlässt eine Nachricht, es entsteht ein
   Ticket), **Chat ausblenden** (der Chat ist dann gar nicht zu sehen) oder **KI antwortet allein** (der
   KI-Assistent führt den Chat auch dann, wenn kein Agent erreichbar ist; siehe unten). **KI antwortet allein** ist
-  nur wählbar, wenn im Reiter **KI** mindestens ein Thema **KI antwortet zuerst** nutzt.
+  nur wählbar, wenn im Reiter **KI** mindestens ein Thema **KI antwortet zuerst** nutzt. Für solche Themen bleibt der
+  Chat dann auch außerhalb der Öffnungszeiten und ohne erreichbaren Agenten offen, solange der Assistent bereit ist;
+  alle übrigen Themen verhalten sich wie beim **Nachrichtenformular**.
 - **Standard-Kunde (optional)**: der Kundenbenutzer, dem Chats ohne E-Mail-Adresse zugeordnet werden.
 
 **Vorab-Formular**
 
-Hier legen Sie fest, was der Chat abfragt, bevor das Gespräch beginnt. Ohne Felder starten Besucher direkt. Pro
+Hier legen Sie fest, was der Chat abfragt, bevor das Gespräch beginnt. Ein neuer Chat bringt zwei freiwillige Felder mit
+(**Name** → Name, **E-Mail** → E-Mail); bis zu 15 Felder sind möglich. Ohne Felder starten Besucher direkt. Pro
 Feld gibt es **Schlüssel**, **Beschriftung**, **Art** (**Text**, **Mehrzeiliger Text**, **E-Mail**, **Auswahl**,
 **Kontrollkästchen**) und **Pflichtfeld**. Mit **Übernehmen in** bestimmen Sie, wohin die Antwort wandert:
 
@@ -138,7 +155,11 @@ E-Mails (Modelle, Wissensdatenbank, Datenschutz-Maskierung, Budgets); es gibt ke
    Absender der Antworten im Ticket. Die **Autonomie** sollte **Voll autonom** sein: Bei **Aus (nur Entwürfe)**
    gilt der Assistent als nicht bereit; bei **Nur Rückfragen** kann er nur Rückfragen senden und übergibt, sobald er
    eine abschließende Antwort geben müsste.
-2. Der Dienst **tiqora-ai-worker** läuft. Er führt die Gespräche; ohne ihn gehen neue Chats gleich an Ihr Team.
+2. Der Dienst **tiqora-ai-worker** läuft und ist eingeschaltet (Dienstschalter `daemon.ai_worker.enabled`), und der
+   Schalter **Web-Chat eingeschaltet** steht auf an. Der Dienst führt die Gespräche; ohne ihn gehen neue Chats gleich
+   an Ihr Team, und ein Chat, auf dessen Besucherzeile der Assistent länger als 60 Sekunden nicht antwortet, wird
+   automatisch an Ihr Team übergeben. Betreiben Sie genau einen KI-Dienst
+   ([deployment.md](../deployment.md#chat-assistant-and-website-sign-in)).
 3. Mindestens ein Modell ist erreichbar.
 
 **Empfehlung: eine eigene Chat-Queue.** Die Einstellung **automatische Antworten** gilt für die ganze Queue.
@@ -149,13 +170,14 @@ und die allgemeinen Grenzen).
 Im Reiter **KI** des Chats:
 
 - **KI antwortet zuerst: *Thema*** (**Aus** / **Ja**): pro Thema. Nur dort startet der Besucher beim Assistenten.
-- **Name des Assistenten** (Pflicht, höchstens 80 Zeichen): So stellt sich die KI vor, zum Beispiel
-  „Mira“. Der Name erscheint in der Begrüßungszeile und im Chat.
+- **Name des Assistenten** (Pflicht, höchstens 80 Zeichen, Vorgabe „KI-Assistent“): So stellt sich die KI vor, zum
+  Beispiel „Mira“. Der Name erscheint in der Begrüßungszeile und im Chat.
 - **Tonfall (optional)**: ein kurzer Hinweis für den Stil, zum Beispiel „Freundlich, kurz, per Sie.“ (höchstens
   2000 Zeichen). Ohne Angabe antwortet der Assistent knapp und in Klartext, ohne Anrede und Grußformel.
 - **Status je Thema**: zeigt für den gespeicherten Stand, ob der Assistent bereit ist (**Bereit**) oder warum
   nicht, mit einem Link **KI-Einstellungen der Queue öffnen**. Mögliche Gründe: für das Thema ausgeschaltet; die
-  Queue hat keine KI-Einstellungen, keine automatischen Antworten oder keinen Service-Agent; die Autonomie der
+  Queue hat keine KI-Einstellungen, keine automatischen Antworten oder keinen Service-Agent (in der Statusliste
+  „Dienstbenutzer“ genannt); die Autonomie der
   Queue steht auf **Aus**; die KI-Antworten sind für den Kanal gesperrt oder pausiert; der KI-Dienst
   (`tiqora-ai-worker`) läuft nicht; das Stunden- oder Tageslimit ist erreicht; kein Modell erreichbar.
 
@@ -308,6 +330,56 @@ ohne Schlüssel und ohne Code auf Ihrer Seite. Es kann nur ein Chat im Kundenpor
 Kundenportal muss eingeschaltet sein (`TIQORA_PORTAL_ENABLED`). Meldet sich der Kunde im Portal ab, meldet sich auch
 der Chat ab (bei einer Abmeldung über einen externen Anmeldedienst kann das ausbleiben). In der Vorschau im Admin-Bereich wird nie eine Portal-Anmeldung verwendet.
 
+### 8. Schnittstelle der Website (JavaScript)
+
+Das Einbettungsskript legt auf der Seite das Objekt `window.Tiqora.chat` an. Es enthält genau diese Funktionen; Aufrufe vor
+dem Laden des Chats werden gemerkt und danach ausgeführt:
+
+| Aufruf | Wirkung |
+|---|---|
+| `Tiqora.chat.open()` / `close()` / `toggle()` | öffnet, schließt oder wechselt das Chatfenster (Button und Fenster erscheinen nur, wenn der Chat für die Seite sichtbar ist) |
+| `Tiqora.chat.setTopic("<Thema-Schlüssel>")` | wählt ein Thema vor (Schlüssel: Kleinbuchstaben, Ziffern, `_` und `-`) |
+| `Tiqora.chat.identify("<signierte Anmeldung>")` | übergibt die Anmeldung aus Abschnitt 6; nur der letzte Aufruf vor dem Laden zählt |
+| `Tiqora.chat.logout()` | vergisst die Anmeldung und den gespeicherten Chat; ein Aufruf vor dem Laden wird vor einem späteren `identify` ausgeführt |
+| `Tiqora.chat.on(event, callback)` | hört auf `ready`, `open`, `close`, `message`, `availability` oder `identity`; liefert eine Funktion zum Abmelden des Hörers |
+
+Die Ereignisse tragen nur Metadaten, nie Nachrichtentext: `ready` und `availability` liefern `{ online }` (sind „klebrig“,
+ein später registrierter Hörer bekommt den letzten Stand), `message` liefert `{ sender }` und `identity` liefert
+`{ verified }`. Beispiel: `Tiqora.chat.on("availability", (d) => showHelpButton(d.online));`.
+
+### 9. Einstellungen und Standardwerte im Überblick
+
+| Einstellung (Reiter) | Standard | Grenzen |
+|---|---|---|
+| **Web-Chat eingeschaltet** (Liste) | aus | gilt für alle Chats |
+| **Aktiv** (Allgemein) | an | |
+| **Erlaubte Websites** (Allgemein) | leer | höchstens 20 |
+| **Themen** (Allgemein) | mindestens eins | höchstens 20; **Bezeichnung** höchstens 80 Zeichen |
+| **Begrüßung** (Allgemein) | leer | höchstens 500 Zeichen |
+| **Mitarbeitername zeigen** (Allgemein) | an | |
+| **Öffnungszeiten** (Zeiten & Offline) | **Immer** | **Standardkalender** oder **Kalender 1** bis **Kalender 9** |
+| **Wartezeit bis E-Mail-Angebot (Sekunden)** | 180 | 30 bis 3600 |
+| **Wenn niemand da ist** | **Nachrichtenformular** | Formular, Ausblenden, KI antwortet allein |
+| **Vorab-Formular** | **Name** und **E-Mail**, beide freiwillig | höchstens 15 Felder, Auswahl höchstens 50 Werte |
+| **Farbe** / **Position** / **Darstellung** (Aussehen) | `#2563eb` / **Rechts** / **Automatisch** | **Text am Button** höchstens 40 Zeichen |
+| **Neue Chats pro Adresse (10 Min.)** | 5 | 1 bis 100 |
+| **Neue Chats gesamt (pro Minute)** | 30 | 5 bis 300 |
+| **Nachrichten pro Chat (pro Minute)** | 30 | 5 bis 300 |
+| **Nachrichten pro Adresse (pro Minute)** | 60 | 5 bis 600 |
+| **Datei-Uploads pro Chat (10 Min.)** | 10 | 1 bis 100 |
+| **Nachrichtenformulare pro Adresse (pro Stunde)** | 3 | 1 bis 50 |
+| **Nachrichtenformulare gesamt (pro Stunde)** | 60 | 1 bis 1000 |
+| **Datei-Uploads erlauben** / **Höchstgröße (MB)** | an / 10 | 1 bis 25; alle sechs Dateiarten vorgewählt |
+| **Aufbewahrung Chatverlauf (Tage)** | 30 | 1 bis 3650 |
+| **Name des Assistenten** / **Tonfall** (KI) | „KI-Assistent“ / leer | 80 / 2000 Zeichen |
+| **KI antwortet zuerst** (KI, je Thema) | **Aus** | |
+| **Unbekannte Kunden anlegen** (Einbetten) | aus | |
+| **Im Kundenportal anzeigen** (Einbetten) | aus | ein Chat im Portal |
+| **Chats annehmen** / **Gleichzeitig höchstens** (Agent) | aus / 3 | 1 bis 20 |
+
+Zusätzlich gelten feste Grenzen, die Sie nicht einstellen: höchstens 3 Klicks auf **Mit einem Menschen sprechen** pro Chat
+und Minute und höchstens 30 fehlgeschlagene Anmeldungs-Prüfungen pro Adresse in 10 Minuten.
+
 ## Was Besucher sehen
 
 - **Chat besetzt**: Der Besucher füllt das Vorab-Formular aus und schreibt die erste Nachricht. Damit entsteht
@@ -322,15 +394,23 @@ der Chat ab (bei einer Abmeldung über einen externen Anmeldedienst kann das aus
   **Mit einem Menschen sprechen**. Während der Assistent schreibt, steht dort „*Name* schreibt …“. Nach einem Klick
   auf die Schaltfläche (**Wird übergeben …**) steht dort „Wir verbinden Sie mit einem Mitarbeiter.“, danach läuft
   der Chat wie ein normaler Chat: wartend, dann mit dem Agenten. Gibt die KI den Chat ab, erscheint „Der
-  KI-Assistent hat den Chat an einen Mitarbeiter übergeben.“; bei einer Störung „Die KI ist gerade nicht
-  erreichbar. Der Chat wurde an einen Mitarbeiter übergeben.“ Übernimmt ein Agent von sich aus, steht dort „Ein
-  Mitarbeiter hat den Chat übernommen.“ Ist kein Agent da, endet der Chat mit der Frage nach der E-Mail-Adresse.
+  KI-Assistent hat den Chat an einen Mitarbeiter übergeben.“; greift ein Limit, steht dort „Der Chat wurde an einen
+  Mitarbeiter übergeben.“; bei einer Störung „Die KI ist gerade nicht erreichbar. Der Chat wurde an einen Mitarbeiter
+  übergeben.“, ist der Assistent nicht mehr verfügbar „Die KI ist gerade nicht verfügbar. Der Chat wurde an einen
+  Mitarbeiter übergeben.“ Übernimmt ein Agent von sich aus, steht dort „Ein
+  Mitarbeiter hat den Chat übernommen.“ Ist kein Agent da, endet der Chat mit der Frage nach der E-Mail-Adresse („Gerade ist niemand frei. Wohin dürfen wir
+  Ihnen antworten?“, oder ohne Frage „Gerade ist niemand frei. Wir antworten Ihnen per E-Mail.“, wenn der Besucher eine
+  Adresse angegeben hat).
+- **Chat endet von selbst**: Ein wartender Besucher, der sich 2 Minuten lang nicht meldet, und ein Chat, in dem 15
+  Minuten lang nichts passiert, werden als „Der Chat wurde wegen Inaktivität beendet.“ geschlossen.
 - **Erkannter Besucher**: Hat die Website oder das Kundenportal den Besucher angemeldet, zeigt der Chat „Angemeldet
   als *Name*“ (ohne Namen in der Anmeldung nur „Angemeldet“). Die Felder, die dem Namen und der E-Mail-Adresse
   zugeordnet sind, werden nicht mehr abgefragt; die übrigen Felder des Vorab-Formulars schon, auch ein zweites
   E-Mail-Feld.
-- **Chat ausgeschaltet**: Besucher sehen den bisherigen Verlauf und den Hinweis, dass der Chat geschlossen ist.
-  Weitere Nachrichten sind nicht mehr möglich.
+- **Chat ausgeschaltet**: Besucher sehen den bisherigen Verlauf und den Hinweis „Der Chat wurde beendet, Sie können
+  nichts mehr senden.“ Weitere Nachrichten sind nicht mehr möglich.
+- **Sprache**: Der Chat übernimmt die Sprache aus `<html lang="…">` der Website (sonst die Browsersprache); ist sie
+  nicht verfügbar, erscheint Englisch. Arabisch, Hebräisch, Persisch und Urdu werden von rechts nach links gesetzt.
 
 ## Chats annehmen und beantworten (Agenten)
 
@@ -340,13 +420,14 @@ Rechts oben in der Kopfzeile öffnet die Schaltfläche **Chats** das Postfach. D
 Ein neuer Chat läutet und erscheint als **Neuer Chat wartet**.
 
 1. Schalten Sie **Chats annehmen** ein, sonst bekommen Sie keine Chats und gelten für Besucher nicht als
-   erreichbar.
+   erreichbar. Zusätzlich muss Tiqora in Ihrem Browser geöffnet sein: Als erreichbar zählen nur Agenten mit einer
+   offenen Verbindung (die Anzeige verfällt nach etwa einer Minute ohne Verbindung) und `rw`-Recht auf die Queue des
+   Themas.
 2. Unter **Themen** wählen Sie, welche Themen Sie annehmen. Ohne Auswahl nehmen Sie alle Themen an.
-3. **Gleichzeitig höchstens** begrenzt, wie viele Chats Sie parallel führen. Ist die Grenze erreicht, steht dort
+3. **Gleichzeitig höchstens** begrenzt, wie viele Chats Sie parallel führen (1 bis 20, ab Werk 3). Ist die Grenze erreicht, steht dort
    „Sie haben bereits die maximale Zahl gleichzeitiger Chats.“
 4. Unter **Wartende Chats** wählen Sie **Annehmen**. Wer zuerst annimmt, bekommt den Chat; war jemand schneller,
-   meldet Tiqora **Schon angenommen**. Beim Annehmen werden Sie Besitzer des Tickets und das Ticket wird für Sie
-   gesperrt.
+   meldet Tiqora **Schon angenommen**. Beim Annehmen werden Sie Besitzer des Tickets; ist es noch nicht gesperrt, wird es für Sie gesperrt.
 5. Unter **Meine Chats** finden Sie Ihre laufenden Unterhaltungen.
 
 Wenn Sie ein Ticket mit einem noch wartenden Chat öffnen und direkt eine Antwort schicken, nimmt Tiqora den Chat
@@ -411,8 +492,10 @@ Daten eines bestehenden Kunden preis, bevor Sie seine Identität auf anderem Weg
 
 KI-Agenten und Integrationen schreiben über `ticket_reply` (MCP) oder die REST-API in einen Chat. Eine MCP-Antwort
 in einen noch **wartenden** Chat wird mit `chat_not_accepted` abgelehnt, und es gibt kein MCP-Werkzeug zum
-Annehmen: Ein Mensch muss den Chat zuerst annehmen. Ein Chat, den der Assistent führt (**Mit KI im Gespräch**),
-ist davon getrennt: Dort antwortet nur der Assistent, bis ein Agent übernimmt. Die REST-Endpunkte unter `/api/v1/chat/` sind in
+Annehmen: Ein Mensch muss den Chat zuerst annehmen. Dasselbe gilt für einen Chat, den der Assistent führt
+(**Mit KI im Gespräch**): Dort antwortet nur der Assistent, bis ein Mensch ihn übernimmt; eine MCP-Antwort wird auch
+hier mit `chat_not_accepted` abgelehnt. Über die REST-Antwort im Ticket (wie im Browser) wird ein wartender oder von
+der KI geführter Chat dagegen implizit angenommen bzw. übernommen. Die REST-Endpunkte unter `/api/v1/chat/` sind in
 [rest-v1.md](../api/rest-v1.md) beschrieben.
 
 ## Datenschutz: was wird gespeichert und wie lange?

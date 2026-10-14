@@ -14,7 +14,8 @@ create -> bot       topic ai_mode = first_line AND assistant available AND (huma
        -> 409       neither (the widget shows the offline form or hides)
 bot  -> waiting     hand_off_chat, humans available            (ring: chat_waiting)
 bot  -> ended       hand_off_chat, nobody available            (end_reason no_agent, e-mail prompt)
-bot  -> active      an agent accepts or replies (takeover)
+bot  -> active      an agent accepts or replies (takeover, handoff_reason = takeover)
+bot  -> waiting/ended   sweep, no AI worker answers a visitor line for 60 s (handoff_reason = unavailable)
 bot  -> ended/abandoned   visitor ends, agent ends, idle sweep
 ```
 
@@ -42,8 +43,23 @@ visitor line stored (create_session / send message)
 ai-worker bot loop (ai/chat_bot_loop.py)
   -> BLPOP the queue, and every 15 s rescan the DB for status=bot AND last_visitor_seq > bot_answered_seq
   -> at most TIQORA_CHAT_BOT_CONCURRENCY run_chat_bot_turn tasks
-  -> SET tiqora:chat:bot:alive EX 30 every 10 s (only while daemon.ai_worker.enabled)
+  -> SET tiqora:chat:bot:alive EX 30 every 10 s (only while the loop is enabled, see below)
 ```
+
+**Enabled gate.** The loop runs only while both `daemon.ai_worker.enabled` and the web chat master switch
+(`channel.webchat.enabled`) are on; the check is cached for 5 s. While either is off the loop idles (it sleeps 2 s per
+round) and touches neither Redis nor the chat tables, and it does **not** refresh `tiqora:chat:bot:alive`. The
+availability check then reports `worker_down`, so new chats go to humans, and the chat sweep hands over a `bot` chat
+whose visitor line has waited longer than 60 s ([Orphaned bot chats](#orphaned-bot-chats)). Setting `operation_mode`
+to `parallel` does not block the loop: `webchat` is a Tiqora-only channel.
+
+**Redis client (v0.19.0).** The loop uses its own Redis client (`make_bot_redis`) whose socket timeout
+(`BOT_BLPOP_TIMEOUT` 5 s + 2 s grace + 1 s = 8 s) is longer than the server-side `BLPOP` wait. Before, the shared
+client's default 5 s socket timeout equalled the `BLPOP` timeout, so every idle poll ended in a `TimeoutError`. Each
+`BLPOP` is also wrapped in `asyncio.wait_for(5 s + 2 s)`, so a half-open connection cannot stall the 15 s rescan.
+Identical failures (`webchat_bot_enabled_check_failed`, `webchat_bot_alive_refresh_failed`,
+`webchat_bot_rescan_failed`, `webchat_bot_queue_pop_failed`) are logged once per distinct error and then at most every
+10 minutes, with the exception text. These changes ship with v0.19.0 (commit `976ada44a`).
 
 The Redis list is an accelerator only. The database is the truth, so a lost push, a Redis restart or a crashed
 worker costs at most one rescan interval (15 s).
@@ -91,8 +107,30 @@ state the policy allows after a sent auto-reply.
 
 ### Agent takeover
 
-An agent accepting or replying to a `bot` chat changes it to `active` under the same row lock; a running turn
-notices at delivery (`BotChatTakenOver`). Capacity limits apply to the agent.
+An agent accepting a `bot` chat (`POST /api/v1/chat/sessions/{id}/accept`) or replying to the ticket
+(`POST /api/v1/tickets/{id}/articles` with a chat reply, via `accept_waiting_chat_for_reply`) changes it to `active`
+under the same row lock. It also stores `handoff_at` and `handoff_reason = takeover`; unlike `hand_off_chat` it sets no
+AI escalation mark, and the ticket is not parked as bot-resolved afterwards. A running turn notices at delivery
+(`BotChatTakenOver`) and saves its answer as a draft. The agent needs `rw` on the ticket's **current** queue and a free
+slot (`max_concurrent`, 1-20, default 3). The visitor gets the system line `handoff` with reason `takeover`
+("Ein Mitarbeiter hat den Chat übernommen."). A reply through MCP (`ticket_reply`) never takes over: while the chat
+is `waiting` or `bot` (anything but `active`) it is refused with `chat_not_accepted`.
+
+### Visitor handoff
+
+`POST /api/chat/v1/sessions/{id}/handoff` ("Mit einem Menschen sprechen") calls `hand_off_chat(reason="visitor")`
+with the internal note "Der Besucher möchte mit einem Menschen sprechen." It answers `409 not_bot` when the chat is not
+(or no longer) in `bot`, and has its own bucket of 3 presses per session and minute. A running AI turn does not block it.
+
+### Orphaned bot chats
+
+`webchat_sweep` (in `tiqora-worker`) also protects visitors from a stopped assistant. When `tiqora:chat:bot:alive` is
+missing and a `bot` chat has a visitor line older than 60 s (`ORPHAN_BOT_SECONDS`) with no answer, the sweep calls
+`hand_off_chat(reason="unavailable")`: the chat becomes `waiting`, or `ended/no_agent` when nobody is there. If the
+Redis check itself fails the sweep leaves the chats alone for that tick. Other sweep thresholds: a `waiting` visitor
+without a sign of life for 120 s and an `active` or `bot` chat quiet for 900 s become `abandoned/idle`; `waiting`
+longer than the config's `wait_timeout_seconds` (default 180, 30-3600) ends as `no_agent`; ended chats are purged
+after `retention_days` (default 30).
 
 ## Identity paths
 

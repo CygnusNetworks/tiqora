@@ -1,9 +1,16 @@
-# Additional channels: SMS, WhatsApp Business, Phone/CTI, Telegram
+# Additional channels: SMS, WhatsApp Business, Phone/CTI, Telegram, Web chat, plugin channels
 
 Beyond email (`channels/email/`, see the postmaster pipeline docs) and the
-customer web portal, Tiqora ships four more `CommunicationChannel` plugins.
-All four are **disabled by default** — they are integrations an operator
-opts into, not something that activates on upgrade. Every plugin funnels
+customer web portal, Tiqora ships four more `CommunicationChannel` plugins
+(SMS, WhatsApp Business, Phone/CTI, Telegram) and, separately, an embeddable
+**web chat** for websites (see [Web chat](#web-chat-webchat) below and the
+admin/agent guide [guide/webchat.md](guide/webchat.md); internals in
+[webchat.md](webchat.md)). Further channels can be added by installed
+extensions: a plugin registers a *channel driver* and gets its own channel key
+and sending path (see [plugins.md](plugins.md#channel-drivers)). The four plugins
+above are **disabled by default** — they are integrations an operator
+opts into, not something that activates on upgrade; the web chat is likewise off
+until its master switch is turned on. Every plugin funnels
 ticket/article writes through `domain/ticket_write_service` — never writes
 tickets/articles directly — and shares building blocks from
 `channels/common.py`:
@@ -595,8 +602,9 @@ internet endpoint**, so abuse protection (rate limits, origin checks, upload lim
 - **Master switch.** `channel.webchat.enabled` (default off) in the admin channels API; the chats themselves
   (topics, hours, look, limits) are configured under Admin, **Web-Chat**.
 - **Tables.** `tiqora_chat_config`, `tiqora_chat_session`, `tiqora_chat_message`, `tiqora_chat_agent_state`
-  (Alembic chain `versions_tiqora`). Sessions are `waiting`, `active`, `ended` or `abandoned`; the offline
-  message form stores an `ended` session with `end_reason="offline_form"`.
+  (Alembic chain `versions_tiqora`). Sessions are `bot` (the AI assistant answers), `waiting`, `active`, `ended` or
+  `abandoned`; the offline message form stores an `ended` session with `end_reason="offline_form"`. The state
+  machine, claims and hand-offs are described in [webchat.md](webchat.md#session-states).
 - **History and notifications.** All writes go through `domain/ticket_write_service` (history, cache
   invalidation, outbox events). The first visitor message is a `WebRequestCustomer` article and triggers
   `NotificationNewTicket`; follow-up lines use the normal agent notifications.
@@ -605,7 +613,15 @@ internet endpoint**, so abuse protection (rate limits, origin checks, upload lim
   the retention purge, which deletes the `tiqora_chat_message` rows and clears the session's visitor columns;
   the transcript articles and their attachments stay on the ticket under the ticket's own retention and GDPR
   erasure.
-- **AI.** Webchat articles are skipped by the auto-reply worker in phase 1; drafts work as on other tickets.
+- **AI.** A topic can be answered first by the AI assistant (the `tiqora-ai-worker` bot loop, source channel
+  `webchat`; setup in [guide/webchat.md](guide/webchat.md#5-ki-assistent-einrichten), gate and limits in
+  [ai-integration.md](ai-integration.md#web-chat-assistant)). The ordinary outbox auto-reply tick still never answers
+  a webchat article, and a chat answer never reaches SMTP. Drafts work as on other tickets.
+- **Visitor identity.** A website can vouch for a logged-in visitor with a signed token
+  (`Tiqora.chat.identify(token)`), and the customer portal can show the chat to logged-in customers; the ticket
+  then shows "Identität bestätigt" (see [guide/webchat.md](guide/webchat.md#6-website-anmeldung-erkannte-besucher)).
+- **Plugin channels.** Chat-like channels from extensions are separate from this built-in web chat; they use the
+  driver API in [plugins.md](plugins.md#channel-drivers).
 - **Not a chat engine of Znuny.** Znuny's own chat module is not used.
 
 ## Admin config

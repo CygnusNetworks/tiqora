@@ -75,7 +75,7 @@ appearing over time.
 ## 2. MCP as the primary AI interface
 
 `tiqora.mcp_server.server` runs a FastMCP streamable-HTTP server (default
-port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **~40 tools**.
+port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **43 built-in tools** (40 ticket, knowledge-base and reference tools plus 3 read-only CMDB tools) and the tools of active plugins.
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 Mutations use `TicketWriteService` (queue permissions + SMTP parity for
 agent email replies). Optional per-key `tool:<name>` allowlist and rate limit.
@@ -125,6 +125,31 @@ agent email replies). Optional per-key `tool:<name>` allowlist and rate limit.
 | `kb_upsert_article` | Create or update a KB article. |
 | `kb_publish_article` | Publish + index a KB article. |
 | `customer_lookup` | Look up a customer user by login. |
+
+#### CMDB (read-only)
+
+Three tools expose the configuration items to an agent. They only read, never change a CI, and the answer depends
+on the ITSM mode ([itsm.md](itsm.md)):
+
+| Tool | Purpose |
+|---|---|
+| `cmdb_search` | Search CIs by number or name (`query`, optional `class_key`, `deployment_state`, `incident_state`, `limit` 1-100, default 20). Returns `ci_id`, `number`, `name`, `class`, `deployment_state`, `incident_state`. |
+| `cmdb_get` | One CI by `ci_id` or `number`: states, `version_id`, `changed`, flattened `attributes` (class-definition labels, catalog values as names; at most 200 values, then `truncated: true`) and `links` to other objects (Tiqora CMDB only). |
+| `cmdb_impact` | Impact analysis for a `ci_id` (`max_depth` 1-5, default 4): dependent `cis`, reached `services` and `customers`, linked `open_tickets`, and `truncated`. |
+
+- **Mode dependence.** Mode B (`tiqora`): all three tools use the Tiqora CMDB. Mode A (`znuny_readthrough`): only
+  `cmdb_search` and `cmdb_get` work (read-only Znuny adapter, no `links`); `cmdb_impact` answers that it needs the
+  Tiqora CMDB. ITSM `off`: every CMDB tool answers an error ("ITSM is switched off on this site").
+- **Visibility.** The CMDB's own class-group permissions apply to the key's user. A CI of a class the user may not
+  read is answered exactly like an unknown CI ("CI not found"), `cmdb_search` skips such classes, and
+  `cmdb_impact` lists only customers, services and open tickets reached through readable CIs and readable queues.
+- **Allowlist.** Like every tool they can be restricted with a `tool:cmdb_search` (etc.) entry on the API key.
+
+#### Plugin tools
+
+Active plugins can add their own MCP tools, named `<short_id>_<name>`. They appear next to the built-in tools, follow
+the same `tool:<name>` allowlist and, if they write, need an `mcp:rw` key. Authoring and security notes:
+[plugins.md](plugins.md#mcp-tools).
 
 Full parameter tables: [`api/mcp.md`](api/mcp.md).
 
@@ -968,7 +993,9 @@ ticket's **current** queue.
 
 - **Gate.** The assistant runs only where the queue's policy has `enabled_auto_reply` and a service user
   (`service_user_id`), the autonomy is not `off`, the kill switch allows `auto_reply` for the `webchat` channel and
-  the `tiqora-ai-worker` is alive (it refreshes the Redis key `tiqora:chat:bot:alive` every 10 s, TTL 30 s). In the
+  the `tiqora-ai-worker` is alive (it refreshes the Redis key `tiqora:chat:bot:alive` every 10 s, TTL 30 s, and only
+  while both `daemon.ai_worker.enabled` and the web chat master switch `channel.webchat.enabled` are on; with either
+  off the bot loop idles and the status is `worker_down`). In the
   Admin editor (tab **KI**) the status list shows why a topic is not ready (`ai_mode_off`, `no_policy`,
   `auto_reply_off`, `no_service_user`, `autonomy_off`, `gate`, `paused`, `worker_down`, `queue_rate_limit`,
   `global_rate_limit`, `budget_tokens_day`, `llm_unavailable`). A bot that is not available is never shown to
@@ -982,7 +1009,17 @@ ticket's **current** queue.
   ("Auto-reply caps and budget"). A cap hit is not a silent skip here: it hands the chat to a human
   (`handoff_reason` `limit`), because a visitor is waiting. `unavailable` (assistant gone mid-chat) and `error`
   (three failed attempts, e.g. the LLM is unreachable) end the same way, and so does the model's own
-  escalation (`ai`) or a visitor click (`visitor`).
+  escalation (`ai`) or a visitor click (`visitor`). An agent who accepts or answers the chat takes it over
+  (`handoff_reason` `takeover`); a stopped worker is covered by the chat sweep, which hands a `bot` chat with a
+  visitor line unanswered for 60 s to the team (`unavailable`). A hand-off writes the internal note "KI-Übergabe im
+  Chat" (when there is a summary) and marks the ticket as escalated by the AI (`webchat_<reason>`).
+- **When nobody is online.** With the chat's **Wenn niemand da ist** set to **KI antwortet allein**
+  (`offline_mode = ai`), a topic with **KI antwortet zuerst** stays open for visitors outside business hours or
+  without an agent, answered by the assistant alone; a hand-off then ends the chat with the e-mail prompt.
+- **Operation.** Run exactly one `tiqora-ai-worker` (a turn is leased for 180 s). Turns run in parallel up to
+  `TIQORA_CHAT_BOT_CONCURRENCY` (default 4, 1-32); a failed turn is retried after 5 s and hands over after the third
+  failure. Operator details: [deployment.md](deployment.md#chat-assistant-and-website-sign-in); state machine and
+  claim logic: [webchat.md](webchat.md#the-bot-loop-tiqora-ai-worker).
 - **Tone and disclosure.** The chat has its own default tone (short plain-text answers, no greeting or signature,
   no Markdown headings, one question at a time) unless the chat's **Tonfall** is set. The disclosure footer is not
   added to chat lines; the chat's first system line (`bot_intro`) carries the notice, using the policy's
