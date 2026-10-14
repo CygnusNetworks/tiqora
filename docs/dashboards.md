@@ -10,6 +10,11 @@
 > extension point `core.dashboard.widgets` (plugins) and the backend extension point
 > `core.dashboard.providers` (data sources); see the last section.
 >
+> **Who does what.** Agents: arrange, share and filter dashboards, drill down into numbers.
+> Admins: role templates (**Verwaltung → Dashboard-Vorlagen**) and wallboard links
+> (**Verwaltung → Wallboard-Links**); only admins can create a wallboard link. There are 16 core
+> widget types; report widgets are described in [reporting.md](reporting.md).
+>
 > **Phase 2.** A filter bar applies queues and a time range to a whole dashboard. Report widgets
 > (chart, table, SLA gauge, backlog aging, heatmap), AI status and chat queue widgets show analytics
 > next to ticket lists. Numbers, lists and chart points drill down to the tickets behind them (and
@@ -69,11 +74,20 @@ Fassungen nicht zusammen.
 | Notizen | Freier Text (Markdown) für Sie oder Ihr Team |
 | Links | Wichtige Adressen (`/`, `http://`, `https://`, `mailto:`) |
 | Bericht | Ein Bericht aus der Auswertung als Diagramm oder Tabelle |
-| SLA-Quote, Rückstand nach Alter, Heatmap | Fertige Auswertungen als Kachel |
+| SLA-Erfüllung, Rückstand nach Alter, Eingang nach Zeit | Fertige Auswertungen als Kachel: Anteil der Tickets, die ihre SLA eingehalten haben, gegen ein Ziel; offene Tickets je Queue nach Alter; Heatmap der eingehenden Tickets nach Wochentag und Uhrzeit |
 | KI-Status | Autopilot, Übergaben und Budget der KI |
-| Chat-Warteschlange | Wartende Web-Chats (bis 200; „200+“ bei Erreichen der Grenze) und die Zahl der Chats, die gerade der KI-Assistent beantwortet („Mit KI im Gespräch“; nur die Zahl, sie zählen nicht als wartend) |
+| Web-Chat | Wartende Web-Chats (bis 200; „200+“ bei Erreichen der Grenze) und die Zahl der Chats, die gerade der KI-Assistent beantwortet („Mit KI im Gespräch“; nur die Zahl, sie zählen nicht als wartend) |
 
-Plugins können weitere Widgets mitbringen; sie erscheinen in derselben Galerie.
+Die Galerie gruppiert die Widgets in „Tickets“, „Für mich“, „Team“ (mit Web-Chat und KI-Status) und
+„Berichte“. Es gibt 16 Widget-Arten im Kern (`core.ticket-list`, `core.counter`, `core.escalations`,
+`core.reminders`, `core.recent-views`, `core.queue-overview`, `core.calendar-agenda`,
+`core.team-presence`, `core.notes`, `core.links`, `core.report`, `core.sla-gauge`,
+`core.backlog-aging`, `core.heatmap`, `core.chat-queue`, `core.ai-status`); Notizen, Links und
+„Zuletzt angesehen“ haben keine Datenquelle auf dem Server, alle anderen laden ihre Daten über einen
+Provider (siehe [Für Entwickler](#für-entwickler)). Die vier Berichts-Kacheln („Bericht“, „SLA-Erfüllung“, „Rückstand nach Alter“, „Eingang nach
+Zeit“) bietet die Galerie nur Personen mit Berichtszugriff an (siehe [reporting.md](reporting.md#who-may-do-what)).
+Plugins können weitere Widgets mitbringen; sie
+erscheinen in derselben Galerie.
 
 ### Einstellungen
 
@@ -115,13 +129,17 @@ anderen nicht und lässt sich mit **Erneut versuchen** neu laden.
 
 ### Filter für das ganze Dashboard
 
-Unter den Reitern steht die Filterleiste mit **Queues** und **Zeitraum**. Wer das Dashboard
+Unter den Reitern steht die Filterleiste mit **Queues** (bis zu 50) und **Zeitraum** („Wie im
+Bericht“, „Heute“, „Letzte 7 Tage“, „Letzte 30 Tage“, „Letzte 90 Tage“, „Dieser Monat“, „Letzter
+Monat“). Wer das Dashboard
 bearbeiten darf, ändert die Filter in der Ansicht; sie werden sofort gespeichert und gelten für alle,
 die das Dashboard sehen. Der Queue-Filter schränkt Kennzahlen, Ticketlisten und Berichte zusätzlich
 zu Ihren Queue-Rechten ein (er erweitert sie nie). Der Zeitraum ersetzt den Zeitraum der Berichte;
 „Wie im Bericht“ lässt ihn unverändert. Berichte, die keinen Queue-Filter kennen, weisen darauf hin.
 Einzelne Widgets lassen sich vom Dashboard-Filter ausnehmen („Dashboard-Filter gelten hier nicht“).
 Beim Duplizieren eines Dashboards und beim Anlegen aus einer Vorlage werden die Filter mitkopiert.
+
+![Dashboard mit Filterleiste („Queues: Raw::Misc“, „Time range: As in the report“) und einem Berichts-Widget; Demo-Modus, englische Oberfläche](images/agent-dashboard-filters.png)
 
 ### Berichte als Widgets
 
@@ -151,17 +169,19 @@ Wurde eine Rollenvorlage seit der Kopie um Widgets erweitert, zeigt das kopierte
 
 ### Wallboard und TV-Modus
 
-**TV-Modus** (Menü des Reiters, `/agent/wallboard?ids=1,3&rotate=60`) zeigt ein oder mehrere
+**TV-Modus** (Menüpunkt „Als Wallboard anzeigen“ im Menü des Reiters, `/agent/wallboard?ids=1,3&rotate=60`) zeigt ein oder mehrere
 Dashboards formatfüllend, dunkel und mit größerer Schrift; mehrere wechseln im eingestellten Takt
 (15 bis 900 Sekunden, bis zu 10 Dashboards). **Vollbild** und **Beenden** erscheinen, wenn Sie die
 Maus bewegen. Ein Dashboard mit mehr als 14 Zeilen wird dort sehr klein; planen Sie für Bildschirme
 ein eigenes, flaches Dashboard.
 
-Für Bildschirme ohne Anmeldung erstellen Sie einen **Wallboard-Link** (Menü des Reiters oder
-**Verwaltung → Wallboard-Links**): Name, Dashboards, Wechselzeit, Gültigkeit (1 bis 365 Tage) und
-ob Details angezeigt werden. Der Link wird nur einmal angezeigt; das Geheimnis steht hinter dem `#`
-und erreicht dadurch weder Server-Logs noch Referrer. Verwaltung: Widerrufen und Löschen unter
-**Wallboard-Links**.
+Für Bildschirme ohne Anmeldung gibt es den **Wallboard-Link**. Ihn erstellen nur Administratoren
+(Menüpunkt „Wallboard-Link erstellen …“ im Menü des Reiters, oder **Verwaltung → Wallboard-Links**,
+„Wallboard-Link erstellen“): Name, Dashboards (1 bis 10), Wechselzeit („Wechsel alle“, Standard 60,
+15 bis 900 Sekunden), Gültigkeit („Gültig für“, Standard 90, 1 bis 365 Tage) und ob Details
+angezeigt werden („Details anzeigen“). Der Link wird nur einmal angezeigt; das Geheimnis steht hinter dem `#`
+und erreicht dadurch weder Server-Logs noch Referrer. Widerrufen und Löschen
+verwalten Administratoren unter **Wallboard-Links**.
 
 **Rechte und Datenschutz.**
 
@@ -258,9 +278,19 @@ Die Architektur (Tabellen, Provider, Datenendpunkt, Layout-Engine) steht in
   Pydantic-Modell. Ein Provider liest Ticketdaten nur, schreibt höchstens eigene `tiqora_*`-Hilfsdaten
   (etwa den Tageswert einer Kennzahl) und committet nie selbst; er wirft `ProviderForbidden`, wenn
   die Berechtigung fehlt.
-- **Dashboards per API.** `GET /api/v1/dashboards` (Reiter), `GET/PUT /api/v1/dashboards/{id}`,
-  `GET /api/v1/dashboards/{id}/data` (alle Widgets in einem Aufruf). Jede Speicherung trägt die
+- **Dashboards per API.** `GET /api/v1/dashboards` (Reiter), `POST /api/v1/dashboards` (anlegen),
+  `POST /api/v1/dashboards/ensure-start` (legt „Mein Start“ an), `PUT /api/v1/dashboards/order`
+  (Reihenfolge), `GET/PUT/DELETE /api/v1/dashboards/{id}`, `PATCH /api/v1/dashboards/{id}/filters`,
+  `PUT /api/v1/dashboards/{id}/share`, `GET/POST /api/v1/dashboards/{id}/template-update`,
+  `PATCH /api/v1/dashboards/{id}/widgets/{widget_id}/settings`,
+  `GET /api/v1/dashboards/{id}/data` (alle Widgets in einem Aufruf),
+  `GET /api/v1/dashboards/{id}/widgets/{widget_id}/data` (ein Widget, bis 25 Sekunden),
+  `GET /api/v1/dashboards/{id}/widgets/{widget_id}/tickets` (Drill-down) und
+  `POST /api/v1/dashboards/{id}/widgets/{widget_id}/report-job` (Berichts-Widget im Hintergrund
+  rechnen). Der Wallboard-Abruf ohne Anmeldung läuft über `GET /api/v1/kiosk/board` und
+  `GET /api/v1/kiosk/dashboards/{id}/data`. Jede Speicherung trägt die
   gelesene `version`; bei Abweichung antwortet der Server mit 409. Die Dashboard-Routen stehen nur
   angemeldeten Sitzungen und API-Schlüsseln ohne Bereichsbeschränkung offen; ein API-Schlüssel mit
-  Bereichen (Scopes) erhält 403. Die Vorlagen verwaltet `/api/v1/admin/dashboard-templates` (Bereich
-  `admin`).
+  Bereichen (Scopes) erhält 403. Die Vorlagen verwaltet `/api/v1/admin/dashboard-templates`, die Wallboard-Links
+  `/api/v1/admin/dashboard-kiosk-links` (anlegen, auflisten, `POST …/{id}/revoke`, löschen); beide
+  brauchen Administratorrechte (Bereich `admin`).
