@@ -10,7 +10,14 @@
 > (`ro` reads, `rw` writes). Everything lives in `tiqora_*` tables; the CMDB answers only in
 > Mode B (`itsm.mode = tiqora`). Two SQL views (`tiqora_v1_itsm_ci`, `tiqora_v1_itsm_ci_links`)
 > serve the Znuny add-on. REST: `/api/v1/cmdb` and `/api/v1/admin/cmdb` (API-key area `cmdb`),
-> portal: `/api/portal/config-items`.
+> portal: `/api/portal/config-items`. Read-only AI tools for the MCP server (`cmdb_search`,
+> `cmdb_get`, `cmdb_impact`) are described in "KI-Werkzeuge (MCP)" below.
+>
+> **API-key scopes in short.** `cmdb:ro` / `cmdb:rw` cover `/api/v1/cmdb` and the mode-agnostic
+> `/api/v1/itsm`; the admin endpoints (`/api/v1/admin/cmdb`) need the `admin` area; the MCP tools
+> need `mcp:ro` (or higher) and optionally a `tool:<name>` allowlist.
+>
+> **Not included (wave 5):** reporting and statistics over CIs, change management and workorders.
 
 ## Was die CMDB ist
 
@@ -302,6 +309,52 @@ Prüfen Sie vor einem Release auf der Prod-MariaDB mit `SHOW GRANTS`. Spätere M
 Spalten von `tiqora_cmdb_ci`, `tiqora_cmdb_class`, `tiqora_cmdb_catalog` oder `tiqora_itsm_link`
 ändern, müssen beide Ansichten vorher löschen und danach neu anlegen.
 
+## KI-Werkzeuge (MCP)
+
+Der MCP-Server von Tiqora (siehe [ai-integration.md](ai-integration.md), Abschnitt 2) bietet drei
+**reine Lesewerkzeuge** für Konfigurationsobjekte. Sie ändern nichts (`readOnlyHint`) und
+brauchen deshalb keinen Schreibzugriff (`mcp:rw`) auf dem Schlüssel.
+
+| Werkzeug | Zweck | Parameter |
+|---|---|---|
+| `cmdb_search` | CIs nach Nummer oder Name suchen | `query` (Text zu Nummer und Name, leer = kein Textfilter), `class_key`, `deployment_state` (Statusschlüssel, z. B. `production`), `incident_state` (z. B. `operational`), `limit` (Vorgabe 20, 1 bis 100) |
+| `cmdb_get` | ein CI mit Status, aktueller Version, Attributen und Verknüpfungen holen | `ci_id` oder `number` (eines von beiden; `number` wird exakt gesucht) |
+| `cmdb_impact` | Auswirkungsanalyse eines CI | `ci_id`, `max_depth` (Vorgabe 4, 1 bis 5) |
+
+**Antworten.**
+
+- `cmdb_search` liefert je Treffer `ci_id`, `number`, `name`, `class` (Anzeigename),
+  `deployment_state` und `incident_state` (Namen).
+- `cmdb_get` liefert dieselben Felder plus `version_id`, `changed`, `attributes` und `links`.
+  Attribute erscheinen mit dem Bezeichner aus der Klassendefinition, Katalogwerte als Namen;
+  Gruppen werden mit ` / ` zusammengesetzt, mehrere Werte als Liste. Es werden höchstens
+  200 Werte ausgegeben, darüber hinaus steht `"truncated": true` in der Antwort. `links` nennt
+  je Verknüpfung `kind`, `key`, `link_type` und `direction`; verdeckte Enden (Objekte ohne
+  Leserecht) fehlen. In Modus A gibt es keine `links`.
+- `cmdb_impact` liefert `ci`, `services`, `customers`, `open_tickets`, `cis` (die abhängigen
+  CIs, ohne das Start-CI selbst) und `truncated`. Aufgeführt wird nur, was über lesbare CIs und
+  lesbare Queues erreicht wird.
+
+**Verhalten je ITSM-Modus** (siehe [itsm.md](itsm.md), Kapitel 1):
+
+| Modus | `cmdb_search`, `cmdb_get` | `cmdb_impact` |
+|---|---|---|
+| B (`tiqora`) | aus der Tiqora-CMDB | aus der Tiqora-CMDB |
+| A (`znuny_readthrough`) | über den schreibgeschützten Znuny-Durchgriff | Fehler: die Analyse braucht die Tiqora-CMDB, verwenden Sie `cmdb_search` und `cmdb_get` |
+| aus (`off`) | Fehler „ITSM is switched off on this site“ | Fehler, wie links |
+
+**Rechte.** Die Sichtbarkeit folgt der Znuny-Gruppe der Klasse (siehe „Berechtigungen“): Der
+Agent, dem der API-Schlüssel gehört, sieht nur Klassen mit Leserecht. Ein CI einer nicht
+lesbaren Klasse wird wie ein unbekanntes CI beantwortet („CI not found (or not readable for this
+API key's user)“), auch bei `cmdb_get` per Nummer und bei `cmdb_impact`; so lässt sich über
+MCP nicht erkennen, ob es das CI gibt.
+
+**API-Schlüssel.** Der Schlüssel braucht den Bereich `mcp` (mindestens `mcp:ro`; der ältere
+Token `mcp` genügt). Der Bereich `cmdb` ist für MCP nicht nötig. Enthält der Schlüssel
+`tool:<name>`-Einträge, laufen nur die genannten Werkzeuge; für die CMDB also
+`tool:cmdb_search`, `tool:cmdb_get`, `tool:cmdb_impact`, sonst antwortet das Werkzeug mit
+einem Zugriffsfehler. Schlüssel ohne `tool:`-Eintrag dürfen alle Werkzeuge.
+
 ## API
 
 - Agent: `/api/v1/cmdb` (Klassen, Kataloge, CIs, Suche, Versionen, Diff, Verlauf, Impact,
@@ -309,7 +362,9 @@ Spalten von `tiqora_cmdb_ci`, `tiqora_cmdb_class`, `tiqora_cmdb_catalog` oder `t
   `bulk-jobs`, `status`). Admin: `/api/v1/admin/cmdb` (Klassen, Definitionen, Vorlagen, Kataloge,
   Definitionsimport, `seed-defaults`, `propagation/recompute`). Portal: `/api/portal/config-items`.
 - Maschinenzugang über **API-Schlüssel** mit dem Bereich `cmdb` (`ro`/`rw`; die klassischen
-  Bereiche `read`/`write` gelten mit). Bekannte Folge: `POST /cmdb/cis/search` braucht `cmdb:rw`,
+  Bereiche `read`/`write` gelten mit). Der Bereich `cmdb` umfasst `/api/v1/cmdb` und die
+  modusunabhängige `/api/v1/itsm`; die Admin-Endpunkte unter `/api/v1/admin/cmdb` verlangen den
+  bestehenden Bereich `admin`, Ticket-Unterressourcen (`/tickets/{id}/cis`) den Bereich `tickets`. Bekannte Folge: `POST /cmdb/cis/search` braucht `cmdb:rw`,
   und ein reiner `cmdb`-Schlüssel kann `/api/v1/jobs` nicht abfragen, braucht dafür also
   zusätzlich `tickets:ro`.
 - Die OpenAPI-Beschreibung steht in `docs/api/openapi.json`.
@@ -320,7 +375,8 @@ Spalten von `tiqora_cmdb_ci`, `tiqora_cmdb_class`, `tiqora_cmdb_catalog` oder `t
 
 ## Nicht enthalten (Welle 5)
 
-Berichte und Statistiken über CIs (Reporting-Quelle) sind für Welle 5 vorgesehen. Nicht
+Berichte und Statistiken über CIs (Reporting-Quelle) sind für Welle 5 vorgesehen; im
+Reporting gibt es derzeit keine CMDB-Quelle. Nicht
 übernommen werden außerdem Änderungsmanagement (Change) und Workorders.
 
 Beispieldaten in diesem Dokument verwenden ausschließlich `example.org`.

@@ -1,5 +1,16 @@
 # ITSM-Import: Znuny-ITSM-Schema je Version
 
+> **English summary.** This page documents (1) how Znuny ITSM stores its data in the two surveyed
+> lines (profile `itsm-6` = ITSMCore and ITSMConfigurationManagement 6.5.x, profile `itsm-7` = 7.3.x;
+> every other package version is refused with `unsupported_znuny_itsm_version`), which Mode A reads
+> and the importer copies; (2) the Znuny rules reproduced as test vectors; and (3) the importer: what
+> is mapped where, repeat and conflict rules, the report (11 steps plus the class-definition counters,
+> the issue codes, the CSV file) and the interfaces: the admin page, the REST API under
+> `/api/v1/admin/itsm/import` (API-key area `admin`) and the `tiqora itsm import|status` commands. The
+> importer only reads Znuny, writes only `tiqora_*` tables, can run any number of times and is possible
+> only while Mode A is active and before the switch to Tiqora. Changes and workorders are counted, not
+> imported. Operational steps are in [itsm.md](itsm.md), chapter 7.
+
 Dieses Dokument beschreibt, wie Znuny sein ITSM speichert, und ist die Grundlage für den Adapter
 im Mode A (Znuny führt das ITSM, Tiqora liest) und für den Importer in den Mode B (Tiqora führt das
 ITSM). Alle Angaben stammen aus einer Vermessung echter Znuny-Instanzen mit installierten
@@ -22,6 +33,14 @@ Spalten und Indizes, dieselben Zeilen im Auslieferungszustand (Allgemeiner Katal
 Klassendefinitionen, Ticket-Typen, Dynamische Felder), derselbe Speicher für Attribute und dasselbe
 Definitionsformat. Andere 6.x-Stände (6.0 bis 6.4) und 7.0 bis 7.2 sind **nicht vermessen**; der
 Importer lehnt sie nicht stillschweigend ab, sondern meldet `unsupported_znuny_itsm_version`.
+
+Die Erkennung liest die Paketversionen aus `package_repository` (Status „installed“): `ITSMCore` muss
+vorhanden sein und, falls installiert, auch `ITSMConfigurationManagement`; beide müssen derselben
+Linie angehören (`>=6.5,<6.6` für `itsm-6`, `>=7.3,<7.4` für `itsm-7`). Maßgeblich ist also die
+Version der ITSM-Pakete, nicht die des Znuny-Kerns; Pakete verschiedener Linien werden nie gemischt.
+Ohne `ITSMCore` (Tabellen `general_catalog` und `cip_allocate` fehlen) meldet Tiqora „kein ITSM
+gefunden“, mit unbekannter Paketversion „nicht unterstützt“. Ist nur ITSMCore ohne das CMDB-Paket
+installiert, importiert Tiqora Katalog, Prioritätsmatrix und Service-Angaben ohne Klassen und CIs.
 
 Unterschiede in den Konfigurationseinstellungen (`sysconfig.json`): 7.3 liefert zusätzlich die
 Vorgabewerte `ITSMConfigItem::Frontend::AgentITSMConfigItemSearch###Defaults###<Klasse>###<Attribut>`;
@@ -599,7 +618,25 @@ der Wechsel in den Mode B selbst (Schreibsperre in Znuny, Umstellung, Rückweg) 
 
 Die Reihenfolge der Schritte im Bericht ist: Katalog, Klassen, CIs (Durchgang 1: Köpfe, Durchgang 2:
 Versionen), Verknüpfungen, Anhänge, Prioritätsmatrix, Service-Angaben, Changes, in Znuny gelöschte CIs und
-abgeleitete Zustände. Ohne installiertes CMDB-Paket (nur ITSMCore) erscheinen die Klassen- und CI-Schritte
+abgeleitete Zustände. Die Schlüssel und Namen auf der Seite sind:
+
+| Schlüssel | Anzeige („Schritt“) | Bemerkung |
+|---|---|---|
+| `catalog` | „Auswahllisten“ | |
+| `classes` | „Klassen“ | dazu die Zählergruppe `definitions` („Klassendefinitionen“) |
+| `cis_pass1` | „CIs (Grunddaten)“ | |
+| `cis_pass2` | „CI-Versionen“ | |
+| `links` | „Verknüpfungen“ | |
+| `attachments` | „Anhänge“ | |
+| `priority_matrix` | „Prioritätsmatrix“ | |
+| `service_meta` | „Service-Angaben“ | |
+| `changes` | „Changes (nur gezählt)“ | |
+| `deleted_in_znuny` | „In Znuny gelöscht“ | läuft nur mit installiertem CMDB-Paket |
+| `incident_states` | „Vorfallstatus“ | |
+
+Je Schritt zählt der Bericht „Neu“, „Aktualisiert“, „Unverändert“, „Übersprungen“ und „Probleme“. In
+der Zusammenfassung des Laufs stehen höchstens die ersten 200 Meldungen (mit dem Hinweis „Es werden
+die ersten … von … Auffälligkeiten angezeigt“); die CSV-Datei enthält alle. Ohne installiertes CMDB-Paket (nur ITSMCore) erscheinen die Klassen- und CI-Schritte
 mit Zählern von 0; Katalog, Matrix und Service-Angaben werden trotzdem übernommen.
 
 ### Wiederholen und Abgleich
@@ -646,12 +683,41 @@ Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issu
 
 ### Die CSV-Datei lesen
 
-Die CSV-Datei hat die Spalten `Schritt`, `Code`, `Objekt` und `Meldung`, eine Zeile je Meldung, UTF-8 mit
-Semikolon als Trenner wie die übrigen Berichte. Filtern Sie zuerst nach `Code`: Meldungen wie
+Die CSV-Datei („Vollständiger Bericht (CSV)“) hat die Spalten `Schritt`, `Code`, `Objekt` und `Meldung`, eine
+Zeile je Meldung, UTF-8 mit Byte-Order-Mark (damit Excel Umlaute richtig zeigt), Semikolon als Trenner
+und Zeilenende CRLF wie die übrigen Berichte. Filtern Sie zuerst nach `Code`: Meldungen wie
 `changes_not_imported` oder `deleted_in_znuny` sind Hinweise, `bad_value`, `unresolved_reference` und
 `definition_unreadable` bedeuten, dass Daten fehlen. Die Spalte `Objekt` führt direkt zum Datensatz in
-Znuny. Texte aus Znuny können in Excel als Formel gedeutet werden; deshalb beginnt jede Zelle, die mit
-`=`, `+`, `-` oder `@` anfängt, mit einem vorangestellten Apostroph.
+Znuny. Texte aus Znuny können in Excel als Formel gedeutet werden; deshalb erhält jede Zelle, die mit
+`=`, `+`, `-`, `@`, Tabulator oder Wagenrücklauf beginnt, einen vorangestellten Apostroph.
+
+### Befehlszeile und Schnittstelle
+
+**Befehlszeile.** `tiqora itsm` hat zwei Unterbefehle. Es gibt keinen Unterbefehl für Umstellung oder
+Rückweg; beide laufen über die Seite oder die API.
+
+| Befehl | Optionen | Wirkung |
+|---|---|---|
+| `tiqora itsm import` | `--dry-run` (nur zählen, nichts schreiben), `--page-size N` (CIs je Seite, Vorgabe 500, mindestens 1), `--json` (Lauf als JSON ausgeben) | Legt einen Lauf (`dry_run` oder `import`) an, reiht denselben Hintergrundauftrag ein wie die Admin-Seite (`core.itsm_import`) und wartet im Abstand von 2 Sekunden auf den Worker. Danach gibt der Befehl Status, Meldung, je Schritt die Zähler (`created`, `updated`, `unchanged`, `skipped`, `problems`) und `issues: <Anzahl>` aus. Der Lauf gehört dem Benutzer 1 (root). |
+| `tiqora itsm status` | `--json` | Gibt Modus (`mode`), `switched`, den aktiven Auftrag (`active_job_id`) und den letzten Lauf aus. |
+
+`tiqora itsm import` endet mit Code 0, wenn der Lauf „done“ erreicht, sonst mit 1, ebenso wenn die
+Umstellung schon erfolgt ist („Die ITSM-Daten werden bereits in Tiqora geführt.“) oder bereits ein Lauf
+aktiv ist. Der Worker muss laufen, sonst wartet der Befehl.
+
+**Admin-API** (`/api/v1/admin/itsm/import`, nur Admins, API-Schlüsselbereich `admin`):
+
+| Aufruf | Zweck |
+|---|---|
+| `GET /status` | Modus, gefundene Znuny-ITSM-Version (`profile`), Zähler in Znuny (CIs, Klassen, Changes, Arbeitsaufträge), Umstellung, Sperre, letzter Lauf, aktiver Auftrag, `can_import`, `can_switch`, `blocked_reason`, Drift-Zähler |
+| `POST /runs` mit `{"dry_run": bool}` | Probelauf oder Übernahme; 202 mit Auftrags-ID, 409 mit Grund, wenn blockiert (nach der Umstellung, Auftrag läuft, kein Znuny-ITSM, nicht unterstützte Version, hängende Sperre, Modus nicht „Znuny-Durchgriff“) |
+| `GET /runs?limit=` und `GET /runs/{id}` | Läufe (1 bis 100, Vorgabe 20) und ein Lauf mit Bericht |
+| `POST /switch` | Umstellung auf Tiqora: `confirm` = `UMSTELLEN`, `addon_installed`, `edits_stopped`, `without_ci_data`; verlangt einen erfolgreichen Import (außer bei `without_ci_data`) und entweder die Erweiterung oder die Bestätigung, dass in Znuny nichts mehr bearbeitet wird |
+| `POST /rollback` | Zurück zu Modus A: `confirm` = `ZURÜCK` (auch `ZURUECK`) |
+| `POST /release-lock` | „Sperre aufheben“: löscht eine hängende Schreibsperre, nicht während eines Auftrags und nicht nach der Umstellung |
+
+Ein Probelauf und ein Import sind nur im Modus „Znuny-Durchgriff“ (Modus A) möglich. Es läuft immer
+nur ein Import- oder Umstellungsauftrag.
 
 ## Importer und GI gegen Znuny: Golden-Abgleich (`tests/golden/test_itsm_import.py`, `test_gi_config_items.py`)
 

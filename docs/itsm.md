@@ -1,5 +1,19 @@
 # ITSM in Tiqora
 
+> **English summary.** Tiqora's ITSM covers incident and problem handling in the ticket (criticality,
+> impact, priority matrix, known-error KB article, major-incident declaration with a timeline and
+> updates), services with ITSM data and a derived incident state, ticket links (types, delete, note to
+> linked tickets, link graph) and a CMDB. One setting, `itsm.mode`, selects who owns the configuration
+> items (CIs): **off**; **`znuny_readthrough`** (Mode A: Znuny's ITSM tables are read, never written; CIs
+> are edited in Znuny); **`tiqora`** (Mode B: the Tiqora CMDB, see [cmdb.md](cmdb.md)). On first start
+> Tiqora detects Znuny's ITSM tables (`general_catalog` and `cip_allocate` both present means Mode A,
+> otherwise Mode B) and stores the result once. A -> B is possible only through the ITSM import
+> (chapter 7, [itsm-import.md](itsm-import.md)). The process action `LinkAdd` with a CI end follows
+> the mode (Mode B: CMDB link service with the same rights as the API; Mode A: Znuny link; off:
+> skipped as `itsm_off`), and a refused link or a plugin veto never aborts the process transition: the
+> action is reported in `skipped_actions`. API-key area: `cmdb` for `/api/v1/itsm`, `tickets` for the
+> ticket sub-routes, `admin` for `/api/v1/admin/itsm`. UI labels below are the German defaults.
+
 Dieses Dokument beschreibt die ITSM-Funktionen von Tiqora: Incident und Problem, Services und
 Prioritätsmatrix, Verknüpfungen, die CMDB und den Betrieb neben Znuny. Die Kapitel werden mit den
 Wave-4-Plänen gefüllt; jedes Kapitel hat genau einen zuständigen Plan (ITSM-Kern: Kapitel 1–5,
@@ -45,16 +59,39 @@ Erlaubte Wechsel:
 
 ### Einstellungen
 
-Admin, Einstellungen, Abschnitt „ITSM“: Ticket-Typen (Störung, Großstörung, Serviceanfrage,
-Problem, Änderung, Änderungsaufgabe), Status „Geschlossen mit Workaround“, die Felder für
-Kritikalität und Auswirkung, Prioritätsmatrix ein/aus, Verknüpfungstypen für betroffene CIs und
-Probleme, Wissensdatenbank-Kategorie für bekannte Fehler, Minuten zwischen Störungen,
-Höchstzahl Tickets pro Notiz, Kundenantwort bei Großstörungen und die Znuny-Agentenadresse
-(leer oder `http(s)://`). Die Vorgaben entsprechen den Namen, die Znunys ITSM-Pakete anlegen.
+Admin, Einstellungen, Abschnitt „ITSM“ (von der Seite „ITSM“ über „ITSM-Einstellungen“ erreichbar;
+gespeichert als `itsm.<Schlüssel>`). Die Vorgaben entsprechen den Namen, die Znunys ITSM-Pakete anlegen.
+
+| Schlüssel | Vorgabe | Bedeutung |
+|---|---|---|
+| `incident_type` | `Incident` | Ticket-Typ Störung |
+| `major_incident_type` | `Incident::Major` | Ticket-Typ Großstörung (Major Incident) |
+| `service_request_type` | `ServiceRequest` | Ticket-Typ Serviceanfrage |
+| `problem_type` | `Problem` | Ticket-Typ Problem |
+| `change_type`, `change_task_type` | `Change`, `Change::Task` | Ticket-Typen Änderung und Änderungsaufgabe (nur als Rolle erkannt, kein Change-Management) |
+| `workaround_state` | `closed with workaround` | Status „Geschlossen mit Workaround“ |
+| `criticality_field`, `impact_field` | `ITSMCriticality`, `ITSMImpact` | Dynamische Felder für Kritikalität und Auswirkung |
+| `priority_matrix_enabled` | an | Prioritätsmatrix anwenden |
+| `ci_ticket_link_type` | `RelevantTo` | Verknüpfungstyp für „Betroffene CIs“ |
+| `problem_link_type` | `ParentChild` | Verknüpfungstyp zwischen Problem und Störung |
+| `known_error_kb_category_id` | 0 | Kategorie der Wissensdatenbank für bekannte Fehler; 0 = nicht eingestellt, die Schaltfläche ist aus |
+| `min_minutes_between_incidents` | 0 | Vorgabe für die Störungsflut-Warnung (0 bis 10080); 0 = aus |
+| `linked_articles_max_tickets` | 200 | Höchstzahl Tickets je Notiz an verknüpfte Tickets (1 bis 1000) |
+| `major_incident_customer_reply` | aus | erlaubt den Antwortmodus („Antwort an Kunden“) bei Großstörungen |
+| `znuny_agent_url` | leer | Adresse des Znuny-Agentenbereichs für „In Znuny bearbeiten“; leer = aus HttpType/FQDN/ScriptAlias der SysConfig abgeleitet, sonst `http(s)://` |
+
+Den Modus selbst ändern Sie nicht hier, sondern auf der Seite „ITSM“ (Abschnitt „ITSM-Modus“):
+Schaltflächen „ITSM ausschalten“, „Znuny führen lassen (nur lesen)“ und „Tiqora führen lassen“
+erscheinen nur für erlaubte Wechsel; die Seite zeigt außerdem die in Znuny gefundenen Pakete („In
+Znuny installiert“) und die Quelle der Entscheidung („automatisch erkannt“, „vom Administrator“,
+„durch den Import“).
+
+![Admin, Seite „ITSM“: Modus, Einrichtung und Prioritätsmatrix (Demo, Modus A)](images/admin-itsm.png)
 
 ### Berechtigungen und API
 
-Die ITSM-Routen unter `/api/v1/itsm` gehören zum API-Schlüsselbereich **cmdb**. Die ticketbezogenen
+Die ITSM-Routen unter `/api/v1/itsm` gehören zum API-Schlüsselbereich **cmdb**, die Verwaltung unter
+`/api/v1/admin/itsm` und `/api/v1/admin/itsm/import` zum Bereich **admin**. Die ticketbezogenen
 Routen (`/api/v1/tickets/{id}/cis`, `/itsm`, `/problem`, `/major-incident`, `/link-graph`) gehören
 zum Bereich **tickets**. Ein Ticket ist für eine Rolle nur sichtbar, wenn der Agent mindestens
 `ro` darauf hat: Ohne `ro` antworten alle diese Routen 404, und verknüpfte Tickets ohne
@@ -101,24 +138,33 @@ verknüpfte Tickets“ in Kapitel 4).
 
 ### Großstörung (Major Incident)
 
-„Als Großstörung kennzeichnen“ setzt den Ticket-Typ auf `Incident::Major` und legt einen Eintrag
-mit Zeitleiste an. Jedes verknüpfte Ticket, das der Agent lesen darf, zeigt ein Banner mit der
-aktiven Großstörung. „Aktualisierung senden“ hat drei Arten:
+Im Ticket zeigt der Block „Major Incident“ die Schaltfläche „Major Incident ausrufen“ (Dialog mit
+optionaler „Zusammenfassung“, höchstens 500 Zeichen; sie ist bei Antworten der Betreff). Sie setzt den
+Ticket-Typ auf `Incident::Major` und legt einen Eintrag mit Zeitleiste („Ausgerufen“, „Update“,
+„Beendet“) an. Jedes verknüpfte Ticket, das der Agent lesen darf, zeigt ein Banner „Mit einem aktiven
+Major Incident verknüpft:“. „Update senden“ (Dialog „Update an alle Betroffenen“, Feld „Zustellung“)
+hat drei Arten:
 
-- **Intern**: Notiz nur am Großstörungs-Ticket.
-- **Notiz**: zusätzlich interne Notiz an jedem verknüpften Ticket (Hintergrundauftrag).
-- **Antwort**: zusätzlich E-Mail an die Kunden der verknüpften Tickets. Das ist nur möglich, wenn
+- **Nur intern**: Notiz nur am Großstörungs-Ticket.
+- **Notiz an verknüpfte Tickets**: zusätzlich interne Notiz an jedem verknüpften Ticket
+  (Hintergrundauftrag).
+- **Antwort an Kunden**: zusätzlich E-Mail an die Kunden der verknüpften Tickets. Das ist nur möglich, wenn
   die Einstellung „Kundenantwort bei Großstörungen“ eingeschaltet ist, und sie ist **aus** (bewusste
   Abweichung vom Entwurf, damit keine Kundenpost versehentlich ausgeht).
 
-Der Text der Aktualisierung wird beim Speichern bereinigt (wie Artikeltext). „Beenden“ trägt das
-Ende in die Zeitleiste ein; der Ticket-Typ bleibt, denn Znuny kennt kein „Beenden“.
+Der Text der Aktualisierung wird beim Speichern bereinigt (wie Artikeltext) und darf nicht leer sein
+(422 `empty_body`); ist der Antwortmodus ausgeschaltet, lehnt die Schnittstelle ihn mit 409
+`customer_reply_disabled` ab, bei beendeter Großstörung mit 409 `not_active`. „Major Incident
+beenden“ trägt das Ende in die Zeitleiste ein; der Ticket-Typ bleibt, denn Znuny kennt kein
+„Beenden“.
 
 **Einschränkung (kanalgebundene Antwort).** Der Antwortmodus bei Großstörungen sendet **für jedes
 verknüpfte Ticket eine E-Mail**, auch wenn das Ticket über einen Plugin-Kanal (zum Beispiel Chat
 oder Messenger) läuft. Eine kanalbewusste Antwort gibt es in
 Wave 4 nicht; sie ist ein späterer Punkt. Wer Plugin-Kanäle einsetzt, sollte den Antwortmodus
 ausgeschaltet lassen und den Notizmodus verwenden.
+
+![Ticket-Zoom mit Banner zur Großstörung, „Betroffene CIs“, „Major Incident“, „Notiz an verknüpfte Tickets“ und „Als Grafik“ (Demo, englische Oberfläche)](images/itsm-ticket-zoom.png)
 
 ## 3 Service und Prioritätsmatrix
 
@@ -181,6 +227,13 @@ Gültigkeit eines Typs (im Editor oder durch „Aus Znuny aktualisieren“), ber
 abgeleiteten Vorfallstatus im Hintergrund neu (Job `core.cmdb_propagation`, siehe
 [cmdb.md](cmdb.md)).
 
+**Prozesse.** Die Prozess-Aktion `LinkAdd` legt Verknüpfungen ebenfalls an. Sobald ein Ende ein CI
+(`ITSMConfigItem`) ist, richtet sie sich nach dem ITSM-Modus: In Modus B läuft sie über den
+CMDB-Link-Dienst mit denselben Rechten wie die API, in Modus A über die Znuny-Verknüpfung, bei „Aus“
+wird sie übersprungen (`itsm_off`). Eine abgelehnte Verknüpfung oder ein Veto eines Plugins bricht den
+Prozessübergang nicht ab, die Aktion steht in `skipped_actions` (Einzelheiten im Abschnitt „Prozess-Aktion
+LinkAdd und der ITSM-Modus“ in Kapitel 7).
+
 ### Notizen an verknüpfte Tickets
 
 „Notiz an verknüpfte Tickets“ ersetzt `AgentTicketNoteToLinkedTicket`. Der Auftrag läuft im
@@ -204,8 +257,9 @@ Tickets ist eine allgemeine Ticket-Funktion und steht in jedem ITSM-Modus zur Ve
 
 ### Verknüpfungsgrafik
 
-„Als Grafik“ zeigt die Verknüpfungen eines Tickets bis Tiefe 2 mit höchstens 60 Knoten:
-Tickets (nur lesbare) und CIs, Kanten mit Typ und Richtung. Gekürzte Grafiken sind gekennzeichnet.
+„Als Grafik“ zeigt die Verknüpfungen eines Tickets bis Tiefe 2 (die Schnittstelle erlaubt 1 bis 3) mit
+höchstens 60 Knoten: Tickets (nur lesbare) und CIs, Kanten mit Typ und Richtung. Gekürzte Grafiken
+sind mit „Weitere Verknüpfungen ausgeblendet“ gekennzeichnet.
 
 ## 5 Znuny führt das ITSM (Modus A)
 
@@ -215,6 +269,12 @@ Adapter ist auf die Linien 6.5 (ITSMCore 6.5.5, ITSMConfigurationManagement 6.5.
 7.3.5) vermessen (`docs/itsm-import.md`, Abschnitte „Schema je Version“ und „Behaviour“); beide
 Linien verhalten sich gleich. Eine andere Paketversion zeigt „Diese Znuny-ITSM-Version wird noch
 nicht unterstützt“.
+
+In Modus A zeigt die CI-Seite (Menü „CMDB“ in der Seitenleiste) Liste, Suche
+(Nummer und Name, Attributwerte ab 3 Zeichen), Detail mit Attributen, Versionen und verknüpften Tickets,
+den Hinweis „Nur-Lese-Ansicht der Znuny-CMDB“ und den Verweis „In Znuny bearbeiten“.
+
+![CI-Detail in Modus A: Attribute, Versionen, verknüpfte Tickets (Demo, englische Oberfläche)](images/itsm-ci-detail.png)
 
 ### Was Znuny-Nutzer in jedem Modus sehen
 
@@ -401,7 +461,7 @@ Tiqora diesen Weg ab (`409`), denn dann gilt der Ablauf mit Import.
 
 Auf der Seite „Import aus Znuny“ führt „Zurück zu Znuny (Modus A)“ zum alten Zustand: Znuny ist wieder
 führend, die Sperre der CI-Bildschirme ist aufgehoben, Tiqora liest die CIs wieder aus Znuny. Sie müssen das
-Wort im Dialog zur Bestätigung eingeben.
+Wort im Dialog zur Bestätigung eingeben („ZURÜCK“, ersatzweise „ZURUECK“; beim Umstellen „UMSTELLEN“).
 
 **Was verloren geht:** Alles, was Sie seit der Umstellung in Tiqora an CIs geändert haben, ist in Znuny nicht
 sichtbar. Tiqora löscht es aber nicht; die übernommenen und geänderten Zeilen bleiben in den Tiqora-Tabellen
@@ -451,11 +511,15 @@ Auf der Befehlszeile gilt:
 ```sh
 tiqora itsm import --dry-run   # Probelauf, gibt die Zähler aus
 tiqora itsm import             # echte Übernahme
+tiqora itsm import --page-size 200 --json
 tiqora itsm status             # Modus und letzter Lauf (mit --json maschinenlesbar)
 ```
 
 `tiqora itsm import` startet den Auftrag und wartet auf den Worker; der Worker muss laufen. Es gelten
-dieselben Sperren wie auf der Seite.
+dieselben Sperren wie auf der Seite. Alle Unterbefehle und Optionen (`--dry-run`, `--page-size`,
+`--json`) stehen in [itsm-import.md](itsm-import.md), Abschnitt „Befehlszeile und Schnittstelle“. Die
+Umstellung auf Modus B und der Rückweg gibt es nur auf der Seite beziehungsweise über die
+Admin-API, nicht in der Befehlszeile.
 
 ## Znuny-Erweiterung TiqoraITSM
 
