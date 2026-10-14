@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any, cast
 
@@ -194,6 +195,13 @@ async def test_unsupported_module_is_reported_not_raised() -> None:
     assert result == "TestOnlyUnrun"
 
 
+class _SavepointSession:
+    """Just enough session for the engine's per-action savepoint (no database)."""
+
+    def begin_nested(self) -> contextlib.AbstractAsyncContextManager[None]:
+        return contextlib.nullcontext()  # type: ignore[return-value]
+
+
 async def test_action_unsupported_from_a_handler_is_reported_not_raised() -> None:
     async def _inactive(*_a: Any) -> None:
         raise ActionUnsupported("not here")
@@ -203,7 +211,7 @@ async def test_action_unsupported_from_a_handler_is_reported_not_raised() -> Non
     set_registry_for_tests(registry)
     try:
         result = await execute_transition_action(
-            cast(AsyncSession, object()),
+            cast(AsyncSession, _SavepointSession()),
             action=TransitionActionConfig(module="TestInactive", config={}),
             ticket_id=1,
             process_entity_id="P",

@@ -621,6 +621,13 @@
             ],
             "title": "New Activity Entity Id"
           },
+          "skipped_actions": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedActionOut"
+            },
+            "title": "Skipped Actions",
+            "type": "array"
+          },
           "state": {
             "$ref": "#/components/schemas/TicketProcessStateOut"
           },
@@ -28248,6 +28255,13 @@
             "title": "Activity Changed",
             "type": "boolean"
           },
+          "skipped_actions": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedActionOut"
+            },
+            "title": "Skipped Actions",
+            "type": "array"
+          },
           "state": {
             "$ref": "#/components/schemas/TicketProcessStateOut"
           },
@@ -41035,6 +41049,30 @@
           "items"
         ],
         "title": "SimilarTicketsOut",
+        "type": "object"
+      },
+      "SkippedActionOut": {
+        "description": "A transition action that was skipped on this run (the transition itself went through).",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "reason",
+          "detail"
+        ],
+        "title": "SkippedActionOut",
         "type": "object"
       },
       "SlaCreate": {

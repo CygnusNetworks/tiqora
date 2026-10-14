@@ -294,6 +294,27 @@ async def add_type_update(
     )
 
 
+async def add_initial_type(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    type_name: str,
+    type_id: int,
+    user_id: int,
+) -> None:
+    """TypeUpdate written by TicketCreate (``Ticket::Type`` on): ``%%Type%%TypeID``.
+
+    Unlike a later type change this has no old-value part (bug#12702 history row).
+    """
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        history_type=TYPE_TYPE_UPDATE,
+        name=f"%%{type_name}%%{type_id}",
+        user_id=user_id,
+    )
+
+
 async def add_service_update(
     session: AsyncSession,
     *,
@@ -639,6 +660,7 @@ __all__ = [
     "add_pending_time",
     "add_priority_update",
     "add_responsible_update",
+    "add_initial_type",
     "add_service_update",
     "add_sla_update",
     "add_state_update",

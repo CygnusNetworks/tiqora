@@ -61,7 +61,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -103,7 +103,9 @@ from tiqora.domain.ticket_write_service import (
     update_dynamic_field,
     watch_ticket,
 )
+from tiqora.itsm.mode import get_itsm_mode
 from tiqora.process.actions.registry import (
+    ActionSkipped,
     ActionUnsupported,
     module_short_name,
     resolve_action,
@@ -178,6 +180,7 @@ __all__ = [
     "apply_activity_dialog",
     "dialog_values_and_missing",
     "evaluate_transition",
+    "SkippedAction",
     "execute_transition_action",
     "get_ticket_attrs",
     "run_transitions",
@@ -1030,6 +1033,24 @@ async def _action_link_add(
         if obj == "Ticket" and not key.isdigit():
             raise RequiredFieldMissing(f"LinkAdd: {key!r} is not a ticket id")
     link_type = str(config.get("Type") or config.get("LinkType") or "Normal")
+    if _CI_LINK_OBJECT in (source_object, target_object):
+        mode = (await get_itsm_mode(session)).mode
+        if mode == "off":
+            raise ActionSkipped(
+                "itsm_off",
+                "LinkAdd: ITSM ist ausgeschaltet; Verknüpfungen mit Konfigurationseinträgen"
+                " werden nicht angelegt.",
+            )
+        if mode == "tiqora":
+            await _link_add_cmdb(
+                session,
+                actor=actor,
+                source=(source_object, source_key),
+                target=(target_object, target_key),
+                link_type=link_type,
+            )
+            return
+        # znuny_readthrough: Znuny's ITSMConfigItem link object, stored as link_relation
     try:
         await link_objects(
             session,
@@ -1053,6 +1074,61 @@ async def _action_link_add(
             target_key,
             link_type,
         )
+
+
+_CI_LINK_OBJECT = "ITSMConfigItem"
+#: Znuny link objects Mode B can store next to a CI (``tiqora_itsm_link`` kinds)
+_CMDB_LINK_KINDS = {"ITSMConfigItem": "ci", "Ticket": "ticket", "Service": "service"}
+
+
+async def _link_add_cmdb(
+    session: AsyncSession,
+    *,
+    actor: int,
+    source: tuple[str, str],
+    target: tuple[str, str],
+    link_type: str,
+) -> None:
+    """Mode B ``LinkAdd`` with a CI end: Tiqora's CMDB link service, as the process actor.
+
+    The service applies the R12 rule (``rw`` on the ticket's queue, ``ro`` on the CI's class; CI to
+    CI needs ``rw`` on both classes). A refusal skips the action with a German text -- Znuny's
+    ``LinkAdd`` logs a refusal and the process goes on, so does Tiqora.
+    """
+    # lazy: tiqora.cmdb imports the ticket write service (and through it, the process engine)
+    from tiqora.cmdb.access import load_access
+    from tiqora.cmdb.errors import CmdbError, CmdbForbidden, CmdbNotFound
+    from tiqora.cmdb.links import LinkEnd, LinkInvalid, LinkService, UnknownLinkType
+
+    kinds: list[LinkEnd] = []
+    for obj, key in (source, target):
+        kind = _CMDB_LINK_KINDS.get(obj)
+        if kind is None:
+            raise ActionSkipped(
+                "link_refused",
+                f"LinkAdd: Objekte vom Typ „{obj}“ lassen sich nicht mit Konfigurationseinträgen"
+                " verknüpfen.",
+            )
+        kinds.append(LinkEnd(kind, key))  # type: ignore[arg-type]
+    try:
+        access = await load_access(session, actor)
+        await LinkService(session).add(
+            access, source=kinds[0], target=kinds[1], link_type_key=link_type
+        )
+    except UnknownLinkType as exc:
+        raise ActionSkipped(
+            "link_refused", f"LinkAdd: Der Verknüpfungstyp „{exc.name}“ existiert nicht."
+        ) from exc
+    except (CmdbNotFound, CmdbForbidden) as exc:
+        raise ActionSkipped(
+            "link_refused",
+            "LinkAdd: Die Verknüpfung wurde abgelehnt: Ticket oder Konfigurationseintrag"
+            " existiert nicht oder dem Prozess-Benutzer fehlen die Rechte.",
+        ) from exc
+    except LinkInvalid as exc:
+        raise ActionSkipped("link_refused", f"LinkAdd: {exc}") from exc
+    except CmdbError as exc:
+        raise ActionSkipped("link_refused", f"LinkAdd: {exc}") from exc
 
 
 _LINK_OBJECT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,99}$")
@@ -1383,6 +1459,7 @@ async def execute_transition_action(
     transition_entity_id: str,
     user_id: int,
     sysconfig: SysConfig,
+    skipped: list[SkippedAction] | None = None,
 ) -> str | None:
     """Dispatch and run one TransitionAction.
 
@@ -1400,6 +1477,11 @@ async def execute_transition_action(
     (:func:`tiqora.process.smart_tags.replace_action_config`, Znuny's
     ``_ReplaceTicketAttributes`` + ``_ReplaceAdditionalAttributes``); ``action`` itself is never
     mutated.
+
+    Every handler runs inside its own savepoint. A handler that raises :class:`ActionSkipped`, or
+    whose ticket write a plugin refused (``OperationVetoed`` / ``PluginWriteError``, reason
+    ``vetoed``), leaves nothing behind: the savepoint is rolled back, the skip is appended to
+    *skipped* (when given) and logged, and the transition goes on -- it is never lost to a 500.
     """
     del process_entity_id, activity_entity_id, transition_entity_id  # see docstring
     entry = resolve_action(action.module)
@@ -1409,17 +1491,46 @@ async def execute_transition_action(
     config = await replace_action_config(
         action.config, session=session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
     )
+    # lazy: plugins.* import tiqora.process (package init imports this module)
+    from tiqora.plugins.sync_hooks import OperationVetoed
+    from tiqora.plugins.writes import PluginWriteError
+
     try:
-        await entry.run(session, config, ticket_id, user_id, sysconfig)
+        async with session.begin_nested():
+            await entry.run(session, config, ticket_id, user_id, sysconfig)
     except ActionUnsupported:
         logger.warning("ProcessManagement TransitionAction not active here: %s", action.module)
         return module_short_name(action.module)
+    except (ActionSkipped, OperationVetoed, PluginWriteError) as exc:
+        if isinstance(exc, ActionSkipped):
+            reason, detail = exc.reason, exc.detail
+        else:
+            reason, detail = "vetoed", str(exc)
+        name = module_short_name(action.module)
+        logger.warning(
+            "ProcessManagement TransitionAction %s skipped (%s) on ticket %s: %s",
+            name,
+            reason,
+            ticket_id,
+            detail,
+        )
+        if skipped is not None:
+            skipped.append(SkippedAction(module=name, reason=reason, detail=detail))
     return None
 
 
 # ---------------------------------------------------------------------------
 # 5. submit_activity_dialog
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SkippedAction:
+    """A transition action that did not run on this pass (its savepoint was rolled back)."""
+
+    module: str
+    reason: str  # stable code: ``vetoed``, ``itsm_off``, ``link_refused``, ...
+    detail: str  # German text for the agent
 
 
 @dataclass(frozen=True)
@@ -1430,6 +1541,7 @@ class ActivityDialogSubmitResult:
     new_activity_entity_id: str | None
     unsupported_actions: list[str]
     transition_entity_id: str | None
+    skipped_actions: list[SkippedAction] = field(default_factory=list)
 
 
 async def _resolve_dialog_field_id(
@@ -2035,6 +2147,7 @@ class TransitionOutcome:
     new_activity_entity_id: str | None
     transition_entity_id: str | None
     unsupported_actions: list[str]
+    skipped_actions: list[SkippedAction] = field(default_factory=list)
 
 
 _NO_TRANSITION = TransitionOutcome(False, None, None, [])
@@ -2118,6 +2231,7 @@ async def run_transitions(
     from tiqora.plugins.process_points import action_budget_scope
 
     unsupported: list[str] = []
+    skipped_actions: list[SkippedAction] = []
     with action_budget_scope():  # one shared time budget for all plugin actions of this run
         for action_node in transition.actions:
             skipped = await execute_transition_action(
@@ -2129,6 +2243,7 @@ async def run_transitions(
                 transition_entity_id=transition.entity_id,
                 user_id=user_id,
                 sysconfig=sysconfig,
+                skipped=skipped_actions,
             )
             if skipped is not None:
                 unsupported.append(skipped)
@@ -2137,6 +2252,7 @@ async def run_transitions(
         new_activity_entity_id=transition.target_activity_entity_id,
         transition_entity_id=transition.entity_id,
         unsupported_actions=unsupported,
+        skipped_actions=skipped_actions,
     )
 
 
@@ -2222,4 +2338,5 @@ async def submit_activity_dialog(
         new_activity_entity_id=outcome.new_activity_entity_id,
         unsupported_actions=outcome.unsupported_actions,
         transition_entity_id=outcome.transition_entity_id,
+        skipped_actions=outcome.skipped_actions,
     )

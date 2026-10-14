@@ -23,6 +23,7 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
 from tiqora.config import Settings
 from tiqora.dashboard import start, store
+from tiqora.dashboard.runner import run_batch, run_widget
 from tiqora.dashboard.schemas import (
     DashboardCreateIn,
     DashboardOut,
@@ -646,3 +647,36 @@ async def store_foreign(env: Env) -> int:
     """A dashboard of someone who is none of A, B, C: invisible to all of them."""
     d = await env.create(OTHER_OWNER, DashboardCreateIn(name="dash497 foreign"))
     return d.id
+
+
+#: functional tests need no production budget (25 s single widget, per-provider batch budgets):
+#: budget semantics are covered by test_dashboard_runner.py; a loaded host must not turn a
+#: correct answer into "pending"/"timeout"
+FUNCTIONAL_TIMEOUT = 120.0
+
+
+def assert_not_starved(out: Any) -> None:
+    """Fail with a message that names an overloaded host instead of a product failure."""
+    statuses = [o.status for o in out.values()] if isinstance(out, dict) else [out.status]
+    assert "pending" not in statuses, (
+        f"host starved: the widget did not finish within {FUNCTIONAL_TIMEOUT:.0f} s"
+        f" (infrastructure, not a product failure): {out!r}"
+    )
+
+
+async def run_widget_fn(*args: Any, **kw: Any) -> Any:
+    """``run_widget`` with the functional budget; None (unknown provider) passes through."""
+    kw.setdefault("timeout", FUNCTIONAL_TIMEOUT)
+    out = await run_widget(*args, **kw)
+    if out is not None:
+        assert_not_starved(out)
+    return out
+
+
+async def run_batch_fn(*args: Any, **kw: Any) -> Any:
+    """``run_batch`` with the functional per-provider budget and batch deadline."""
+    kw.setdefault("timeout", FUNCTIONAL_TIMEOUT)
+    kw.setdefault("deadline", FUNCTIONAL_TIMEOUT)
+    out = await run_batch(*args, **kw)
+    assert_not_starved(out)
+    return out

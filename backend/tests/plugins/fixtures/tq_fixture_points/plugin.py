@@ -107,8 +107,13 @@ def _register_sync_hooks(registry: PluginRegistry) -> None:
 
 async def _set_contract(ac: ActionContext) -> None:
     behaviour.CALLS.append(("action.SetContract", dict(ac.config)))
+    # MODE["as_agent"]: write as the acting agent (the write then runs the before-hooks)
     await ac.plugin.tickets.set_dynamic_field(
-        ac.ticket_id, "PP55Contract", [str(ac.config["Contract"])], session=ac.session
+        ac.ticket_id,
+        "PP55Contract",
+        [str(ac.config["Contract"])],
+        as_agent=ac.user_id if behaviour.MODE.get("as_agent") else None,
+        session=ac.session,
     )
     mode = behaviour.MODE.get("action", "ok")
     if mode == "raise":

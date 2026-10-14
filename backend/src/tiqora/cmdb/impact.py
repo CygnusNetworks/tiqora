@@ -271,11 +271,28 @@ async def impact_graph(
     ids = {n.id for n in nodes}
     propagating = await LinkTypeService(session).propagating()
     out_edges = [
-        ImpactEdgeOut(source=s, target=t, link_type=name, propagates=name in propagating)
+        ImpactEdgeOut(
+            source=s, target=t, link_type=name, propagates=_edge_propagates(propagating, s, t, name)
+        )
         for s, t, name in sorted(edges)
         if s in ids and t in ids
     ]
     return ImpactGraphOut(nodes=nodes, edges=out_edges, truncated=truncated, root=f"ci:{ci_id}")
+
+
+def _edge_propagates(
+    propagating: Mapping[str, Propagating], source: str, target: str, name: str
+) -> bool:
+    """Whether an incident travels over this edge at all: an unpointed ``target`` type reaches
+    nobody (Znuny ``LinkObject.pm``), so it is not drawn as propagating."""
+    ltype = propagating.get(name)
+    if ltype is None:
+        return False
+    if source.startswith("service:") or target.startswith("service:"):
+        return counts_for_service(
+            ltype.propagation, ltype.pointed, service_is_source=source.startswith("service:")
+        )
+    return bool(ltype.ci_edges(0, 1))
 
 
 async def _class_keys(session: AsyncSession, class_ids: set[int]) -> dict[int, str]:

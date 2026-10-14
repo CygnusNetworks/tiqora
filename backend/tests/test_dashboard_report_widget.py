@@ -18,6 +18,7 @@ from sqlalchemy import create_engine, text
 import tiqora.reporting.jobs as report_jobs
 import tiqora.reporting.run_service as run_service
 from tests._dashboard3_helpers import ADMIN, GROUP_1, GROUP_2, Q1, Q2, A, B, Env3, open_env3
+from tests._dashboard_helpers import run_widget_fn
 from tiqora.config import Settings
 from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.providers import (
@@ -34,7 +35,6 @@ from tiqora.dashboard.providers.report import (
     report_provider,
     run_report_widget,
 )
-from tiqora.dashboard.runner import run_widget
 from tiqora.dashboard.settings_models import ReportWidgetSettings
 from tiqora.extensions import get_registry
 from tiqora.extensions.registry import Registry
@@ -212,7 +212,7 @@ async def run_tile(
     env: Env3, uid: int, settings: dict[str, Any], *, pinned: bool = False, **kw: Any
 ) -> Any:
     kw.setdefault("app_settings", SETTINGS)
-    out = await run_widget(
+    out = await run_widget_fn(
         env.factory, registry(), uid, W("dash3wid", "core.report", settings, pinned=pinned), **kw
     )
     assert out is not None
@@ -563,7 +563,7 @@ async def test_report_provider_leaves_the_session_statement_limit_alone(env: Env
         ),
     )
     reg.freeze()
-    out = await run_widget(
+    out = await run_widget_fn(
         env.factory,
         reg,
         A,
@@ -606,7 +606,7 @@ async def run_type(
 ) -> dict[str, Any]:
     kw.setdefault("app_settings", SETTINGS)
     pinned = bool(kw.pop("pinned", False))
-    out = await run_widget(
+    out = await run_widget_fn(
         env.factory, registry(), uid, W("dash3wid", type_key, settings, pinned=pinned), **kw
     )
     assert out is not None and out.status == "ok", out

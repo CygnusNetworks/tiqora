@@ -417,6 +417,10 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # SCIM provisioning (/scim/v2) is not under /api/. Here "/" already covers it; a proxy that
+    # lists its locations needs its own `location /scim/` (same proxy_pass and headers as /api/,
+    # see docs/deployment.md, "Upgrading to v0.19.0").
+
     # SAML: the ACS endpoint receives the IdP's signed response as a POST body
     # (up to ~1 MB); nginx's default client_max_body_size of 1m is too tight.
     location /api/ {

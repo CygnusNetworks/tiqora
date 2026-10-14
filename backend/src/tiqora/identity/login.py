@@ -15,7 +15,7 @@ with Znuny tables on strings (mixed collations on production MariaDB).
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Final, Literal
@@ -587,13 +587,15 @@ async def apply_login(
     plan: LoginPlan,
     *,
     settings: Settings,
+    refuse: Callable[[int], Awaitable[bool]] | None = None,
     _replanned: bool = False,
 ) -> tuple[int, str]:
     """Create (JIT) or sync the account, store the link and commit. Returns (user_id, login).
 
     Order: create -> flush -> profile sync -> role/group sync (agents) -> link -> commit.
     Losing a race against a concurrent first login re-plans once (the other request's
-    committed link/login then matches); otherwise ``login_taken``.
+    committed link/login then matches); otherwise ``login_taken``. ``refuse`` (optional) is
+    asked about the account a re-plan resolves, before anything is written.
     """
     if plan.decision == "reject":
         raise LoginRejected(plan.reject_code or "no_match")
@@ -614,8 +616,18 @@ async def apply_login(
                 raise LoginRejected(
                     (replan.reject_code if replan.decision == "reject" else None) or "login_taken"
                 ) from None
+            if refuse is not None and replan.user_id is not None and await refuse(replan.user_id):
+                # The account the lost race resolved to is refused (SSO-managed): nothing
+                # has been written yet, so end the login before the sync below.
+                raise LoginRejected("no_match") from None
             return await apply_login(
-                session, provider, identity, replan, settings=settings, _replanned=True
+                session,
+                provider,
+                identity,
+                replan,
+                settings=settings,
+                refuse=refuse,
+                _replanned=True,
             )
         await session.flush()
     elif plan.decision == "login" and plan.user_id is not None and plan.login is not None:

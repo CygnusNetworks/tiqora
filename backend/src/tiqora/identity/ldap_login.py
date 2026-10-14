@@ -314,7 +314,7 @@ async def ldap_sign_in(
     login: str,
     password: str,
     user_kind: UserKind,
-    refuse: Callable[[int], Awaitable[bool]] | None = None,
+    refuse: Callable[[int], Awaitable[bool]],
 ) -> str | None:
     """Password login against the directories, then the shared login chain (link, login
     match, JIT, profile and role sync; commits). Returns the account's login, or ``None``
@@ -325,7 +325,9 @@ async def ldap_sign_in(
     ``refuse`` (P2A-PM-I2b, m-c) is asked about an existing account the plan resolved,
     between ``plan_login`` and ``apply_login``: True ends the login with ``None`` before
     anything is written (no link, no profile or role sync). A ``create`` plan is a new
-    account, which no SCIM mapping can name yet."""
+    account, which no SCIM mapping can name yet; if it loses a JIT race, ``apply_login``
+    asks again about the account the re-plan resolves. ``refuse`` is required (no default
+    that skips the check)."""
     found = await ldap_password_login(
         session, settings, login=login, password=password, user_kind=user_kind
     )
@@ -337,15 +339,10 @@ async def ldap_sign_in(
         if plan.decision == "reject":
             logger.info("ldap_login_rejected", provider=record.slug, reason=plan.reject_code)
             return None
-        if (
-            refuse is not None
-            and plan.decision == "login"
-            and plan.user_id is not None
-            and await refuse(plan.user_id)
-        ):
+        if plan.decision == "login" and plan.user_id is not None and await refuse(plan.user_id):
             return None
         _user_id, account_login = await apply_login(
-            session, record, identity, plan, settings=settings
+            session, record, identity, plan, settings=settings, refuse=refuse
         )
     except LoginRejected as exc:
         logger.info("ldap_login_rejected", provider=record.slug, reason=exc.reject_code)

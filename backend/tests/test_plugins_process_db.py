@@ -26,7 +26,7 @@ from tiqora.process.actions.registry import ZNUNY_MODULE_PREFIX, resolve_action
 from tiqora.process.condition_modules import ZNUNY_VALIDATION_PREFIX, resolve_condition_module
 from tiqora.process.config import TransitionActionConfig
 from tiqora.process.designer.catalog import build_designer_catalog
-from tiqora.process.engine import execute_transition_action
+from tiqora.process.engine import SkippedAction, execute_transition_action
 from tiqora.process.exceptions import PluginActionTimedOut
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -268,7 +268,12 @@ async def _ticket(title: str = "Vertrag") -> int:
 
 
 async def _run(
-    session: AsyncSession, ticket_id: int, config: dict[str, Any], module: str = ACTION_MODULE
+    session: AsyncSession,
+    ticket_id: int,
+    config: dict[str, Any],
+    module: str = ACTION_MODULE,
+    skipped: list[SkippedAction] | None = None,
+    user_id: int = 1,
 ) -> str | None:
     return await execute_transition_action(
         session,
@@ -277,8 +282,9 @@ async def _run(
         process_entity_id="Process-pp55",
         activity_entity_id="Activity-pp55",
         transition_entity_id="Transition-pp55",
-        user_id=1,
+        user_id=user_id,
         sysconfig=_sysconfig(session),
+        skipped=skipped,
     )
 
 
@@ -355,6 +361,98 @@ async def test_failing_action_rolls_back_savepoint_and_continues(env: Env) -> No
     assert failed[0]["plugin"] == "org.example.points"
     assert "RuntimeError" in failed[0]["error"]
     assert failed[0]["timed_out"] is False
+
+
+async def test_vetoed_action_is_skipped_with_text_and_leaves_nothing(env: Env) -> None:
+    """PROCESS-VETO: a before-hook veto on the action's own ticket write is a skip, not an error."""
+    tid = await _ticket()
+    behaviour = points_behaviour()
+    behaviour.MODE["as_agent"] = "1"
+    behaviour.MODE["hook.ticket.dynamic_fields_update"] = "veto_listed"
+    behaviour.VETO_TICKETS.add(tid)
+    skipped: list[SkippedAction] = []
+    async with env.factory() as session:
+        result = await _run(session, tid, {"Contract": "nachher"}, skipped=skipped, user_id=AGENT)
+        await session.commit()
+    assert result is None
+    assert skipped == [
+        SkippedAction(
+            module="Plugin_points_SetContract",
+            reason="vetoed",
+            detail=f"Ticket {tid}: Vertragsnummer fehlt",
+        )
+    ]
+    assert env.contract(tid) == []
+
+
+async def test_vetoed_action_keeps_earlier_savepoint_work(env: Env) -> None:
+    tid = await _ticket()
+    behaviour = points_behaviour()
+    skipped: list[SkippedAction] = []
+    async with env.factory() as session:
+        await PluginTickets().set_dynamic_field(tid, "PP55Contract", ["vorher"], session=session)
+        behaviour.MODE["as_agent"] = "1"
+        behaviour.MODE["hook.ticket.dynamic_fields_update"] = "veto_listed"
+        behaviour.VETO_TICKETS.add(tid)
+        assert (
+            await _run(session, tid, {"Contract": "nachher"}, skipped=skipped, user_id=AGENT)
+            is None
+        )
+        await session.commit()
+    assert [(x.reason, x.detail) for x in skipped] == [
+        ("vetoed", f"Ticket {tid}: Vertragsnummer fehlt")
+    ]
+    assert env.contract(tid) == ["vorher"]
+
+
+async def test_vetoed_action_without_collector_is_only_logged(env: Env) -> None:
+    tid = await _ticket()
+    behaviour = points_behaviour()
+    behaviour.MODE["as_agent"] = "1"
+    behaviour.MODE["hook.ticket.dynamic_fields_update"] = "veto"
+    with capture_logs():
+        async with env.factory() as session:
+            assert await _run(session, tid, {"Contract": "x"}, user_id=AGENT) is None
+            await session.commit()
+    assert env.contract(tid) == []
+
+
+async def test_vetoed_actions_do_not_fail_the_transition_through_the_route(env: Env) -> None:
+    """The submit answers 200, the activity moves on and both skips are in the response."""
+    tid = await _ticket()
+    async with _http_client(env) as client:
+        started = await client.post(
+            f"/api/v1/process/ticket/{tid}/start", json={"process_entity_id": PROC}
+        )
+        assert started.status_code == 200, started.text
+        behaviour = points_behaviour()
+        behaviour.MODE["as_agent"] = "1"
+        behaviour.MODE["hook.ticket.dynamic_fields_update"] = "veto_listed"
+        behaviour.VETO_TICKETS.add(tid)
+        resp = await client.post(
+            f"/api/v1/process/ticket/{tid}/submit",
+            json={
+                "activity_dialog_entity_id": DIALOG,
+                "field_values": {"Title": "Updated via REST"},
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["activity_changed"] is True
+    assert body["state"]["activity_entity_id"] == ACT_B
+    assert (
+        body["skipped_actions"]
+        == [
+            {
+                "module": "Plugin_points_SetContract",
+                "reason": "vetoed",
+                "detail": f"Ticket {tid}: Vertragsnummer fehlt",
+            }
+        ]
+        * 2
+    )
+    assert env.contract(tid) == []
+    assert env.rows("SELECT title FROM ticket WHERE id = :t", t=tid)[0][0] == "Updated via REST"
 
 
 async def test_hanging_actions_are_bounded_by_one_budget(

@@ -17,9 +17,9 @@ import pytest
 from sqlalchemy import create_engine, text
 
 from tests._dashboard3_helpers import GROUP_1, GROUP_2, Q1, Q2, A, B, Env3, open_env3
+from tests._dashboard_helpers import run_batch_fn, run_widget_fn
 from tiqora.dashboard.filters import DashboardFilters, filters_key
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, core_providers
-from tiqora.dashboard.runner import run_batch, run_widget
 from tiqora.domain.ticket_service import TicketService
 from tiqora.extensions.registry import Registry
 from tiqora.filters import Filter
@@ -152,7 +152,7 @@ def listing(preset: str = "mine_open", *, pinned: bool = False) -> W:
 
 
 async def data_of(env: Env3, uid: int, widget: W, flt: DashboardFilters | None = None) -> Any:
-    out = await run_widget(env.factory, registry(), uid, widget, filters=flt)
+    out = await run_widget_fn(env.factory, registry(), uid, widget, filters=flt)
     assert out is not None and out.status == "ok", out
     assert out.data is not None
     return out.data
@@ -250,7 +250,7 @@ async def test_pinned_widget_ignores_filters(env: Env3) -> None:
     flt = fq(Q1)
     assert (await data_of(env, A, counter(pinned=True), flt))["value"] == 6
     assert (await data_of(env, A, listing(pinned=True), flt))["total"] == 6
-    out = await run_batch(
+    out = await run_batch_fn(
         env.factory,
         registry(),
         A,

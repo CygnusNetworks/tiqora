@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { JobProgress } from "@/components/jobs/JobProgress";
 import { useJob } from "@/components/jobs/useJob";
+import { skippedOf } from "./skipped";
+import { SkippedTargets } from "./SkippedTargets";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -134,7 +136,7 @@ function CloseIncidentsDialog({
     onSuccess: (accepted) => setJobId(accepted.job_id),
   });
   const done = Array.isArray(job?.result?.done) ? (job?.result?.done as number[]) : [];
-  const skipped = Array.isArray(job?.result?.skipped) ? (job?.result?.skipped as unknown[]) : [];
+  const skipped = skippedOf(job?.result);
   const close = () => {
     if (jobId != null) void qc.invalidateQueries({ queryKey: ["tickets"] });
     onClose();
@@ -173,9 +175,7 @@ function CloseIncidentsDialog({
             {job && isTerminal && (
               <div data-testid="problem-close-result">
                 <p className="font-medium text-ink">{t("itsm.problem.close.done", { count: done.length })}</p>
-                {skipped.length > 0 && (
-                  <p className="text-xs text-muted">{t("itsm.problem.close.skipped", { count: skipped.length })}</p>
-                )}
+                <SkippedTargets skipped={skipped} testId="problem-close-skipped" />
               </div>
             )}
             <div className="flex justify-end gap-2">

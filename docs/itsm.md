@@ -495,3 +495,18 @@ alten löschen), wenn ein Support-Paket die Firma verlassen hat.
 **Kundenseite.** Schalten Sie sie ein, indem Sie `CustomerFrontend::Module###CustomerTiqoraITSM` und
 `CustomerFrontend::Navigation###CustomerTiqoraITSM###002-TiqoraITSM` gültig setzen. Ohne Daten in Tiqora
 bleibt die Seite leer.
+
+### Prozess-Aktion LinkAdd und der ITSM-Modus
+
+Die Prozess-Aktion `LinkAdd` richtet sich nach dem ITSM-Modus, sobald ein Ende `ITSMConfigItem` ist:
+
+| Modus | Verhalten |
+|---|---|
+| `tiqora` | Die Verknüpfung läuft über den CMDB-Link-Dienst, mit denselben Rechten wie die API: `rw` auf der Queue des Tickets und `ro` auf der CI-Klasse, geprüft für den Prozess-Benutzer (`UserID` der Aktion, sonst der Agent). |
+| `znuny_readthrough` | Wie bisher: Znuny-Verknüpfung (`link_relation`). |
+| `off` | Die Aktion wird übersprungen (Grund `itsm_off`), Ticket-zu-Ticket-Verknüpfungen funktionieren weiter. |
+
+Eine abgelehnte Verknüpfung (unbekanntes CI oder Typ, fehlende Rechte) bricht den Prozessübergang nicht ab. Die Aktion
+steht dann in `skipped_actions` der Antwort (`module`, `reason`, `detail`). Dasselbe gilt für Schreibzugriffe von
+Erweiterungs-Aktionen, die ein Plugin per Hook ablehnt (Grund `vetoed`, `detail` ist der Text des Plugins). Die
+Aktion hinterlässt dann nichts in der Datenbank.

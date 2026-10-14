@@ -289,18 +289,33 @@ async def recompute_all(
     the running job (dedupe key ``all``), whose pass still uses the shape read at its start. So
     the shape is read again after each pass and, if it changed, the pass runs once more, at most
     :data:`MAX_PASSES` times; a shape still moving after that is logged (ruling CMDB-PM-I3).
+
+    A CI saved while a pass runs was recomputed by the save path from fresh data, but the pass
+    still holds the incident set it read at its start. The pass therefore leaves CIs alone whose
+    ``changed_at`` is newer than the latest save before its start, and runs once more when it
+    met any, because the neighbours of such a CI were judged against the old picture
+    (CMDB-RECOMPUTE-VS-SAVE).
+
+    Progress is monotone across passes: an extra pass continues after the rows the earlier
+    ones scanned instead of restarting at 0.
     """
     _ = settings
     updated = 0
+    scanned = 0
     for attempt in range(MAX_PASSES):
-        started_with, changed = await _recompute_pass(session_factory, progress)
+        started_with, changed, rows, saved_during = await _recompute_pass(
+            session_factory, progress, base=scanned
+        )
         updated += changed
+        scanned += rows
         async with session_factory() as session:
             ended_with = await _shape(session)
-        if ended_with == started_with:
+        if ended_with == started_with and not saved_during:
             break
         if attempt + 1 < MAX_PASSES:
-            logger.info("cmdb_propagation_shape_moved", pass_no=attempt + 1)
+            logger.info(
+                "cmdb_propagation_shape_moved", pass_no=attempt + 1, saved_during=saved_during
+            )
         else:
             logger.warning("cmdb_propagation_shape_still_moving", passes=MAX_PASSES)
     return updated
@@ -309,9 +324,16 @@ async def recompute_all(
 async def _recompute_pass(
     session_factory: async_sessionmaker[AsyncSession],
     progress: Callable[[int, int | None], Awaitable[None]] | None,
-) -> tuple[tuple[dict[str, Propagating], _States], int]:
-    """One full pass; returns the shape it used and the number of rows changed."""
+    *,
+    base: int = 0,
+) -> tuple[tuple[dict[str, Propagating], _States], int, int, bool]:
+    """One full pass; returns the shape it used, the rows changed, the rows scanned and whether
+    CIs were saved while it ran. ``base`` is added to the reported progress."""
+    saved_during = False
     async with session_factory() as session:
+        # the newest save before this pass: data, not the clock, so the dialects' DATETIME
+        # precision and any clock skew between app and database do not matter
+        watermark = (await session.execute(select(func.max(TiqoraCmdbCi.changed_at)))).scalar()
         shape = await _shape(session)
         props, states = shape
         graph = _Graph(session, props)
@@ -334,7 +356,7 @@ async def _recompute_pass(
     updated = 0
     last = 0
     if progress is not None:
-        await progress(0, total)
+        await progress(base, base + total)
     while True:
         async with session_factory() as session:
             batch = (
@@ -343,6 +365,7 @@ async def _recompute_pass(
                         TiqoraCmdbCi.id,
                         TiqoraCmdbCi.incident_state_id,
                         TiqoraCmdbCi.cur_incident_state_id,
+                        TiqoraCmdbCi.changed_at,
                     )
                     .where(TiqoraCmdbCi.id > last)
                     .order_by(TiqoraCmdbCi.id)
@@ -352,7 +375,11 @@ async def _recompute_pass(
             if not batch:
                 break
             changes: dict[int, list[int]] = {}
-            for ci_id, own, cur in batch:
+            for ci_id, own, cur, changed_at in batch:
+                if watermark is not None and changed_at > watermark:
+                    # saved since the pass began: the save path recomputed it from fresh data
+                    saved_during = True
+                    continue
                 want = _target_state(int(ci_id), int(own), states, warned)
                 if want != int(cur):
                     changes.setdefault(want, []).append(int(ci_id))
@@ -361,8 +388,8 @@ async def _recompute_pass(
             last = int(batch[-1][0])
             done += len(batch)
         if progress is not None:
-            await progress(done, max(total, done))
-    return shape, updated
+            await progress(base + done, base + max(total, done))
+    return shape, updated, done, saved_during
 
 
 async def run_propagation_job(ctx: JobContext, payload: PropagationPayload) -> dict[str, int]:

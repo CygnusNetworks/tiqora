@@ -588,11 +588,75 @@ runs) use the job system, so the same one-worker and 90 s nginx notes apply.
   inline within the 75 s budget.
 - **Migration.** `20261010_0074` adds the schedule and run tables (`tiqora migrate upgrade`).
 
+## Upgrading to v0.19.0 (wave 4)
+
+Operator notes for the release that adds the ITSM core, the CMDB, the ITSM importer, SCIM 2.0 and the
+plugin extension points (release notes: [releases/v0.19.0.md](releases/v0.19.0.md)). Work through the
+list before rolling out; every item has a failure mode that is silent until somebody needs the feature.
+
+1. **nginx: add `location /scim/`.** Identity providers push to `/scim/v2`, which is **not** under `/api/`.
+   A reverse proxy that lists its locations explicitly (the Puppet-managed nginx in front of production
+   does) answers 404 or an HTML page there until a `/scim/` block proxies to `tiqora-api`, exactly like
+   `/api/`. The block, `TIQORA_TRUSTED_PROXIES` and `TIQORA_PUBLIC_BASE_URL` are listed under
+   [SCIM provisioning](#scim-provisioning). A proxy that sends `/` to the api (the example in
+   [deploy/docker-compose.md](deploy/docker-compose.md#nginx-example)) needs no change.
+2. **Roll out `tiqora-ai-worker` together with api, worker and mcp.** All four roles load the same code: the
+   ai-worker now hosts plugins (SDK 0.2.0) and runs the web chat assistant against the new schema. Use the same
+   image (and, with plugins, the same plugin image and volume) for all four and restart the ai-worker in the
+   same step. An ai-worker left on the old image does not load plugins and may fail against the new tables.
+   Order: `tiqora-api` first (it migrates), then worker, mcp and ai-worker.
+3. **Compose: wait for a healthy api.** Only the api container runs the migrations (and, once plugin
+   installation from packages is used, the migrations of plugins). Worker, mcp and ai-worker must therefore
+   start after the api is *healthy*, not merely started:
+
+   ```yaml
+   tiqora-worker:      # and tiqora-ai-worker, tiqora-mcp
+     depends_on:
+       tiqora-api:
+         condition: service_healthy
+   ```
+
+   The compose examples in this repository ship this. The production compose file lives outside the
+   repository and needs the change by hand. Without it a role that boots before the migration finished keeps
+   a plugin with pending database changes in the state "failed" until its next restart (the coordinated
+   restart after a runtime install covers that case; a plain stack start does not).
+4. **Plugin packages and `max_allowed_packet`.** Plugin packages uploaded in the admin UI or fetched from a
+   package repository are stored in the database. `TIQORA_PLUGINS_MAX_PACKAGE_MB` (default 15, maximum 25) is the
+   size limit per package; MariaDB's `max_allowed_packet` must be **larger** than that limit, or the upload
+   fails with "Paket zu groß für die Datenbank-Einstellung max_allowed_packet". Either raise
+   `max_allowed_packet` (for example to 32M) or lower `TIQORA_PLUGINS_MAX_PACKAGE_MB`. Check with
+   `SHOW VARIABLES LIKE 'max_allowed_packet'`. nginx's body limit for `/api/` has to be above the package limit as well.
+   Installation from packages is only possible in the browser session of an admin (API keys are refused) and is
+   switched off in read-only containers; baking plugins into the image stays supported.
+5. **Migrations 0077 to 0082.** `20261010_0077` (ITSM link types), `0078` (ITSM core), `0079` (CMDB),
+   `0080` (SCIM; also adds columns to `tiqora_identity_provider`), `0081` (ITSM import) and `0082` (plugin
+   packages and repositories). They only create `tiqora_*` tables or add columns to existing `tiqora_*` tables;
+   no Znuny table is altered, indexed or backfilled. The new tables start empty apart from a few seeded catalog
+   and link-type rows. The run takes seconds. Znuny keeps running during the upgrade
+   and stays unchanged; the migration is additive, so rolling back the image leaves unused tables behind
+   without harm. The API entrypoint runs them (`TIQORA_RUN_MIGRATIONS=1`); with `TIQORA_RUN_MIGRATIONS=0` run
+   `tiqora migrate upgrade` once before starting the roles.
+6. **ITSM mode is detected once.** On the first start after the migration Tiqora looks in the Znuny database
+   for the tables `general_catalog` **and** `cip_allocate` (the ITSM core of Znuny). Found: mode **Znuny führt
+   das ITSM** (Mode A, read-only). Not found: mode **Tiqora führt das ITSM** (Mode B). The result is stored in
+   `itsm.mode` (source "automatisch erkannt") and never re-detected. A site without Znuny ITSM tables, such as
+   production with Znuny 6.5 and `Ticket::Type=0`, `Ticket::Service=0`, therefore starts in Mode B. The mode can be switched off in Admin, ITSM. See
+   [itsm.md](itsm.md#wie-der-modus-gewählt-wird). The detection lives in `itsm/mode.py` (`ZNUNY_ITSM_MARKER_TABLES`)
+   and is also documented for the importer in [itsm-import.md](itsm-import.md).
+7. **Znuny add-on `TiqoraITSM` 1.0.0** (German only) is optional and only for sites whose CIs moved to Tiqora
+   through the importer and that keep Znuny agents working (Znuny 6.0 to 7.3). Install the `.opm` from
+   `packages/znuny-addon/TiqoraITSM` in the Znuny package manager *after* the switch; it is inert before.
+   See [itsm-import.md](itsm-import.md).
+8. **Check afterwards.** `tiqora migrate current` shows `20261010_0082 (head)`. `GET /scim/v2/ServiceProviderConfig`
+   with a SCIM token answers 200 through the public host name (not 404). Admin, Erweiterungen lists all plugins
+   in "Aktiv" on all four processes. Admin, ITSM shows the stored mode.
+
 ## Reverse proxy sketch
 
 ```
 https://helpdesk.example.com/          → tiqora-api (static + SPA)
 https://helpdesk.example.com/api/      → tiqora-api
+https://helpdesk.example.com/scim/     → tiqora-api (SCIM provisioning, v0.19.0; see "Upgrading to v0.19.0")
 https://helpdesk.example.com/mcp       → tiqora-mcp
 https://znuny.example.com/             → existing Znuny (until cutover)
 ```

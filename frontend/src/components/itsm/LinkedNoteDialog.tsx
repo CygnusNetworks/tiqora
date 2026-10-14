@@ -9,10 +9,10 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Switch } from "@/components/ui/Switch";
 import { ApiError } from "@/lib/api";
 import { itsmApi } from "@/lib/itsmApi";
+import { skippedOf } from "./skipped";
+import { SkippedTargets } from "./SkippedTargets";
 
 export type LinkedTarget = { id: number; tn: string; title: string };
-
-type SkippedEntry = { ticket_id: number; reason: string; detail?: string | null };
 
 const inputCls =
   "mt-1 w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink focus:border-accent";
@@ -21,7 +21,7 @@ function JobResult({ result, targets }: { result: Record<string, unknown> | null
   const { t } = useTranslation();
   const name = (id: number) => targets.find((x) => x.id === id)?.tn ?? String(id);
   const done = Array.isArray(result?.done) ? (result.done as number[]) : [];
-  const skipped = Array.isArray(result?.skipped) ? (result.skipped as SkippedEntry[]) : [];
+  const skipped = skippedOf(result);
   return (
     <div className="mt-3 space-y-2 text-sm" data-testid="linked-note-result">
       <div>
@@ -32,21 +32,11 @@ function JobResult({ result, targets }: { result: Record<string, unknown> | null
           ))}
         </ul>
       </div>
-      {skipped.length > 0 && (
-        <div>
-          <p className="font-medium text-ink">{t("itsm.linkedNote.skipped", { count: skipped.length })}</p>
-          <ul className="text-xs text-muted" data-testid="linked-note-skipped">
-            {skipped.map((s) => (
-              <li key={s.ticket_id}>
-                {name(s.ticket_id)}:{" "}
-                {t(`itsm.linkedNote.reasons.${s.reason}`, { defaultValue: t("itsm.linkedNote.reasons.error") })}
-                {/* a plugin's veto text (German, written for agents) says why */}
-                {s.reason === "vetoed" && s.detail ? ` (${s.detail})` : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <SkippedTargets
+        skipped={skipped}
+        names={Object.fromEntries(targets.map((x) => [x.id, x.tn]))}
+        testId="linked-note-skipped"
+      />
     </div>
   );
 }

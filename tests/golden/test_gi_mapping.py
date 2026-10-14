@@ -204,6 +204,9 @@ _TICKET = {
     "Queue": "Golden",
     "State": "new",
     "Priority": "3 normal",
+    # ITSM peers make the type mandatory (TicketCreate.MissingParameter otherwise); the
+    # standard type exists on every peer and is sent to both sides alike.
+    "Type": "Unclassified",
     "CustomerUser": "golden.customer",
 }
 _ARTICLE = {

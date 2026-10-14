@@ -643,7 +643,7 @@ async def test_recompute_all_runs_again_when_a_link_type_changes_mid_run(
     starts: list[int | None] = []
 
     async def progress(done: int, total: int | None) -> None:
-        if done == 0:
+        if total == done + 2:  # a pass starts: 2 CIs left to scan, earlier passes counted in done
             starts.append(total)
             if len(starts) == 1:  # after the first BFS, before the first batch is written
                 cmdb_db.sql(
@@ -652,9 +652,41 @@ async def test_recompute_all_runs_again_when_a_link_type_changes_mid_run(
                 )
 
     updated = await recompute_all(cmdb_db.factory, settings=CmdbSettings(), progress=progress)
-    assert updated == 1 and starts == [2, 2]
+    assert updated == 1 and starts == [2, 4]  # the second pass continues at 2, not at 0
     async with cmdb_db.factory() as s:
         assert await _cur(s, [a, b]) == ["warning", "incident"]
+
+
+async def test_recompute_all_does_not_overwrite_a_ci_saved_mid_run(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pass reads the incident set at its start. A CI saved into incident after batch 1 was
+    recomputed by the save path; the later batches must neither overwrite it nor the neighbours
+    the save path warned (CMDB-RECOMPUTE-VS-SAVE). Runs on both dialects."""
+    from tiqora.cmdb import propagation
+
+    monkeypatch.setattr(propagation, "_CHUNK", 1)  # one CI per batch: a save fits between them
+    async with cmdb_db.factory() as s:
+        ids = await _chain(s, [f"cmdb4-n{i}" for i in range(4)])
+    # age every row: the pass's watermark is the newest save before it starts
+    cmdb_db.sql(
+        "UPDATE tiqora_cmdb_ci SET changed_at = '2020-01-01 00:00:00' WHERE id >= :m", m=min(ids)
+    )
+    seen: list[tuple[int, int | None]] = []
+
+    async def progress(done: int, total: int | None) -> None:
+        seen.append((done, total))
+        if (done, total) == (1, 4):  # batch 1 (the head of the chain) is written
+            async with cmdb_db.factory() as s:
+                await _set_own_incident(s, ids[-1], "incident")  # the save path warns n0..n2
+
+    await recompute_all(cmdb_db.factory, settings=CmdbSettings(), progress=progress)
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, ids) == ["warning"] * 3 + ["incident"]
+    # the extra pass continues after the 4 rows of the first one, it does not restart at 0
+    firsts = [d for d, _ in seen]
+    assert firsts == sorted(firsts)
+    assert seen[-1][0] == 8 and seen[-1][1] == 8
 
 
 async def test_recompute_all_stops_after_three_passes_and_warns(cmdb_db: CmdbWorld) -> None:
@@ -667,7 +699,7 @@ async def test_recompute_all_stops_after_three_passes_and_warns(cmdb_db: CmdbWor
     starts: list[int | None] = []
 
     async def progress(done: int, total: int | None) -> None:
-        if done == 0:
+        if total == done + 2:
             starts.append(total)
             flip = "source" if len(starts) % 2 else "none"
             cmdb_db.sql(

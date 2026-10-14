@@ -164,6 +164,27 @@ async def test_definition_import_yaml_and_json(cmdb_db: CmdbWorld) -> None:
         assert not_list.status_code == 422 and not_list.json()["detail"]["code"] == "parse_error"
 
 
+async def test_definition_import_json_errors_are_german_without_parser_text(
+    cmdb_db: CmdbWorld,
+) -> None:
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        broken = await c.post(
+            f"{ADMIN}/definition-import", json={"format": "tiqora_json", "text": "[{"}
+        )
+        shape = await c.post(
+            f"{ADMIN}/definition-import",
+            json={"format": "tiqora_json", "text": '[{"key": 5}]'},
+        )
+    for r in (broken, shape):
+        assert r.status_code == 422
+        detail = r.json()["detail"]
+        assert detail["code"] == "parse_error"
+        msg = detail["message"]
+        assert msg.startswith("JSON-Definition nicht lesbar")
+        for english in ("Expecting", "validation error", "Field required", "line 1", "Input"):
+            assert english not in msg
+
+
 async def test_definition_import_rejects_perl_code(cmdb_db: CmdbWorld) -> None:
     async with client_for(cmdb_db, USER_ADMIN) as c:
         r = await c.post(

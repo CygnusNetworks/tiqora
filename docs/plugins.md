@@ -370,7 +370,10 @@ weder das eigene Kennwort noch LDAP noch eine Erweiterung, auch nicht über die
 GenericInterface-Webservices (`SessionCreate` oder `UserLogin`/`Password` je
 Aufruf): Tiqora antwortet wie bei einem falschen Kennwort
 (`password_login_rejected`, `reason=sso_managed`), und das Kennwort eines
-solchen Kontos erreicht keine Erweiterung. Diese Konten melden sich über den Anmeldedienst an (Regel und
+solchen Kontos erreicht keinen Kennwort-Anbieter. Eine GenericInterface-Operation einer Erweiterung
+erhält die Anfrage dagegen wie gesendet (SDK-Vertrag) und muss `ctx.authenticate` aufrufen, das ein
+solches Konto abweist. Die Regel gilt für die Schnittstellen von Tiqora; ein parallel laufendes Znuny
+akzeptiert das alte Kennwort weiter (dort Kennwort zurücksetzen oder Agenten-Anmeldung abschalten). Diese Konten melden sich über den Anmeldedienst an (Regel und
 Ausnahmen: [Identity-Provider](guide/identity-providers.md#zweiter-faktor-vom-anmeldedienst)).
 Ein nicht erreichbarer LDAP-Server antwortet weiterhin mit "nicht verfügbar",
 bevor die Erweiterung gefragt wird.
@@ -1622,7 +1625,12 @@ attempts count. Notes:
   `password_login_rejected reason=sso_managed` with `path=local|ldap|plugin|compat`.
   The LDAP check runs between `plan_login` and `apply_login`, so a refused
   directory login writes no link, profile or role sync. When the typed login is such an account, no
-  provider is called at all, so its password never reaches a plugin. When a
+  password provider is called at all, so its password never reaches one. A plugin GI
+  operation is different by SDK design: it receives the request as sent (including
+  `Password`) and must call `ctx.authenticate`, which refuses such an account. The rule
+  covers Tiqora's interfaces only: a Znuny running in parallel still accepts the old
+  password (reset it on the Znuny side, or disable Znuny agent login during parallel
+  operation). When a
   provider names such an account (a mapped login), its answer is skipped and the
   chain goes on with the next provider, whose answer is checked the same way
   (naming the same account again is refused again). A disabled provider or a

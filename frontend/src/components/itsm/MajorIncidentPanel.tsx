@@ -5,6 +5,8 @@ import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
 import { ComposerBody } from "@/components/agent/ComposerBody";
 import { JobProgress } from "@/components/jobs/JobProgress";
 import { useJob } from "@/components/jobs/useJob";
+import { skippedOf } from "./skipped";
+import { SkippedTargets } from "./SkippedTargets";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -85,7 +87,7 @@ function UpdateForm({
   const [mode, setMode] = useState<UpdateMode>("internal");
   const [body, setBody] = useState("");
   const [jobId, setJobId] = useState<number | null>(null);
-  const { job } = useJob(jobId);
+  const { job, isTerminal } = useJob(jobId);
   const post = useMutation({
     mutationFn: () => itsmApi.majorIncident.postUpdate(ticketId, { mode, body_html: body }),
     onSuccess: (out) => {
@@ -132,6 +134,7 @@ function UpdateForm({
         {t("itsm.major.update.send")}
       </Button>
       {job && <JobProgress job={job} testId="major-update-job" />}
+      {job && isTerminal && <SkippedTargets skipped={skippedOf(job.result)} testId="major-update-skipped" />}
     </div>
   );
 }

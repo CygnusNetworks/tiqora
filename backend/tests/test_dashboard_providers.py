@@ -24,11 +24,11 @@ from tests._dashboard_helpers import (
     Env,
     FakeRedis,
     open_env,
+    run_widget_fn,
 )
 from tiqora.api.v1.agents import list_online_agents_for, online_key
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, core_providers
 from tiqora.dashboard.providers.calendar_agenda import agenda_window
-from tiqora.dashboard.runner import run_widget
 from tiqora.domain.timezones import USER_TIME_ZONE_KEY, resolve_user_time_zone
 from tiqora.extensions.registry import Registry
 from tiqora.znuny.sysconfig import SysConfig
@@ -67,7 +67,7 @@ def tickets(preset: str, **extra: Any) -> W:
 
 
 async def data_of(env: Env, uid: int, widget: W, **kw: Any) -> dict[str, Any]:
-    out = await run_widget(env.factory, registry(), uid, widget, **kw)
+    out = await run_widget_fn(env.factory, registry(), uid, widget, **kw)
     assert out is not None and out.status == "ok", out
     assert out.data is not None
     return out.data
@@ -307,7 +307,7 @@ async def test_team_presence_lists_online_agents_own_first(env: Env) -> None:
 
 
 async def test_team_presence_without_redis_is_empty_not_an_error(env: Env) -> None:
-    out = await run_widget(
+    out = await run_widget_fn(
         env.factory, registry(), USER_A, W("p", "core.team-presence"), redis=None
     )
     assert (
@@ -411,9 +411,9 @@ async def test_user_without_any_queue_gets_empty_states_not_errors(env: Env) -> 
         ("core.reminders", {"items": [], "total": 0}),
         ("core.calendar-agenda", {"items": []}),
     ):
-        out = await run_widget(env.factory, reg, USER_C, W("x", key))
+        out = await run_widget_fn(env.factory, reg, USER_C, W("x", key))
         assert out is not None and out.status == "ok" and out.data == empty, key
-    counter = await run_widget(env.factory, reg, USER_C, W("x", "core.counter"))
+    counter = await run_widget_fn(env.factory, reg, USER_C, W("x", "core.counter"))
     assert counter is not None and counter.status == "ok"
     assert counter.data is not None and counter.data["value"] == 0
 

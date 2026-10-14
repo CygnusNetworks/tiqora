@@ -21,8 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.plugins.calls import PluginCallBudget, call_plugin, call_plugin_sync
 from tiqora.plugins.context import PluginContext
 from tiqora.plugins.state import is_active
+from tiqora.plugins.sync_hooks import OperationVetoed
+from tiqora.plugins.writes import PluginWriteError
 from tiqora.process.actions.registry import (
     ActionHandler,
+    ActionSkipped,
     TransitionActionModule,
 )
 from tiqora.process.condition_modules import (
@@ -154,8 +157,19 @@ def make_action_adapter(
             session=session,
         )
         savepoint = await session.begin_nested()
+        refused: list[str] = []
+
+        async def guarded() -> None:
+            # a plugin write that a before-hook vetoed (or that names something unknown) is not
+            # a plugin crash: the engine records it as a skipped action (reason ``vetoed``)
+            try:
+                await run(ac)
+            except (OperationVetoed, PluginWriteError) as exc:
+                refused.append(str(exc))
+                raise
+
         outcome = await call_plugin(
-            plugin_id, f"transition_action {qualified_name}", lambda: run(ac), timeout=timeout
+            plugin_id, f"transition_action {qualified_name}", guarded, timeout=timeout
         )
         if outcome.timed_out:
             # Do not touch the connection: it may be in the middle of a cancelled statement.
@@ -171,6 +185,8 @@ def make_action_adapter(
             await savepoint.commit()
             return
         await savepoint.rollback()
+        if refused:
+            raise ActionSkipped("vetoed", refused[0])
         logger.warning(
             "plugin_transition_action_failed",
             plugin=plugin_id,

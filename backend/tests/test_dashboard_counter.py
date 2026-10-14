@@ -12,11 +12,19 @@ from typing import Any
 
 import pytest
 
-from tests._dashboard_helpers import GROUP_2, USER_A, USER_B, USER_C, Env, open_env
+from tests._dashboard_helpers import (
+    GROUP_2,
+    USER_A,
+    USER_B,
+    USER_C,
+    Env,
+    open_env,
+    run_batch_fn,
+    run_widget_fn,
+)
 from tiqora.dashboard.layout import Rect
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, core_providers
 from tiqora.dashboard.providers.presets import TICKET_PRESETS, preset_kwargs
-from tiqora.dashboard.runner import run_batch, run_widget
 from tiqora.dashboard.schemas import WidgetIn, WidgetLayouts
 from tiqora.domain.ticket_service import TicketService
 from tiqora.extensions import get_registry
@@ -84,7 +92,7 @@ def test_counter_is_registered_in_the_core_registry() -> None:
 @pytest.mark.parametrize("preset", list(SUMMARY_KEY))
 async def test_counter_equals_dashboard_summary(env: Env, preset: str) -> None:
     summary = await summary_of(env, USER_A)
-    out = await run_widget(env.factory, registry(), USER_A, counter(preset))
+    out = await run_widget_fn(env.factory, registry(), USER_A, counter(preset))
     assert out is not None and out.status == "ok" and out.data is not None
     assert out.data["value"] == summary[SUMMARY_KEY[preset]]  # parity with today's numbers
     # and with the ticket list the tile stands for
@@ -103,7 +111,7 @@ async def test_world_has_something_to_count_for_every_preset(env: Env) -> None:
 
 
 async def test_counter_for_a_user_without_queues_is_zero(env: Env) -> None:
-    out = await run_widget(env.factory, registry(), USER_C, counter("mine_open"))
+    out = await run_widget_fn(env.factory, registry(), USER_C, counter("mine_open"))
     assert out is not None and out.status == "ok"
     assert out.data == {"value": 0, "delta": None, "spark": [0]}
 
@@ -111,8 +119,10 @@ async def test_counter_for_a_user_without_queues_is_zero(env: Env) -> None:
 async def test_counter_writes_one_sample_per_counter_and_day(env: Env) -> None:
     reg = registry()
     both = [counter("mine_open", "c1"), counter("mine_new")]
-    await run_batch(env.factory, reg, USER_B, both, now=env.now)  # fixed clock: no midnight flake
-    out = await run_batch(env.factory, reg, USER_B, [counter("mine_open", "c1")], now=env.now)
+    await run_batch_fn(
+        env.factory, reg, USER_B, both, now=env.now
+    )  # fixed clock: no midnight flake
+    out = await run_batch_fn(env.factory, reg, USER_B, [counter("mine_open", "c1")], now=env.now)
     assert out["c1"].data is not None and out["c1"].data["spark"] == [1]
     rows = await env.sample_rows(USER_B)
     assert [(k, v) for k, _, v in rows] == [("preset:mine_new", 0), ("preset:mine_open", 1)]
@@ -123,7 +133,7 @@ async def test_previews_never_write_samples(env: Env) -> None:
     reg = registry()
     before = await env.sample_keys(USER_B)
     for _ in range(2):
-        out = await run_widget(env.factory, reg, USER_B, counter("unowned_new"), preview=True)
+        out = await run_widget_fn(env.factory, reg, USER_B, counter("unowned_new"), preview=True)
         assert out is not None and out.status == "ok"
         assert out.data == {"value": 0, "delta": None, "spark": [0]}
     assert await env.sample_keys(USER_B) == before == set()
