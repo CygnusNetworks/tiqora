@@ -5232,6 +5232,7 @@
       "restart": {
         "now": "Jetzt neu starten",
         "running": "Tiqora wird neu gestartet …",
+        "waitsForJobs": "Läuft in einem Dienst gerade eine Hintergrundaufgabe (zum Beispiel ein ITSM-Import), wartet der Neustart dieses Dienstes, bis sie fertig ist, höchstens bis zur eingestellten Wartezeit.",
         "apiDown": "Weboberfläche startet neu …",
         "apiTimeout": "Die Weboberfläche ist nach dem Neustart nicht zurückgekommen.",
         "done": "Tiqora wurde neu gestartet.",

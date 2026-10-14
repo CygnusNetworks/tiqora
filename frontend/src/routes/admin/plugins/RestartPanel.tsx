@@ -81,6 +81,9 @@ export function RestartPanel({ generation }: { generation: number | null }) {
         <Spinner />
         {q.isError ? t("admin.plugins.restart.apiDown") : t("admin.plugins.restart.running")}
       </p>
+      <p className="text-xs text-muted" data-testid="plugin-restart-waits-for-jobs">
+        {t("admin.plugins.restart.waitsForJobs")}
+      </p>
       {ours && !q.isError && (
         <ul className="space-y-0.5 text-xs text-muted">
           {ours.roles.map((row) => (

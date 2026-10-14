@@ -420,7 +420,12 @@ liegen (eine gerade laufende Installation könnte sie eben erst angelegt haben).
    und werden vom Container-System neu gestartet: zuerst `worker`, dann
    `ai-worker` und `mcp`, zuletzt `api`. Die Folge hält an, wenn ein Dienst nicht
    zurückkommt, und die Seite nennt ihn. Solange ein Installations- oder
-   Deinstallations-Job läuft, wartet der Neustart. Voraussetzungen für den Betrieb
+   Deinstallations-Job läuft, wartet der Neustart. Läuft in einem Dienst ein
+   anderer Hintergrund-Job (zum Beispiel ein ITSM-Import oder eine CMDB-Neuberechnung),
+   wartet dieser Dienst ebenfalls, bis der Job fertig ist, höchstens
+   `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS` (180 s) lang; danach startet er trotzdem neu
+   und der Job wird wie nach einem Deployment fortgesetzt oder als abgebrochen
+   gemeldet. Voraussetzungen für den Betrieb
    (Neustart-Richtlinie, Start-Reihenfolge, Volume) stehen in
    [deployment.md](deployment.md#erweiterungen-zur-laufzeit-installieren).
 
@@ -2021,4 +2026,5 @@ Was die Ausbaustufen 1, 2a und 2b bewusst nicht können (auf Deutsch, in einfach
 - **Ausschalten wirkt nach Neustart,** und der Zustand "Aktiv" gilt pro Prozess.
   Nach Installieren, Aktualisieren oder Deinstallieren starten die Dienste einer nach
   dem anderen neu (Abschnitt 7); währenddessen sind einzelne Dienste kurz nicht
-  erreichbar, und ein Neustart wartet, solange ein Installations-Job läuft.
+  erreichbar, und ein Neustart wartet, solange ein Installations-Job läuft (andere
+  laufende Jobs höchstens bis zur Neustart-Wartezeit).

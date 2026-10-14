@@ -5232,6 +5232,7 @@
       "restart": {
         "now": "Restart now",
         "running": "Tiqora is restarting …",
+        "waitsForJobs": "If a background task is running in a service (for example an ITSM import), the restart of that service waits until it has finished, at most for the configured timeout.",
         "apiDown": "The web interface is restarting …",
         "apiTimeout": "The web interface did not come back after the restart.",
         "done": "Tiqora has been restarted.",

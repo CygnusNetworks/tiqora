@@ -193,7 +193,7 @@ change is never interrupted.
 | `TIQORA_PLUGINS_TRUSTED_KEYS` | *(empty)* | Additional trusted publisher public keys (`ed25519:<base64>`, comma-separated). |
 | `TIQORA_PLUGINS_MAX_PACKAGE_MB` | `15` (1-25) | Largest accepted package. Must fit the database setting `max_allowed_packet` (MariaDB); otherwise the upload is refused with a hint to raise it or lower this value. |
 | `TIQORA_PLUGINS_COORDINATED_RESTART` | `true` | `0` for platforms without automatic restarts (see above). |
-| `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS` | `180` (30-1800) | How long the coordinated restart waits for the processes before it fails. |
+| `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS` | `180` (30-1800) | How long the coordinated restart waits for the processes before it fails. Also the longest time a process holds back its own restart while a background job (ITSM import, CMDB recompute, ...) runs in it. |
 | `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS` | `300` (1-3600) | Limit per plugin database migration (run in a subprocess). |
 | `TIQORA_PLUGIN_REPOSITORIES` | *(empty)* | JSON list of package sources managed by the deployment (example below). |
 | `TIQORA_PLUGIN_REPOSITORY_FILE_ROOT` | `/var/lib/tiqora/plugin-repository` | `file://` sources must lie below this directory. |

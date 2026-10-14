@@ -53,6 +53,10 @@ describe("RestartPanel", () => {
     expect(await screen.findByTestId("plugin-restart-running")).toHaveTextContent("Tiqora wird neu gestartet");
     expect(screen.getByText("Hintergrunddienst")).toBeInTheDocument();
     expect(screen.getByText("Wartet")).toBeInTheDocument();
+    // REL-RESTART-ALLJOBS: the panel says that running background tasks are waited for
+    expect(screen.getByTestId("plugin-restart-waits-for-jobs")).toHaveTextContent(
+      "wartet der Neustart dieses Dienstes, bis sie fertig ist",
+    );
     await tick();
     expect(await screen.findByText("Tiqora wurde neu gestartet.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Seite neu laden" })).toBeInTheDocument();

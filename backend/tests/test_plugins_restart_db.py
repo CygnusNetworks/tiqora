@@ -65,6 +65,7 @@ async def factory_fixture(
 @pytest.fixture(autouse=True)
 def _reset_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(restart, "_REQUESTED", False)
+    monkeypatch.setattr(restart, "_JOB_WAIT_SINCE", {})
 
 
 def _proc(
@@ -267,6 +268,129 @@ async def test_watch_loop_busy_worker_stays_until_job_ends(
     )
     # stayed through the two ticks with the running job, left right after it finished
     assert exits == [2]
+
+
+def _job_here(kind: str, key: str) -> TiqoraJob:
+    import os
+    import socket
+
+    return TiqoraJob(
+        kind=kind,
+        status="running",
+        payload="{}",
+        dedupe_key=key,
+        worker_id=f"{socket.gethostname()}:{os.getpid()}",
+        created_at=T0,
+    )
+
+
+async def _finish_job(factory: async_sessionmaker[AsyncSession], key: str) -> None:
+    async with factory() as s:
+        job = (await s.execute(select(TiqoraJob).where(TiqoraJob.dedupe_key == key))).scalar_one()
+        job.status = "succeeded"
+        await s.commit()
+
+
+async def test_watch_loop_waits_for_any_job_running_here(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """REL-RESTART-ALLJOBS: an ITSM import in this worker holds its turn until it ends."""
+    async with factory() as s:
+        s.add(_proc("w", "worker", 0))
+        s.add(_job_here("core.itsm_import", "plg62080:import"))
+        # a job of another process does not count
+        other = _job_here("core.cmdb_recompute", "plg62080:other")
+        other.worker_id = "plg62080-elsewhere:1"
+        s.add(other)
+        await s.commit()
+    await _request(factory)
+    exits: list[int] = []
+    calls: list[float] = []
+    stop = asyncio.Event()
+    now = [T0 + timedelta(seconds=1)]
+
+    async def fake_sleep(seconds: float) -> None:
+        calls.append(seconds)
+        now[0] += timedelta(seconds=seconds)
+        if len(calls) == 3:
+            await _finish_job(factory, "plg62080:import")
+        if len(calls) >= 6:
+            stop.set()
+
+    await restart_watch_loop(
+        factory,
+        "worker",
+        f"worker:{HOST}:1:w",
+        settings=_settings(plugins_restart_timeout_seconds=180),
+        on_exit=lambda: exits.append(len(calls)),
+        stop=stop,
+        sleep=fake_sleep,
+        clock=lambda: now[0],
+    )
+    assert exits == [3]  # stayed three ticks while the import ran, left on the next one
+
+
+async def test_watch_loop_job_wait_is_capped_by_the_restart_timeout(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with factory() as s:
+        s.add(_proc("w", "worker", 0))
+        s.add(_job_here("core.itsm_import", "plg62080:long"))
+        await s.commit()
+    await _request(factory)
+    exits: list[datetime] = []
+    stop = asyncio.Event()
+    now = [T0 + timedelta(seconds=1)]
+
+    async def fake_sleep(seconds: float) -> None:
+        now[0] += timedelta(seconds=seconds)
+        if now[0] > T0 + timedelta(seconds=120):
+            stop.set()
+
+    await restart_watch_loop(
+        factory,
+        "worker",
+        f"worker:{HOST}:1:w",
+        settings=_settings(plugins_restart_timeout_seconds=30),
+        on_exit=lambda: exits.append(now[0]),
+        stop=stop,
+        sleep=fake_sleep,
+        clock=lambda: now[0],
+    )
+    # first busy tick at +1 s; stays while waited <= 30 s, exits on the first tick after that
+    assert exits == [T0 + timedelta(seconds=1 + 35)]
+
+
+async def test_watch_loop_ignores_jobs_when_not_its_turn(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The job wait starts only once the process would exit: an ai-worker whose turn has not
+    come yet does not use up the cap while the worker restarts."""
+    async with factory() as s:
+        s.add(_proc("w", "worker", 0))
+        s.add(_proc("a", "ai-worker", 0))
+        s.add(_job_here("core.itsm_import", "plg62080:ai"))
+        await s.commit()
+    await _request(factory)
+    stop = asyncio.Event()
+    ticks: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        ticks.append(seconds)
+        if len(ticks) >= 3:
+            stop.set()
+
+    await restart_watch_loop(
+        factory,
+        "ai-worker",
+        f"ai-worker:{HOST}:1:a",
+        settings=_settings(plugins_restart_timeout_seconds=30),
+        on_exit=lambda: None,
+        stop=stop,
+        sleep=fake_sleep,
+        clock=lambda: T0 + timedelta(seconds=1),
+    )
+    assert restart._JOB_WAIT_SINCE == {}  # the worker's turn: no wait recorded
 
 
 async def test_plugin_job_active(factory: async_sessionmaker[AsyncSession]) -> None:

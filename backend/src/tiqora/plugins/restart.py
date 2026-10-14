@@ -204,7 +204,8 @@ def decide(
         return _STAY
     if busy:
         # a plugin install/uninstall runs in this process; the clock of the later roles
-        # only starts when it exits, so waiting costs nothing
+        # only starts when it exits, so waiting costs nothing. Other jobs running here are
+        # waited for in ``_step`` (REL-RESTART-ALLJOBS), capped by the restart timeout.
         return _STAY
     same = [p for p in processes if p.role == me.role and p.instance_id != me.instance_id]
     window = LIVE_WITHIN_SECONDS + timeout_seconds
@@ -469,21 +470,37 @@ async def plugin_job_active(session: AsyncSession) -> bool:
     return bool(n)
 
 
-async def _busy_here(session: AsyncSession) -> bool:
-    """A plugins-lane job is running in this process's job runner (worker id host:pid)."""
+async def _jobs_here(session: AsyncSession) -> list[str]:
+    """Kinds of the jobs running in this process's job runner (worker id ``host:pid``)."""
     worker_id = f"{socket.gethostname()}:{os.getpid()}"
-    n = (
-        await session.execute(
-            select(func.count())
-            .select_from(TiqoraJob)
-            .where(
-                TiqoraJob.kind.in_(PLUGIN_JOB_KINDS),
-                TiqoraJob.status == "running",
-                TiqoraJob.worker_id == worker_id,
-            )
+    rows = await session.execute(
+        select(TiqoraJob.kind).where(
+            TiqoraJob.status == "running", TiqoraJob.worker_id == worker_id
         )
-    ).scalar()
-    return bool(n)
+    )
+    return sorted({str(k) for k in rows.scalars()})
+
+
+#: REL-RESTART-ALLJOBS: restart generation -> when this process first held its turn back
+#: because a non-plugin job ran here (per process; the cap is the restart timeout)
+_JOB_WAIT_SINCE: dict[int, datetime] = {}
+
+
+def _waits_for_jobs(generation: int, kinds: Sequence[str], now: datetime, timeout: int) -> bool:
+    """Stay while a job runs here, at most ``timeout`` seconds from the first such tick."""
+    since = _JOB_WAIT_SINCE.setdefault(generation, now)
+    waited = (now - since).total_seconds()
+    if waited <= timeout:
+        if since == now:
+            log.info("plugin_restart_waiting_for_jobs", generation=generation, kinds=list(kinds))
+        return True
+    log.warning(
+        "plugin_restart_job_wait_timed_out",
+        generation=generation,
+        kinds=list(kinds),
+        waited_seconds=int(waited),
+    )
+    return False
 
 
 async def _latest_restart(session: AsyncSession) -> TiqoraRestart | None:
@@ -588,7 +605,7 @@ async def _step(
         if me is None or latest is None:
             return False
         target = _restart_row(latest)
-        busy = await _busy_here(session) if settings.plugins_coordinated_restart else False
+        kinds = await _jobs_here(session) if settings.plugins_coordinated_restart else []
         decision = decide(
             me,
             target,
@@ -596,11 +613,17 @@ async def _step(
             now=now,
             timeout_seconds=settings.plugins_restart_timeout_seconds,
             enabled=settings.plugins_coordinated_restart,
-            busy=busy,
+            busy=any(k in PLUGIN_JOB_KINDS for k in kinds),
         )
         if decision.action == "stay":
             return False
         if decision.action == "exit":
+            if kinds and _waits_for_jobs(
+                target.generation, kinds, now, settings.plugins_restart_timeout_seconds
+            ):
+                # REL-RESTART-ALLJOBS: an ITSM import, CMDB recompute, mail job ... runs here;
+                # finishing it beats a resumed or failed job. Capped by the restart timeout.
+                return False
             await session.execute(
                 update(TiqoraProcess)
                 .where(TiqoraProcess.instance_id == instance_id)
