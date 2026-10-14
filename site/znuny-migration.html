@@ -1226,7 +1226,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
             </p>
             <p>
               A provider can also provision agents over <strong>SCIM&nbsp;2.0</strong>
-              (<code>/scim/v2</code>, one token per provider), require proof of a second factor
+              (<code>/scim/v2</code>, bearer tokens per provider), require proof of a second factor
               from the IdP and shorten the session lifetime. Accounts and role assignments land
               in Znuny's own tables, so Znuny sees the same agents and permissions. A SCIM
               deactivation sets the account invalid in Znuny and ends its Tiqora sessions.
