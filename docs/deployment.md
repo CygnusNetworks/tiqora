@@ -181,7 +181,10 @@ Kubernetes: the default `restartPolicy: Always`). On platforms without
 automatic restarts set `TIQORA_PLUGINS_COORDINATED_RESTART=0`; the admin page
 then shows that a restart is pending and you restart the services yourself.
 Running plugin installs hold the restart back, so a half-applied database
-change is never interrupted.
+change is never interrupted. The restart runs role by role: `worker`, then
+`ai-worker`, then `mcp`, and `api` last (it serves the progress page); only
+roles that report a running process are included, and the sequence stops at a
+process that does not come back within `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS`.
 
 ### Environment variables
 
@@ -194,10 +197,10 @@ change is never interrupted.
 | `TIQORA_PLUGINS_MAX_PACKAGE_MB` | `15` (1-25) | Largest accepted package. Must fit the database setting `max_allowed_packet` (MariaDB); otherwise the upload is refused with a hint to raise it or lower this value. |
 | `TIQORA_PLUGINS_COORDINATED_RESTART` | `true` | `0` for platforms without automatic restarts (see above). |
 | `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS` | `180` (30-1800) | How long the coordinated restart waits for the processes before it fails. Also the longest time a process holds back its own restart while a background job (ITSM import, CMDB recompute, ...) runs in it. |
-| `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS` | `300` (1-3600) | Limit per plugin database migration (run in a subprocess). |
+| `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS` | `300` (1-3600) | Limit per plugin database migration at process start (run in a subprocess). The migration step of an install job has its own fixed limit of 15 minutes. |
 | `TIQORA_PLUGIN_REPOSITORIES` | *(empty)* | JSON list of package sources managed by the deployment (example below). |
 | `TIQORA_PLUGIN_REPOSITORY_FILE_ROOT` | `/var/lib/tiqora/plugin-repository` | `file://` sources must lie below this directory. |
-| `TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS` | `21600` | How often the daemon refreshes the package sources. |
+| `TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS` | `21600` (900-604800) | How often the daemon refreshes the package sources. |
 
 `TIQORA_PLUGIN_REPOSITORIES` example (`public_key` is optional; without it the
 index cannot be verified and its packages are treated as unverified):
@@ -516,7 +519,7 @@ tiqora report backfill [--since YYYY-MM-DD]   # start or resume; --since starts 
 tiqora report status                          # state of the report data as JSON
 ```
 
-The admin page for report data (Admin, Berichte = reports) shows the state and
+The admin page for report data (Admin, **Berichtsdaten** = report data; `/admin/reporting`) shows the state and
 can rebuild everything; during a rebuild reports are incomplete again. Redis
 serves as the report result cache (keys `tiqora:report:v1:*`, TTL
 `reporting.cache_seconds`, default 300, plus the counter
@@ -532,7 +535,7 @@ server may keep executing it for up to `reporting.query_timeout_seconds`
 After an upgrade that changes the report fact version, the worker rebuilds the
 facts and events on its own, but stored daily snapshots (backlog history) are
 only rewritten for the last two days: run an admin rebuild (Admin,
-Berichtsdaten) to recompute the older history as well.
+Berichtsdaten, "Berichtsdaten neu aufbauen" = rebuild report data) to recompute the older history as well.
 
 The first backfill (and every admin rebuild) runs as a background job in the
 default lane and occupies one of its `jobs.max_concurrency` slots (default 2) for
@@ -584,7 +587,7 @@ runs) use the job system, so the same one-worker and 90 s nginx notes apply.
   article mails.
 - **Link in mails.** Set `TIQORA_PUBLIC_BASE_URL` (for example `https://tiqora.example.org`);
   the footer links to the schedule. Empty means no link.
-- **Settings** (Admin, Berichte): `reporting.schedule_external_recipients` (default off:
+- **Settings** (Admin, settings section **Berichte** = reports; `/admin/settings/reporting`, also linked from "Berichtsdaten" as "Einstellungen für Berichte"): `reporting.schedule_external_recipients` (default off:
   only agents, groups and roles), `schedule_max_recipients` (50),
   `run_retention_days` (90, max 365), `pdf_row_limit` (1000 per report),
   `delivery_max_attachment_mb` (15).

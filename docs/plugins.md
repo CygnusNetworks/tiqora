@@ -263,7 +263,8 @@ Developer guide, Abschnitt "Packaging").
 
 Mit dem SDK 0.2.0 können Erweiterungen weitere Teile von Tiqora ergänzen. Was
 eine Erweiterung kann, steht in ihrer Karte unter "Erweiterungen" (Bereich
-"Fähigkeiten"). Die Texte dort bedeuten:
+"Was diese Erweiterung angibt"; in der Verwaltung unter "Erweiterungen" /
+Extensions). Die Texte dort bedeuten:
 
 | Anzeige | Bedeutung |
 |---|---|
@@ -351,8 +352,9 @@ diesem Kanal antworten. KI-Antworten laufen in Tiqora über denselben Kanal.
 ### Kundenverzeichnis
 
 Erweiterungen können ein externes Kundenverzeichnis anbinden. Treffer
-erscheinen in der Kundensuche unter "Aus Kundenverzeichnis" (erst ab drei
-Zeichen oder über "Im Kundenverzeichnis suchen"). "Übernehmen" legt den
+erscheinen beim Anlegen eines Tickets ("Neues Ticket", Feld für den Kunden) unter
+"Aus Kundenverzeichnis" (Aus dem Kundenverzeichnis), sobald Sie mindestens drei
+Zeichen getippt haben. "Übernehmen" legt den
 Kunden einmal in Tiqora an; ein bestehender Kunde wird nie überschrieben.
 Gehört die E-Mail-Adresse schon einem anderen Kunden, bricht die Übernahme ab.
 Je nach Erweiterung legt Tiqora unbekannte Absender eingehender E-Mails
@@ -392,7 +394,9 @@ Erweiterungen erscheinen im Berichtskatalog mit eigenen Titeln.
 Seit Ausbaustufe 2b müssen Sie für eine neue Erweiterung kein Image mehr
 bauen. Unter **Verwaltung → Erweiterungen** laden Sie ein Paket mit der
 Endung `.tqplugin` hoch (Schaltfläche "Paket hochladen") oder holen es aus
-einer Paketquelle (Abschnitt 8). Das Paket liegt danach in der **Datenbank**;
+einer Paketquelle (Abschnitt 8). Die Seite hat drei Reiter: "Installiert"
+(Installed), "Verfügbar" (Available, der Katalog der Paketquellen) und
+"Paketquellen" (Repositories). Das Paket liegt danach in der **Datenbank**;
 jeder Dienst (`api`, `worker`, `mcp`, `ai-worker`) packt es beim Start selbst
 aus. Das Verzeichnis `TIQORA_PLUGINS_DIR` ist nur eine Arbeitskopie und darf
 verloren gehen. Beim Start räumt jeder Dienst ausgepackte Versionen auf, die
@@ -410,12 +414,18 @@ liegen (eine gerade laufende Installation könnte sie eben erst angelegt haben).
 2. **Dialog "Erweiterung installieren".** Er zeigt Name, Version, Herausgeber,
    Vertrauensstufe (unten), die Änderungen gegenüber der installierten Version,
    "Was diese Erweiterung angibt" (Erweiterungspunkte, aufgerufene Hosts,
-   Oberflächenstellen, neue Tabellen) sowie **Hinweise** und **Kann nicht installiert werden**. Die Angaben beschreiben, was die Erweiterung von
+   Oberflächenstellen, neue Tabellen) sowie **Hinweise** ("Hinweise") und **Kann nicht installiert werden**. Die Überschrift nennt die Aktion: "Neu installieren",
+   "Aktualisieren von … auf …", "Erneut installieren" (gleiche Version) oder
+   "Zurückstufen von … auf …" (wird abgelehnt, siehe unten). Die Angaben beschreiben, was die Erweiterung von
    sich sagt. Sie sind keine Absicherung: Es gibt keine Sandbox (Abschnitt 1).
 3. **Installieren.** Ein Hintergrund-Job speichert das Paket, passt die
    Datenbank an (Migrationen der Erweiterung, siehe unten) und schaltet die
-   Erweiterung auf Wunsch ein. Das Häkchen "Tiqora danach automatisch neu
-   starten" löst danach den abgestimmten Neustart aus.
+   Erweiterung auf Wunsch ein (Häkchen "Nach der Installation einschalten").
+   Das Häkchen "Tiqora danach automatisch neu starten" löst danach den
+   abgestimmten Neustart aus; sonst bietet die Seite "Jetzt neu starten" an.
+   Der Fortschritt jedes Dienstes erscheint als "Wartet", "Startet neu",
+   "Neu gestartet" oder "Nicht zurückgekommen". Die Datenbank-Anpassung im
+   Installations-Job hat ein festes Zeitlimit von 15 Minuten.
 4. **Neustart.** Die Dienste beenden sich nacheinander mit dem Exit-Code 75
    und werden vom Container-System neu gestartet: zuerst `worker`, dann
    `ai-worker` und `mcp`, zuletzt `api`. Die Folge hält an, wenn ein Dienst nicht
@@ -849,8 +859,9 @@ Handed to events and tasks as `ctx.plugin`, and available as
   (SDK 0.2.0, see "Write services and `as_agent`").
 - `ctx.logger`: a structlog logger bound to the plugin id.
 - `ctx.session_factory()`: an async SQLAlchemy session factory for Tiqora's
-  database (full trust: nothing restricts the SQL you run). Plugins cannot
-  ship their own tables or migrations yet (see Teil 3).
+  database (full trust: nothing restricts the SQL you run). Plugins can ship
+  their own tables and migrations under the prefix `tqp_<short id>_`
+  (see "Database tables and migrations").
 
 ### HTTP routes
 
@@ -1173,7 +1184,7 @@ reload.
 
 ## Extension points of SDK 0.2.0
 
-SDK 0.2.0 adds fifteen backend extension points, write-capable ticket
+SDK 0.2.0 adds seventeen backend extension points, write-capable ticket
 services and the `ai-worker` as a plugin host. Every point is opt-in: declare
 its capability in `capabilities.extension_points`, call the registrar method in
 `register()`, and the name rules below apply. The examples are taken from the
@@ -1907,6 +1918,27 @@ tiqora plugins verify [--path SITE_DIR --only <plugin id>]
 
 Never ship the private key in an image or a package.
 
+### CLI reference: `tiqora plugins`
+
+All subcommands run through the container entrypoint (`tiqora plugins …`, see
+[Deployment](deployment.md#erweiterungen-einbauen-plugins)). Messages are
+printed in German. Exit codes are listed per command; `2` always means a usage
+or file error (for example "file exists"), `1` a failed check.
+
+| Command | Purpose | Flags | Exit code |
+|---|---|---|---|
+| `list` | Installed plugins (baked and runtime-installed) with version and state; imports nothing, needs no database | `--json` prints a JSON list (`id`, `name`, `version`, `distribution`, `problem`) | `0` |
+| `verify` | Checks installed plugins (metadata, SDK/Tiqora compatibility); problems go to stderr | `--import` also loads each entry point; `--strict` fails when a plugin requires `tiqora` or `tiqora-sdk` as a Python dependency; `--timeout SECONDS` for the import (default 20); `--path SITE_DIR` checks a freshly unpacked package without activating the installed ones; `--only ID` checks one plugin | `0` ok, `1` problems |
+| `constraints` | Prints `Name==version` of every distribution in the image; used by the bake to pin core dependencies | none | `0` |
+| `bake PLUGINS_TXT` | Writes `Dockerfile`, `plugins.txt` (and `wheels/`) for an image with plugins baked in | `--output DIR` / `-o` (required); `--base-image IMAGE` when the running image has no release version | `0`, `2` on error |
+| `keygen` | New Ed25519 signing key (PKCS#8 PEM, mode 0600); prints the public key and `key_id` | `--out FILE` (required; an existing file is never overwritten) | `0`, `2` |
+| `pack WHEEL` | Wraps a plugin wheel into an unsigned `.tqplugin`; reads the result back with the install reader | `--output FILE` / `-o` (required); `--changelog FILE`; `--force` overwrites an existing output | `0`, `1` invalid, `2` file exists |
+| `sign PACKAGE` | Adds or replaces `SIGNATURE` | `--key FILE` (required); `--output FILE` / `-o` (default: the input); `--force` is required to overwrite the input in place | `0`, `1` invalid package, `2` |
+| `inspect PACKAGE` | The install dialog's checks without a database (trust level against the official and local keys, problems, warnings) | `--json` | `0` installable, `1` not installable |
+| `migrate ID` | Runs the plugin's own database migrations and records the result (the install job calls this) | `--path SITE_DIR` for a freshly unpacked package | `0`, `1` |
+| `index build DIR` | Builds an `index.json` over all `*.tqplugin` files in `DIR` (one publisher per call; edit by hand to combine several) | `--repository-id` and `--name` (required); `--publisher-id`, `--publisher-name`, `--publisher-key ed25519:…` (all three or none); `--output FILE` / `-o` (required) | `0`, `1`, `2` |
+| `index sign INDEX` | Writes `INDEX.sig` next to the index | `--key FILE` (required) | `0`, `2` |
+
 ## Repository index format v1
 
 A repository is an `index.json` at an `https://` URL (or `file://` from the
@@ -2019,8 +2051,9 @@ Was die Ausbaustufen 1, 2a und 2b bewusst nicht können (auf Deutsch, in einfach
   Ticketnummer-Schema wählen Sie in Tiqora; Znuny nutzt weiter sein eigenes.
   Filter für ausgehende E-Mails können den Inhalt nicht ändern. Es gibt keinen
   Erweiterungspunkt für die Konfigurationsdatenbank (CMDB).
-  Das Dashboard zeigt Kacheln von Erweiterungen in einem eigenen Abschnitt, bis
-  das Raster der Dashboards kommt.
+  Kacheln von Erweiterungen erscheinen in der Widget-Galerie der Dashboards
+  ("Widget hinzufügen", unter ihrer Kategorie); Mitarbeitende platzieren sie
+  selbst auf ihrem Dashboard (siehe [Dashboards](dashboards.md)).
 - **Ein Schreiber für Ereignisse.** Siehe Galera-Hinweis oben; Ereignisse
   kommen aus `ticket_history`, nicht aus einem Ereignisbus.
 - **Ausschalten wirkt nach Neustart,** und der Zustand "Aktiv" gilt pro Prozess.

@@ -22,7 +22,7 @@ tiqora/  # repository root (Tiqora monorepo)
   backend/          # Python package tiqora
   frontend/         # Vite React app
   docs/             # English documentation
-  packages/         # api-client, znuny-addon (later)
+  packages/         # api-client, plugin-sdk, webchat-widget, znuny-addon
   docker-compose.dev.yml
   docker-compose.example.yml
   Dockerfile
@@ -314,6 +314,47 @@ documented in `tiqora.config.Settings` and [deployment.md](./deployment.md).
   `toBcp47(i18n.language)` for `Intl` formatting and `setAppLanguage()` for
   switches (not ad-hoc `localStorage` / `startsWith("de")`).
 
+### Writing a plugin
+
+Plugins extend Tiqora without touching core. The full guide (manifest,
+`register()`, extension points, packaging, signing) is [plugins.md](plugins.md);
+for development you need three places:
+
+| Where | What |
+|---|---|
+| `backend/src/tiqora_sdk/` | The Python SDK (`tiqora_sdk`, `SDK_VERSION`). Its public surface is pinned by `backend/tests/test_tiqora_sdk_surface.py`: changing it bumps the version on both SDKs. |
+| `packages/plugin-sdk/` | The frontend half (`@tiqora/plugin-sdk`: types, Vite preset `tiqoraPluginConfig`, `pnpm check:preset`). |
+| `packages/plugin-sdk/test-plugin/` | A minimal frontend plugin that the preset check builds; the reference for `vite.config.ts` and slot components. Backend fixture plugins live in `backend/tests/plugins/fixtures/` (for example `tq_fixture_hello`, `tq_fixture_points`). |
+
+The `tiqora plugins` CLI covers the whole loop on a developer machine:
+`list` and `verify --import` check an installed plugin, `pack`, `sign` and
+`inspect` build and check a `.tqplugin`, `migrate` runs its database changes,
+and `index build` / `index sign` produce a repository index (all flags in
+[plugins.md](plugins.md#cli-reference-tiqora-plugins)). Backend plugin tests
+live in `backend/tests/plugins/`.
+
+### Docs guard tests
+
+A few tests read the documentation and fail when a pinned statement or link
+disappears, so a docs edit can turn CI red:
+
+| Test | Pins |
+|---|---|
+| `backend/tests/test_docs_itsm_links.py` | German headings in `docs/itsm.md`; every anchor link into `docs/itsm.md` used by the frontend, docs, backend and the Znuny add-on must resolve |
+| `backend/tests/test_plugins_docs_ai_worker.py` | `docs/plugins.md` and `docs/deployment.md` statements on the `ai-worker` as a plugin host and the four processes that need the plugin image |
+| `backend/tests/test_gi_docs_events.py` | the `Events` row in `docs/compatibility.md` |
+| `backend/tests/test_docs_release_v0190.py` | wording of `docs/releases/v0.19.0.md` and of "Upgrading to v0.19.0" and "SCIM provisioning" in `docs/deployment.md` |
+
+Run them after editing those files:
+
+```bash
+cd backend && uv run python -m pytest -q tests/test_docs_itsm_links.py \
+  tests/test_plugins_docs_ai_worker.py tests/test_gi_docs_events.py \
+  tests/test_docs_release_v0190.py
+```
+
+There is no generic link checker: check relative links and anchors by hand.
+
 ## Useful commands
 
 | Command | Action |
@@ -342,7 +383,8 @@ workflow dispatch where available). Before tagging a release:
    ```bash
    cd frontend && AUDIT_SAMPLE=1 pnpm exec playwright test e2e/audit-sample.spec.ts --project=chromium
    ```
-2. **OpenAPI + typed client** (if REST models/routes changed):
+2. **OpenAPI + typed client** (if REST models/routes changed; CI fails the
+   frontend type check when `packages/api-client/openapi.json` is stale):
    ```bash
    cd backend && uv run tiqora openapi -o ../docs/api/openapi.json
    # also refresh packages/api-client/openapi.json and regenerate types
