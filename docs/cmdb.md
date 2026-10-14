@@ -27,9 +27,9 @@ Jedes CI gehört zu einer **Klasse**. Die Klasse legt fest, welche Attribute ein
 sehen darf und ob Kunden es im Portal sehen.
 
 Alle Daten stehen in Tiqora-eigenen Tabellen (`tiqora_cmdb_*`, `tiqora_itsm_link`). Die CMDB
-schreibt nie in die Tabellen von Znuny und verknüpft sie nie per SQL-JOIN mit ihnen (die
-Prod-Datenbank mischt Zeichensatz-Vergleichsregeln; Schlüssel werden geladen und dann als
-IN-Liste abgefragt).
+schreibt nie in die Tabellen von Znuny und verknüpft sie nie per SQL-JOIN mit ihnen (eine
+bestehende Znuny-Datenbank kann Zeichensatz-Vergleichsregeln mischen; Schlüssel werden
+geladen und dann als IN-Liste abgefragt).
 
 ![CMDB-Liste](images/agent-cmdb-list.png)
 
@@ -305,7 +305,7 @@ GRANT CREATE ON SCHEMA public TO tiqora;
 Fehlt das Recht, bricht die Migration nicht ab: Die Anweisung läuft in einem SAVEPOINT, wird
 zurückgerollt und es erscheint die Meldung „CREATE VIEW-Recht fehlt“; **Admin → CMDB-Klassen** warnt in diesem Fall
 (`views_present` ist falsch), und **Standardwerte anlegen** versucht es erneut.
-Prüfen Sie vor einem Release auf der Prod-MariaDB mit `SHOW GRANTS`. Spätere Migrationen, die
+Prüfen Sie vor einem Release auf der produktiven MariaDB mit `SHOW GRANTS`. Spätere Migrationen, die
 Spalten von `tiqora_cmdb_ci`, `tiqora_cmdb_class`, `tiqora_cmdb_catalog` oder `tiqora_itsm_link`
 ändern, müssen beide Ansichten vorher löschen und danach neu anlegen.
 

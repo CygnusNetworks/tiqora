@@ -8,7 +8,7 @@
 
 **Tech Stack:** FastAPI, SQLAlchemy async, React 18, TanStack Query/Router, Tailwind tokens, Vitest.
 
-**Spec:** Approved mockup <mockup-link> (version 3, user: "ja bitte so umsetzen", 2026-09-30). Local copy: `<tmp>`. Its "notes" section lists the rules; the decisions below are binding.
+**Spec:** Approved mockup (version 3, approved 2026-09-30). Its "notes" section lists the rules; the decisions below are binding.
 
 ## Global Constraints
 

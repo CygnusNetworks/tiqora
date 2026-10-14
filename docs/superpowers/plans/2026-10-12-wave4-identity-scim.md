@@ -28,7 +28,7 @@ Every item is decided conservatively in this plan (marked **Assumption:** where 
 12. **The SCIM log records writes and failures only** (no reads), keeps no attribute values (field names only), and is purged after 180 days. (S8)
 13. **Unknown member ids in a group push are ignored** (counted in the log) instead of failing the whole request. (S7)
 14. **"active" is read from Znuny** (`valid_id == 1`): if an admin re-enables a SCIM-deactivated account by hand, SCIM reports it active and the IdP may deactivate it again on its next cycle. (S6)
-15. **SCIM lives at `/scim/v2`** (spec) — production nginx (Puppet) needs a new `location /scim/` block; until then the endpoint is unreachable from outside. (S5, Task 22)
+15. **SCIM lives at `/scim/v2`** (spec) — production nginx needs a new `location /scim/` block; until then the endpoint is unreachable from outside. (S5, Task 22)
 16. **The SCIM `password` attribute is ignored**; SCIM-created accounts get the wave-1 unusable password hash (login via SSO only). (S6)
 17. **MFA proof is read only from the verified OIDC id_token** (never userinfo); a provider that returns no id_token can never satisfy "zweiten Faktor verlangen" and always falls back. (S9)
 

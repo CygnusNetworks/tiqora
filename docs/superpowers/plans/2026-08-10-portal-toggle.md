@@ -619,7 +619,7 @@ rtk git commit -m "feat(portal): admin API reads and writes the portal switch"
 
 - [ ] **Step 1: Regenerate**
 
-Run: `cd ~/git/tiqora && just api-client-gen`
+Run: `cd <repo> && just api-client-gen`
 
 - [ ] **Step 2: Verify the new fields landed**
 
@@ -1436,7 +1436,7 @@ Kundendaten, Kundenfirmen und E-Mail-Tickets bleiben in beiden Fällen unberühr
 
 ```bash
 cd backend && uv run python -m pytest -q -m "not db" && uv run ruff check src tests && uv run mypy src
-cd ~/git/tiqora && npm exec -y pnpm@9 -- --filter tiqora-frontend lint
+cd <repo> && npm exec -y pnpm@9 -- --filter tiqora-frontend lint
 npm exec -y pnpm@9 -- --filter tiqora-frontend test
 npm exec -y pnpm@9 -- --filter tiqora-frontend i18n:check
 ```

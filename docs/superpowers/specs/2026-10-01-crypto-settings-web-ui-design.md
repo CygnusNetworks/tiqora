@@ -8,12 +8,12 @@ Alle PGP- und S/MIME-Einstellungen, die Znuny in der SysConfig führt und die in
 eine Wirkung haben, sollen sich in der Tiqora-Web-UI setzen lassen, ohne Znuny, SQL oder
 Shell. Ist ein Wert in Znuny ausdrücklich gesetzt, hat er Vorrang (Parallelbetrieb).
 
-Auslöser: Auf Prod war ein geheimer PGP-Schlüssel importiert, die
-Passphrase ließ sich aber nur über die Znuny-SysConfig eintragen, und Znuny ist gestoppt.
+Auslöser: Ist ein geheimer PGP-Schlüssel importiert, lässt sich die Passphrase bisher
+nur über die Znuny-SysConfig eintragen. Läuft Znuny nicht mehr, geht das nicht.
 
 ## Vorrang (pro Einstellung)
 
-1. Umgebungsvariable `TIQORA_CRYPTO_*`, wo es eine gibt (Deployment, z. B. Prod-Homedir)
+1. Umgebungsvariable `TIQORA_CRYPTO_*`, wo es eine gibt (Deployment)
 2. Znuny-SysConfig, **gesetzt** = system-weite Zeile in `sysconfig_modified`
    (`user_id IS NULL`, `is_valid = 1`)
 3. Tiqora-Wert aus der Web-UI (`tiqora_settings`)
@@ -123,7 +123,7 @@ gibt Passphrasen nie zurück, nur ob eine gesetzt ist und woher sie kommt.
 
 ## Nach dem Deploy
 
-Das Hilfsskript `<deploy-dir>` (+ `.py`) auf dem Host wird
+Ein Hilfsskript, das die Passphrase bisher auf dem Host direkt gesetzt hat, wird
 entfernt. Hat es schon eine `sysconfig_modified`-Zeile für `PGP::Key::Password`
 angelegt, wird die Passphrase in die Tiqora-Einstellung übernommen und die Zeile
 gelöscht, damit sie in der UI änderbar ist.
