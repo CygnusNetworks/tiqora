@@ -68,6 +68,7 @@ from tiqora.ai.gate import (
 )
 from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
 from tiqora.ai.listfields import parse_str_list
+from tiqora.ai.llm import LlmError
 from tiqora.ai.llm_routing import (
     TASK_AGENT,
     TASK_SUMMARY,
@@ -158,14 +159,24 @@ async def _hand_off_capped_ticket(
     silent (seen on a production ticket). Later messages skip as ``escalated_to_human``
     until someone switches the autopilot back on, so this runs once per
     handoff. ``grant_used``: the release an agent granted is spent."""
-    if reason == "grant_used":
-        state = await session.get(TiqoraAiTicketState, ticket_id)
-        total = state.ai_grant_total if state is not None else None
-        limit = f"{total} automatic replies released by hand" if total else "released replies"
-    elif reason == "max_clarifications":
-        limit = f"{policy.max_clarifications} clarifying questions"
+    if reason == "llm_error":
+        body = (
+            "Escalated to human: the AI could not answer because the LLM provider failed "
+            "even after retries. The customer's latest message is unanswered."
+        )
     else:
-        limit = f"{policy.max_auto_replies} automatic replies"
+        if reason == "grant_used":
+            state = await session.get(TiqoraAiTicketState, ticket_id)
+            total = state.ai_grant_total if state is not None else None
+            limit = f"{total} automatic replies released by hand" if total else "released replies"
+        elif reason == "max_clarifications":
+            limit = f"{policy.max_clarifications} clarifying questions"
+        else:
+            limit = f"{policy.max_auto_replies} automatic replies"
+        body = (
+            f"Escalated to human: the AI has reached its limit of {limit} on this "
+            "ticket and stops answering. The customer's latest message is unanswered."
+        )
     assert policy.service_user_id is not None  # checked by the caller
     await add_article(
         session,
@@ -174,10 +185,7 @@ async def _hand_off_capped_ticket(
             sender_type="agent",
             is_visible_for_customer=False,
             subject="AI agent escalation",
-            body=(
-                f"Escalated to human: the AI has reached its limit of {limit} on this "
-                "ticket and stops answering. The customer's latest message is unanswered."
-            ),
+            body=body,
             channel="note",
         ),
         user_id=policy.service_user_id,
@@ -360,17 +368,30 @@ async def _process_customer_article_event(
         raise no_profile_error(TASK_AGENT) from exc
     await _record_skip(session, state, None)
 
-    result = await run_ticket_agent(
-        session,
-        settings=settings,
-        **prepared.as_kwargs(),
-        ticket_id=ticket_id,
-        trigger=TRIGGER_AUTO,
-        acting_user_id=None,
-        run_id=uuid.uuid4().hex,
-        worker_instance="ai-worker",
-        source_channel=source_channel,
-    )
+    try:
+        result = await run_ticket_agent(
+            session,
+            settings=settings,
+            **prepared.as_kwargs(),
+            ticket_id=ticket_id,
+            trigger=TRIGGER_AUTO,
+            acting_user_id=None,
+            run_id=uuid.uuid4().hex,
+            worker_instance="ai-worker",
+            source_channel=source_channel,
+        )
+    except LlmError:
+        # The provider failed even after the runtime's retries and fallback.
+        # The outbox watermark advances regardless, so without a handoff the
+        # customer's message would be dropped without anyone noticing.
+        logger.exception(
+            "ai_auto_worker_llm_error_handoff", ticket_id=ticket_id, queue_id=ticket.queue_id
+        )
+        await session.rollback()
+        await _hand_off_capped_ticket(
+            session, ticket_id=ticket_id, policy=policy, reason="llm_error"
+        )
+        return None
     await _consume_grant(session, ticket_id, result)
     return result
 

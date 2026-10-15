@@ -857,7 +857,7 @@ class TiqoraAiTicketState(TiqoraBase):
     # the ticket moves to closed/merged/removed.
     ai_escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Why the AI handed over (max_clarifications, max_auto_replies, grant_used,
-    # escalate_to_human, identity); set and cleared together with ai_escalated_at.
+    # llm_error, escalate_to_human, identity); set and cleared together with ai_escalated_at.
     ai_escalated_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # A release an agent granted by switching the autopilot back on for N
     # automatic replies. While set it replaces the queue's per-ticket caps

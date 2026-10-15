@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parseaddr
-from typing import Any
+from typing import Any, Final
 
 import structlog
 from sqlalchemy import select, text
@@ -63,8 +63,10 @@ from tiqora.ai.llm import (
     LlmClient,
     LlmEmptyOutputError,
     LlmError,
+    LlmHttpError,
     LlmMessage,
     LlmResponse,
+    LlmTimeoutError,
     LlmUsage,
 )
 from tiqora.ai.llm_routing import (
@@ -312,6 +314,36 @@ def _is_empty_length_output(response: LlmResponse) -> bool:
     )
 
 
+_TRANSIENT_RETRY_DELAYS_SECONDS: Final = (2.0, 6.0)
+
+
+def _is_transient_llm_error(exc: LlmError) -> bool:
+    """Provider hiccups worth retrying: timeouts, 429/5xx and the 404 "model
+    does not exist" a gateway answers while a model is briefly not served
+    (seen on production for a model that worked 40 times before and after)."""
+    if isinstance(exc, LlmTimeoutError):
+        return True
+    if isinstance(exc, LlmHttpError):
+        if exc.status_code in (429, 500, 502, 503, 504):
+            return True
+        return exc.status_code == 404 and "does not exist" in exc.body
+    return False
+
+
+async def _chat_transient_retry(llm: LlmClient, **kwargs: Any) -> LlmResponse:
+    """``llm.chat`` with a couple of delayed retries on transient provider
+    errors; the last error propagates."""
+    for delay in _TRANSIENT_RETRY_DELAYS_SECONDS:
+        try:
+            return await llm.chat(**kwargs)
+        except LlmError as exc:
+            if not _is_transient_llm_error(exc):
+                raise
+            logger.warning("ai_llm_transient_retry", error=str(exc)[:200], delay_seconds=delay)
+            await asyncio.sleep(delay)
+    return await llm.chat(**kwargs)
+
+
 async def _chat_with_budget_retry(
     llm: LlmClient,
     *,
@@ -331,7 +363,8 @@ async def _chat_with_budget_retry(
     treating it as "the model had nothing to say" (the previous behaviour,
     which ended the run with a bare "no proposal" skip and no diagnostic).
     """
-    response = await llm.chat(
+    response = await _chat_transient_retry(
+        llm,
         messages=messages,
         tools=tools,
         tool_choice=tool_choice,
@@ -344,7 +377,8 @@ async def _chat_with_budget_retry(
     logger.warning(
         "ai_llm_empty_output_retry", max_tokens=max_tokens, retry_max_tokens=max_tokens * 2
     )
-    retry_response = await llm.chat(
+    retry_response = await _chat_transient_retry(
+        llm,
         messages=messages,
         tools=tools,
         tool_choice=tool_choice,
@@ -1716,9 +1750,20 @@ async def run_ticket_agent(
         final_completion_tokens = 0
         final_served_model: str | None = None
         for _round in range(rounds):
-            response: LlmResponse = await _chat_with_budget_retry(
-                active_llm, messages=messages, tools=schemas, max_tokens=completion_budget
-            )
+            try:
+                response: LlmResponse = await _chat_with_budget_retry(
+                    active_llm, messages=messages, tools=schemas, max_tokens=completion_budget
+                )
+            except LlmError:
+                if not handed_over:
+                    raise
+                # The final-answer model failed even after retries: the primary
+                # model writes the answer instead of losing the customer's mail.
+                logger.warning("ai_final_answer_fallback_to_primary", ticket_id=ticket_id)
+                handed_over, final_answer, active_llm = False, None, llm
+                response = await _chat_with_budget_retry(
+                    active_llm, messages=messages, tools=schemas, max_tokens=completion_budget
+                )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
             if handed_over:
@@ -1812,9 +1857,24 @@ async def run_ticket_agent(
             if final_answer is not None:
                 handed_over = True
                 active_llm = final_answer.llm
-            response = await _chat_with_budget_retry(
-                active_llm, messages=messages, tools=terminal_schemas, max_tokens=completion_budget
-            )
+            try:
+                response = await _chat_with_budget_retry(
+                    active_llm,
+                    messages=messages,
+                    tools=terminal_schemas,
+                    max_tokens=completion_budget,
+                )
+            except LlmError:
+                if not handed_over:
+                    raise
+                logger.warning("ai_final_answer_fallback_to_primary", ticket_id=ticket_id)
+                handed_over, final_answer, active_llm = False, None, llm
+                response = await _chat_with_budget_retry(
+                    active_llm,
+                    messages=messages,
+                    tools=terminal_schemas,
+                    max_tokens=completion_budget,
+                )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
             if handed_over:
