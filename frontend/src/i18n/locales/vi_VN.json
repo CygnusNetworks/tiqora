@@ -647,6 +647,7 @@
     "signaturePreview": "Chữ ký (được thêm tự động)",
     "forwardDialogTitle": "Chuyển tiếp bài viết",
     "forwardNote": "Lưu ý (tùy chọn)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Trả lại bài viết",
     "bounceNewState": "Đặt trạng thái (tùy chọn)",
     "splitDialogTitle": "Chia thành vé mới",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Lưu",
+      "send": "Send",
       "cancel": "Hủy bỏ",
       "selectPlaceholder": "Chọn…",
       "mergeTargetId": "Hợp nhất vào ID vé",

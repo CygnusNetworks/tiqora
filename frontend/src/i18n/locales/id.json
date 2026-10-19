@@ -647,6 +647,7 @@
     "signaturePreview": "Tanda tangan (ditambahkan secara otomatis)",
     "forwardDialogTitle": "Artikel maju",
     "forwardNote": "Catatan (opsional)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Artikel memantul",
     "bounceNewState": "Tetapkan status (opsional)",
     "splitDialogTitle": "Bagi menjadi tiket baru",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Simpan",
+      "send": "Send",
       "cancel": "Batalkan",
       "selectPlaceholder": "Pilih…",
       "mergeTargetId": "Gabungkan ke dalam ID tiket",

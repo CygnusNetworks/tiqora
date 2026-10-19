@@ -647,6 +647,7 @@
     "signaturePreview": "Signatur (wird automatisch angehängt)",
     "forwardDialogTitle": "Artikel weiterleiten",
     "forwardNote": "Notiz (optional)",
+    "forwardIncludesOriginal": "Die Originalnachricht und ihre Anhänge werden unter deiner Notiz mitgeschickt.",
     "bounceDialogTitle": "Artikel umleiten",
     "bounceNewState": "Status setzen (optional)",
     "splitDialogTitle": "In neues Ticket teilen",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Speichern",
+      "send": "Senden",
       "cancel": "Abbrechen",
       "selectPlaceholder": "Auswählen…",
       "mergeTargetId": "In Ticketnummer zusammenfassen",

@@ -3516,22 +3516,38 @@ class TicketWriteService:
         user_id: int,
         ticket_id: int,
         *,
-        subject: str,
+        subject: str | None,
         body: str,
         to_address: str,
         cc: str | None = None,
         email_security: EmailSecurityIn | None = None,
         email_security_explicit: bool = False,
+        article_id: int | None = None,
     ) -> int:
         """Forward by email: SMTP send-then-store like a reply (history 'Forward').
 
         Goes through :func:`deliver_agent_email_reply`, so the forward is
         really sent when outbound mail is enabled (Znuny AgentTicketForward)
         and can be signed/encrypted (``email_security``).
+
+        With *article_id* (the article being forwarded) the mail carries that
+        article like Znuny's AgentTicketForward does: *body* (the agent's own
+        text) on top, the original below as an inline forward block, and the
+        original's attachments attached. A missing *subject* becomes
+        ``Fwd: <original subject>``. Without *article_id* (MCP tool) *body* and
+        *subject* are sent as given.
         """
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
         from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+        attachments: list[tuple[str, str, bytes]] = []
+        if article_id is not None:
+            fwd_subject, original, attachments = await self._forward_source(
+                user_id, ticket_id, article_id
+            )
+            subject = subject or fwd_subject
+            body = f"{body}\n\n{original}\n" if body.strip() else f"{original}\n"
 
         return await deliver_agent_email_reply(
             self._session,
@@ -3543,7 +3559,7 @@ class TicketWriteService:
             article=ArticleIn(
                 sender_type="agent",
                 is_visible_for_customer=True,
-                subject=subject,
+                subject=subject or "Fwd:",
                 body=body,
                 content_type="text/plain; charset=utf-8",
                 to_address=to_address,
@@ -3552,8 +3568,82 @@ class TicketWriteService:
                 history_type_override="Forward",
                 email_security=email_security,
                 email_security_explicit=email_security_explicit,
+                attachments=attachments,
             ),
         )
+
+    async def _forward_source(
+        self, user_id: int, ticket_id: int, article_id: int
+    ) -> tuple[str, str, list[tuple[str, str, bytes]]]:
+        """``(Fwd: subject, inline forward block, attachments)`` of the forwarded article.
+
+        The subject drops the ticket-number tag before deduplicating
+        Re:/Fwd: prefixes (the send path re-adds the tag), so
+        ``[Ticket#1] Re: Re: X`` becomes ``Fwd: X``. Znuny's body-part
+        pseudo-attachments (``file-1``/``file-2``) are not re-sent as files.
+        """
+        from tiqora.domain.quoting import clean_subject, forward_plaintext_body, html_to_plaintext
+        from tiqora.domain.subject_hook import load_subject_config
+        from tiqora.domain.ticket_service import _is_body_part_attachment
+        from tiqora.domain.timezones import resolve_user_time_zone
+        from tiqora.storage.backend import DbMimeStorage
+
+        row = (
+            (
+                await self._session.execute(
+                    text(
+                        "SELECT a.ticket_id, a.create_time, m.a_from, m.a_to, m.a_cc,"
+                        " m.a_subject, m.a_body, m.a_content_type"
+                        " FROM article a JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.id = :aid LIMIT 1"
+                    ),
+                    {"aid": article_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if row is None or int(row["ticket_id"]) != ticket_id:
+            raise TicketNotFound(f"article {article_id}")
+
+        hook_cfg = await load_subject_config(self._session, self._sysconfig)
+        original_subject = str(row["a_subject"] or "")
+        if hook_cfg.enabled:
+            base = clean_subject(original_subject, hook=hook_cfg.hook, divider=hook_cfg.divider)
+        else:
+            base = clean_subject(original_subject)
+
+        raw_body = row["a_body"]
+        if isinstance(raw_body, (bytes, bytearray, memoryview)):
+            raw_body = bytes(raw_body).decode("utf-8", "replace")
+        content_type = str(row["a_content_type"] or "text/plain").split(";", 1)[0]
+        is_html = content_type.strip().lower() in {"text/html", "application/xhtml+xml"}
+        plain = html_to_plaintext(str(raw_body or "")) if is_html else str(raw_body or "")
+        original = forward_plaintext_body(
+            plain,
+            from_address=row["a_from"] or None,
+            to_address=row["a_to"] or None,
+            cc=row["a_cc"] or None,
+            subject=original_subject,
+            sent_at=row["create_time"],
+            time_zone=await resolve_user_time_zone(self._session, self._sysconfig, user_id),
+        )
+
+        storage = DbMimeStorage(self._session)
+        attachments: list[tuple[str, str, bytes]] = []
+        for meta in await storage.list_attachments(article_id):
+            if _is_body_part_attachment(meta):
+                continue
+            att = await storage.get_attachment(meta.id)
+            if att is not None:
+                attachments.append(
+                    (
+                        meta.filename or "attachment",
+                        meta.content_type or "application/octet-stream",
+                        att.content,
+                    )
+                )
+        return f"Fwd: {base}", original, attachments
 
     async def bounce_article(
         self,

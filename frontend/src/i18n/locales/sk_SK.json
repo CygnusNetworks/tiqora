@@ -647,6 +647,7 @@
     "signaturePreview": "Podpis (pripája sa automaticky)",
     "forwardDialogTitle": "Dopredu článok",
     "forwardNote": "Poznámka (voliteľné)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Bounce článok",
     "bounceNewState": "Nastaviť stav (voliteľné)",
     "splitDialogTitle": "Rozdeliť na nový lístok",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Uložiť",
+      "send": "Send",
       "cancel": "Zrušiť",
       "selectPlaceholder": "Vybrať…",
       "mergeTargetId": "Zlúčiť do ID lístka",

@@ -9,6 +9,7 @@ from tiqora.domain.quoting import (
     build_reply_subject,
     build_ticket_subject,
     clean_subject,
+    forward_plaintext_body,
     html_to_plaintext,
     quote_plaintext_body,
     strip_ticket_hook,
@@ -189,3 +190,26 @@ def test_html_to_plaintext_strips_tags() -> None:
     assert "Hello world" in out
     assert "Line2 & more" in out
     assert "<" not in out
+
+
+def test_forward_plaintext_body_frames_original_with_headers() -> None:
+    out = forward_plaintext_body(
+        "Line one\nLine two\n",
+        from_address="Alice <alice@example.com>",
+        to_address="support@example.com",
+        cc=None,
+        subject="Help please",
+        sent_at=datetime(2026, 10, 19, 7, 1, 30),
+        time_zone="Europe/Berlin",
+    )
+    assert out == (
+        "---- Forwarded message from Alice <alice@example.com> ---\n"
+        "From: Alice <alice@example.com>\n"
+        "Date: 2026-10-19 09:01 CEST\n"
+        "Subject: Help please\n"
+        "To: support@example.com\n"
+        "\n"
+        "Line one\nLine two\n"
+        "\n"
+        "---- End forwarded message ---"
+    )

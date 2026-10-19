@@ -647,6 +647,7 @@
     "signaturePreview": "Podpis (připojen automaticky)",
     "forwardDialogTitle": "Přeposlat článek",
     "forwardNote": "Poznámka (volitelné)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Vrátit článek (bounce)",
     "bounceNewState": "Nastavit stav (volitelné)",
     "splitDialogTitle": "Rozdělit do nového tiketu",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Uložit",
+      "send": "Send",
       "cancel": "Zrušit",
       "selectPlaceholder": "Vyberte…",
       "mergeTargetId": "Sloučit do tiketu ID",

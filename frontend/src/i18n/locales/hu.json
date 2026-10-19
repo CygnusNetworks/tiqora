@@ -647,6 +647,7 @@
     "signaturePreview": "Aláírás (automatikusan hozzáfűzve)",
     "forwardDialogTitle": "Cikk továbbítása",
     "forwardNote": "Megjegyzés (nem kötelező)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Visszapattanó cikk",
     "bounceNewState": "Állapot beállítása (opcionális)",
     "splitDialogTitle": "Osztva új jegyre",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Mentés",
+      "send": "Send",
       "cancel": "Mégsem",
       "selectPlaceholder": "Válasszon…",
       "mergeTargetId": "Egyesítse a jegyazonosítóba",

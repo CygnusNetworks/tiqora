@@ -647,6 +647,7 @@
     "signaturePreview": "Потпис (дополнет автоматски)",
     "forwardDialogTitle": "Препрати статија",
     "forwardNote": "Забелешка (изборно)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Статија за отскокнување",
     "bounceNewState": "Поставете состојба (опционално)",
     "splitDialogTitle": "Поделете на нов билет",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Зачувај",
+      "send": "Send",
       "cancel": "Откажи",
       "selectPlaceholder": "Изберете…",
       "mergeTargetId": "Спојувајте се во ID на билет",

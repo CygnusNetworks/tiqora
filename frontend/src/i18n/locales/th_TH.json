@@ -647,6 +647,7 @@
     "signaturePreview": "ลายเซ็น (ต่อท้ายอัตโนมัติ)",
     "forwardDialogTitle": "ส่งต่อบทความ",
     "forwardNote": "หมายเหตุ (ไม่บังคับ)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "บทความเด้ง",
     "bounceNewState": "ตั้งค่าสถานะ (ไม่บังคับ)",
     "splitDialogTitle": "แยกออกเป็นตั๋วใหม่",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "บันทึก",
+      "send": "Send",
       "cancel": "ยกเลิก",
       "selectPlaceholder": "เลือก...",
       "mergeTargetId": "รวมเข้ากับรหัสตั๋ว",

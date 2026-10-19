@@ -12235,8 +12235,11 @@ export interface paths {
          * Forward Article Endpoint
          * @description Forward an article by email (history type 'Forward'). Requires ``rw``.
          *
-         *     Sent like a reply (send-then-store, HTTP 502 on SMTP failure); optional
-         *     ``email_security`` signs/encrypts it (422 on missing/unusable keys).
+         *     The mail carries the forwarded article: ``note``/``body`` on top, the
+         *     original inline below and its attachments attached; ``subject`` defaults
+         *     to ``Fwd: <original subject>``. Sent like a reply (send-then-store, HTTP
+         *     502 on SMTP failure); optional ``email_security`` signs/encrypts it (422
+         *     on missing/unusable keys).
          */
         post: operations["forward_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__forward_post"];
         delete?: never;

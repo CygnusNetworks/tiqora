@@ -647,6 +647,7 @@
     "signaturePreview": "Sahihi (imeongezwa kiotomatiki)",
     "forwardDialogTitle": "Sambaza makala",
     "forwardNote": "Kumbuka (si lazima)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Makala ya kuruka",
     "bounceNewState": "Weka hali (ya hiari)",
     "splitDialogTitle": "Gawanya katika tiketi mpya",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Hifadhi",
+      "send": "Send",
       "cancel": "Ghairi",
       "selectPlaceholder": "Chagua...",
       "mergeTargetId": "Unganisha kwenye kitambulisho cha tikiti",

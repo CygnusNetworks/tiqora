@@ -647,6 +647,7 @@
     "signaturePreview": "İmza (otomatik olarak eklenir)",
     "forwardDialogTitle": "İleri makale",
     "forwardNote": "Not (isteğe bağlı)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Geri dönen makale",
     "bounceNewState": "Durumu ayarla (isteğe bağlı)",
     "splitDialogTitle": "Yeni bilete bölün",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Kaydet",
+      "send": "Send",
       "cancel": "İptal",
       "selectPlaceholder": "Seç…",
       "mergeTargetId": "Bilet kimliğiyle birleştir",

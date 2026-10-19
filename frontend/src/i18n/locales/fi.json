@@ -647,6 +647,7 @@
     "signaturePreview": "Allekirjoitus (lisätään automaattisesti)",
     "forwardDialogTitle": "Eteenpäin artikkeli",
     "forwardNote": "Huomautus (valinnainen)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Bounce artikkeli",
     "bounceNewState": "Aseta tila (valinnainen)",
     "splitDialogTitle": "Jaettu uuteen lippuun",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Tallenna",
+      "send": "Send",
       "cancel": "Peruuta",
       "selectPlaceholder": "Valitse…",
       "mergeTargetId": "Yhdistä lipputunnukseen",

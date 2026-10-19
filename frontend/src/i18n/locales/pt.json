@@ -647,6 +647,7 @@
     "signaturePreview": "Assinatura (anexada automaticamente)",
     "forwardDialogTitle": "Artigo de encaminhamento",
     "forwardNote": "Nota (opcional)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Artigo rejeitado",
     "bounceNewState": "Definir estado (opcional)",
     "splitDialogTitle": "Dividir em novo ticket",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Salvar",
+      "send": "Send",
       "cancel": "Cancelar",
       "selectPlaceholder": "Selecione…",
       "mergeTargetId": "Mesclar no ID do ticket",

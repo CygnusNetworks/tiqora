@@ -647,6 +647,7 @@
     "signaturePreview": "Signatur (läggs till automatiskt)",
     "forwardDialogTitle": "Vidarebefordra artikel",
     "forwardNote": "Obs (valfritt)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Bounce artikel",
     "bounceNewState": "Ange tillstånd (valfritt)",
     "splitDialogTitle": "Dela upp till nytt ärende",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Spara",
+      "send": "Send",
       "cancel": "Avbryt",
       "selectPlaceholder": "Välj...",
       "mergeTargetId": "Slå ihop till ärende-ID",

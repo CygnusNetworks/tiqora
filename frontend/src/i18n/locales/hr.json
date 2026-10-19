@@ -647,6 +647,7 @@
     "signaturePreview": "Potpis (dodaje se automatski)",
     "forwardDialogTitle": "Proslijedi članak",
     "forwardNote": "Napomena (nije obavezno)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Odbaciti članak",
     "bounceNewState": "Postavi stanje (nije obavezno)",
     "splitDialogTitle": "Podijelite na novu kartu",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "spremiti",
+      "send": "Send",
       "cancel": "Odustani",
       "selectPlaceholder": "Odaberite…",
       "mergeTargetId": "Spojite u ID ulaznice",

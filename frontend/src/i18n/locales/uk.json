@@ -647,6 +647,7 @@
     "signaturePreview": "Підпис (додається автоматично)",
     "forwardDialogTitle": "Переслати статтю",
     "forwardNote": "Примітка (необов'язково)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Відмовна стаття",
     "bounceNewState": "Установити стан (необов'язково)",
     "splitDialogTitle": "Розділіть на новий квиток",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "зберегти",
+      "send": "Send",
       "cancel": "Скасувати",
       "selectPlaceholder": "Виберіть…",
       "mergeTargetId": "Об’єднати в ID квитка",

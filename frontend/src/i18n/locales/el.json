@@ -647,6 +647,7 @@
     "signaturePreview": "Υπογραφή (προστίθεται αυτόματα)",
     "forwardDialogTitle": "Προώθηση άρθρου",
     "forwardNote": "Σημείωση (προαιρετικό)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "άρθρο αναπήδησης",
     "bounceNewState": "Ορισμός κατάστασης (προαιρετικό)",
     "splitDialogTitle": "Διαχωρισμός σε νέο εισιτήριο",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Αποθήκευση",
+      "send": "Send",
       "cancel": "Ακύρωση",
       "selectPlaceholder": "Επιλέξτε…",
       "mergeTargetId": "Συγχώνευση στο αναγνωριστικό εισιτηρίου",

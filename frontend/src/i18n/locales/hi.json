@@ -647,6 +647,7 @@
     "signaturePreview": "हस्ताक्षर (स्वचालित रूप से संलग्न)",
     "forwardDialogTitle": "अग्रेषित लेख",
     "forwardNote": "नोट (वैकल्पिक)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "बाउंस लेख",
     "bounceNewState": "स्थिति सेट करें (वैकल्पिक)",
     "splitDialogTitle": "नए टिकट में विभाजित करें",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "सहेजें",
+      "send": "Send",
       "cancel": "रद्द करें",
       "selectPlaceholder": "चुनें…",
       "mergeTargetId": "टिकट आईडी में मर्ज करें",

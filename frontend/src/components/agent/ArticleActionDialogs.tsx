@@ -80,6 +80,9 @@ export function ForwardDialog({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
+        <p className="text-xs text-muted" data-testid="forward-includes-original">
+          {t("ticket.forwardIncludesOriginal")}
+        </p>
         <EmailSecurityControl security={security} testId="forward-security" />
         {m.isError && (
           <p className="text-xs text-danger" data-testid="forward-error">
@@ -94,6 +97,7 @@ export function ForwardDialog({
           disabled={
             !to.trim() || m.isPending || ticketLock.lockedBy !== null || security.blocked !== null
           }
+          saveLabel={t("ticket.dialog.send")}
         />
       </div>
     </Dialog>
@@ -351,10 +355,13 @@ function DialogActions({
   onCancel,
   onSave,
   disabled,
+  saveLabel,
 }: {
   onCancel: () => void;
   onSave: () => void;
   disabled: boolean;
+  /** Primary button text; defaults to "Save" (the forward dialog sends a mail instead). */
+  saveLabel?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -363,7 +370,7 @@ function DialogActions({
         {t("ticket.dialog.cancel")}
       </Button>
       <Button variant="primary" size="sm" disabled={disabled} onClick={onSave}>
-        {t("ticket.dialog.save")}
+        {saveLabel ?? t("ticket.dialog.save")}
       </Button>
     </div>
   );

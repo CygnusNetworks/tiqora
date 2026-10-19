@@ -647,6 +647,7 @@
     "signaturePreview": "簽名（自動附加）",
     "forwardDialogTitle": "轉發文章",
     "forwardNote": "注意（可選）",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "彈跳文章",
     "bounceNewState": "設定狀態（可選）",
     "splitDialogTitle": "拆分成新票",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "儲存",
+      "send": "Send",
       "cancel": "取消",
       "selectPlaceholder": "選擇…",
       "mergeTargetId": "合併到票證 ID",

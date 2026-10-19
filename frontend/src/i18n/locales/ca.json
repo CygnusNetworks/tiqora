@@ -647,6 +647,7 @@
     "signaturePreview": "Signatura (adjunta automàticament)",
     "forwardDialogTitle": "Endavant l'article",
     "forwardNote": "Nota (opcional)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Article de rebot",
     "bounceNewState": "Estableix l'estat (opcional)",
     "splitDialogTitle": "Dividiu en un bitllet nou",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Desa",
+      "send": "Send",
       "cancel": "Cancel·la",
       "selectPlaceholder": "Seleccioneu…",
       "mergeTargetId": "Combina't amb l'identificador del bitllet",

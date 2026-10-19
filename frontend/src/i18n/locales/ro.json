@@ -647,6 +647,7 @@
     "signaturePreview": "Semnătura (anexată automat)",
     "forwardDialogTitle": "Înainte articol",
     "forwardNote": "Notă (opțional)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Articol Bounce",
     "bounceNewState": "Setați starea (opțional)",
     "splitDialogTitle": "Împărțit în bilet nou",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Salvați",
+      "send": "Send",
       "cancel": "Anulează",
       "selectPlaceholder": "Selectați…",
       "mergeTargetId": "Fuzionați în ID-ul biletului",

@@ -647,6 +647,7 @@
     "signaturePreview": "Allkiri (lisatakse automaatselt)",
     "forwardDialogTitle": "Edastage artikkel",
     "forwardNote": "Märkus (valikuline)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Põrkeartikkel",
     "bounceNewState": "Määra olek (valikuline)",
     "splitDialogTitle": "Jagage uueks piletiks",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Salvesta",
+      "send": "Send",
       "cancel": "Tühista",
       "selectPlaceholder": "Vali…",
       "mergeTargetId": "Ühendage pileti ID-ga",

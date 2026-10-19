@@ -647,6 +647,7 @@
     "signaturePreview": "Handtekening (automatisch toegevoegd)",
     "forwardDialogTitle": "Artikel doorsturen",
     "forwardNote": "Opmerking (optioneel)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Artikel bouncen",
     "bounceNewState": "Status instellen (optioneel)",
     "splitDialogTitle": "Opsplitsen naar nieuw ticket",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Opslaan",
+      "send": "Send",
       "cancel": "Annuleren",
       "selectPlaceholder": "Selecteer…",
       "mergeTargetId": "Samenvoegen in ticket-ID",

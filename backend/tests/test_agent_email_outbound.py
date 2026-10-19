@@ -6,6 +6,7 @@ so the session-scoped testcontainer DB is shared safely across tests/files.
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 from typing import Any
 
@@ -22,7 +23,7 @@ from tiqora.channels.email.smtp import CapturingMailSender, FailingMailSender, b
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraMailOutbound  # noqa: F401 — register for create_all
-from tiqora.domain.ticket_write_service import ArticleIn, TicketWriteService
+from tiqora.domain.ticket_write_service import ArticleIn, TicketNotFound, TicketWriteService
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -224,6 +225,7 @@ def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
         "customer_email": f"alice91{ns}@example.com",
         "support_email": f"support{ns}@outbound.example",
         "orig_mid": f"<cust-orig-91{ns}@example.com>",
+        "seed_article": seed_article_id,
         "ns": ns,
     }
 
@@ -502,6 +504,116 @@ async def test_agent_email_reply_sends_and_stores(
             )
             assert list(stored) == [name for name, _ct, _content in files]
 
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_forward_carries_original_and_attachments(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Forwarding an article sends it along (Znuny AgentTicketForward).
+
+    Regression: the forward used to go out as the agent's note only, subject
+    a bare ``Fwd:``, without the original text or its attachments.
+    """
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "1")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=8)
+        csv = b"ID;NAME\nu00001;Example\n"
+        engine_sync = create_engine(sync_url)
+        postgres = engine_sync.dialect.name == "postgresql"
+        with engine_sync.begin() as conn:
+            conn.execute(
+                text("UPDATE article_data_mime SET a_subject = :s WHERE article_id = :aid"),
+                {"s": f"[Ticket#{ids['tn']}] Re: Re: Help please", "aid": ids["seed_article"]},
+            )
+            # A real attachment plus Znuny's file-1 body copy, which must not be re-sent.
+            for filename, ctype, content in (
+                ("Mieterliste.csv", "text/csv", csv),
+                ("file-1", "text/plain; charset=utf-8", b"I need help"),
+            ):
+                conn.execute(
+                    text(
+                        "INSERT INTO article_data_mime_attachment"
+                        " (article_id, filename, content_size, content_type, content,"
+                        " create_time, create_by, change_time, change_by)"
+                        " VALUES (:aid, :fn, :sz, :ct, :c, :t, 1, :t, 1)"
+                    ),
+                    {
+                        "aid": ids["seed_article"],
+                        "fn": filename,
+                        "sz": str(len(content)),
+                        "ct": ctype,
+                        "c": base64.b64encode(content).decode("ascii") if postgres else content,
+                        "t": NOW,
+                    },
+                )
+        engine_sync.dispose()
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sender = CapturingMailSender()
+
+        async with factory() as session, session.begin():
+            svc = TicketWriteService(session, factory, _make_sysconfig(), mail_sender=sender)
+            article_id = await svc.forward_article(
+                ids["agent"],
+                ids["ticket"],
+                article_id=ids["seed_article"],
+                subject=None,
+                body="FYI, see below.",
+                to_address="colleague918@example.com",
+            )
+
+        assert len(sender.sent) == 1
+        msg = sender.sent[0]
+        assert msg["To"] == "colleague918@example.com"
+        assert msg["Subject"] == f"[Ticket#{ids['tn']}] Fwd: Help please"
+        body_part = msg.get_body(("plain",))
+        assert body_part is not None
+        body = body_part.get_content()
+        assert body.index("FYI, see below.") < body.index("---- Forwarded message from")
+        assert f"From: {ids['customer_email']}" in body
+        assert "I need help" in body
+        assert "---- End forwarded message ---" in body
+        sent_files = [
+            (p.get_filename(), p.get_payload(decode=True)) for p in msg.iter_attachments()
+        ]
+        assert sent_files == [("Mieterliste.csv", csv)]
+
+        async with factory() as session:
+            stored = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT filename FROM article_data_mime_attachment"
+                            " WHERE article_id = :aid"
+                        ),
+                        {"aid": article_id},
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert list(stored) == ["Mieterliste.csv"]
+
+            # A nonexistent article id is a not-found, not a note-only forward.
+            svc = TicketWriteService(session, factory, _make_sysconfig(), mail_sender=sender)
+            with pytest.raises(TicketNotFound):
+                await svc.forward_article(
+                    ids["agent"],
+                    ids["ticket"],
+                    article_id=article_id + 100000,
+                    subject=None,
+                    body="",
+                    to_address="colleague918@example.com",
+                )
         await engine.dispose()
     finally:
         get_settings.cache_clear()

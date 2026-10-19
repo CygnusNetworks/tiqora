@@ -144,6 +144,40 @@ def quote_plaintext_body(
     return f"{attribution}\n{quoted}"
 
 
+def forward_plaintext_body(
+    body: str,
+    *,
+    from_address: str | None,
+    to_address: str | None,
+    cc: str | None,
+    subject: str | None,
+    sent_at: datetime | None,
+    time_zone: str = "UTC",
+) -> str:
+    """The forwarded original as an inline block (plaintext only).
+
+    Mirrors Znuny's ``AgentTicketForward`` framing (``---- Forwarded message
+    from <from> ---`` … ``---- End forwarded message ---``) and, like MUAs do
+    for inline forwards, repeats the original's From/Date/Subject/To/Cc header
+    lines so the recipient sees who wrote what to whom. The body itself is
+    not ``> ``-quoted. HTML bodies must be converted by the caller first.
+    """
+    who = from_address or "unknown sender"
+    headers = [f"From: {who}"]
+    if sent_at:
+        headers.append(f"Date: {format_in_zone(sent_at, time_zone, '%Y-%m-%d %H:%M %Z')}")
+    headers.append(f"Subject: {subject or ''}")
+    if to_address:
+        headers.append(f"To: {to_address}")
+    if cc:
+        headers.append(f"Cc: {cc}")
+    return (
+        f"---- Forwarded message from {who} ---\n"
+        + "\n".join(headers)
+        + f"\n\n{(body or '').rstrip()}\n\n---- End forwarded message ---"
+    )
+
+
 def html_to_plaintext(html_body: str) -> str:
     """Very small HTML→plaintext fallback for quoting HTML article bodies.
 

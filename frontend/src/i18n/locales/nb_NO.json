@@ -647,6 +647,7 @@
     "signaturePreview": "Signatur (legges til automatisk)",
     "forwardDialogTitle": "Videresend artikkelen",
     "forwardNote": "Merknad (valgfritt)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Sprett artikkel",
     "bounceNewState": "Angi tilstand (valgfritt)",
     "splitDialogTitle": "Del opp i ny billett",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Lagre",
+      "send": "Send",
       "cancel": "Avbryt",
       "selectPlaceholder": "Velg...",
       "mergeTargetId": "Slå sammen til billett-ID",

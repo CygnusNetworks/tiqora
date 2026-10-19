@@ -647,6 +647,7 @@
     "signaturePreview": "التوقيع (يتم إلحاقه تلقائيًا)",
     "forwardDialogTitle": "المادة إلى الأمام",
     "forwardNote": "ملاحظة (اختياري)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "ترتد المادة",
     "bounceNewState": "تعيين الحالة (اختياري)",
     "splitDialogTitle": "تقسيم إلى تذكرة جديدة",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "حفظ",
+      "send": "Send",
       "cancel": "إلغاء",
       "selectPlaceholder": "اختر…",
       "mergeTargetId": "دمج في معرف التذكرة",

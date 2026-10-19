@@ -647,6 +647,7 @@
     "signaturePreview": "Signatur (tilføjes automatisk)",
     "forwardDialogTitle": "Videresend artikel",
     "forwardNote": "Bemærk (valgfrit)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Bounce artikel",
     "bounceNewState": "Indstil tilstand (valgfrit)",
     "splitDialogTitle": "Opdel til ny billet",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Gem",
+      "send": "Send",
       "cancel": "Annuller",
       "selectPlaceholder": "Vælg...",
       "mergeTargetId": "Flet ind i billet-id",

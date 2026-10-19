@@ -647,6 +647,7 @@
     "signaturePreview": "Подпись (добавляется автоматически)",
     "forwardDialogTitle": "Переслать статью",
     "forwardNote": "Примечание (необязательно)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Отказ статьи",
     "bounceNewState": "Установить состояние (необязательно)",
     "splitDialogTitle": "Разделить на новый тикет",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Сохранить",
+      "send": "Send",
       "cancel": "Отмена",
       "selectPlaceholder": "Выбирать…",
       "mergeTargetId": "Объединить с идентификатором заявки",

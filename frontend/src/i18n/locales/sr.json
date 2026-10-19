@@ -647,6 +647,7 @@
     "signaturePreview": "Потпис (аутоматски се додаје)",
     "forwardDialogTitle": "Проследи чланак",
     "forwardNote": "Напомена (опционо)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Преусмеравање чланка",
     "bounceNewState": "Подесите стање (опционо)",
     "splitDialogTitle": "Подели у нови тикет",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Сачувај",
+      "send": "Send",
       "cancel": "Откажи",
       "selectPlaceholder": "Изаберите…",
       "mergeTargetId": "Споји у ИД тикета",

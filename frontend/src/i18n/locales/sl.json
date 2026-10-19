@@ -647,6 +647,7 @@
     "signaturePreview": "Podpis (dodan samodejno)",
     "forwardDialogTitle": "Posreduj članek",
     "forwardNote": "Opomba (neobvezno)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Odbit članek",
     "bounceNewState": "Nastavi stanje (neobvezno)",
     "splitDialogTitle": "Razdelite na novo vstopnico",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Shrani",
+      "send": "Send",
       "cancel": "Prekliči",
       "selectPlaceholder": "Izberite ...",
       "mergeTargetId": "Spojite se v ID vstopnice",

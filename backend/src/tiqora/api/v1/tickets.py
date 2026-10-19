@@ -2095,18 +2095,21 @@ async def forward_article_endpoint(
 ) -> ArticleCreateResponse:
     """Forward an article by email (history type 'Forward'). Requires ``rw``.
 
-    Sent like a reply (send-then-store, HTTP 502 on SMTP failure); optional
-    ``email_security`` signs/encrypts it (422 on missing/unusable keys).
+    The mail carries the forwarded article: ``note``/``body`` on top, the
+    original inline below and its attachments attached; ``subject`` defaults
+    to ``Fwd: <original subject>``. Sent like a reply (send-then-store, HTTP
+    502 on SMTP failure); optional ``email_security`` signs/encrypts it (422
+    on missing/unusable keys).
     """
     svc = _write_service(session, settings)
-    fwd_body = f"{body.note}\n\n{body.body}" if body.note else body.body
-    subject = body.subject or "Fwd:"
+    fwd_body = "\n\n".join(part for part in (body.note, body.body) if part)
     try:
         async with session.begin():
             aid = await svc.forward_article(
                 user.id,
                 ticket_id,
-                subject=subject,
+                article_id=article_id,
+                subject=body.subject or None,
                 body=fwd_body,
                 to_address=body.to_address,
                 cc=body.cc,

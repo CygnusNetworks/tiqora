@@ -647,6 +647,7 @@
     "signaturePreview": "Paraksts (pievienots automātiski)",
     "forwardDialogTitle": "Uz priekšu rakstu",
     "forwardNote": "Piezīme (pēc izvēles)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Atlekšanas raksts",
     "bounceNewState": "Iestatīt stāvokli (neobligāti)",
     "splitDialogTitle": "Sadalīts jaunā biļetē",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Saglabāt",
+      "send": "Send",
       "cancel": "Atcelt",
       "selectPlaceholder": "Izvēlieties…",
       "mergeTargetId": "Apvienot biļetes ID",

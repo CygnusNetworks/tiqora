@@ -647,6 +647,7 @@
     "signaturePreview": "Podpis (dołączany automatycznie)",
     "forwardDialogTitle": "Prześlij artykuł dalej",
     "forwardNote": "Notatka (opcjonalnie)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Odbij artykuł",
     "bounceNewState": "Ustaw status (opcjonalnie)",
     "splitDialogTitle": "Podziel na nowy ticket",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Zapisz",
+      "send": "Send",
       "cancel": "Anuluj",
       "selectPlaceholder": "Wybierz…",
       "mergeTargetId": "Scal z ticketem o ID",

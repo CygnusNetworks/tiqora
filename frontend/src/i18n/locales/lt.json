@@ -647,6 +647,7 @@
     "signaturePreview": "Parašas (pridedamas automatiškai)",
     "forwardDialogTitle": "Persiųsti straipsnį",
     "forwardNote": "Pastaba (neprivaloma)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Bounce straipsnis",
     "bounceNewState": "Nustatyti būseną (pasirenkama)",
     "splitDialogTitle": "Padalinta į naują bilietą",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Išsaugoti",
+      "send": "Send",
       "cancel": "Atšaukti",
       "selectPlaceholder": "Pasirinkite…",
       "mergeTargetId": "Sujungti į bilieto ID",

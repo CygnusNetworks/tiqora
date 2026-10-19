@@ -115518,7 +115518,7 @@
     },
     "/api/v1/tickets/{ticket_id}/articles/{article_id}/forward": {
       "post": {
-        "description": "Forward an article by email (history type 'Forward'). Requires ``rw``.\n\nSent like a reply (send-then-store, HTTP 502 on SMTP failure); optional\n``email_security`` signs/encrypts it (422 on missing/unusable keys).",
+        "description": "Forward an article by email (history type 'Forward'). Requires ``rw``.\n\nThe mail carries the forwarded article: ``note``/``body`` on top, the\noriginal inline below and its attachments attached; ``subject`` defaults\nto ``Fwd: <original subject>``. Sent like a reply (send-then-store, HTTP\n502 on SMTP failure); optional ``email_security`` signs/encrypts it (422\non missing/unusable keys).",
         "operationId": "forward_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__forward_post",
         "parameters": [
           {

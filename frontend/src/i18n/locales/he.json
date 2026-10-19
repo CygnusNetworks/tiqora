@@ -647,6 +647,7 @@
     "signaturePreview": "חתימה (נוספה אוטומטית)",
     "forwardDialogTitle": "העבר מאמר",
     "forwardNote": "הערה (אופציונלי)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "מאמר להקפיץ",
     "bounceNewState": "הגדר מצב (אופציונלי)",
     "splitDialogTitle": "התפצל לכרטיס חדש",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "שמור",
+      "send": "Send",
       "cancel": "בטל",
       "selectPlaceholder": "בחר…",
       "mergeTargetId": "התמזג לתוך מזהה כרטיס",

@@ -647,6 +647,7 @@
     "signaturePreview": "签名（自动附加）",
     "forwardDialogTitle": "转发文章",
     "forwardNote": "备注（可选）",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "退回文章",
     "bounceNewState": "设置状态（可选）",
     "splitDialogTitle": "拆分为新工单",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "保存",
+      "send": "Send",
       "cancel": "取消",
       "selectPlaceholder": "选择…",
       "mergeTargetId": "合并到工单 ID",

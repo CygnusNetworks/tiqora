@@ -647,6 +647,7 @@
     "signaturePreview": "署名 (自動的に追加)",
     "forwardDialogTitle": "前の記事",
     "forwardNote": "注記 (オプション)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "記事をバウンスする",
     "bounceNewState": "状態の設定 (オプション)",
     "splitDialogTitle": "新しいチケットに分割",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "保存",
+      "send": "Send",
       "cancel": "キャンセル",
       "selectPlaceholder": "選択してください…",
       "mergeTargetId": "チケットIDに結合",

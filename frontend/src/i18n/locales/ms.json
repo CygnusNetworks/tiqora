@@ -647,6 +647,7 @@
     "signaturePreview": "Tandatangan (dilampirkan secara automatik)",
     "forwardDialogTitle": "Artikel hadapan",
     "forwardNote": "Nota (pilihan)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Artikel lantunan",
     "bounceNewState": "Tetapkan keadaan (pilihan)",
     "splitDialogTitle": "Berpecah kepada tiket baharu",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Jimat",
+      "send": "Send",
       "cancel": "Batal",
       "selectPlaceholder": "Pilih…",
       "mergeTargetId": "Bercantum ke dalam ID tiket",

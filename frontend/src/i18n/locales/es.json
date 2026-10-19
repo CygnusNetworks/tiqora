@@ -647,6 +647,7 @@
     "signaturePreview": "Firma (se agrega automáticamente)",
     "forwardDialogTitle": "Artículo siguiente",
     "forwardNote": "Nota (opcional)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Artículo de rebote",
     "bounceNewState": "Establecer estado (opcional)",
     "splitDialogTitle": "Dividir en un nuevo billete",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Guardar",
+      "send": "Send",
       "cancel": "Cancelar",
       "selectPlaceholder": "Seleccione…",
       "mergeTargetId": "Fusionarse con el ID del ticket",

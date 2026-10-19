@@ -647,6 +647,7 @@
     "signaturePreview": "امضا (به طور خودکار اضافه می شود)",
     "forwardDialogTitle": "مقاله رو به جلو",
     "forwardNote": "توجه (اختیاری)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "مقاله پرش",
     "bounceNewState": "تنظیم وضعیت (اختیاری)",
     "splitDialogTitle": "تقسیم به بلیط جدید",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "ذخیره کنید",
+      "send": "Send",
       "cancel": "لغو کنید",
       "selectPlaceholder": "انتخاب…",
       "mergeTargetId": "ادغام در شناسه بلیط",

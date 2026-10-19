@@ -647,6 +647,7 @@
     "signaturePreview": "서명(자동으로 추가됨)",
     "forwardDialogTitle": "앞으로 기사",
     "forwardNote": "참고(선택사항)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "바운스 기사",
     "bounceNewState": "상태 설정(선택 사항)",
     "splitDialogTitle": "새 티켓으로 분할",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "저장",
+      "send": "Send",
       "cancel": "취소",
       "selectPlaceholder": "선택…",
       "mergeTargetId": "티켓 ID로 병합",

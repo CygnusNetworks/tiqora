@@ -647,6 +647,7 @@
     "signaturePreview": "Sinatura (anexada automaticamente)",
     "forwardDialogTitle": "Reenviar artigo",
     "forwardNote": "Nota (opcional)",
+    "forwardIncludesOriginal": "The original message and its attachments are sent below your note.",
     "bounceDialogTitle": "Artigo de rebote",
     "bounceNewState": "Establecer estado (opcional)",
     "splitDialogTitle": "Dividido en novo billete",
@@ -807,6 +808,7 @@
     },
     "dialog": {
       "save": "Gardar",
+      "send": "Send",
       "cancel": "Cancelar",
       "selectPlaceholder": "Selecciona…",
       "mergeTargetId": "Combínase coa identificación do ticket",
