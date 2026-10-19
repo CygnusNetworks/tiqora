@@ -140,11 +140,18 @@ export function BounceDialog({
           {t("ticket.replyTo")}
           <input className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
-        {m.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
+        {m.isError && (
+          <p className="text-xs text-danger" data-testid="bounce-error">
+            {m.error instanceof ApiError && (m.error.status === 422 || m.error.status === 502)
+              ? m.error.message
+              : t("ticket.dialog.genericError")}
+          </p>
+        )}
         <DialogActions
           onCancel={onClose}
           onSave={() => m.mutate()}
           disabled={!to.trim() || m.isPending || ticketLock.lockedBy !== null}
+          saveLabel={t("ticket.dialog.send")}
         />
       </div>
     </Dialog>
@@ -360,7 +367,7 @@ function DialogActions({
   onCancel: () => void;
   onSave: () => void;
   disabled: boolean;
-  /** Primary button text; defaults to "Save" (the forward dialog sends a mail instead). */
+  /** Primary button text; defaults to "Save" (forward/bounce send a mail instead). */
   saveLabel?: string;
 }) {
   const { t } = useTranslation();

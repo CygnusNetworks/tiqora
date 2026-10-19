@@ -2134,7 +2134,13 @@ async def bounce_article_endpoint(
     session: DbSession,
     settings: AppSettings,
 ) -> ArticleCreateResponse:
-    """Bounce (resend) an article verbatim to a new recipient. Requires ``rw``."""
+    """Bounce (redirect) an article's mail to a new recipient. Requires ``rw``.
+
+    The original mail goes out unchanged with ``Resent-*`` headers, to the new
+    recipient only; no article is stored (history ``Bounce``), the response
+    carries the source article id. 422 when outbound mail is disabled, 502 on
+    SMTP failure.
+    """
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -2145,7 +2151,7 @@ async def bounce_article_endpoint(
                 to_address=body.to_address,
                 state_id=body.state_id,
             )
-    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+    except (WriteAccessDenied, WriteNotFound, InvalidInput, OutboundMailError) as exc:
         raise _map_exc(exc) from exc
     return ArticleCreateResponse(article_id=aid)
 

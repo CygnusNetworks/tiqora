@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketService
-from tiqora.domain.ticket_write_service import TicketWriteService
+from tiqora.domain.ticket_write_service import InvalidInput, TicketWriteService
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -375,11 +375,13 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         )
         assert fwd_id > 0
 
-        # Bounce → resends article body verbatim, history type Bounce.
-        bounce_id = await svc.bounce_article(
-            ids["agent"], ids["ticket"], ids["article"], to_address="ext2@partner.com"
-        )
-        assert bounce_id > 0
+        # Bounce redirects the original mail by SMTP; with outbound mail off
+        # it is refused instead of pretending (sending: test_agent_email_outbound).
+        with pytest.raises(InvalidInput):
+            async with session.begin_nested():
+                await svc.bounce_article(
+                    ids["agent"], ids["ticket"], ids["article"], to_address="ext2@partner.com"
+                )
 
         # Split → new linked ticket.
         new_ticket_id = await svc.split_article(
@@ -430,7 +432,7 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert merged.merged_into_tn
 
     async with factory() as session:
-        # Forward/Bounce history types present.
+        # Forward history present; the refused bounce left none.
         rows = (
             await session.execute(
                 text(
@@ -443,7 +445,7 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         ).fetchall()
         htypes = {r[0] for r in rows}
         assert "Forward" in htypes
-        assert "Bounce" in htypes
+        assert "Bounce" not in htypes
 
     await engine.dispose()
 

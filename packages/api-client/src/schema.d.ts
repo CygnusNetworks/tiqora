@@ -12213,7 +12213,12 @@ export interface paths {
         put?: never;
         /**
          * Bounce Article Endpoint
-         * @description Bounce (resend) an article verbatim to a new recipient. Requires ``rw``.
+         * @description Bounce (redirect) an article's mail to a new recipient. Requires ``rw``.
+         *
+         *     The original mail goes out unchanged with ``Resent-*`` headers, to the new
+         *     recipient only; no article is stored (history ``Bounce``), the response
+         *     carries the source article id. 422 when outbound mail is disabled, 502 on
+         *     SMTP failure.
          */
         post: operations["bounce_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__bounce_post"];
         delete?: never;

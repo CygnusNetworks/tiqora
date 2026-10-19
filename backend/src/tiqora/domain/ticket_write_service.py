@@ -3654,30 +3654,37 @@ class TicketWriteService:
         to_address: str,
         state_id: int | None = None,
     ) -> int:
-        """Resend the given article's body verbatim to ``to_address``."""
+        """Bounce (redirect) the article's mail to ``to_address`` (Znuny AgentTicketBounce).
+
+        The original mail is sent unchanged with ``Resent-*`` headers to
+        ``to_address`` only (:func:`deliver_bounce`); like Znuny no article is
+        stored, just a ``Bounce`` history row on the source article. Returns
+        the source article id. Raises :class:`InvalidInput` when outbound mail
+        is disabled and ``OutboundMailError`` when the send fails.
+        """
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
-        mime = (
-            await self._session.execute(
-                text(
-                    "SELECT a_subject, a_body, a_content_type FROM article_data_mime"
-                    " WHERE article_id = :aid LIMIT 1"
-                ),
-                {"aid": article_id},
-            )
-        ).first()
-        if mime is None:
-            raise TicketNotFound(f"article {article_id}")
-        aid = await bounce_article(
+        from tiqora.channels.email.outbound_reply import deliver_bounce
+
+        await deliver_bounce(
+            self._session,
+            self._sysconfig,
+            self._resolve_mail_sender(),
+            ticket_id=ticket_id,
+            queue_id=int(t["queue_id"]),
+            article_id=article_id,
+            to_address=to_address,
+        )
+        await history_add(
             self._session,
             ticket_id=ticket_id,
-            subject=str(mime[0] or ""),
-            body=str(mime[1] or ""),
-            content_type=str(mime[2] or "text/plain; charset=utf-8"),
-            to_address=to_address,
+            article_id=article_id,
+            history_type="Bounce",
+            name=f"%%{to_address.strip()}",
             user_id=user_id,
-            sysconfig=self._sysconfig,
         )
+        await invalidate_ticket_cache(self._session, ticket_id)
+        await _emit_event(self._session, "ArticleBounce", ticket_id, {"article_id": article_id})
         if state_id is not None:
             await change_state(
                 self._session,
@@ -3686,7 +3693,7 @@ class TicketWriteService:
                 user_id=user_id,
                 sysconfig=self._sysconfig,
             )
-        return aid
+        return article_id
 
     async def split_article(
         self,

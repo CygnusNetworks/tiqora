@@ -621,6 +621,122 @@ async def test_forward_carries_original_and_attachments(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_bounce_redirects_original_mail_to_target_only(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bounce = Znuny Email::Bounce: original mail + Resent-*, RCPT TO the target alone.
+
+    Regression: bounce stored an agent article and never sent anything. The
+    envelope check matters most — the original To/Cc headers stay on the
+    mail, and header-based delivery would mail the original recipients again.
+    """
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "1")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=9)
+        target = "other919@example.com"
+        engine_sync = create_engine(sync_url)
+        postgres = engine_sync.dialect.name == "postgresql"
+        pdf = b"%PDF-1.4 data"
+        with engine_sync.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO article_data_mime_attachment"
+                    " (article_id, filename, content_size, content_type, content,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:aid, 'Formular.pdf', :sz, 'application/pdf', :c, :t, 1, :t, 1)"
+                ),
+                {
+                    "aid": ids["seed_article"],
+                    "sz": str(len(pdf)),
+                    "c": base64.b64encode(pdf).decode("ascii") if postgres else pdf,
+                    "t": NOW,
+                },
+            )
+        engine_sync.dispose()
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sender = CapturingMailSender()
+
+        async def bounce() -> int:
+            async with factory() as session, session.begin():
+                svc = TicketWriteService(session, factory, _make_sysconfig(), mail_sender=sender)
+                return await svc.bounce_article(
+                    ids["agent"], ids["ticket"], ids["seed_article"], to_address=target
+                )
+
+        # 1) No stored raw mail: rebuilt from the article, original headers kept.
+        assert await bounce() == ids["seed_article"]
+        msg = sender.sent[0]
+        assert sender.envelope_recipients[0] == [target]
+        assert sender.envelope_senders[0] == ids["support_email"]
+        assert msg["Resent-To"] == target
+        assert msg["Resent-From"] == ids["support_email"]
+        assert msg["Resent-Message-ID"] and msg["Resent-Date"]
+        assert msg["From"] == ids["customer_email"]
+        assert msg["To"] == ids["support_email"]
+        assert msg["Subject"] == "Help please"
+        assert msg["Message-ID"] == ids["orig_mid"]
+        body_part = msg.get_body(("plain",))
+        assert body_part is not None and "I need help" in body_part.get_content()
+        sent_files = [
+            (p.get_filename(), p.get_payload(decode=True)) for p in msg.iter_attachments()
+        ]
+        assert sent_files == [("Formular.pdf", pdf)]
+
+        # 2) Stored raw mail: sent byte for byte behind the Resent-* lines.
+        raw = (
+            f"From: {ids['customer_email']}\r\nTo: {ids['support_email']}\r\n"
+            f"Subject: Help please\r\nMessage-ID: {ids['orig_mid']}\r\n\r\nI need help\r\n"
+        )
+        engine_sync = create_engine(sync_url)
+        with engine_sync.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO article_data_mime_plain"
+                    " (article_id, body, create_time, create_by, change_time, change_by)"
+                    " VALUES (:aid, :b, :t, 1, :t, 1)"
+                ),
+                {"aid": ids["seed_article"], "b": raw if postgres else raw.encode(), "t": NOW},
+            )
+        engine_sync.dispose()
+        await bounce()
+        msg = sender.sent[1]
+        assert sender.envelope_recipients[1] == [target]
+        wire = msg.tiqora_raw  # type: ignore[attr-defined]
+        assert wire.startswith(b"Resent-Message-ID: ")
+        assert f"Resent-To: {target}\r\n".encode() in wire
+        assert wire.endswith(raw.encode())
+
+        async with factory() as session:
+            history = (
+                await session.execute(
+                    text(
+                        "SELECT h.name, h.article_id FROM ticket_history h"
+                        " JOIN ticket_history_type t ON t.id = h.history_type_id"
+                        " WHERE h.ticket_id = :tid AND t.name = 'Bounce'"
+                    ),
+                    {"tid": ids["ticket"]},
+                )
+            ).all()
+            assert [tuple(r) for r in history] == [(f"%%{target}", ids["seed_article"])] * 2
+            articles = (
+                await session.execute(
+                    text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
+                    {"tid": ids["ticket"]},
+                )
+            ).scalar()
+            assert articles == 1, "a bounce stores no article (Znuny)"
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_agent_email_smtp_failure_raises_no_silent_success(
     url_fixture: str,
     request: pytest.FixtureRequest,

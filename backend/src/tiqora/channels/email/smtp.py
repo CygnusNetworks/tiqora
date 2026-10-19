@@ -237,8 +237,16 @@ class SmtpMailSender:
         message = apply_outbound_headers(message, added)
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
-        explicit = envelope_recipients(message, self.sendmail_bcc)
-        header = _header_recipients(message)
+        # A bounce (Resent-*) keeps the original To/Cc headers; its envelope is
+        # the bounce target alone, without SendmailBcc (Znuny Email::Bounce).
+        envelope_to = getattr(message, "tiqora_envelope_to", None)
+        explicit: list[str] | None
+        if envelope_to:
+            explicit = list(envelope_to)
+            header = list(envelope_to)
+        else:
+            explicit = envelope_recipients(message, self.sendmail_bcc)
+            header = _header_recipients(message)
         candidates = explicit if explicit is not None else header
         kept = drop_invalid_tld(candidates, context="smtp_send")
         if len(kept) != len(candidates):
@@ -302,12 +310,16 @@ class CapturingMailSender:
     def __init__(self) -> None:
         self.sent: list[EmailMessage] = []
         self.envelope_senders: list[str | None] = []
+        # ``tiqora_envelope_to`` per message (``None`` = header recipients).
+        self.envelope_recipients: list[list[str] | None] = []
         self.last_smtp_code: int | None = 250
         self.last_smtp_detail: str | None = "250 OK (captured)"
 
     async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
         self.sent.append(message)
         self.envelope_senders.append(envelope_from)
+        envelope_to = getattr(message, "tiqora_envelope_to", None)
+        self.envelope_recipients.append(list(envelope_to) if envelope_to else None)
 
 
 class FailingMailSender:

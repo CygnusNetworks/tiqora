@@ -115424,7 +115424,7 @@
     },
     "/api/v1/tickets/{ticket_id}/articles/{article_id}/bounce": {
       "post": {
-        "description": "Bounce (resend) an article verbatim to a new recipient. Requires ``rw``.",
+        "description": "Bounce (redirect) an article's mail to a new recipient. Requires ``rw``.\n\nThe original mail goes out unchanged with ``Resent-*`` headers, to the new\nrecipient only; no article is stored (history ``Bounce``), the response\ncarries the source article id. 422 when outbound mail is disabled, 502 on\nSMTP failure.",
         "operationId": "bounce_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__bounce_post",
         "parameters": [
           {

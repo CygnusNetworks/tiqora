@@ -2122,8 +2122,9 @@ async def ticket_forward(
 
 @mcp.tool(
     description=(
-        "Bounce (resend verbatim) an existing article to a new recipient. "
-        "History type Bounce. Requires to_address and rw on the queue."
+        "Bounce (redirect) an existing article's mail unchanged to a new recipient "
+        "(Resent-* headers, no new article). History type Bounce. Requires "
+        "to_address, rw on the queue and enabled outbound mail."
     )
 )
 async def ticket_bounce(
@@ -2133,7 +2134,7 @@ async def ticket_bounce(
     to_address: str,
     state_id: int | None = None,
 ) -> dict[str, Any]:
-    """Resend an article's body verbatim to ``to_address``.
+    """Redirect an article's mail unchanged to ``to_address``.
 
     Args:
         ticket_id: Ticket that owns the article.
@@ -2167,6 +2168,12 @@ async def ticket_bounce(
             }
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
+        except Exception as e:  # bounce is sent by SMTP now
+            from tiqora.channels.email.outbound_reply import OutboundMailError
+
+            if isinstance(e, OutboundMailError):
+                return {"error": f"Outbound email delivery failed: {e}"}
+            raise
 
 
 # ---------------------------------------------------------------------------

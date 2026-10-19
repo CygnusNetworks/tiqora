@@ -26,6 +26,7 @@ import socket
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
+from datetime import UTC
 from email.message import EmailMessage
 from typing import TYPE_CHECKING, Any
 
@@ -38,11 +39,12 @@ from tiqora.channels.email.smtp import MailSender, build_message, message_id_dom
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.subject_hook import load_subject_config
-from tiqora.domain.ticket_write_service import ArticleIn, InvalidInput, add_article
+from tiqora.domain.ticket_write_service import ArticleIn, InvalidInput, TicketNotFound, add_article
 from tiqora.znuny.sysconfig import SysConfig
 
 if TYPE_CHECKING:
     from tiqora.crypto.mime_build import SecuredMessage
+    from tiqora.domain.mail_outbound import ResolvedOutboundSmtp
 
 logger = structlog.get_logger(__name__)
 
@@ -401,6 +403,179 @@ async def secure_agent_email(
         raise OutboundMailError(f"{plan.backend} signing/encryption failed: {exc}") from exc
 
 
+async def _outbound_sender(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    mail_sender: MailSender | None,
+    resolved: ResolvedOutboundSmtp,
+) -> MailSender:
+    """The injected *mail_sender*, else an SMTP sender from DB outbound settings or env."""
+    from tiqora.channels.email.smtp import SmtpMailSender
+
+    if mail_sender is not None:
+        return mail_sender
+    sendmail_bcc = await sysconfig.sendmail_bcc()
+    if resolved.enabled:
+        oauth_gen = None
+        if resolved.auth_type == "oauth2_token" and resolved.oauth2_token_config_id is not None:
+            from tiqora.domain.mail_outbound import make_oauth_token_generator
+
+            oauth_gen = make_oauth_token_generator(session, resolved.oauth2_token_config_id)
+        return SmtpMailSender.from_resolved(
+            resolved, sendmail_bcc=sendmail_bcc, oauth_token_generator=oauth_gen
+        )
+    # Explicit dispatch=True without resolved config: env-shaped default.
+    from tiqora.config import get_settings
+
+    return SmtpMailSender(get_settings(), sendmail_bcc=sendmail_bcc)
+
+
+async def deliver_bounce(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    mail_sender: MailSender | None,
+    *,
+    ticket_id: int,
+    queue_id: int,
+    article_id: int,
+    to_address: str,
+) -> None:
+    """Bounce (redirect) an article's mail to *to_address* (Znuny ``Email::Bounce``).
+
+    The original mail goes out unchanged — its From/To/Cc/Subject/Message-ID
+    stay — with ``Resent-Message-ID/-To/-From/-Date`` added (RFC 5322 3.6.6).
+    Envelope: MAIL FROM is the queue's system address, RCPT TO is
+    *to_address* alone (no SendmailBcc), so the original recipients are not
+    mailed again. The stored raw mail is sent byte for byte when there is one,
+    else the mail is rebuilt from the article (body + attachments). Nothing is
+    stored as an article; with outbound mail disabled the bounce is refused.
+    """
+    from email.utils import format_datetime, getaddresses, localtime
+
+    from tiqora.crypto.article_view import load_raw_mail
+    from tiqora.domain.mail_outbound import resolve_outbound_smtp
+
+    target = [addr for _name, addr in getaddresses([to_address]) if addr]
+    if not target:
+        raise InvalidInput("Bounce requires to_address")
+    resolved = await resolve_outbound_smtp(session)
+    if not resolved.enabled:
+        raise InvalidInput("Outbound mail is disabled; an article cannot be bounced")
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT a.ticket_id, a.create_time, m.a_from, m.a_to, m.a_cc, m.a_reply_to,"
+                    " m.a_subject, m.a_message_id, m.a_in_reply_to, m.a_references,"
+                    " m.a_content_type, m.a_body"
+                    " FROM article a JOIN article_data_mime m ON m.article_id = a.id"
+                    " WHERE a.id = :aid"
+                ),
+                {"aid": article_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None or int(row["ticket_id"]) != ticket_id:
+        raise TicketNotFound(f"article {article_id}")
+
+    from_line, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
+    resent_from = next((a for _n, a in getaddresses([from_line]) if a), "")
+    resent_id = generate_message_id(domain=message_id_domain(resent_from))
+    resent = {
+        "Resent-Message-ID": resent_id,
+        "Resent-To": ", ".join(target),
+        "Resent-From": resent_from,
+        "Resent-Date": format_datetime(localtime()),
+    }
+
+    raw = await load_raw_mail(session, article_id)
+    if raw:
+        from email import message_from_bytes
+        from email.policy import default as default_policy
+
+        message = message_from_bytes(raw, policy=default_policy)
+        assert isinstance(message, EmailMessage)
+        newline = b"\r\n" if raw.find(b"\r\n") != -1 else b"\n"
+        prefix = b"".join(f"{name}: {value}".encode() + newline for name, value in resent.items())
+        message.tiqora_raw = prefix + raw  # type: ignore[attr-defined]
+        for name, value in resent.items():
+            message[name] = value
+    else:
+        body = row["a_body"]
+        if isinstance(body, (bytes, bytearray, memoryview)):
+            body = bytes(body).decode("utf-8", "replace")
+        message = build_message(
+            from_addr=str(row["a_from"] or resent_from),
+            to_addrs=str(row["a_to"] or ""),
+            cc_addrs=row["a_cc"] or None,
+            reply_to=row["a_reply_to"] or None,
+            subject=str(row["a_subject"] or ""),
+            body=str(body or ""),
+            content_type=str(row["a_content_type"] or "text/plain; charset=utf-8"),
+            in_reply_to=row["a_in_reply_to"] or None,
+            references=row["a_references"] or None,
+            message_id=row["a_message_id"] or None,
+            loop_hint=False,
+            attachments=await _stored_attachments(session, article_id),
+        )
+        if row["create_time"] is not None:
+            del message["Date"]
+            message["Date"] = format_datetime(row["create_time"].replace(tzinfo=UTC))
+        for name, value in resent.items():
+            message[name] = value
+    message.tiqora_envelope_to = target  # type: ignore[attr-defined]
+
+    sender = await _outbound_sender(session, sysconfig, mail_sender, resolved)
+    subject = str(row["a_subject"] or "")
+    t0 = time.perf_counter()
+    try:
+        await sender.send(message, envelope_from=resent_from or None)
+    except Exception as exc:
+        logger.exception("bounce_smtp_failed", ticket_id=ticket_id, article_id=article_id)
+        await write_mail_log(
+            session,
+            direction="out",
+            status="failed",
+            from_addr=resent_from,
+            to_addr=", ".join(target),
+            subject=subject,
+            message_id=resent_id,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            queue=queue_name,
+            detail=str(exc),
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+        )
+        raise OutboundMailError(f"SMTP send failed: {exc}") from exc
+    smtp_code = getattr(sender, "last_smtp_code", None)
+    smtp_detail = getattr(sender, "last_smtp_detail", None)
+    await write_mail_log(
+        session,
+        direction="out",
+        status="sent",
+        from_addr=resent_from,
+        to_addr=", ".join(target),
+        subject=subject,
+        message_id=resent_id,
+        ticket_id=ticket_id,
+        article_id=article_id,
+        queue=queue_name,
+        smtp_code=smtp_code if isinstance(smtp_code, int) else None,
+        detail=str(smtp_detail) if smtp_detail else None,
+        duration_ms=int((time.perf_counter() - t0) * 1000),
+    )
+    logger.info(
+        "article_bounced",
+        ticket_id=ticket_id,
+        article_id=article_id,
+        to=", ".join(target),
+        raw=bool(raw),
+    )
+
+
 async def send_prepared_agent_email(
     mail_sender: MailSender,
     article: ArticleIn,
@@ -499,7 +674,6 @@ async def deliver_agent_email_reply(
     ``agent_email_not_dispatched`` — never attempt SMTP, never 502. Production
     often has no relay; losing the agent's typed text is worse than not sending.
     """
-    from tiqora.channels.email.smtp import SmtpMailSender
     from tiqora.domain.mail_outbound import resolve_outbound_smtp
 
     prepared = await prepare_outgoing_agent_email(
@@ -535,24 +709,7 @@ async def deliver_agent_email_reply(
         queue_name = None
 
     if should_dispatch:
-        sendmail_bcc = await sysconfig.sendmail_bcc()
-        sender: MailSender
-        if mail_sender is not None:
-            sender = mail_sender
-        elif resolved.enabled:
-            oauth_gen = None
-            if resolved.auth_type == "oauth2_token" and resolved.oauth2_token_config_id is not None:
-                from tiqora.domain.mail_outbound import make_oauth_token_generator
-
-                oauth_gen = make_oauth_token_generator(session, resolved.oauth2_token_config_id)
-            sender = SmtpMailSender.from_resolved(
-                resolved, sendmail_bcc=sendmail_bcc, oauth_token_generator=oauth_gen
-            )
-        else:
-            # Explicit dispatch=True without resolved config: env-shaped default.
-            from tiqora.config import get_settings
-
-            sender = SmtpMailSender(get_settings(), sendmail_bcc=sendmail_bcc)
+        sender = await _outbound_sender(session, sysconfig, mail_sender, resolved)
         t0 = time.perf_counter()
         try:
             await send_prepared_agent_email(
