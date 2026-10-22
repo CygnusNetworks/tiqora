@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· klient dostaje potwierdzenie przyjęcia",
       "autoReplyNo": "· bez potwierdzenia",
       "autoReplyNoCustomer": "· bez potwierdzenia (brak klienta)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "odebrane {{time}}",
       "endedAt": "zakończone {{time}}"
     },

@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· müşteri alındı onayını alır",
       "autoReplyNo": "· alındı onayı yok",
       "autoReplyNoCustomer": "· alındı onayı yok (müşteri yok)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "{{time}} yanıtlandı",
       "endedAt": "{{time}} bitti"
     },

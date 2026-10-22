@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· klant ontvangt de ontvangstbevestiging",
       "autoReplyNo": "· geen ontvangstbevestiging",
       "autoReplyNoCustomer": "· geen ontvangstbevestiging (geen klant)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "opgenomen om {{time}}",
       "endedAt": "beëindigd om {{time}}"
     },

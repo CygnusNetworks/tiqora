@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· 顧客に受付確認を送信",
       "autoReplyNo": "· 受付確認なし",
       "autoReplyNoCustomer": "· 受付確認なし（顧客なし）",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "{{time}} に応答",
       "endedAt": "{{time}} に終了"
     },

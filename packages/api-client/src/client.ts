@@ -827,6 +827,8 @@ export type ComposeContext = {
   signature: string;
   signature_is_html: boolean;
   rich_text: boolean;
+  /** An inbound phone ticket in this queue sends the queue's "auto reply". */
+  auto_reply: boolean;
 };
 
 /** Compact ticket hit for agent link/merge pickers (GET /api/v1/tickets/search). */

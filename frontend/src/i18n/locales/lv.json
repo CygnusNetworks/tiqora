@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· klients saņem apstiprinājumu",
       "autoReplyNo": "· bez apstiprinājuma",
       "autoReplyNoCustomer": "· bez apstiprinājuma (nav klienta)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "atbildēts {{time}}",
       "endedAt": "beidzies {{time}}"
     },

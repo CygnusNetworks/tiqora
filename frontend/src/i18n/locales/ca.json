@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· el client rep la confirmació de recepció",
       "autoReplyNo": "· sense confirmació de recepció",
       "autoReplyNoCustomer": "· sense confirmació de recepció (sense client)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "atesa {{time}}",
       "endedAt": "acabada {{time}}"
     },

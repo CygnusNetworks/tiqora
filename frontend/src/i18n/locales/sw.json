@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· mteja anapokea uthibitisho wa kupokea",
       "autoReplyNo": "· hakuna uthibitisho wa kupokea",
       "autoReplyNoCustomer": "· hakuna uthibitisho wa kupokea (hakuna mteja)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "ilipokelewa {{time}}",
       "endedAt": "ilimalizika {{time}}"
     },

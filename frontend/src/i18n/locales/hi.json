@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· ग्राहक को पावती मिलती है",
       "autoReplyNo": "· कोई पावती नहीं",
       "autoReplyNoCustomer": "· कोई पावती नहीं (कोई ग्राहक नहीं)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "{{time}} पर उत्तर",
       "endedAt": "{{time}} पर समाप्त"
     },

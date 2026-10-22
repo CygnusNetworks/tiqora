@@ -18,6 +18,7 @@ function renderStrip(props: Partial<React.ComponentProps<typeof PhoneCallStrip>>
         running
         onToggleTimer={onToggleTimer}
         hasCustomer
+        queueAutoReply
         {...props}
       />
     </I18nextProvider>,
@@ -55,6 +56,18 @@ describe("PhoneCallStrip", () => {
     expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
       "no acknowledgement (no customer)",
     );
+  });
+
+  it("an inbound call to a queue without an auto reply sends no acknowledgement", () => {
+    renderStrip({ queueAutoReply: false });
+    expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
+      "no acknowledgement (none set up for the queue)",
+    );
+  });
+
+  it("promises nothing while the queue's auto reply is unknown", () => {
+    renderStrip({ queueAutoReply: undefined });
+    expect(screen.queryByTestId("new-ticket-autoreply-hint")).not.toBeInTheDocument();
   });
 
   it("carries the number and the call timer with pause", () => {

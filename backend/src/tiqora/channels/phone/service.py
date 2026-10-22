@@ -330,6 +330,29 @@ def _truthy(value: Any) -> bool:
     return bool(value)
 
 
+async def phone_ticket_auto_response_configured(
+    session: AsyncSession, sysconfig: SysConfig, queue_id: int
+) -> bool:
+    """Whether an inbound phone ticket in *queue_id* gets the "auto reply":
+    ``AutoResponseForWebTickets`` on and an "auto reply" assigned to the
+    queue -- the same lookup ``send_auto_response`` makes. The customer's
+    address and the outbound relay are checked at send time only."""
+    if not _truthy(await sysconfig.get("AutoResponseForWebTickets", 1)):
+        return False
+    row = (
+        await session.execute(
+            text(
+                "SELECT 1 FROM queue_auto_response qar"
+                " JOIN auto_response ar ON ar.id = qar.auto_response_id"
+                " JOIN auto_response_type art ON art.id = ar.type_id"
+                " WHERE qar.queue_id = :qid AND art.name = 'auto reply' LIMIT 1"
+            ),
+            {"qid": queue_id},
+        )
+    ).first()
+    return row is not None
+
+
 async def send_phone_ticket_auto_response(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],

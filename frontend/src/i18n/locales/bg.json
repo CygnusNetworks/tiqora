@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· клиентът получава потвърждение за получаване",
       "autoReplyNo": "· без потвърждение за получаване",
       "autoReplyNoCustomer": "· без потвърждение за получаване (няма клиент)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "прието {{time}}",
       "endedAt": "приключило {{time}}"
     },

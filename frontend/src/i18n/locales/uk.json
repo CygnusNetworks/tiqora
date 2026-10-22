@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· замовник отримає підтвердження отримання",
       "autoReplyNo": "· без підтвердження отримання",
       "autoReplyNoCustomer": "· без підтвердження отримання (немає замовника)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "прийнято {{time}}",
       "endedAt": "завершено {{time}}"
     },

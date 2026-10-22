@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· مشتری تأیید دریافت را می‌گیرد",
       "autoReplyNo": "· بدون تأیید دریافت",
       "autoReplyNoCustomer": "· بدون تأیید دریافت (بدون مشتری)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "پذیرفته‌شده {{time}}",
       "endedAt": "پایان {{time}}"
     },

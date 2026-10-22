@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· клиент получит подтверждение приёма",
       "autoReplyNo": "· без подтверждения приёма",
       "autoReplyNoCustomer": "· без подтверждения приёма (нет клиента)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "принят {{time}}",
       "endedAt": "завершён {{time}}"
     },

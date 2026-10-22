@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· pelanggan menerima konfirmasi penerimaan",
       "autoReplyNo": "· tanpa konfirmasi penerimaan",
       "autoReplyNoCustomer": "· tanpa konfirmasi penerimaan (tanpa pelanggan)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "dijawab {{time}}",
       "endedAt": "berakhir {{time}}"
     },

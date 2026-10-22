@@ -48,6 +48,7 @@ export function PhoneCallStrip({
   running,
   onToggleTimer,
   hasCustomer,
+  queueAutoReply,
 }: {
   direction: CallDirection;
   onDirectionChange: (d: CallDirection) => void;
@@ -62,9 +63,22 @@ export function PhoneCallStrip({
   onToggleTimer: () => void;
   /** Without a customer nobody gets the acknowledgement, whatever the direction. */
   hasCustomer: boolean;
+  /** The queue has an "auto reply" (and it is switched on); undefined while unknown. */
+  queueAutoReply?: boolean;
 }) {
   const { t } = useTranslation();
   const inbound = direction === "inbound";
+  // Same order as the send path: direction, then the queue's auto reply, then
+  // the recipient. Nothing while the queue's setting is still unknown.
+  const autoReplyHint = !inbound
+    ? "newTicket.call.autoReplyNo"
+    : queueAutoReply === false
+      ? "newTicket.call.autoReplyNoQueue"
+      : !hasCustomer
+        ? "newTicket.call.autoReplyNoCustomer"
+        : queueAutoReply
+          ? "newTicket.call.autoReplyYes"
+          : null;
   const meta = [
     answeredAt !== undefined ? t("newTicket.call.answeredAt", { time: clock(answeredAt) }) : null,
     endedAt !== undefined ? t("newTicket.call.endedAt", { time: clock(endedAt) }) : null,
@@ -119,13 +133,11 @@ export function PhoneCallStrip({
           </button>
         </span>
       )}
-      <span className="text-[12px] text-muted" data-testid="new-ticket-autoreply-hint">
-        {!inbound
-          ? t("newTicket.call.autoReplyNo")
-          : hasCustomer
-            ? t("newTicket.call.autoReplyYes")
-            : t("newTicket.call.autoReplyNoCustomer")}
-      </span>
+      {autoReplyHint !== null && (
+        <span className="text-[12px] text-muted" data-testid="new-ticket-autoreply-hint">
+          {t(autoReplyHint)}
+        </span>
+      )}
       {number.trim() !== "" && (
         <span className="font-mono text-[13px] text-ink" data-testid="phone-call-strip-number">
           {number}

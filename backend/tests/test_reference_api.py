@@ -341,6 +341,41 @@ async def test_reference_compose_context(mariadb_znuny_url: str) -> None:
     # to the endpoint's own default (true), same as ZNUNY_SETTING_DEFAULTS
     # fallback semantics for unknown keys.
     assert body["rich_text"] is True
+    # No "auto reply" assigned to the queue: an inbound phone ticket sends none.
+    assert body["auto_reply"] is False
+
+
+@pytest.mark.asyncio
+async def test_reference_compose_context_auto_reply_assigned(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        # auto_response 1 is Znuny's seeded "default reply" of type "auto reply".
+        conn.execute(
+            text(
+                "INSERT INTO queue_auto_response (queue_id, auto_response_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:qid, 1, :t, 1, :t, 1)"
+            ),
+            {"qid": ids["queue_id"], "t": NOW},
+        )
+    try:
+        client, aengine = await _client_for(mariadb_znuny_url, ids)
+        async with client:
+            resp = await client.get(
+                "/api/v1/reference/compose-context", params={"queue_id": ids["queue_id"]}
+            )
+        await aengine.dispose()
+    finally:
+        # The DB is shared: _seed's cleanup deletes the queue, which this row blocks.
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM queue_auto_response WHERE queue_id = :qid"),
+                {"qid": ids["queue_id"]},
+            )
+        engine.dispose()
+    assert resp.status_code == 200
+    assert resp.json()["auto_reply"] is True
 
 
 @pytest.mark.asyncio

@@ -17798,6 +17798,11 @@ export interface components {
         };
         /** ComposeContextOut */
         ComposeContextOut: {
+            /**
+             * Auto Reply
+             * @default false
+             */
+            auto_reply: boolean;
             /** From Address */
             from_address: string;
             /**

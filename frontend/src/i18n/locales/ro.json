@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· clientul primește confirmarea de primire",
       "autoReplyNo": "· fără confirmare de primire",
       "autoReplyNoCustomer": "· fără confirmare de primire (fără client)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "preluat la {{time}}",
       "endedAt": "încheiat la {{time}}"
     },

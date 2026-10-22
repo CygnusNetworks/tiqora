@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· le client reçoit l'accusé de réception",
       "autoReplyNo": "· pas d'accusé de réception",
       "autoReplyNoCustomer": "· pas d'accusé de réception (pas de client)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "répondu à {{time}}",
       "endedAt": "terminé à {{time}}"
     },

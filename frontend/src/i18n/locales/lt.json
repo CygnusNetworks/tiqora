@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· klientas gauna gavimo patvirtinimą",
       "autoReplyNo": "· be gavimo patvirtinimo",
       "autoReplyNoCustomer": "· be gavimo patvirtinimo (nėra kliento)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "atsiliepta {{time}}",
       "endedAt": "baigta {{time}}"
     },

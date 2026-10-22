@@ -12971,6 +12971,11 @@
       },
       "ComposeContextOut": {
         "properties": {
+          "auto_reply": {
+            "default": false,
+            "title": "Auto Reply",
+            "type": "boolean"
+          },
           "from_address": {
             "title": "From Address",
             "type": "string"

@@ -19,6 +19,7 @@ from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.channels.common import channel_setting
 from tiqora.channels.email.outbound_reply import queue_outbound_meta
 from tiqora.channels.email.placeholder import expand_placeholders
+from tiqora.channels.phone.service import phone_ticket_auto_response_configured
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.queue import Queue, Service, ServiceSla, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType, TicketType
@@ -174,6 +175,9 @@ class ComposeContextOut(BaseModel):
     signature: str = ""
     signature_is_html: bool = False
     rich_text: bool = True
+    #: An inbound phone ticket here sends the queue's "auto reply" (on and
+    #: assigned) -- drives the hint next to the call direction.
+    auto_reply: bool = False
 
 
 @router.get("/priorities", response_model=list[PriorityRefOut])
@@ -616,6 +620,7 @@ async def compose_context(
         signature=signature,
         signature_is_html="html" in (sig_ct or "").lower(),
         rich_text=rich_text,
+        auto_reply=await phone_ticket_auto_response_configured(session, sysconfig, queue_id),
     )
 
 

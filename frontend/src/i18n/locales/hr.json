@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· kupac dobiva potvrdu primitka",
       "autoReplyNo": "· bez potvrde primitka",
       "autoReplyNoCustomer": "· bez potvrde primitka (nema kupca)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "preuzeto {{time}}",
       "endedAt": "završeno {{time}}"
     },

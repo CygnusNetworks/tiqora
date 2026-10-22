@@ -752,6 +752,7 @@ export function NewTicketPage() {
                 running={timer.running}
                 onToggleTimer={timer.running ? timer.pause : timer.resume}
                 hasCustomer={customer !== null}
+                queueAutoReply={composeContextQ.data?.auto_reply}
               />
             )}
             {ticketType === "phone" && (

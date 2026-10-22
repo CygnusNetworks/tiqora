@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· ο πελάτης λαμβάνει τη βεβαίωση παραλαβής",
       "autoReplyNo": "· χωρίς βεβαίωση παραλαβής",
       "autoReplyNoCustomer": "· χωρίς βεβαίωση παραλαβής (χωρίς πελάτη)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "απαντήθηκε {{time}}",
       "endedAt": "έληξε {{time}}"
     },

@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· asiakas saa vastaanottokuittauksen",
       "autoReplyNo": "· ei vastaanottokuittausta",
       "autoReplyNoCustomer": "· ei vastaanottokuittausta (ei asiakasta)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "vastattu {{time}}",
       "endedAt": "päättyi {{time}}"
     },

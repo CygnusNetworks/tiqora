@@ -186,6 +186,7 @@ const composeContext = {
   signature: "",
   signature_is_html: false,
   rich_text: false,
+  auto_reply: true,
 };
 const customer = {
   login: "jane.doe",
@@ -827,6 +828,18 @@ describe("NewTicketPage property bar and queue default", () => {
     await waitFor(() =>
       expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
         "customer gets the acknowledgement",
+      ),
+    );
+  });
+
+  it("the inbound hint says so when the queue has no auto reply", async () => {
+    getComposeContext.mockResolvedValue({ ...composeContext, auto_reply: false });
+    searchParams.current = { type: "phone" };
+    await renderReady();
+    await pick("jane.doe");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
+        "no acknowledgement (none set up for the queue)",
       ),
     );
   });

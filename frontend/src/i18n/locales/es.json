@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· el cliente recibe el acuse de recibo",
       "autoReplyNo": "· sin acuse de recibo",
       "autoReplyNoCustomer": "· sin acuse de recibo (sin cliente)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "contestada a las {{time}}",
       "endedAt": "finalizada a las {{time}}"
     },

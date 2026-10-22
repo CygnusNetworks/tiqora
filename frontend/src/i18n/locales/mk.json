@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· клиентот ја добива потврдата за прием",
       "autoReplyNo": "· нема потврда за прием",
       "autoReplyNoCustomer": "· нема потврда за прием (нема клиент)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "примиен {{time}}",
       "endedAt": "завршен {{time}}"
     },

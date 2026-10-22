@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· il cliente riceve la conferma di ricezione",
       "autoReplyNo": "· nessuna conferma di ricezione",
       "autoReplyNoCustomer": "· nessuna conferma di ricezione (nessun cliente)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "risposta alle {{time}}",
       "endedAt": "terminata alle {{time}}"
     },

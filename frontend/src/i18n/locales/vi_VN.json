@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· khách hàng nhận được xác nhận",
       "autoReplyNo": "· không có xác nhận",
       "autoReplyNoCustomer": "· không có xác nhận (không có khách hàng)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "đã trả lời lúc {{time}}",
       "endedAt": "đã kết thúc lúc {{time}}"
     },

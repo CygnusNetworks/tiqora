@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· Kunde bekommt die Eingangsbestätigung",
       "autoReplyNo": "· keine Eingangsbestätigung",
       "autoReplyNoCustomer": "· keine Eingangsbestätigung (kein Kunde)",
+      "autoReplyNoQueue": "· keine Eingangsbestätigung (für die Queue keine eingerichtet)",
       "answeredAt": "{{time}} angenommen",
       "endedAt": "beendet {{time}}"
     },

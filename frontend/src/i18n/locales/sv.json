@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· kunden får mottagningsbekräftelsen",
       "autoReplyNo": "· ingen mottagningsbekräftelse",
       "autoReplyNoCustomer": "· ingen mottagningsbekräftelse (ingen kund)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "svarade {{time}}",
       "endedAt": "avslutades {{time}}"
     },

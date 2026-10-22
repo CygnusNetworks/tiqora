@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· 고객이 접수 확인을 받습니다",
       "autoReplyNo": "· 접수 확인 없음",
       "autoReplyNoCustomer": "· 접수 확인 없음(고객 없음)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "{{time}}에 응답",
       "endedAt": "{{time}}에 종료"
     },

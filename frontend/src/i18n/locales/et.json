@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· klient saab kinnituse",
       "autoReplyNo": "· kinnitust ei saadeta",
       "autoReplyNoCustomer": "· kinnitust ei saadeta (klienti ei ole)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "vastatud {{time}}",
       "endedAt": "lõppenud {{time}}"
     },

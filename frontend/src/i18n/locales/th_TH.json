@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· ลูกค้าจะได้รับข้อความตอบรับ",
       "autoReplyNo": "· ไม่มีข้อความตอบรับ",
       "autoReplyNoCustomer": "· ไม่มีข้อความตอบรับ (ไม่มีลูกค้า)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "รับสายเมื่อ {{time}}",
       "endedAt": "สิ้นสุดเมื่อ {{time}}"
     },

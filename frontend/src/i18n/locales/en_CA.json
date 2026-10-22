@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· customer gets the acknowledgement",
       "autoReplyNo": "· no acknowledgement",
       "autoReplyNoCustomer": "· no acknowledgement (no customer)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "answered {{time}}",
       "endedAt": "ended {{time}}"
     },

@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· kunden får kvitteringen",
       "autoReplyNo": "· ingen kvittering",
       "autoReplyNoCustomer": "· ingen kvittering (ingen kunde)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "besvart {{time}}",
       "endedAt": "avsluttet {{time}}"
     },

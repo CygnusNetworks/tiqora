@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· az ügyfél megkapja a visszaigazolást",
       "autoReplyNo": "· nincs visszaigazolás",
       "autoReplyNoCustomer": "· nincs visszaigazolás (nincs ügyfél)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "fogadva: {{time}}",
       "endedAt": "vége: {{time}}"
     },

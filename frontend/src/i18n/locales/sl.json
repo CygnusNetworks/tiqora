@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· stranka prejme potrdilo o prejemu",
       "autoReplyNo": "· brez potrdila o prejemu",
       "autoReplyNoCustomer": "· brez potrdila o prejemu (ni stranke)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "sprejeto {{time}}",
       "endedAt": "končano {{time}}"
     },

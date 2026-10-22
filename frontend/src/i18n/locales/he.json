@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· הלקוח מקבל אישור קבלה",
       "autoReplyNo": "· ללא אישור קבלה",
       "autoReplyNoCustomer": "· ללא אישור קבלה (אין לקוח)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "נענתה ב־{{time}}",
       "endedAt": "הסתיימה ב־{{time}}"
     },

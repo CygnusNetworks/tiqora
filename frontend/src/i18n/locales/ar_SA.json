@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· يتلقى العميل إشعار الاستلام",
       "autoReplyNo": "· بلا إشعار استلام",
       "autoReplyNoCustomer": "· بلا إشعار استلام (لا يوجد عميل)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "تم الرد {{time}}",
       "endedAt": "انتهت {{time}}"
     },

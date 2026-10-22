@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· 客户会收到确认回执",
       "autoReplyNo": "· 不发送确认回执",
       "autoReplyNoCustomer": "· 不发送确认回执（无客户）",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "{{time}} 接听",
       "endedAt": "{{time}} 结束"
     },

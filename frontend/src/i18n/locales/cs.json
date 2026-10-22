@@ -1347,6 +1347,7 @@
       "autoReplyYes": "· zákazník dostane potvrzení přijetí",
       "autoReplyNo": "· bez potvrzení přijetí",
       "autoReplyNoCustomer": "· bez potvrzení přijetí (žádný zákazník)",
+      "autoReplyNoQueue": "· no acknowledgement (none set up for the queue)",
       "answeredAt": "přijato {{time}}",
       "endedAt": "ukončeno {{time}}"
     },
