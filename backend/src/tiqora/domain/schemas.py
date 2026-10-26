@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from email.utils import getaddresses, parseaddr
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema, field_validator
 
 from tiqora.crypto.attachment_kind import CryptoKind
 from tiqora.crypto.compose import EmailSecurityIn
@@ -638,6 +639,42 @@ class CustomerTicketItem(BaseModel):
 class CustomerTicketsOut(BaseModel):
     login: str
     tickets: list[CustomerTicketItem]
+
+
+class OutboundTicketIn(BaseModel):
+    """Create a ticket with one outgoing e-mail (``POST /integrations/outbound-ticket``)."""
+
+    queue: str = Field(min_length=1, max_length=200)
+    to_address: str = Field(min_length=1, max_length=320)
+    """Exactly one e-mail address (a display name is allowed, a list is not)."""
+    subject: str = Field(min_length=1, max_length=250)
+    body: str = Field(min_length=1, max_length=100000)
+    customer_user_id: str | None = Field(default=None, max_length=250)
+    close: bool = True
+    """Set the ticket to ``closed successful`` after the mail went out."""
+
+    @field_validator("to_address")
+    @classmethod
+    def _single_address(cls, value: str) -> str:
+        value = value.strip()
+        _name, addr = parseaddr(value)
+        local, sep, domain = addr.rpartition("@")
+        if (
+            len(getaddresses([value])) != 1
+            or any(c in value for c in ",;\r\n\x00")
+            or not sep
+            or not local
+            or "." not in domain
+            or any(c.isspace() for c in addr)
+        ):
+            raise ValueError("to_address must be exactly one valid e-mail address")
+        return value
+
+
+class OutboundTicketOut(BaseModel):
+    ticket_id: int
+    ticket_number: str
+    article_id: int
 
 
 # ---------------------------------------------------------------------------

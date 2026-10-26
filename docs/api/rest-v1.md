@@ -1230,6 +1230,40 @@ Per ticket: number, title (+ a conservative `title_pii_free` flag), queue,
 state, e-mail and message counts, first channel, stored AI summary. Details:
 [`../architecture.md`](../architecture.md#customer-ticket-history-for-external-tools-netadmin).
 
+### Ticket with an outgoing e-mail
+
+```sh
+# New ticket in a queue plus one customer-visible e-mail, ticket closed
+curl -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"queue": "stw-bn-netzkoordinator", "to_address": "mentor@example.org",
+       "subject": "Ihre Zugangsdaten", "body": "...", "customer_user_id": null,
+       "close": true}' \
+  "$TIQORA_URL/api/v1/integrations/outbound-ticket"
+```
+
+Request: `queue` (name, 1..200), `to_address` (exactly one address, else 422),
+`subject` (1..250, also the ticket title), `body` (1..100000, plain text),
+`customer_user_id` (optional), `close` (default `true`: state `closed successful`
+after sending, otherwise `new`). Answer `201`: `ticket_id`, `ticket_number`,
+`article_id`.
+
+Needs a key with `tickets:rw` (a `tickets:ro` key gets 403) whose agent has
+`create`, `note` and `rw` on the queue's group. The ticket is created and the
+mail sent in one transaction; the mail goes out first, so nothing stays stored
+when sending fails.
+
+| Status | Meaning |
+|---|---|
+| 403 | key scope or queue permission missing |
+| 404 | queue unknown or invalid |
+| 422 | validation (e.g. more than one address) |
+| 502 | mail delivery failed, nothing stored |
+| 503 `outbound_mail_disabled` | outbound mail is switched off, nothing created |
+
+AI automation is paused on the ticket before the article is created, and the
+article raises no agent notification, because the mail may contain credentials.
+The text stays stored in the ticket.
+
 ## SSO endpoints (browser flows)
 
 These are navigation endpoints (redirects and form posts), not JSON APIs. `<slug>` is the provider's
