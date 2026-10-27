@@ -9469,6 +9469,29 @@ export interface paths {
         patch: operations["patch_change_api_v1_itsm_changes__ticket_id__patch"];
         trace?: never;
     };
+    "/api/v1/itsm/changes/{ticket_id}/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Conflicts
+         * @description Freeze windows, overlapping changes and tasks off the window, from stored data only.
+         *
+         *     An overlapping change the caller cannot read is listed as ``hidden`` with its window and
+         *     counts, without a reference.
+         */
+        get: operations["get_change_conflicts_api_v1_itsm_changes__ticket_id__conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/changes/{ticket_id}/events": {
         parameters: {
             query?: never;
@@ -18479,6 +18502,35 @@ export interface components {
             op: "eq" | "neq" | "in" | "not_in" | "contains" | "starts_with" | "is_empty" | "is_not_empty" | "lt" | "lte" | "gt" | "gte" | "between" | "before" | "after" | "within_last" | "older_than" | "is_true" | "is_false";
             /** Value */
             value?: unknown;
+        };
+        /** ConflictOut */
+        ConflictOut: {
+            /** End */
+            end: string | null;
+            /** Hidden */
+            hidden: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "freeze" | "change_overlap" | "task_outside" | "no_window" | "freeze_truncated" | "overlap_truncated";
+            /** Ref */
+            ref: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warn" | "block";
+            /** Shared Ci Count */
+            shared_ci_count: number;
+            /** Shared Cis */
+            shared_cis: number[];
+            /** Shared Service Count */
+            shared_service_count: number;
+            /** Shared Services */
+            shared_services: number[];
+            /** Start */
+            start: string | null;
         };
         /**
          * ContainerOut
@@ -55600,6 +55652,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_conflicts_api_v1_itsm_changes__ticket_id__conflicts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictOut"][];
                 };
             };
             /** @description Validation Error */

@@ -32,6 +32,7 @@ from tiqora.api.v1.itsm_change_schemas import (
 )
 from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.db.tiqora.models import TiqoraJob
+from tiqora.itsm.change.conflicts import ConflictOut, read_conflicts
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import occurrences
 from tiqora.itsm.change.gate import change_availability, require_change_mode
@@ -185,6 +186,20 @@ async def get_change_impact(
     Only what the caller may read: CIs of classes without ``ro`` are counted, not named.
     """
     return await read_impact(
+        session, settings, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
+    )
+
+
+@router.get("/changes/{ticket_id:int}/conflicts", response_model=list[ConflictOut])
+async def get_change_conflicts(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> list[ConflictOut]:
+    """Freeze windows, overlapping changes and tasks off the window, from stored data only.
+
+    An overlapping change the caller cannot read is listed as ``hidden`` with its window and
+    counts, without a reference.
+    """
+    return await read_conflicts(
         session, settings, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
     )
 

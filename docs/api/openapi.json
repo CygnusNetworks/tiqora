@@ -14116,6 +14116,106 @@
         "title": "Condition",
         "type": "object"
       },
+      "ConflictOut": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "freeze",
+              "change_overlap",
+              "task_outside",
+              "no_window",
+              "freeze_truncated",
+              "overlap_truncated"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warn",
+              "block"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "shared_ci_count": {
+            "title": "Shared Ci Count",
+            "type": "integer"
+          },
+          "shared_cis": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Shared Cis",
+            "type": "array"
+          },
+          "shared_service_count": {
+            "title": "Shared Service Count",
+            "type": "integer"
+          },
+          "shared_services": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Shared Services",
+            "type": "array"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          }
+        },
+        "required": [
+          "kind",
+          "severity",
+          "ref",
+          "hidden",
+          "start",
+          "end",
+          "shared_services",
+          "shared_cis",
+          "shared_service_count",
+          "shared_ci_count"
+        ],
+        "title": "ConflictOut",
+        "type": "object"
+      },
       "ContainerOut": {
         "description": "One Docker container as reported by the daemon (via the mounted socket).",
         "properties": {
@@ -103344,6 +103444,85 @@
           }
         },
         "summary": "Patch Change",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/conflicts": {
+      "get": {
+        "description": "Freeze windows, overlapping changes and tasks off the window, from stored data only.\n\nAn overlapping change the caller cannot read is listed as ``hidden`` with its window and\ncounts, without a reference.",
+        "operationId": "get_change_conflicts_api_v1_itsm_changes__ticket_id__conflicts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConflictOut"
+                  },
+                  "title": "Response Get Change Conflicts Api V1 Itsm Changes  Ticket Id  Conflicts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Conflicts",
         "tags": [
           "itsm-change"
         ]
