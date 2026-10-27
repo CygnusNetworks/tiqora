@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -313,7 +314,9 @@ async def test_expired_token(url_fixture: str, request: pytest.FixtureRequest) -
             await session.commit()
             await _expect(session, token, "link_expired")
             with pytest.raises(ApprovalError) as excinfo:
-                await tokens.redeem_link(session, token, decision="approved", comment=None)
+                await tokens.redeem_link(
+                    session, token, decision="approved", comment=None, settings=SETTINGS
+                )
             assert excinfo.value.code == "link_expired"
             await session.rollback()
             assert await _votes(session, aid) == []
@@ -335,7 +338,7 @@ async def test_redeem_approves(url_fixture: str, request: pytest.FixtureRequest)
             other = await _issue(session, approver)
             await session.commit()
             result = await tokens.redeem_link(
-                session, token, decision="approved", comment="  ok per Mail  "
+                session, token, decision="approved", comment="  ok per Mail  ", settings=SETTINGS
             )
             await session.commit()
             assert (result.info.status, result.info.reason, result.on_behalf) == (
@@ -365,7 +368,9 @@ async def test_redeem_rejects(url_fixture: str, request: pytest.FixtureRequest) 
             aid = await _request(session, ONE_STEP)
             token = await _issue(session, await _approver(session, aid, AG3))
             await session.commit()
-            result = await tokens.redeem_link(session, token, decision="rejected", comment=None)
+            result = await tokens.redeem_link(
+                session, token, decision="rejected", comment=None, settings=SETTINGS
+            )
             await session.commit()
             assert (result.info.status, result.info.reason) == ("rejected", "votes")
             assert [v.decision for v in await _votes(session, aid)] == ["rejected"]
@@ -379,11 +384,15 @@ async def test_redeem_twice(url_fixture: str, request: pytest.FixtureRequest) ->
             aid = await _request(session, ONE_STEP)
             token = await _issue(session, await _approver(session, aid, AG3))
             await session.commit()
-            await tokens.redeem_link(session, token, decision="approved", comment=None)
+            await tokens.redeem_link(
+                session, token, decision="approved", comment=None, settings=SETTINGS
+            )
             await session.commit()
             for _ in range(2):
                 with pytest.raises(ApprovalError) as excinfo:
-                    await tokens.redeem_link(session, token, decision="rejected", comment=None)
+                    await tokens.redeem_link(
+                        session, token, decision="rejected", comment=None, settings=SETTINGS
+                    )
                 assert (excinfo.value.code, excinfo.value.http_status) == ("link_used", 410)
                 await session.rollback()
             await _expect(session, token, "link_used")
@@ -403,9 +412,11 @@ async def test_failed_decide_leaves_link_unused(
             token = await _issue(session, approver)
             await session.commit()
             with pytest.raises(ApprovalError) as excinfo:
-                await tokens.redeem_link(session, token, decision="approved", comment="x" * 2001)
+                await tokens.redeem_link(
+                    session, token, decision="approved", comment="x" * 2001, settings=SETTINGS
+                )
             assert excinfo.value.code == "comment_too_long"
-            await session.rollback()
+            await session.commit()  # a careless caller committing anyway consumes nothing
             assert (await _tokens(session, approver))[0].used_at is None
             assert (await tokens.resolve_link(session, token)).approver_id == approver
             assert await _votes(session, aid) == []
@@ -420,14 +431,32 @@ async def test_step_without_email_decisions_refuses(
         with installed_registry(make_fake_subject_type()):
             aid = await _request(session, _defn(_step("Prüfung", AG3, allow_email=False)))
             approver = await _approver(session, aid, AG3)
-            token = await _issue(session, approver)
+            with pytest.raises(ApprovalError) as excinfo:  # issue refuses ...
+                await _issue(session, approver)
+            assert excinfo.value.code == "forbidden"
+            token = "appr97-raw-token"  # ... so a stray row is planted to prove redeem refuses too
+            session.add(
+                TiqoraApprovalToken(
+                    approval_id=aid,
+                    approver_id=approver,
+                    ticket_id=T1,
+                    token_hash=tokens.link_digest(token),
+                    created_at=utc_now(),
+                    expires_at=utc_now() + timedelta(days=1),
+                )
+            )
             await session.commit()
             with pytest.raises(ApprovalError) as excinfo:
-                await tokens.redeem_link(session, token, decision="approved", comment=None)
+                await tokens.redeem_link(
+                    session, token, decision="approved", comment=None, settings=SETTINGS
+                )
             assert excinfo.value.code == "forbidden"
-            await session.rollback()
+            await session.commit()
             assert (await _tokens(session, approver))[0].used_at is None
             assert await _votes(session, aid) == []
+            with pytest.raises(ApprovalError) as excinfo:  # and no new link is issued either
+                await _issue(session, approver)
+            assert excinfo.value.code == "forbidden"
 
 
 @pytest.mark.db
@@ -450,7 +479,9 @@ async def test_token_authorizes_only_its_own_row(
             mine, delegated = await _approver(session, aid, AG3), await _approver(session, aid, AG4)
             token = await _issue(session, mine)
             await session.commit()
-            result = await tokens.redeem_link(session, token, decision="approved", comment=None)
+            result = await tokens.redeem_link(
+                session, token, decision="approved", comment=None, settings=SETTINGS
+            )
             await session.commit()
             assert result.on_behalf is False and result.step_status == "active"
             (vote,) = await _votes(session, aid)
@@ -466,6 +497,65 @@ async def test_token_authorizes_only_its_own_row(
                 ).scalars()
             }
             assert statuses == {mine: "approved", delegated: "pending"}
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_links_switched_off_kill_sent_links(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, ONE_STEP)
+            approver = await _approver(session, aid, AG3)
+            token = await _issue(session, approver)
+            await _set_settings(session, email_links_enabled=False)
+            await session.commit()
+            with pytest.raises(ApprovalError) as excinfo:
+                await tokens.redeem_link(
+                    session, token, decision="approved", comment=None, settings=SETTINGS
+                )
+            assert (excinfo.value.code, excinfo.value.http_status) == ("link_invalid", 410)
+            await session.rollback()
+            assert await _votes(session, aid) == []
+            with pytest.raises(ApprovalError) as excinfo:
+                await _issue(session, approver, email_links_enabled=False)
+            assert excinfo.value.code == "forbidden"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_lock_held_still_locks_the_request(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """decide(lock_held=True) on a fresh session starts with SELECT … FOR UPDATE anyway."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, ONE_STEP)
+            await session.commit()
+            session.expunge_all()
+            seen: list[str] = []
+
+            def _capture(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+                seen.append(" ".join(statement.split()).lower())
+
+            bind = session.sync_session.get_bind()
+            event.listen(bind, "before_cursor_execute", _capture)
+            try:
+                await service.decide(
+                    session,
+                    aid,
+                    actor=Actor.agent(AG3),
+                    decision="approved",
+                    channel="ui",
+                    lock_held=True,
+                    settings=SETTINGS,
+                )
+            finally:
+                event.remove(bind, "before_cursor_execute", _capture)
+            real = [q for q in seen if not q.startswith(("savepoint", "release", "rollback"))]
+            assert real[0].startswith("select") and real[0].endswith("for update")
+            assert re.search(r"from tiqora_approval(?![_a-z])", real[0])
 
 
 # --- revocation ----------------------------------------------------------------------------------
@@ -510,7 +600,9 @@ async def test_token_dead_after_request_cancel(
             await _expect(session, tok4, "link_invalid")
             await session.commit()
             with pytest.raises(ApprovalError) as excinfo:
-                await tokens.redeem_link(session, tok3, decision="approved", comment=None)
+                await tokens.redeem_link(
+                    session, tok3, decision="approved", comment=None, settings=SETTINGS
+                )
             assert excinfo.value.code == "link_invalid"
             await session.rollback()
             assert await _votes(session, aid) == []
@@ -554,7 +646,9 @@ async def test_token_for_forwarded_row_dead(
             await _expect(session, token, "link_invalid")
             await session.commit()
             with pytest.raises(ApprovalError) as excinfo:
-                await tokens.redeem_link(session, token, decision="approved", comment=None)
+                await tokens.redeem_link(
+                    session, token, decision="approved", comment=None, settings=SETTINGS
+                )
             assert excinfo.value.code == "link_invalid"
             await session.rollback()
             assert await _votes(session, aid) == []
@@ -583,8 +677,11 @@ async def test_revoke_links_counts_live_only(
 
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
-async def test_purge_links(url_fixture: str, request: pytest.FixtureRequest) -> None:
-    """Dead rows older than the cutoff go; live and recently dead rows stay."""
+async def test_purge_links(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dead rows older than the cutoff go (in batches of 2 here); live and recent ones stay."""
+    monkeypatch.setattr(tokens, "_PURGE_BATCH", 2)
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type()):
             aid = await _request(session, ONE_STEP)
@@ -660,7 +757,9 @@ async def _redeem_and_commit(factory: async_sessionmaker[AsyncSession], token: s
     async with factory() as session:
         await session.rollback()
         try:
-            await tokens.redeem_link(session, token, decision="approved", comment=None)
+            await tokens.redeem_link(
+                session, token, decision="approved", comment=None, settings=SETTINGS
+            )
         except ApprovalError as exc:
             await session.rollback()
             return exc.code

@@ -23,7 +23,7 @@ from sqlalchemy import Select, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import audit
-from tiqora.approvals.contract import Actor, ApprovalError, Decision, Principal
+from tiqora.approvals.contract import Actor, ApprovalError, Decision, Principal, StepSpec
 from tiqora.approvals.models import (
     TiqoraApproval,
     TiqoraApprovalApprover,
@@ -31,6 +31,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalToken,
 )
 from tiqora.approvals.settings import ApprovalSettings
+from tiqora.config import Settings
 from tiqora.jobs.service import utc_now
 
 if TYPE_CHECKING:
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 #: a link outlives the step deadline by this much (a late click still counts until the sweeper acts)
 _DEADLINE_GRACE = timedelta(hours=24)
 _SYSTEM = Actor.system()
+_PURGE_BATCH = 500
 
 
 def link_digest(token: str) -> str:
@@ -108,6 +110,8 @@ async def issue_link(session: AsyncSession, approver_id: int, *, settings: Appro
         or step.status != "active"
     ):
         raise ApprovalError("not_an_approver", 403)
+    if not settings.email_links_enabled or not StepSpec.model_validate_json(step.spec).allow_email:
+        raise ApprovalError("forbidden", 403, "this step does not accept decisions by e-mail")
 
     now = _now()
     expires_at = now + timedelta(hours=settings.link_ttl_hours)
@@ -216,16 +220,23 @@ async def resolve_link(
 
 
 async def redeem_link(
-    session: AsyncSession, token: str, *, decision: Decision, comment: str | None
+    session: AsyncSession,
+    token: str,
+    *,
+    decision: Decision,
+    comment: str | None,
+    settings: Settings | None = None,
 ) -> DecisionResult:
     """Casts the vote of the link's approver row, once, however many requests race.
 
     Two phases (F1(b)): a plain lookup of the request id by hash, ``rollback()``, then the
-    request lock as the first statement of the transaction. Under that lock the link is
-    re-resolved with locks and consumed by ``UPDATE … WHERE used_at IS NULL AND revoked_at IS
-    NULL`` (rowcount 1 decides the race, anything else is ``link_used``) and the vote is cast
-    through ``service.decide`` in the same transaction: when it raises, the caller's rollback
-    also undoes ``used_at``. The caller commits. Raises ``link_*`` (HTTP 410) or whatever
+    request lock as the first statement of the transaction. The request lock plus the locked
+    re-read of the link, approver and step decide the race (the loser sees ``used_at`` or a
+    decided row); the conditional ``UPDATE … WHERE used_at IS NULL AND revoked_at IS NULL``
+    (rowcount 1, else ``link_used``) is a second barrier. The vote is cast
+    through ``service.decide`` in the same transaction; when it raises, ``redeem_link`` rolls
+    back itself so ``used_at`` is undone. Links die while ``email_links_enabled`` is off. The
+    caller commits. Raises ``link_*`` (HTTP 410) or whatever
     ``decide`` refuses with.
     """
     from tiqora.approvals import service
@@ -244,6 +255,8 @@ async def redeem_link(
         await service._lock_approval(session, approval_id)  # noqa: SLF001
     except ApprovalError as exc:
         raise ApprovalError("link_invalid", 410) from exc
+    if not (await service._settings(session, settings)).email_links_enabled:  # noqa: SLF001
+        raise ApprovalError("link_invalid", 410)
     target = await resolve_link(session, token, for_update=True)
     consumed = await session.execute(
         update(TiqoraApprovalToken)
@@ -257,22 +270,28 @@ async def redeem_link(
     if consumed.rowcount != 1:  # type: ignore[attr-defined]
         raise ApprovalError("link_used", 410)
     principal = target.principal
-    actor = (
-        Actor.agent(principal.user_id)
-        if principal.user_id is not None
-        else Actor.customer(principal.login or "")
-    )
-    return await service.decide(
-        session,
-        approval_id,
-        actor=actor,
-        decision=decision,
-        channel="email",
-        comment=comment,
-        approver_id=target.approver_id,
-        token_id=target.token_id,
-        lock_held=True,
-    )
+    if principal.kind == "agent" and principal.user_id is not None:
+        actor = Actor.agent(principal.user_id)
+    elif principal.kind == "customer" and principal.login:
+        actor = Actor.customer(principal.login)
+    else:
+        raise ApprovalError("link_invalid", 410)
+    try:
+        return await service.decide(
+            session,
+            approval_id,
+            actor=actor,
+            decision=decision,
+            channel="email",
+            comment=comment,
+            approver_id=target.approver_id,
+            token_id=target.token_id,
+            lock_held=True,
+            settings=settings,
+        )
+    except BaseException:
+        await session.rollback()  # no partial consume (used_at) is left for a caller to commit
+        raise
 
 
 async def revoke_links(
@@ -324,13 +343,27 @@ async def revoke_approval_links(session: AsyncSession, approval_id: int) -> int:
 
 async def purge_links(session: AsyncSession, *, older_than: datetime) -> int:
     """Deletes links that expired, were used or were revoked before *older_than* (sweeper)."""
-    result = await session.execute(
-        delete(TiqoraApprovalToken).where(
-            or_(
-                TiqoraApprovalToken.used_at < older_than,
-                TiqoraApprovalToken.revoked_at < older_than,
-                TiqoraApprovalToken.expires_at < older_than,
+    total = 0
+    while True:
+        ids = (
+            (
+                await session.execute(
+                    select(TiqoraApprovalToken.id)
+                    .where(
+                        or_(
+                            TiqoraApprovalToken.used_at < older_than,
+                            TiqoraApprovalToken.revoked_at < older_than,
+                            TiqoraApprovalToken.expires_at < older_than,
+                        )
+                    )
+                    .order_by(TiqoraApprovalToken.id)
+                    .limit(_PURGE_BATCH)
+                )
             )
+            .scalars()
+            .all()
         )
-    )
-    return int(result.rowcount)  # type: ignore[attr-defined]
+        if not ids:
+            return total
+        await session.execute(delete(TiqoraApprovalToken).where(TiqoraApprovalToken.id.in_(ids)))
+        total += len(ids)

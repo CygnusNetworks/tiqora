@@ -945,6 +945,8 @@ async def decide(
 ) -> DecisionResult:
     """Records one vote (A7b) and moves the request on. Flushes, never commits.
 
+    *lock_held* is accepted for ``redeem_link`` and has no effect: the request is always locked.
+
     The first statement is ``SELECT … FOR UPDATE`` on the request (callers roll back before
     calling, F1(a)); every later read of step/approver/vote rows is a locking read, so the
     latest committed state is evaluated, never a stale snapshot. Raises ``approval_not_found``,
@@ -958,9 +960,9 @@ async def decide(
     if text_ is not None and len(text_) > _COMMENT_MAX:
         raise ApprovalError("comment_too_long", 422, f"at most {_COMMENT_MAX} characters")
     reg = registry or get_registry()
-    # lock_held: the caller (redeem_link) took the request lock as its first statement already
-    held = await session.get(TiqoraApproval, approval_id) if lock_held else None
-    approval = held if held is not None else await _lock_approval(session, approval_id)
+    # lock_held only documents that the caller took the lock; re-locking a row this transaction
+    # holds is free, and honouring the keyword would let any caller skip the F1/F6 lock
+    approval = await _lock_approval(session, approval_id)
     if approval.status != "pending":
         raise ApprovalError("approval_closed", 409)
     asettings = await _settings(session, settings)
