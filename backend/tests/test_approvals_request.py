@@ -8,6 +8,8 @@ commits (a second connection racing) cleans up after itself.
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -36,7 +38,7 @@ from tests._approvals_helpers import (
     to_async_url,
 )
 from tests._row_cleanup import delete_above_marks, snapshot_marks
-from tiqora.approvals import audit, service
+from tiqora.approvals import access, audit, service
 from tiqora.approvals.contract import (
     EVENT_CANCELLED,
     EVENT_DECIDED,
@@ -60,6 +62,7 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraJob
 from tiqora.domain.history_render import render_history_entry
 from tiqora.jobs.service import utc_now
+from tiqora.permissions.engine import PermissionEngine
 from tiqora.settings_sections.store import save_section_values
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
@@ -756,8 +759,11 @@ async def test_cancel_by_requester(url_fixture: str, request: pytest.FixtureRequ
             info = await _request(session, definition=CAB_STEP, actor=Actor.agent(AG3))
             assert len(await _approvers(session, info.approval_id)) == 2
             await session.execute(
-                text("UPDATE tiqora_approval_approver SET last_notified_at = :t"),
-                {"t": utc_now()},
+                text(
+                    "UPDATE tiqora_approval_approver SET last_notified_at = :t"
+                    " WHERE approval_id = :a"
+                ),
+                {"t": utc_now(), "a": info.approval_id},
             )
             done = await service.cancel_approval(
                 session, info.approval_id, actor=Actor.agent(AG3), settings=SETTINGS
@@ -863,8 +869,8 @@ async def test_outbox_payload_has_no_pii(url_fixture: str, request: pytest.Fixtu
             await service.cancel_approval(
                 session, first.approval_id, actor=ACTOR, settings=SETTINGS
             )
-            await _request(session, title=title, definition=defn, approval_key="b")
-            await service.record_auto_decision(
+            second = await _request(session, title=title, definition=defn, approval_key="b")
+            auto = await service.record_auto_decision(
                 session,
                 ticket_id=T1,
                 subject_type=SUBJECT,
@@ -887,7 +893,7 @@ async def test_outbox_payload_has_no_pii(url_fixture: str, request: pytest.Fixtu
                 assert "@" not in blob and "Geheim" not in blob
             for hist in await _history(session):
                 assert "@" not in hist[1] and "Geheim" not in hist[1]
-            for approval_id in {first.approval_id, first.approval_id + 1}:
+            for approval_id in (first.approval_id, second.approval_id, auto.approval_id):
                 for event in await _events(session, approval_id):
                     assert "@" not in (event.detail or "") + event.actor
                     assert "Geheim" not in (event.detail or "")
@@ -952,10 +958,10 @@ async def test_service_never_commits(
             info = await _request(session)
             await service.cancel_approval(session, info.approval_id, actor=ACTOR, settings=SETTINGS)
             await session.rollback()
-            count = (
-                await session.execute(text("SELECT COUNT(*) FROM tiqora_approval"))
-            ).scalar_one()
-            assert count == 0
+            mine = await session.execute(
+                text("SELECT COUNT(*) FROM tiqora_approval WHERE ticket_id = :t"), {"t": T1}
+            )
+            assert mine.scalar_one() == 0
             assert await _jobs(session, JOB_HOOK, info.approval_id) == []
             assert await _outbox(session) == []
 
@@ -973,17 +979,9 @@ _MARKS = (
 )
 
 
-@pytest.mark.db
-@pytest.mark.parametrize("url_fixture", URLS)
-async def test_cancel_inside_consumer_transaction_sees_late_decision(
-    url_fixture: str, request: pytest.FixtureRequest
-) -> None:
-    """Session A read the request, session B decides and commits, A cancels: A sees B's result.
-
-    On MariaDB (REPEATABLE READ) a plain read would still show ``pending`` and the cancel would
-    overwrite the decision; the locking read returns the latest committed version.
-    """
-    url = request.getfixturevalue(url_fixture)
+@asynccontextmanager
+async def _committed_world(url: str) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Committed helper world on a real engine; everything the test wrote is removed again."""
     ensure_tiqora_tables(url)
     marks = snapshot_marks(url, _MARKS)
     engine = create_async_engine(to_async_url(url), poolclass=NullPool)
@@ -992,6 +990,27 @@ async def test_cancel_inside_consumer_transaction_sees_late_decision(
         async with factory() as seed:
             await seed_world(seed)
             await seed.commit()
+        yield factory
+    finally:
+        delete_above_marks(url, marks)
+        async with factory() as cleanup:
+            await delete_world(cleanup)
+            await cleanup.commit()
+        await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_cancel_inside_consumer_transaction_sees_late_decision(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Session A read the request, session B decides and commits, A cancels: A sees B's result.
+
+    On MariaDB (REPEATABLE READ) a plain read would still show ``pending`` and the cancel would
+    overwrite the decision; the locking read returns the latest committed version. (Task 7 adds
+    the vote-based variant ``test_cancel_inside_consumer_transaction_sees_late_vote``.)
+    """
+    async with _committed_world(request.getfixturevalue(url_fixture)) as factory:
         with installed_registry(make_fake_subject_type()):
             async with factory() as a:
                 info = await _request(a)
@@ -1013,9 +1032,121 @@ async def test_cancel_inside_consumer_transaction_sees_late_decision(
                 assert excinfo.value.code == "approval_closed"
                 await a.rollback()
                 assert (await _row(a, info.approval_id)).status == "approved"
-    finally:
-        delete_above_marks(url, marks)
-        async with factory() as cleanup:
-            await delete_world(cleanup)
-            await cleanup.commit()
-        await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_cancel_keeps_a_late_approver_vote(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The approver-row half of CX8: a vote committed after A's snapshot is not overwritten."""
+    async with _committed_world(request.getfixturevalue(url_fixture)) as factory:
+        with installed_registry(make_fake_subject_type()):
+            async with factory() as a:
+                info = await _request(a, definition=CAB_STEP)
+                await a.commit()
+                rows = await _approvers(a, info.approval_id)  # starts A's snapshot
+                assert {r.status for r in rows} == {"pending"} and len(rows) == 3
+                async with factory() as b:
+                    await b.execute(
+                        text(
+                            "UPDATE tiqora_approval_approver SET status = 'approved' WHERE id = :i"
+                        ),
+                        {"i": rows[0].id},
+                    )
+                    await b.commit()
+                done = await service.cancel_approval(
+                    a, info.approval_id, actor=ACTOR, check_permission=False, settings=SETTINGS
+                )
+                assert done.status == "cancelled"
+                await a.commit()  # a fresh snapshot, so the plain read below sees B's vote
+                got = {r.id: r.status for r in await _approvers(a, info.approval_id)}
+                assert got == {
+                    rows[0].id: "approved",
+                    rows[1].id: "not_needed",
+                    rows[2].id: "not_needed",
+                }
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_auto_decision_reason_is_a_short_code(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            for bad in ("x" * 33, "Kunde kunde1@example.org", "", "has space"):
+                with pytest.raises(ApprovalError) as excinfo:
+                    await service.record_auto_decision(
+                        session,
+                        ticket_id=T1,
+                        subject_type=SUBJECT,
+                        title="Vorab",
+                        actor=Actor.system(),
+                        status="approved",
+                        reason=bad,
+                        settings=SETTINGS,
+                    )
+                assert (excinfo.value.code, excinfo.value.http_status) == (
+                    "invalid_definition",
+                    422,
+                )
+            ok = await service.record_auto_decision(
+                session,
+                ticket_id=T1,
+                subject_type=SUBJECT,
+                title="Vorab",
+                actor=Actor.system(),
+                status="approved",
+                reason="standard_change",
+                settings=SETTINGS,
+            )
+            assert ok.reason == "standard_change"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_approval_key_is_stripped(url_fixture: str, request: pytest.FixtureRequest) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            first = await _request(session, approval_key=" default ")
+            assert (await _row(session, first.approval_id)).approval_key == "default"
+            await _request(session)
+            assert (await _row(session, first.approval_id)).status == "cancelled"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_system_and_portal_creators_do_not_make_agent_1_a_creator(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _no(*args: object, **kwargs: object) -> bool:
+        return False
+
+    # agent 1 is an admin in a stock Znuny; take that and queue rights away to test "creator" alone
+    monkeypatch.setattr(PermissionEngine, "is_admin", _no)
+    monkeypatch.setattr(PermissionEngine, "check", _no)
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
+            by_system = await _request(session, actor=Actor.system(), approval_key="sys")
+            by_portal = await _request(
+                session,
+                actor=Actor.customer("appr97-k1"),
+                requester=Principal.customer("appr97-k1"),
+                approval_key="portal",
+            )
+            by_agent = await _request(session, actor=Actor.agent(AG3), approval_key="agent")
+            for info in (by_system, by_portal):
+                row = await _row(session, info.approval_id)
+                assert row.created_by == 1
+                assert await audit.creator_key(session, row) in (None, "customer:appr97-k1")
+                excluded = await service._excluded_keys(session, row)
+                assert "agent:1" not in excluded
+                assert not await access.can_cancel(session, row, Actor(Principal.agent(1), 1))
+            row = await _row(session, by_agent.approval_id)
+            assert await audit.creator_key(session, row) == f"agent:{AG3}"
+            assert await service._excluded_keys(session, row) == {f"agent:{AG3}"}
+            assert await access.can_cancel(session, row, Actor.agent(AG3))
+            # the portal creator is excluded as a creator in later stages (not only as requester)
+            row = await _row(session, by_portal.approval_id)
+            assert await service._excluded_keys(session, row) == {"customer:appr97-k1"}

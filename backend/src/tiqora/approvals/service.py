@@ -12,6 +12,7 @@ step/approver/token rows. Timestamps are naive UTC (``utc_now``).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from datetime import timedelta
 from typing import Literal
@@ -56,6 +57,7 @@ _TITLE_MAX = 250
 _KEY_MAX = 100
 _SYSTEM = Actor.system()
 _CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
+_REASON_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
 
 
 def _info(approval: TiqoraApproval) -> ApprovalInfo:
@@ -118,11 +120,19 @@ async def _locked_approvers(
     return list(result.scalars())
 
 
-def _excluded_keys(approval: TiqoraApproval) -> frozenset[str]:
-    """Requester and creator never approve their own request unless it allows self-approval."""
+async def _excluded_keys(session: AsyncSession, approval: TiqoraApproval) -> frozenset[str]:
+    """Requester and creator never approve their own request unless it allows self-approval.
+
+    The creator comes from the audit trail: a system or portal actor (``created_by`` 1) does
+    not make agent 1 a creator.
+    """
     if approval.allow_self_approval:
         return frozenset()
-    return frozenset({approval.requester, f"agent:{approval.created_by}"})
+    keys = {approval.requester}
+    creator = await audit.creator_key(session, approval)
+    if creator is not None:
+        keys.add(creator)
+    return frozenset(keys)
 
 
 def _allow_customers(
@@ -222,7 +232,7 @@ async def _finalize(
     await _close_open_steps(session, approval, steps, reason)
     approval.status = status
     approval.reason = reason
-    approval.decided_at = utc_now()
+    approval.decided_at = utc_now().replace(microsecond=0)
     approval.current_stage = None
     await session.flush()
     await _revoke_tokens(session, approval.id)
@@ -296,7 +306,7 @@ async def _activate_step(
         session,
         spec.approvers,
         ctx=ctx,
-        excluded_principals=_excluded_keys(approval),
+        excluded_principals=await _excluded_keys(session, approval),
         allow_customers=_allow_customers(approval, settings, registry),
         registry=registry,
     )
@@ -362,7 +372,7 @@ async def _activate_step(
             customer_login=resolved.principal.login,
             source_kind=resolved.source_kind,
             source_ref=resolved.source_ref,
-            source_label=(resolved.source_label or None) and resolved.source_label[:200],
+            source_label=resolved.source_label[:200] if resolved.source_label else None,
             decisive=False,
             status="pending",
             added_at=now,
@@ -445,6 +455,7 @@ async def _activate_next_stage(
 
 def _check_text(title: str, approval_key: str) -> tuple[str, str]:
     title = title.strip()
+    approval_key = approval_key.strip()
     if not title or len(title) > _TITLE_MAX:
         raise ApprovalError("invalid_definition", 422, f"title must be 1-{_TITLE_MAX} characters")
     if not approval_key or len(approval_key) > _KEY_MAX:
@@ -606,7 +617,7 @@ async def request_approval(
     requester_key = await _requester_key(session, requester, actor)
     olds = await _lock_pending_same_key(session, ticket_id, approval_key) if supersede else []
 
-    now = utc_now()
+    now = utc_now().replace(microsecond=0)  # MariaDB DATETIME has no microseconds
     approval = TiqoraApproval(
         ticket_id=ticket_id,
         subject_type=subject_type,
@@ -681,6 +692,8 @@ async def record_auto_decision(
     """
     if status not in ("approved", "rejected"):
         raise ApprovalError("invalid_definition", 422, "status must be approved or rejected")
+    if not _REASON_RE.fullmatch(reason):
+        raise ApprovalError("invalid_definition", 422, "reason must be a short lower-case code")
     reg = registry or get_registry()
     title, approval_key = _check_text(title, approval_key)
     await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
@@ -698,7 +711,7 @@ async def record_auto_decision(
         allow_self_approval=False,
         requester=requester_key,
         created_by=actor.write_user_id,
-        created_at=utc_now(),
+        created_at=utc_now().replace(microsecond=0),
     )
     session.add(approval)
     await session.flush()
@@ -724,8 +737,8 @@ async def cancel_approval(
 
     ``approval_closed`` (409) when it is already decided, ``forbidden`` (403) without
     :func:`access.can_cancel`. Consumers pass ``check_permission=False`` for their own
-    automation. *note* is not stored (audit rows never carry free text); only that one was
-    given is recorded.
+    automation. *note* is accepted for API compatibility but not stored: audit rows never
+    carry free text, so a consumer that wants a note writes its own ticket note.
     """
     if reason not in _CANCEL_REASONS:
         raise ValueError(f"unknown cancel reason: {reason!r}")

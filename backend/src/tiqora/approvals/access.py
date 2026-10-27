@@ -9,6 +9,7 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.approvals import audit
 from tiqora.approvals.contract import Actor
 from tiqora.approvals.models import TiqoraApproval
 from tiqora.permissions.engine import PermissionEngine
@@ -25,7 +26,7 @@ async def can_cancel(session: AsyncSession, approval: TiqoraApproval, actor: Act
     if principal.kind != "agent" or principal.user_id is None:
         return False
     user_id = principal.user_id
-    if actor.key == approval.requester or user_id == approval.created_by:
+    if actor.key == approval.requester or actor.key == await audit.creator_key(session, approval):
         return True
     engine = PermissionEngine(session)
     if await engine.is_admin(user_id):

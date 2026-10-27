@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any, Final
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals.contract import Actor
@@ -129,3 +129,23 @@ async def history(
         name=name,
         user_id=actor.write_user_id,
     )
+
+
+async def creator_key(session: AsyncSession, approval: TiqoraApproval) -> str | None:
+    """Principal key of whoever created the request; None when the system did.
+
+    Read from the actor of the first ``requested`` / ``auto_decided`` audit row, so a system or
+    portal actor (``created_by`` = 1) never makes agent 1 the "creator".
+    """
+    actor = (
+        await session.execute(
+            select(TiqoraApprovalEvent.actor)
+            .where(
+                TiqoraApprovalEvent.approval_id == approval.id,
+                TiqoraApprovalEvent.action.in_(("requested", "auto_decided")),
+            )
+            .order_by(TiqoraApprovalEvent.id)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return None if actor is None or actor == "system" else str(actor)
