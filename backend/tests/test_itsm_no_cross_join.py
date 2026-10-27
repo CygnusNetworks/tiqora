@@ -132,3 +132,25 @@ def test_guard_ignores_variables_named_like_znuny_tables(tmp_path: Path) -> None
         "Q = select(TiqoraItsmProblem.id).where(TiqoraItsmProblem.id == ticket)\n"
     )
     assert find_cross_joins(tmp_path, znuny_tables()) == []
+
+
+def test_guard_resolves_change_orm_classes(tmp_path: Path) -> None:
+    resolved = _class_tables()
+    assert resolved["TiqoraItsmChange"] == "tiqora_itsm_change"
+    assert resolved["TiqoraItsmCab"] == "tiqora_itsm_cab"
+    # positive control: a change table x Znuny table join is found, a change-only query is not
+    (tmp_path / "bad_change.py").write_text(
+        "from sqlalchemy import select\n"
+        "from tiqora.itsm.change.models import TiqoraItsmChange\n"
+        "from tiqora.db.legacy.ticket import Ticket\n"
+        "Q = select(TiqoraItsmChange.id).join(Ticket, Ticket.id == TiqoraItsmChange.ticket_id)\n"
+    )
+    (tmp_path / "good_change.py").write_text(
+        "from sqlalchemy import select\n"
+        "from tiqora.itsm.change.models import TiqoraItsmChange, TiqoraItsmCab\n"
+        "Q = select(TiqoraItsmChange.id).join(\n"
+        "    TiqoraItsmCab, TiqoraItsmCab.id == TiqoraItsmChange.cab_id\n"
+        ")\n"
+    )
+    found = find_cross_joins(tmp_path, znuny_tables())
+    assert [Path(f.rsplit(":", 1)[0]).name for f in found] == ["bad_change.py"]
