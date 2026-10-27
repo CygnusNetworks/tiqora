@@ -6705,7 +6705,8 @@ export interface paths {
         /**
          * Post Link Decide
          * @description Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``
-         *     for a link that was already used, 410 ``link_invalid`` for any other dead or unknown link.
+         *     for a link that was already used, ``link_expired`` for one past its expiry, ``link_invalid``
+         *     for any other dead or unknown link.
          */
         post: operations["post_link_decide_api_v1_approval_links_decide_post"];
         delete?: never;
@@ -22261,8 +22262,9 @@ export interface components {
         /**
          * LinkInspectOut
          * @description What the confirm page shows. Only the link holder's own view: no requester, no other
-         *     approvers, no comments (F25). ``code`` is ``link_invalid`` (unknown, expired, revoked,
-         *     closed or not yours any more: deliberately one answer) or ``link_used``.
+         *     approvers, no comments (F25). ``code``: ``link_used`` (already used), ``link_expired`` (live
+         *     link past its expiry) or ``link_invalid`` (unknown, revoked, closed or not yours any more:
+         *     deliberately one answer).
          */
         LinkInspectOut: {
             /** Approver Name */

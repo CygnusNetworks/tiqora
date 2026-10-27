@@ -24979,6 +24979,7 @@
           "comment": {
             "anyOf": [
               {
+                "maxLength": 2000,
                 "type": "string"
               },
               {
@@ -25268,7 +25269,7 @@
         "type": "object"
       },
       "LinkInspectOut": {
-        "description": "What the confirm page shows. Only the link holder's own view: no requester, no other\napprovers, no comments (F25). ``code`` is ``link_invalid`` (unknown, expired, revoked,\nclosed or not yours any more: deliberately one answer) or ``link_used``.",
+        "description": "What the confirm page shows. Only the link holder's own view: no requester, no other\napprovers, no comments (F25). ``code``: ``link_used`` (already used), ``link_expired`` (live\nlink past its expiry) or ``link_invalid`` (unknown, revoked, closed or not yours any more:\ndeliberately one answer).",
         "properties": {
           "approver_name": {
             "anyOf": [
@@ -89443,7 +89444,7 @@
     },
     "/api/v1/approval-links/decide": {
       "post": {
-        "description": "Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``\nfor a link that was already used, 410 ``link_invalid`` for any other dead or unknown link.",
+        "description": "Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``\nfor a link that was already used, ``link_expired`` for one past its expiry, ``link_invalid``\nfor any other dead or unknown link.",
         "operationId": "post_link_decide_api_v1_approval_links_decide_post",
         "requestBody": {
           "content": {

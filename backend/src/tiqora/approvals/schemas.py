@@ -227,8 +227,9 @@ class LinkInspectIn(BaseModel):
 
 class LinkInspectOut(BaseModel):
     """What the confirm page shows. Only the link holder's own view: no requester, no other
-    approvers, no comments (F25). ``code`` is ``link_invalid`` (unknown, expired, revoked,
-    closed or not yours any more: deliberately one answer) or ``link_used``."""
+    approvers, no comments (F25). ``code``: ``link_used`` (already used), ``link_expired`` (live
+    link past its expiry) or ``link_invalid`` (unknown, revoked, closed or not yours any more:
+    deliberately one answer)."""
 
     valid: bool
     code: str | None = None
@@ -248,8 +249,7 @@ class LinkDecideIn(BaseModel):
 
     token: str = Field(min_length=1, max_length=200)
     decision: DecisionName
-    #: at most 2000 characters (the service answers ``comment_too_long``)
-    comment: str | None = None
+    comment: str | None = Field(None, max_length=2000)  # the engine's limit
 
 
 class LinkDecisionOut(BaseModel):

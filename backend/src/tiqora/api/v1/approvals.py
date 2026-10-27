@@ -573,29 +573,19 @@ async def _link_gate(
     """Per-IP lock and per-link budget, before any database work (429 when exceeded)."""
     limiter = ApprovalLinkRateLimiter(redis, settings)
     ip = client_ip(request, settings.trusted_proxies)
-    for decision in (
-        await limiter.check_ip(ip),
-        await limiter.check_token(tokens.link_digest(token)),
-    ):
-        if not decision.allowed:
-            raise HTTPException(
-                status.HTTP_429_TOO_MANY_REQUESTS,
-                detail={"code": "rate_limited", "detail": None},
-                headers={"Retry-After": str(max(1, decision.retry_after))},
-            )
+    decision = await limiter.check_ip(ip)
+    if decision.allowed:  # a locked IP does not spend the link's budget
+        decision = await limiter.check_token(tokens.link_digest(token))
+    if not decision.allowed:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "rate_limited", "detail": None},
+            headers={"Retry-After": str(max(1, decision.retry_after))},
+        )
     return limiter, ip
 
 
-def _public_link_error(err: ApprovalError) -> ApprovalError:
-    """Unknown, expired, revoked and closed links answer alike; only "already used" differs."""
-    if err.code == "link_used":
-        return err
-    return ApprovalError("link_invalid", err.http_status)
-
-
-async def _link_view(
-    session: AsyncSession, target: tokens.LinkTarget, settings: AppSettings
-) -> LinkInspectOut:
+async def _link_view(session: AsyncSession, target: tokens.LinkTarget) -> LinkInspectOut:
     approval = (
         await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == target.approval_id))
     ).scalar_one()
@@ -642,13 +632,14 @@ async def post_link_inspect(
         if not (await load_approval_settings(session, settings)).email_links_enabled:
             raise ApprovalError("link_invalid", 410)
         target = await tokens.resolve_link(session, body.token)
-        out = await _link_view(session, target, settings)
+        out = await _link_view(session, target)
     except ApprovalError as err:
         await session.rollback()
         if not err.code.startswith("link_"):
             raise _http(err) from err
-        await limiter.record_auth_failure(ip)
-        return LinkInspectOut(valid=False, code=_public_link_error(err).code)
+        if err.code != "link_used":  # a spent link is no guess: it does not feed the IP lock
+            await limiter.record_auth_failure(ip)
+        return LinkInspectOut(valid=False, code=err.code)
     await session.rollback()  # read only: end the transaction
     return out
 
@@ -662,7 +653,8 @@ async def post_link_decide(
     redis: Annotated[Any, Depends(get_redis)],
 ) -> LinkDecisionOut:
     """Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``
-    for a link that was already used, 410 ``link_invalid`` for any other dead or unknown link."""
+    for a link that was already used, ``link_expired`` for one past its expiry, ``link_invalid``
+    for any other dead or unknown link."""
     limiter, ip = await _link_gate(request, settings, redis, body.token)
     try:
         result = await tokens.redeem_link(
@@ -672,8 +664,9 @@ async def post_link_decide(
         await session.rollback()  # nothing is committed after a refusal (used_at included)
         if not err.code.startswith("link_"):
             raise _http(err) from err
-        await limiter.record_auth_failure(ip)
-        raise _http(_public_link_error(err)) from err
+        if err.code != "link_used":
+            await limiter.record_auth_failure(ip)
+        raise _http(err) from err
     await session.commit()
     await _publish(settings, result.affected_user_ids)
     return LinkDecisionOut(decision=body.decision, status=result.info.status)

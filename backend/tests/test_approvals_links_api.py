@@ -32,7 +32,7 @@ from tests._fake_redis import FakeRedis
 from tiqora.api import app as api_app
 from tiqora.api.deps import get_db
 from tiqora.approvals import service, tokens
-from tiqora.approvals.contract import Actor, ApprovalDefinition
+from tiqora.approvals.contract import Actor, ApprovalDefinition, ApprovalError
 from tiqora.approvals.models import (
     TiqoraApproval,
     TiqoraApprovalApprover,
@@ -87,7 +87,7 @@ def _client(
 
 
 async def _link(
-    session: AsyncSession, *users: int, rule: str = "any", user: int = AG3
+    session: AsyncSession, *users: int, rule: str = "any", user: int = AG3, key: str = "default"
 ) -> tuple[int, str]:
     """A request over *users* (default AG3, AG4, rule any) and a live link of *user*'s row."""
     info = await service.request_approval(
@@ -98,6 +98,7 @@ async def _link(
         description="Beschreibung appr97",
         actor=Actor.agent(AG1),
         definition=_defn(_step("Prüfung", *(users or (AG3, AG4)), rule=rule)),
+        approval_key=key,
         settings=SETTINGS,
     )
     row = (
@@ -231,7 +232,7 @@ async def test_inspect_invalid_codes(url_fixture: str, request: pytest.FixtureRe
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type()):
             _, expired = await _link(session)
-            _, used = await _link(session, user=AG4)
+            _, used = await _link(session, user=AG4, key="zweite-freigabe")
             await session.execute(
                 update(TiqoraApprovalToken)
                 .where(TiqoraApprovalToken.token_hash == tokens.link_digest(expired))
@@ -246,7 +247,7 @@ async def test_inspect_invalid_codes(url_fixture: str, request: pytest.FixtureRe
                 unknown = await client.post(f"{BASE}/inspect", json={"token": BAD})
                 late = await client.post(f"{BASE}/inspect", json={"token": expired})
                 gone = await client.post(f"{BASE}/inspect", json={"token": used})
-            # unknown and expired links cannot be told apart; only "already used" is distinct
+            # unknown looks like any dead link; expired and already used are distinct codes
             assert unknown.status_code == late.status_code == gone.status_code == 200
             invalid = {
                 "valid": False, "code": "link_invalid", "approver_name": None, "title": None,
@@ -254,7 +255,7 @@ async def test_inspect_invalid_codes(url_fixture: str, request: pytest.FixtureRe
                 "step_name": None, "rule": None, "due_at": None, "describe_lines": [],
             }  # fmt: skip
             assert unknown.json() == invalid
-            assert late.json() == invalid
+            assert late.json() == {**invalid, "code": "link_expired"}
             assert gone.json() == {**invalid, "code": "link_used"}
 
 
@@ -281,7 +282,7 @@ async def test_inspect_hides_other_approvers_comments(
             assert "agent4" not in text
             assert "agent1" not in text
             assert "agent3" in text  # the caller's own name
-            assert aid
+            assert len(await _votes(session, aid)) == 1  # only the other approver voted
 
 
 # --- decide ----------------------------------------------------------------------------------
@@ -336,22 +337,31 @@ async def test_decide_twice_410(url_fixture: str, request: pytest.FixtureRequest
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_decide_refusal_commits_nothing(
-    url_fixture: str, request: pytest.FixtureRequest
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A refused vote (comment too long) leaves the link usable: used_at is rolled back."""
+    """A vote the engine refuses after the link was consumed rolls ``used_at`` back."""
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type()):
             aid, token = await _link(session)
+            real_decide = service.decide
+            refusals = [ApprovalError("already_decided", 409)]
+
+            async def flaky(*args: Any, **kwargs: Any) -> Any:
+                if refusals:
+                    raise refusals.pop()  # raised after redeem_link consumed the link
+                return await real_decide(*args, **kwargs)
+
+            monkeypatch.setattr(service, "decide", flaky)
             async with _client(session) as client:
                 refused = await client.post(
-                    f"{BASE}/decide",
-                    json={"token": token, "decision": "approved", "comment": "x" * 2001},
+                    f"{BASE}/decide", json={"token": token, "decision": "approved"}
                 )
+                assert (await _token_row(session, aid)).used_at is None
                 retry = await client.post(
                     f"{BASE}/decide", json={"token": token, "decision": "approved"}
                 )
-            assert refused.status_code == 422
-            assert _detail(refused)["code"] == "comment_too_long"
+            assert refused.status_code == 409
+            assert _detail(refused)["code"] == "already_decided"
             assert retry.status_code == 200, retry.text
             assert len(await _votes(session, aid)) == 1
 
@@ -367,7 +377,12 @@ async def test_decide_body_is_strict(url_fixture: str, request: pytest.FixtureRe
                 )
                 too_long = await client.post(f"{BASE}/inspect", json={"token": "t" * 201})
                 extra = await client.post(f"{BASE}/inspect", json={"token": BAD, "approver_id": 1})
+                long_comment = await client.post(
+                    f"{BASE}/decide",
+                    json={"token": BAD, "decision": "approved", "comment": "x" * 2001},
+                )
             assert bad_decision.status_code == too_long.status_code == extra.status_code == 422
+            assert long_comment.status_code == 422
 
 
 # --- rate limit ------------------------------------------------------------------------------
@@ -438,6 +453,43 @@ async def test_rate_limit_by_token_hash_across_ips(
                         (await c.post(f"{BASE}/inspect", json={"token": token})).status_code
                     )
             assert codes == [200, 200, 200, 429, 429]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_used_link_does_not_feed_the_ip_lock_and_locked_ip_spares_the_budget(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    settings = Settings(environment="test", approval_link_fail_max=2)
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            _, token = await _link(session)
+            redis = FakeRedis()
+            async with _client(session, redis, settings=settings) as client:
+                await client.post(f"{BASE}/decide", json={"token": token, "decision": "approved"})
+                fail_key = "tiqora:approval-link:fail:ip:" + IP_A
+                await client.post(f"{BASE}/inspect", json={"token": token})  # link_used
+                assert await redis.get(fail_key) is None  # a spent link is no guess
+                for _ in range(2):
+                    await client.post(f"{BASE}/inspect", json={"token": BAD})
+                budget_key = "tiqora:approval-link:rl:token:" + tokens.link_digest(BAD)
+                before = await redis.get(budget_key)
+                locked = await client.post(f"{BASE}/inspect", json={"token": BAD})
+            assert locked.status_code == 429
+            assert await redis.get(budget_key) == before  # the lock answered before the budget
+
+
+async def test_counter_without_ttl_heals() -> None:
+    from tiqora.security.ratelimit import ApprovalLinkRateLimiter
+
+    redis = FakeRedis()
+    limiter = ApprovalLinkRateLimiter(redis, Settings(environment="test"))
+    await limiter.record_auth_failure(IP_A)
+    key = "tiqora:approval-link:fail:ip:" + IP_A
+    redis.drop_ttl(key)  # a crash between INCR and EXPIRE
+    assert await redis.ttl(key) == -1
+    await limiter.record_auth_failure(IP_A)
+    assert await redis.ttl(key) > 0
 
 
 @pytest.mark.db
