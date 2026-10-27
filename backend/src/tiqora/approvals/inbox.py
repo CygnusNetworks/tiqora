@@ -10,7 +10,7 @@ numbers and titles come from a second query on ``ticket`` (IN list, never a JOIN
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -26,7 +26,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalStep,
     TiqoraApprovalVote,
 )
-from tiqora.approvals.resolve import canonical_principal
+from tiqora.approvals.resolve import canonical_principal, customer_tickets_in_company
 from tiqora.approvals.service import _excluded_keys, _in_rule
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.jobs.service import utc_now
@@ -62,6 +62,8 @@ class InboxItem:
     can_vote: bool = False
     #: "already_voted" (voted in this step) | "own_request" (delegated row, actor is requester)
     blocked_reason: str | None = None
+    #: status of the approver row (pending, approved, rejected, forwarded, not_needed, ...)
+    approver_status: str = "pending"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +87,11 @@ async def _actor_key(session: AsyncSession, actor: Actor) -> str | None:
 
 
 async def _pending_rows(
-    session: AsyncSession, actor: Actor, *, approval_ids: Sequence[int] | None = None
+    session: AsyncSession,
+    actor: Actor,
+    *,
+    approval_ids: Sequence[int] | None = None,
+    ticket_ids: Collection[int] | None = None,
 ) -> list[_Row]:
     """Pending rows of the actor in inbox order (deadline first, NULL last, then id).
 
@@ -105,6 +111,8 @@ async def _pending_rows(
     scope: list[ColumnElement[bool]] = []
     if approval_ids is not None:
         scope.append(P.id.in_(sorted(set(approval_ids))))
+    if ticket_ids is not None:
+        scope.append(P.ticket_id.in_(sorted(set(ticket_ids))))
     result = await session.execute(
         select(A, S, P)
         .join(S, S.id == A.step_id)
@@ -132,11 +140,22 @@ def _decided_filter(key: str) -> ColumnElement[bool]:
 
 
 async def _decided_rows(
-    session: AsyncSession, key: str, *, limit: int, offset: int
+    session: AsyncSession,
+    key: str,
+    *,
+    limit: int,
+    offset: int,
+    ticket_ids: Collection[int] | None = None,
 ) -> tuple[list[_Row], int]:
+    where: list[ColumnElement[bool]] = [_decided_filter(key)]
+    if ticket_ids is not None:
+        where.append(P.ticket_id.in_(sorted(set(ticket_ids))))
     total = (
         await session.execute(
-            select(func.count(A.id)).outerjoin(V, V.approver_id == A.id).where(_decided_filter(key))
+            select(func.count(A.id))
+            .join(P, P.id == A.approval_id)
+            .outerjoin(V, V.approver_id == A.id)
+            .where(*where)
         )
     ).scalar_one()
     result = await session.execute(
@@ -144,7 +163,7 @@ async def _decided_rows(
         .join(S, S.id == A.step_id)
         .join(P, P.id == A.approval_id)
         .outerjoin(V, V.approver_id == A.id)
-        .where(_decided_filter(key))
+        .where(*where)
         .order_by(A.id.desc())
         .limit(limit)
         .offset(offset)
@@ -261,6 +280,7 @@ async def _items(
                 my_decision=row.vote.decision if row.vote is not None else None,
                 can_vote=pending and blocked[row.approver.id] is None,
                 blocked_reason=blocked.get(row.approver.id),
+                approver_status=row.approver.status,
             )
         )
     return items
@@ -293,3 +313,53 @@ async def pending_count(session: AsyncSession, actor: Actor) -> int:
         return 0
     rows = await _pending_rows(session, actor)
     return sum(1 for reason in (await _blocked(session, key, rows)).values() if reason is None)
+
+
+async def customer_page(
+    session: AsyncSession,
+    actor: Actor,
+    *,
+    state: Literal["pending", "decided"],
+    limit: int,
+    offset: int,
+) -> InboxPage:
+    """The inbox of a customer approver, limited to tickets of the customer's own companies.
+
+    The allowed tickets are resolved once (the customer's approver rows name the candidate
+    tickets, one IN-list lookup on ``ticket`` keeps those whose company the customer belongs
+    to); the decided tab is then paged in SQL like the agent inbox.
+    """
+    key = await _actor_key(session, actor)
+    if key is None:
+        return InboxPage([], 0)
+    candidates = (
+        await session.execute(select(A.ticket_id).where(A.principal == key).distinct())
+    ).scalars()
+    assert actor.principal is not None and actor.principal.login is not None
+    allowed = await customer_tickets_in_company(
+        session, actor.principal.login, [int(t) for t in candidates]
+    )
+    if not allowed:
+        return InboxPage([], 0)
+    if state == "pending":
+        rows = await _pending_rows(session, actor, ticket_ids=allowed)
+        return InboxPage(
+            await _items(session, key, rows[offset : offset + limit], pending=True), len(rows)
+        )
+    page, total = await _decided_rows(session, key, limit=limit, offset=offset, ticket_ids=allowed)
+    return InboxPage(await _items(session, key, page), total)
+
+
+async def row_item(
+    session: AsyncSession,
+    key: str,
+    approver: TiqoraApprovalApprover,
+    step: TiqoraApprovalStep,
+    approval: TiqoraApproval,
+    vote: TiqoraApprovalVote | None,
+    *,
+    pending: bool,
+) -> InboxItem:
+    """The inbox item of one approver row (detail views); *pending* = the row is open now."""
+    (item,) = await _items(session, key, [_Row(approver, step, approval, vote)], pending=pending)
+    return item

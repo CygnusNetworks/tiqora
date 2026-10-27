@@ -126,6 +126,35 @@ async def customer_in_ticket_company(session: AsyncSession, login: str, ticket_i
     return (await _companies_of(session, rows, company))[rows[login.lower()][0]]
 
 
+async def customer_tickets_in_company(
+    session: AsyncSession, login: str, ticket_ids: Sequence[int]
+) -> set[int]:
+    """The subset of *ticket_ids* whose company customer user *login* belongs to.
+
+    One lookup of the customer's companies (own plus ``customer_user_customer`` mappings), then
+    ``ticket.customer_id`` for the tickets in IN-list chunks. Same rule as
+    :func:`customer_in_ticket_company`; tickets without a company are never included.
+    """
+    rows = await _customer_rows(session, [login])
+    found = rows.get(login.lower())
+    if found is None or not ticket_ids:
+        return set()
+    companies = {found[2]}
+    mapped = await session.execute(
+        select(CustomerUserCustomer.customer_id).where(
+            func.lower(CustomerUserCustomer.user_id) == login.lower()
+        )
+    )
+    companies.update(str(c) for (c,) in mapped)
+    allowed: set[int] = set()
+    for chunk in _chunks(sorted(set(ticket_ids))):
+        got = await session.execute(
+            select(Ticket.id, Ticket.customer_id).where(Ticket.id.in_(chunk))
+        )
+        allowed.update(int(i) for i, company in got if company and str(company) in companies)
+    return allowed
+
+
 async def canonical_principal(session: AsyncSession, principal: Principal) -> Principal:
     """A customer principal with the login spelled as stored in ``customer_user``.
 

@@ -37,8 +37,6 @@ from tiqora.domain.customer_auth import AuthenticatedCustomer
 from tiqora.domain.portal_gate import portal_enabled
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
 
-_PAGE_SCAN = 100  # decided rows are scanned in pages of this size (the company filter is Python)
-
 
 def _not_found() -> NoReturn:
     raise HTTPException(
@@ -64,22 +62,6 @@ router = APIRouter(
 )
 
 
-class _CompanyGate:
-    """Whether the customer is inside a ticket's company, one lookup per ticket."""
-
-    def __init__(self, session: AsyncSession, login: str) -> None:
-        self._session = session
-        self._login = login
-        self._seen: dict[int, bool] = {}
-
-    async def __call__(self, ticket_id: int) -> bool:
-        if ticket_id not in self._seen:
-            self._seen[ticket_id] = await customer_in_ticket_company(
-                self._session, self._login, ticket_id
-            )
-        return self._seen[ticket_id]
-
-
 async def _key(session: AsyncSession, customer: AuthenticatedCustomer) -> str:
     return (await canonical_principal(session, Principal.customer(customer.login))).key
 
@@ -93,7 +75,7 @@ def _item(item: inbox.InboxItem) -> PortalApprovalItemOut:
         status=item.status,
         step_name=item.step_name,
         due_at=item.due_at,
-        my_status="pending" if item.my_decision is None else item.my_decision,
+        my_status=item.approver_status,
         my_decision=item.my_decision,
         decided_at=item.decided_at,
         can_decide=item.can_vote,
@@ -109,30 +91,10 @@ async def list_approvals(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PortalApprovalPage:
     """The customer's open ("pending") or already decided requests, inside their company."""
-    key = await _key(session, customer)
-    actor = Actor.customer(customer.login)
-    in_company = _CompanyGate(session, customer.login)
-    if state == "pending":
-        rows = [
-            r
-            for r in await inbox._pending_rows(session, actor)
-            if await in_company(r.approval.ticket_id)
-        ]  # noqa: SLF001
-        items = await inbox._items(session, key, rows[offset : offset + limit], pending=True)  # noqa: SLF001
-        total = len(rows)
-    else:
-        kept: list[inbox._Row] = []  # noqa: SLF001
-        scanned, seen_total = 0, 1
-        while scanned < seen_total:
-            page, seen_total = await inbox._decided_rows(
-                session, key, limit=_PAGE_SCAN, offset=scanned
-            )  # noqa: SLF001
-            scanned += _PAGE_SCAN
-            for found in page:
-                if await in_company(found.approval.ticket_id):
-                    kept.append(found)
-        items = await inbox._items(session, key, kept[offset : offset + limit])  # noqa: SLF001
-        total = len(kept)
+    page = await inbox.customer_page(
+        session, Actor.customer(customer.login), state=state, limit=limit, offset=offset
+    )
+    items, total = page.items, page.total
     await session.rollback()  # read only: end the transaction
     return PortalApprovalPage(
         items=[_item(i) for i in items], total=total, limit=limit, offset=offset
@@ -141,7 +103,10 @@ async def list_approvals(
 
 async def _own_row(
     session: AsyncSession, approval_id: int, key: str
-) -> tuple[TiqoraApproval, inbox._Row] | None:  # noqa: SLF001
+) -> (
+    tuple[TiqoraApproval, TiqoraApprovalApprover, TiqoraApprovalStep, TiqoraApprovalVote | None]
+    | None
+):
     """The request and the customer's most relevant row on it (open one first), or None."""
     approval = (
         await session.execute(
@@ -172,7 +137,7 @@ async def _own_row(
             select(TiqoraApprovalVote).where(TiqoraApprovalVote.approver_id == row.id)
         )
     ).scalar_one_or_none()
-    return approval, inbox._Row(row, step, approval, vote)  # noqa: SLF001
+    return approval, row, step, vote
 
 
 async def _out(
@@ -186,31 +151,27 @@ async def _out(
     found = await _own_row(session, approval_id, key)
     if found is None:
         _not_found()
-    approval, row = found
+    approval, row, step, vote = found
     if require_company and not await customer_in_ticket_company(
         session, customer.login, approval.ticket_id
     ):
         _not_found()
-    open_now = (
-        approval.status == "pending"
-        and row.step.status == "active"
-        and row.approver.status == "pending"
-    )
-    (item,) = await inbox._items(session, key, [row], pending=open_now)  # noqa: SLF001
+    open_now = approval.status == "pending" and step.status == "active" and row.status == "pending"
+    item = await inbox.row_item(session, key, row, step, approval, vote, pending=open_now)
     return PortalApprovalOut(
         id=approval.id,
         title=approval.title,
         description=approval.description,
-        describe_lines=await notify._describe_lines(session, approval),  # noqa: SLF001
+        describe_lines=await notify.describe_lines(session, approval),
         ticket_number=item.ticket_number,
         ticket_title=item.ticket_title,
         status=approval.status,
-        step_name=row.step.name,
-        rule_text_key=f"approvals.rule.{row.step.rule}",
+        step_name=step.name,
+        rule_text_key=f"approvals.rule.{step.rule}",
         required=item.required,
         approved_count=item.approved_count,
-        due_at=row.step.due_at,
-        my_status=row.approver.status,
+        due_at=step.due_at,
+        my_status=row.status,
         my_decision=item.my_decision,
         can_decide=item.can_vote,
     )
@@ -258,11 +219,17 @@ async def post_decision(
             await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == approval_id))
         ).scalar_one_or_none()
         visible = approval is not None and await access.can_view(session, approval, actor)
+        in_company = approval is not None and await customer_in_ticket_company(
+            session, customer.login, approval.ticket_id
+        )
         await session.rollback()
         if not visible:
             _not_found()
+        refusal = err
+        if not in_company:  # whatever the request's state: closed must not look different
+            refusal = ApprovalError("customer_approver_outside_company", 403)
         raise HTTPException(
-            err.http_status, detail={"code": err.code, "detail": err.detail}
+            refusal.http_status, detail={"code": refusal.code, "detail": refusal.detail}
         ) from err
     await session.commit()
     await publish_approval_changed(get_pubsub_redis(settings), result.affected_user_ids)

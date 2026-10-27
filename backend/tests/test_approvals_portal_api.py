@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import DBAPIError
@@ -413,9 +414,11 @@ async def test_portal_decide(url_fixture: str, request: pytest.FixtureRequest) -
                 )
                 assert len(await _votes(session, aid)) == 1
                 done = (await client.get(BASE, params={"state": "decided"})).json()
-                assert [(i["id"], i["my_decision"], i["can_decide"]) for i in done["items"]] == [
-                    (aid, "approved", False)
-                ]
+                assert [
+                    (i["id"], i["my_decision"], i["my_status"], i["can_decide"])
+                    for i in done["items"]
+                ] == [(aid, "approved", "approved", False)]
+                assert (await client.get(f"{BASE}/{aid}")).json()["my_status"] == "approved"
                 assert (await client.get(BASE)).json()["items"] == []
 
 
@@ -424,21 +427,91 @@ async def test_portal_decide(url_fixture: str, request: pytest.FixtureRequest) -
 async def test_portal_decide_outside_company(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
+    """403 whether the request is open or already closed: the state is not an oracle."""
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
             await _enable(session)
-            aid = await _request(session, _defn(_step("Kunde", _cust(K2))))
+            open_id = await _request(session, _defn(_step("Kunde", _cust(K2))))
+            closed_id = await _request(session, _defn(_step("Kunde", _cust(K2))), ticket=T1)
+            await service.cancel_approval(
+                session, closed_id, actor=Actor.agent(AG1), settings=SETTINGS
+            )
             await session.execute(
                 text("UPDATE ticket SET customer_id = :c WHERE id = :t"), {"c": ANDERE, "t": T1}
             )
             await session.commit()
             async with _client(session, K2) as client:
-                response = await client.post(
-                    f"{BASE}/{aid}/decision", json={"decision": "approved"}
+                for aid in (open_id, closed_id):
+                    response = await client.post(
+                        f"{BASE}/{aid}/decision", json={"decision": "approved"}
+                    )
+                    assert response.status_code == 403, response.text
+                    assert response.json()["detail"]["code"] == "customer_approver_outside_company"
+            assert await _votes(session, open_id) == []
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_portal_decided_tab_pages_in_sql_inside_the_company(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
+            await _enable(session)
+            ids = []
+            for _ in range(3):
+                aid = await _request(session, _defn(_step("Kunde", _cust(K2))))
+                await service.decide(
+                    session,
+                    aid,
+                    actor=Actor.customer(K2),
+                    decision="approved",
+                    channel="portal",
+                    settings=SETTINGS,
                 )
-            assert response.status_code == 403
-            assert response.json()["detail"]["code"] == "customer_approver_outside_company"
-            assert await _votes(session, aid) == []
+                ids.append(aid)
+            await session.execute(
+                text("UPDATE ticket SET customer_id = :c WHERE id = :t"), {"c": FIRMA, "t": T2}
+            )
+            elsewhere = await _request(session, _defn(_step("Kunde", _cust(K2))), ticket=T2)
+            await service.decide(
+                session,
+                elsewhere,
+                actor=Actor.customer(K2),
+                decision="approved",
+                channel="portal",
+                settings=SETTINGS,
+            )
+            await session.execute(  # the company is gone again: this one must not be listed
+                text("UPDATE ticket SET customer_id = NULL WHERE id = :t"), {"t": T2}
+            )
+            await session.commit()
+            async with _client(session, K2) as client:
+                seen: list[int] = []
+                for offset in (0, 2):
+                    page = (
+                        await client.get(
+                            BASE, params={"state": "decided", "limit": 2, "offset": offset}
+                        )
+                    ).json()
+                    assert page["total"] == 3  # the ticket without a company is not counted
+                    seen += [i["id"] for i in page["items"]]
+                assert sorted(seen) == sorted(ids)
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_require_portal_approvals_checks_the_portal_switch(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The dependency's own ``portal_enabled()`` branch (the app-level gate would hide it)."""
+    async with approvals_session(request, url_fixture, world=False) as session:
+        await _enable(session)
+        await session.commit()
+        await require_portal_approvals(session, SETTINGS)  # on: passes
+        with pytest.raises(HTTPException) as refused:
+            await require_portal_approvals(session, Settings(environment="test"))
+        assert (refused.value.status_code, refused.value.detail) == (404, "Not Found")
 
 
 @pytest.mark.db

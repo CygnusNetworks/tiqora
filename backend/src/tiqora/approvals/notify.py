@@ -367,6 +367,11 @@ async def _describe_lines(session: AsyncSession, approval: TiqoraApproval) -> li
         return []
 
 
+async def describe_lines(session: AsyncSession, approval: TiqoraApproval) -> list[str]:
+    """The subject type's "what is this about" lines for *approval* (empty when it has none)."""
+    return await _describe_lines(session, approval)
+
+
 async def _decision_link(
     session: AsyncSession,
     ctx: JobContext,
