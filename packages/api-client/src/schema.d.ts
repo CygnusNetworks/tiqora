@@ -4146,6 +4146,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/change/cabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cabs
+         * @description All CABs with their members, valid or not.
+         */
+        get: operations["get_cabs_api_v1_admin_itsm_change_cabs_get"];
+        put?: never;
+        /**
+         * Post Cab
+         * @description A new CAB without members; add them with ``PUT /cabs/{id}/members``.
+         */
+        post: operations["post_cab_api_v1_admin_itsm_change_cabs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/cabs/{cab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Cab
+         * @description Replace name, rule and flags; the members stay and must fit the rule.
+         */
+        put: operations["put_cab_api_v1_admin_itsm_change_cabs__cab_id__put"];
+        post?: never;
+        /**
+         * Delete Cab Route
+         * @description Delete the CAB; refused (409 ``cab_has_meetings``) while it has meetings.
+         */
+        delete: operations["delete_cab_route_api_v1_admin_itsm_change_cabs__cab_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/cabs/{cab_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Cab Members
+         * @description Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),
+         *     customer_user (login), resolver (key); users, groups and roles must exist.
+         */
+        put: operations["put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/itsm/change/freeze-windows": {
         parameters: {
             query?: never;
@@ -9450,6 +9519,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/cab-meetings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cab Meetings
+         * @description Meetings that overlap ``[start, end)`` (without their agenda lines); times are UTC.
+         */
+        get: operations["get_cab_meetings_api_v1_itsm_cab_meetings_get"];
+        put?: never;
+        /**
+         * Post Cab Meeting
+         * @description Plan a meeting (change managers).
+         */
+        post: operations["post_cab_meeting_api_v1_itsm_cab_meetings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cab-meetings/{meeting_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cab Meeting
+         * @description Meeting with agenda and minutes; lines of unreadable changes are ``hidden``.
+         */
+        get: operations["get_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Cab Meeting
+         * @description Title, time, place, status and minutes of a meeting (change managers).
+         */
+        patch: operations["patch_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/itsm/cab-meetings/{meeting_id}/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Cab Meeting Agenda
+         * @description Replace the agenda of a planned meeting (change managers).
+         */
+        put: operations["put_cab_meeting_agenda_api_v1_itsm_cab_meetings__meeting_id__agenda_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cab-meetings/{meeting_id}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cab Meeting Suggestions
+         * @description Readable changes waiting for this meeting's CAB to decide.
+         */
+        get: operations["get_cab_meeting_suggestions_api_v1_itsm_cab_meetings__meeting_id__suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cabs
+         * @description Valid CABs with their members (for the change's CAB choice and the meeting pages).
+         */
+        get: operations["get_cabs_api_v1_itsm_cabs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/catalog": {
         parameters: {
             query?: never;
@@ -14321,6 +14498,45 @@ export interface components {
             truncated: boolean;
         };
         /**
+         * AgendaEntryOut
+         * @description ``hidden`` lines carry nothing but their ``position``.
+         */
+        AgendaEntryOut: {
+            approval: components["schemas"]["ApprovalSnapshotOut"] | null;
+            /** Change Ticket Id */
+            change_ticket_id: number | null;
+            /** Change Type */
+            change_type: ("standard" | "normal" | "emergency") | null;
+            /** Hidden */
+            hidden: boolean;
+            /** Note */
+            note: string | null;
+            /** Phase */
+            phase: ("draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled") | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Title */
+            title: string | null;
+            /** Tn */
+            tn: string | null;
+        };
+        /** AgendaIn */
+        AgendaIn: {
+            /** Items */
+            items?: components["schemas"]["AgendaItemIn"][];
+        };
+        /** AgendaItemIn */
+        AgendaItemIn: {
+            /** Change Ticket Id */
+            change_ticket_id: number;
+            /** Note */
+            note?: string | null;
+        };
+        /**
          * AgentCustomerCreateOut
          * @description Created customer-user ref for the ticket Kunde dialog.
          */
@@ -16701,6 +16917,102 @@ export interface components {
              * @enum {string}
              */
             target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+        };
+        /** CabChangeItemOut */
+        CabChangeItemOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
+        /** CabIn */
+        CabIn: {
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Emergency
+             * @default false
+             */
+            is_emergency: boolean;
+            /** Name */
+            name: string;
+            /** Quorum */
+            quorum?: number | null;
+            /**
+             * Rule
+             * @default majority
+             * @enum {string}
+             */
+            rule: "any" | "all" | "majority" | "quorum";
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** CabMemberIn */
+        CabMemberIn: {
+            /**
+             * Member Kind
+             * @enum {string}
+             */
+            member_kind: "user" | "group" | "role" | "list" | "customer_user" | "resolver";
+            /** Member Ref */
+            member_ref: string;
+        };
+        /** CabOut */
+        CabOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Emergency */
+            is_emergency: boolean;
+            /** Members */
+            members: components["schemas"]["ResolvedMemberOut"][];
+            /** Name */
+            name: string;
+            /** Quorum */
+            quorum: number | null;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "any" | "all" | "majority" | "quorum";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+            /** Valid */
+            valid: boolean;
         };
         /** CalendarOut */
         CalendarOut: {
@@ -23965,6 +24277,91 @@ export interface components {
             /** Key */
             key: string;
         };
+        /** MeetingIn */
+        MeetingIn: {
+            /** Cab Id */
+            cab_id: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Location */
+            location?: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Title */
+            title: string;
+        };
+        /** MeetingOut */
+        MeetingOut: {
+            /** Agenda */
+            agenda: components["schemas"]["AgendaEntryOut"][];
+            /** Agenda Count */
+            agenda_count: number;
+            /** Cab Id */
+            cab_id: number;
+            /** Cab Name */
+            cab_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Id */
+            id: number;
+            /** Location */
+            location: string | null;
+            /** Minutes */
+            minutes: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "held" | "cancelled";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+        };
+        /**
+         * MeetingUpdateIn
+         * @description Only the fields that are sent change; the CAB of a meeting stays.
+         */
+        MeetingUpdateIn: {
+            /** Ends At */
+            ends_at?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Minutes */
+            minutes?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Status */
+            status?: ("planned" | "held" | "cancelled") | null;
+            /** Title */
+            title?: string | null;
+        };
         /** MentionCreate */
         MentionCreate: {
             /** Article Id */
@@ -27331,6 +27728,22 @@ export interface components {
             label: string | null;
             /** Url */
             url: string | null;
+        };
+        /** ResolvedMemberOut */
+        ResolvedMemberOut: {
+            /** Count */
+            count: number | null;
+            /** Label */
+            label: string;
+            /**
+             * Member Kind
+             * @enum {string}
+             */
+            member_kind: "user" | "group" | "role" | "list" | "customer_user" | "resolver";
+            /** Member Ref */
+            member_ref: string;
+            /** Missing */
+            missing: boolean;
         };
         /** RestartIn */
         RestartIn: {
@@ -41952,6 +42365,187 @@ export interface operations {
             };
         };
     };
+    get_cabs_api_v1_admin_itsm_change_cabs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_cab_api_v1_admin_itsm_change_cabs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_cab_api_v1_admin_itsm_change_cabs__cab_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cab_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_cab_route_api_v1_admin_itsm_change_cabs__cab_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cab_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cab_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabMemberIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_freeze_windows_api_v1_admin_itsm_change_freeze_windows_get: {
         parameters: {
             query?: never;
@@ -56068,6 +56662,260 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerTicketsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cab_meetings_api_v1_itsm_cab_meetings_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_cab_meeting_api_v1_itsm_cab_meetings_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_cab_meeting_agenda_api_v1_itsm_cab_meetings__meeting_id__agenda_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgendaIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cab_meeting_suggestions_api_v1_itsm_cab_meetings__meeting_id__suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabChangeItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cabs_api_v1_itsm_cabs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"][];
                 };
             };
             /** @description Validation Error */

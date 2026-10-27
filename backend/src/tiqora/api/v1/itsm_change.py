@@ -49,6 +49,7 @@ from tiqora.itsm.change.cab import (
     get_meeting,
     list_cabs,
     list_meetings,
+    meeting_cab_id,
     set_agenda,
     suggest_agenda,
     update_meeting,
@@ -244,8 +245,10 @@ async def get_cab_meeting_suggestions(
 ) -> list[CabChangeItemOut]:
     """Readable changes waiting for this meeting's CAB to decide."""
     await require_change_mode(session, settings)
-    meeting = await get_meeting(session, meeting_id=meeting_id, user_id=user.id)
-    items = await suggest_agenda(session, settings, cab_id=meeting.cab_id, user_id=user.id)
+    cab_id = await meeting_cab_id(session, meeting_id)
+    items = await suggest_agenda(
+        session, settings, cab_id=cab_id, user_id=user.id, meeting_id=meeting_id
+    )
     return [cab_change_item_out(i) for i in items]
 
 

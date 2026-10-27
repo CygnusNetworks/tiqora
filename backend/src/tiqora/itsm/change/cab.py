@@ -39,7 +39,7 @@ from pydantic import (
     ValidationError,
     model_validator,
 )
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -315,8 +315,8 @@ async def _view(session: AsyncSession, cab: TiqoraItsmCab) -> CabView:
     )
 
 
-async def _cab(session: AsyncSession, cab_id: int) -> TiqoraItsmCab:
-    cab = await session.get(TiqoraItsmCab, cab_id)
+async def _cab(session: AsyncSession, cab_id: int, *, lock: bool = False) -> TiqoraItsmCab:
+    cab = await session.get(TiqoraItsmCab, cab_id, with_for_update=lock)
     if cab is None:
         raise ChangeError("cab_not_found", 404)
     return cab
@@ -360,6 +360,11 @@ async def update_cab(session: AsyncSession, *, cab_id: int, data: CabIn, user_id
     """Admin. Replaces name, rule and flags; the members stay (and must fit the new rule)."""
     cab = await _cab(session, cab_id)
     check_definition(data.name, data.rule, data.quorum, await _stored_members(session, cab_id))
+    taken = await session.execute(
+        select(TiqoraItsmCab.id).where(TiqoraItsmCab.name == data.name, TiqoraItsmCab.id != cab_id)
+    )
+    if taken.first() is not None:  # before touching the row: a refused update leaves it clean
+        raise ChangeError("cab_name_exists", 409)
     cab.name = data.name
     cab.description = data.description
     cab.rule = data.rule
@@ -398,7 +403,7 @@ async def set_members(
 ) -> CabView:
     """Admin. Replaces the member list (order kept). The result must be a definition the
     engine accepts with the CAB's rule and quorum."""
-    cab = await _cab(session, cab_id)
+    cab = await _cab(session, cab_id, lock=True)  # concurrent replaces take turns
     await _check_members(session, members)
     check_definition(
         cab.name, cab.rule, cab.quorum, [(m.member_kind, m.member_ref) for m in members]
@@ -509,11 +514,18 @@ async def _require_manager(session: AsyncSession, settings: Settings, user_id: i
         raise ChangeError("forbidden", 403)
 
 
-async def _meeting(session: AsyncSession, meeting_id: int) -> TiqoraItsmCabMeeting:
-    meeting = await session.get(TiqoraItsmCabMeeting, meeting_id)
+async def _meeting(
+    session: AsyncSession, meeting_id: int, *, lock: bool = False
+) -> TiqoraItsmCabMeeting:
+    meeting = await session.get(TiqoraItsmCabMeeting, meeting_id, with_for_update=lock)
     if meeting is None:
         raise ChangeError("meeting_not_found", 404)
     return meeting
+
+
+async def meeting_cab_id(session: AsyncSession, meeting_id: int) -> int:
+    """The CAB of a meeting (404 ``meeting_not_found``); no agenda is loaded."""
+    return int((await _meeting(session, meeting_id)).cab_id)
 
 
 async def _cab_names(session: AsyncSession, cab_ids: set[int]) -> dict[int, str]:
@@ -668,14 +680,14 @@ async def update_meeting(
     await _require_manager(session, settings, user_id)
     meeting = await _meeting(session, meeting_id)
     sent = data.model_fields_set
+    starts = to_utc_naive(data.starts_at) if data.starts_at is not None else meeting.starts_at
+    ends = to_utc_naive(data.ends_at) if data.ends_at is not None else meeting.ends_at
+    if ends <= starts:
+        raise ChangeError("range_invalid", 422)
     if data.title is not None:
         meeting.title = data.title
-    if data.starts_at is not None:
-        meeting.starts_at = to_utc_naive(data.starts_at)
-    if data.ends_at is not None:
-        meeting.ends_at = to_utc_naive(data.ends_at)
-    if meeting.ends_at <= meeting.starts_at:
-        raise ChangeError("range_invalid", 422)
+    meeting.starts_at = starts
+    meeting.ends_at = ends
     if "location" in sent:
         meeting.location = (data.location or "").strip() or None
     if data.status is not None:
@@ -703,7 +715,7 @@ async def set_agenda(
     changes answer alike). Lines the caller cannot read are kept behind the given ones.
     """
     await _require_manager(session, settings, user_id)
-    meeting = await _meeting(session, meeting_id)
+    meeting = await _meeting(session, meeting_id, lock=True)  # concurrent replaces take turns
     if meeting.status != "planned":
         raise ChangeError("meeting_not_planned", 409)
     if len(items) > MAX_AGENDA:
@@ -760,24 +772,41 @@ async def set_agenda(
 
 
 async def suggest_agenda(
-    session: AsyncSession, settings: Settings, *, cab_id: int, user_id: int
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    cab_id: int,
+    user_id: int,
+    meeting_id: int | None = None,
 ) -> list[CabChangeItem]:
-    """Changes in ``approval`` that this CAB decides (its own, or by the default / emergency CAB
-    setting), readable by the caller; planned start first."""
-    await _cab(session, cab_id)
+    """Changes in ``approval`` that this (valid) CAB decides (its own, or by the default /
+    emergency CAB setting), readable by the caller, planned start first. With ``meeting_id`` the
+    changes already on that agenda are left out. The cap (:data:`MAX_SUGGESTIONS`, newest changes
+    first) applies after the CAB filter, so other CABs' changes never push these out."""
+    cab = await _cab(session, cab_id)
+    if not cab.valid:
+        raise ChangeError("cab_not_found", 422)
     cfg = await load_change_settings(session, settings)
-    rows = list(
-        (
-            await session.execute(
-                select(TiqoraItsmChange)
-                .where(
-                    TiqoraItsmChange.phase == "approval",
-                    (TiqoraItsmChange.cab_id == cab_id) | TiqoraItsmChange.cab_id.is_(None),
+    ch = TiqoraItsmChange
+    by_setting = []
+    if cfg.emergency_cab_id == cab_id:
+        by_setting.append(ch.change_type == "emergency")
+    if cfg.default_cab_id == cab_id:
+        by_setting.append(true() if not cfg.emergency_cab_id else ch.change_type != "emergency")
+    decides = ch.cab_id == cab_id
+    if by_setting:
+        decides = or_(decides, and_(ch.cab_id.is_(None), or_(*by_setting)))
+    stmt = select(ch).where(ch.phase == "approval", decides)
+    if meeting_id is not None:
+        stmt = stmt.where(
+            ch.ticket_id.not_in(
+                select(TiqoraItsmCabAgendaItem.change_ticket_id).where(
+                    TiqoraItsmCabAgendaItem.meeting_id == meeting_id
                 )
-                .order_by(TiqoraItsmChange.ticket_id)
-                .limit(MAX_SUGGESTIONS)
             )
-        ).scalars()
+        )
+    rows = list(
+        (await session.execute(stmt.order_by(ch.ticket_id.desc()).limit(MAX_SUGGESTIONS))).scalars()
     )
     mine = [r for r in rows if effective_cab_id(r, cfg) == cab_id]
     readable = await readable_tickets(session, [int(r.ticket_id) for r in mine], user_id=user_id)

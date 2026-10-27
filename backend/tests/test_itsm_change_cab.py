@@ -321,6 +321,11 @@ async def test_cab_crud_and_members(w: ChangeWorld) -> None:
     assert renamed.updated_by == U_MANAGER and len(renamed.members) == 2
     assert [c.id for c in await list_cabs(w.session, include_invalid=False) if c.id == cab.id] == []
 
+    await create_cab(w.session, data=CabIn(name="chg94 CAB Gamma"), user_id=1)
+    with pytest.raises(ChangeError) as clash:
+        await update_cab(w.session, cab_id=cab.id, data=CabIn(name="chg94 CAB Gamma"), user_id=1)
+    assert (_code(clash), clash.value.http_status) == ("cab_name_exists", 409)
+
     with pytest.raises(ChangeError) as missing:
         await update_cab(w.session, cab_id=947198, data=CabIn(name="n"), user_id=1)
     assert (_code(missing), missing.value.http_status) == ("cab_not_found", 404)
@@ -624,7 +629,7 @@ async def test_agenda_only_open_changes_and_readable(w: ChangeWorld) -> None:
     assert emptied.agenda == [] and emptied.agenda_count == 0
 
 
-async def test_agenda_hides_unreadable_change(w: ChangeWorld, port: FakeApprovalPort) -> None:
+async def test_agenda_hides_unreadable_change(w: ChangeWorld) -> None:
     await make_cab(w.session, cab_id=CAB_A, members=[("user", str(U_FULL))])
     mid = await _meeting(w)
     open_change = await _at(w, await _create(w), "approval", approval_id=None)
@@ -801,3 +806,61 @@ async def test_approval_request_uses_cab_rule_and_members(
     # the board a change names also decides while it stays in the suggestions of its CAB
     suggested = await suggest_agenda(w.session, APP_SETTINGS, cab_id=cab.id, user_id=U_MANAGER)
     assert [i.ticket_id for i in suggested] == [tid]
+
+
+async def test_suggest_agenda_emergency_cab_meeting_and_invalid(w: ChangeWorld) -> None:
+    await make_cab(w.session, cab_id=CAB_A, members=[("user", str(U_FULL))])
+    await make_cab(w.session, cab_id=CAB_B, members=[("user", str(U_FULL))])
+    await make_cab(w.session, cab_id=CAB_C, members=[("user", str(U_FULL))], valid=False)
+    await save_section_values(
+        w.session,
+        ITSM_CHANGE_SECTION,
+        {"default_cab_id": CAB_A, "emergency_cab_id": CAB_B},
+        secret_key=APP_SETTINGS.secret_key,
+    )
+    emergency = await _at(w, await _create(w, change_type="emergency"), "approval")
+    normal = await _at(w, await _create(w), "approval")
+
+    ecab = await suggest_agenda(w.session, APP_SETTINGS, cab_id=CAB_B, user_id=U_MANAGER)
+    assert [i.ticket_id for i in ecab] == [emergency.ticket_id]
+    default = await suggest_agenda(w.session, APP_SETTINGS, cab_id=CAB_A, user_id=U_MANAGER)
+    assert [i.ticket_id for i in default] == [normal.ticket_id]  # emergency has its own CAB
+
+    mid = await _meeting(w, CAB_A)
+    await set_agenda(
+        w.session, APP_SETTINGS, meeting_id=mid, items=_agenda(normal.ticket_id), user_id=U_MANAGER
+    )
+    left = await suggest_agenda(
+        w.session, APP_SETTINGS, cab_id=CAB_A, user_id=U_MANAGER, meeting_id=mid
+    )
+    assert left == []  # already on this agenda
+
+    with pytest.raises(ChangeError) as invalid:
+        await suggest_agenda(w.session, APP_SETTINGS, cab_id=CAB_C, user_id=U_MANAGER)
+    assert (_code(invalid), invalid.value.http_status) == ("cab_not_found", 422)
+
+
+async def test_delete_cab_referenced_by_change_clears_reference(w: ChangeWorld) -> None:
+    await make_cab(w.session, cab_id=CAB_A, members=[("user", str(U_FULL))])
+    tid = await _create(w, cab_id=CAB_A)
+    await delete_cab(w.session, cab_id=CAB_A)
+    row = await w.session.get(TiqoraItsmChange, tid)
+    assert row is not None
+    await w.session.refresh(row)
+    assert row.cab_id is None  # ON DELETE SET NULL
+
+
+async def test_update_meeting_invalid_window_changes_nothing(w: ChangeWorld) -> None:
+    await make_cab(w.session, cab_id=CAB_A)
+    mid = await _meeting(w)
+    with pytest.raises(ChangeError):
+        await update_meeting(
+            w.session,
+            APP_SETTINGS,
+            meeting_id=mid,
+            data=MeetingUpdateIn(title="neu", ends_at=SOON - timedelta(hours=1)),
+            user_id=U_MANAGER,
+        )
+    await w.session.flush()  # a caller that goes on with the session flushes nothing wrong
+    kept = await get_meeting(w.session, meeting_id=mid, user_id=U_MANAGER)
+    assert (kept.title, kept.ends_at) == ("CAB Woche 45", SOON + timedelta(hours=1))

@@ -2211,7 +2211,7 @@ async def test_run_erasure_cab_member_customer_login(mariadb_znuny_url: str, mod
 
     async with factory() as session:
         await _seed_tiqora_tables(session, mysql=True)
-        await _insert_company(session, customer_id=company, name="Acme CAB")
+        await _insert_company(session, customer_id=company, name=f"Acme CAB {mode}")
         cuid = await _insert_customer(session, login=login, customer_id=company)
         await session.execute(
             text(
@@ -2235,7 +2235,7 @@ async def test_run_erasure_cab_member_customer_login(mariadb_znuny_url: str, mod
             )
         await session.commit()
 
-    await run_erasure(
+    result = await run_erasure(
         factory,
         Settings(),
         customer_user_ids=[cuid],
@@ -2270,6 +2270,26 @@ async def test_run_erasure_cab_member_customer_login(mariadb_znuny_url: str, mod
                 assert ("customer_user", new_login) in members
             else:
                 assert len(members) == 2
+
+        if mode == "anonymize":  # the rollback gives the member its original login back
+            await rollback_job(
+                factory, Settings(), result.job_id, force_parallel=True, actor="test"
+            )
+            async with factory() as session:
+                back = (
+                    await session.execute(
+                        text(
+                            "SELECT member_kind, member_ref FROM tiqora_itsm_cab_member"
+                            " WHERE cab_id = :c"
+                        ),
+                        {"c": cab_id},
+                    )
+                ).all()
+                assert {(str(k), str(r)) for k, r in back} == {
+                    ("customer_user", login),
+                    ("customer_user", f"keep.{login}"),
+                    ("resolver", login),
+                }
     finally:
         async with factory() as session:
             await session.execute(text("DELETE FROM tiqora_itsm_cab WHERE id = :c"), {"c": cab_id})

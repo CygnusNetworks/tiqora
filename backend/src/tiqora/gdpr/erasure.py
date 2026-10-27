@@ -2564,6 +2564,14 @@ async def _rollback_login_renames(session: AsyncSession, job_id: int) -> None:
                 ),
                 {"old": old_login, "new": new_login},
             )
+        if await _table_exists(session, "tiqora_itsm_cab_member"):
+            await session.execute(
+                text(
+                    "UPDATE tiqora_itsm_cab_member SET member_ref = :old"
+                    " WHERE member_kind = 'customer_user' AND member_ref = :new"
+                ),
+                {"old": old_login, "new": new_login},
+            )
 
 
 async def purge_expired_backups(
