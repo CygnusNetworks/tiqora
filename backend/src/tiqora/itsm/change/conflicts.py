@@ -35,7 +35,7 @@ from tiqora.itsm.change.models import (
     TiqoraItsmChangeImpact,
     TiqoraItsmChangeTask,
 )
-from tiqora.itsm.change.service import _row, _ticket
+from tiqora.itsm.change.service import _ticket
 from tiqora.itsm.ci_provider import CiRef
 from tiqora.itsm.providers import get_ci_provider
 from tiqora.znuny.sysconfig import SysConfig
@@ -222,6 +222,12 @@ async def load_conflicts(
 
     ``user_id=None``: everything, for guards and risk. With a user: see the module docstring.
     """
+    return (await _load(session, ticket_id=ticket_id, user_id=user_id))[0]
+
+
+async def _load(
+    session: AsyncSession, *, ticket_id: int, user_id: int | None
+) -> tuple[list[Conflict], _ImpactSet]:
     row = await session.get(TiqoraItsmChange, ticket_id)
     if row is None:
         raise ChangeError("change_not_found", 404)
@@ -292,7 +298,7 @@ async def load_conflicts(
         conflicts.append(Conflict("freeze_truncated", "warn", None, *(window or (None, None))))
     if overlap_truncated:
         conflicts.append(Conflict("overlap_truncated", "warn", None, *(window or (None, None))))
-    return conflicts
+    return conflicts, mine
 
 
 # --- API read --------------------------------------------------------------------------------
@@ -323,13 +329,14 @@ async def read_conflicts(
     """Conflicts as the caller may see them (404 without ``ro`` on the change ticket)."""
     await require_change_mode(session, settings)
     await _ticket(session, ticket_id, user_id=user_id)
-    await _row(session, ticket_id)
-    conflicts = await load_conflicts(session, ticket_id=ticket_id, user_id=user_id)
+    conflicts, mine = await _load(session, ticket_id=ticket_id, user_id=user_id)
 
-    mine = (await _impact_sets(session, [ticket_id]))[ticket_id]
-    shared_cis = {c for item in conflicts if not item.hidden for c in item.shared_cis}
+    shown = [c for c in conflicts if not c.hidden]
+    shared_cis = {i for c in shown for i in c.shared_cis}
+    # services reached only through CIs the caller cannot read stay unnamed (like read_impact)
+    indirect = {s for c in shown for s in c.shared_services} - mine.direct_services
     readable_cis: set[int] = set()
-    if shared_cis or mine.cis:
+    if shared_cis or indirect:  # the CMDB is only needed when the answer names one of them
         provider = get_ci_provider("tiqora", sysconfig)
         if provider is None:
             raise ChangeError("cmdb_unavailable", 409)
@@ -337,9 +344,8 @@ async def read_conflicts(
             session, [CiRef("tiqora", i) for i in sorted(mine.cis)], user_id=user_id
         )
         readable_cis = {ref.id for ref in summaries}
-    # services reached only through CIs the caller cannot read stay unnamed (like read_impact)
     visible_services = set(mine.direct_services)
-    if readable_cis:
+    if indirect and readable_cis:
         visible_services |= await services_reached_from(session, sorted(readable_cis))
     return [
         ConflictOut(

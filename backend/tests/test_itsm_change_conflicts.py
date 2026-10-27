@@ -14,10 +14,12 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import text, update
 
 from tests._change_fixtures import (
     APP_SETTINGS,
+    G_A,
+    G_B,
     Q_A,
     Q_B,
     SERVICE,
@@ -26,8 +28,12 @@ from tests._change_fixtures import (
     ChangeWorld,
     change_world,
 )
+from tests._cmdb_helpers import make_ci, make_class
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
+from tiqora.cmdb.links import LinkEnd, LinkService
+from tiqora.cmdb.seed import seed_defaults
+from tiqora.cmdb.service import system_access
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.change import conflicts as conflicts_module
@@ -185,7 +191,7 @@ async def w(request: pytest.FixtureRequest) -> AsyncIterator[ChangeWorld]:
         await world.session.execute(
             text(
                 "INSERT INTO service (id, name, valid_id, create_time, create_by, change_time,"
-                " change_by) VALUES (:id, 'chg94-service-b', 1, :t, 1, :t, 1)"
+                " change_by) VALUES (:id, 'chg94-service-a', 1, :t, 1, :t, 1)"
             ),
             {"id": SVC_A, "t": datetime(2026, 10, 1)},
         )
@@ -380,8 +386,58 @@ async def test_conflict_with_unreadable_change_is_hidden(
 
 
 async def test_read_conflicts_names_only_readable_shared_cis(w: ChangeWorld) -> None:
-    mine = await _change(w, phase="assessment", services=(), cis=())
+    await seed_defaults(w.session)
+    svc_x = 946832
+    await w.session.execute(
+        text(
+            "INSERT INTO service (id, name, valid_id, create_time, create_by, change_time,"
+            " change_by) VALUES (:id, 'chg94-service-x', 1, :t, 1, :t, 1)"
+        ),
+        {"id": svc_x, "t": datetime(2026, 10, 1)},
+    )
+    shown_class = await make_class(w.session, key="chg94srv", group_id=G_A)
+    secret_class = await make_class(w.session, key="chg94vault", group_id=G_B)
+    shown = await make_ci(w.session, shown_class, "srv-app-01.example.org", user_id=U_FULL)
+    secret = await make_ci(w.session, secret_class, "srv-vault-01.example.org", user_id=U_FULL)
+    # svc_x is reachable only through the CI the caller cannot read
+    await LinkService(w.session).add(
+        system_access(U_FULL),
+        source=LinkEnd("service", str(svc_x)),
+        target=LinkEnd("ci", str(secret)),
+        link_type_key="DependsOn",
+        enforce_permissions=False,
+    )
+    mine = await _change(w, phase="assessment", services=(SVC_A, svc_x), cis=(shown, secret))
+    await w.session.execute(
+        update(TiqoraItsmChangeImpact)
+        .where(
+            TiqoraItsmChangeImpact.ticket_id == mine, TiqoraItsmChangeImpact.ref_key == str(svc_x)
+        )
+        .values(direct=False)
+    )
+    other = await _change(w, services=(SVC_A, svc_x), cis=(shown, secret))
+
     out = await read_conflicts(
         w.session, APP_SETTINGS, ticket_id=mine, user_id=U_FULL, sysconfig=SysConfig(w.session)
     )
-    assert out == []
+    assert [c.ref for c in out] == [f"change:{other}"]
+    item = out[0]
+    assert item.shared_cis == [shown] and item.shared_ci_count == 2
+    assert item.shared_services == [SVC_A] and item.shared_service_count == 2
+    assert "srv-vault" not in item.model_dump_json()
+    assert str(secret) not in {str(i) for i in item.shared_cis}
+    assert svc_x not in item.shared_services
+
+
+async def test_read_conflicts_needs_no_cmdb_when_nothing_is_named(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(conflicts_module, "get_ci_provider", lambda *_a, **_k: None)
+    mine = await _change(w, phase="assessment", services=(SVC_A,), cis=(CI_A,))
+    await _change(w, services=(SVC_A,), cis=(CI_B,))
+    out = await read_conflicts(
+        w.session, APP_SETTINGS, ticket_id=mine, user_id=U_FULL, sysconfig=SysConfig(w.session)
+    )
+    assert [(c.kind, c.shared_services, c.shared_cis) for c in out] == [
+        ("change_overlap", [SVC_A], [])
+    ]
