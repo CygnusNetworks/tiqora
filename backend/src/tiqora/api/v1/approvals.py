@@ -8,14 +8,24 @@ tells the affected agents' browsers (``approval_changed``) that their inbox chan
 from __future__ import annotations
 
 from collections.abc import Awaitable, Iterable
-from typing import Annotated, Literal, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.deps import AppSettings, CurrentUser, DbSession
-from tiqora.approvals import access, delegation, detail, inbox, lists, service, templates
+from tiqora.api.deps import AppSettings, CurrentUser, DbSession, get_redis
+from tiqora.approvals import (
+    access,
+    delegation,
+    detail,
+    inbox,
+    lists,
+    notify,
+    service,
+    templates,
+    tokens,
+)
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
@@ -27,6 +37,7 @@ from tiqora.approvals.models import (
     TiqoraApproval,
     TiqoraApprovalApprover,
     TiqoraApprovalDelegation,
+    TiqoraApprovalStep,
 )
 from tiqora.approvals.schemas import (
     ApprovalDetailOut,
@@ -41,6 +52,10 @@ from tiqora.approvals.schemas import (
     ForwardIn,
     InboxCountOut,
     InboxItemOut,
+    LinkDecideIn,
+    LinkDecisionOut,
+    LinkInspectIn,
+    LinkInspectOut,
     ResolverOptionOut,
 )
 from tiqora.approvals.settings import load_approval_settings
@@ -49,9 +64,12 @@ from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.security.ratelimit import ApprovalLinkRateLimiter, client_ip
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 ticket_router = APIRouter(prefix="/tickets", tags=["approvals"])
+#: public: the link's secret is the credential (no session, no API-key scope, see CX12)
+links_router = APIRouter(prefix="/approval-links", tags=["approvals"])
 
 
 def _http(err: ApprovalError) -> HTTPException:
@@ -541,3 +559,121 @@ async def request_ticket_approval(
     await session.commit()
     await _publish(settings, await _affected_users(session, info.approval_id))
     return await _detail(session, info.approval_id, actor)
+
+
+# --- public decision links ---------------------------------------------------------------------
+# Only POST routes with the secret in the body: a GET (link scanner, prefetch, preview) never
+# reaches the engine, and no URL, access log or referrer ever carries a token. The page behind
+# the mail link (``/approve#t=…``) keeps the secret in the fragment, which browsers never send.
+
+
+async def _link_gate(
+    request: Request, settings: AppSettings, redis: Any, token: str
+) -> tuple[ApprovalLinkRateLimiter, str]:
+    """Per-IP lock and per-link budget, before any database work (429 when exceeded)."""
+    limiter = ApprovalLinkRateLimiter(redis, settings)
+    ip = client_ip(request, settings.trusted_proxies)
+    for decision in (
+        await limiter.check_ip(ip),
+        await limiter.check_token(tokens.link_digest(token)),
+    ):
+        if not decision.allowed:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={"code": "rate_limited", "detail": None},
+                headers={"Retry-After": str(max(1, decision.retry_after))},
+            )
+    return limiter, ip
+
+
+def _public_link_error(err: ApprovalError) -> ApprovalError:
+    """Unknown, expired, revoked and closed links answer alike; only "already used" differs."""
+    if err.code == "link_used":
+        return err
+    return ApprovalError("link_invalid", err.http_status)
+
+
+async def _link_view(
+    session: AsyncSession, target: tokens.LinkTarget, settings: AppSettings
+) -> LinkInspectOut:
+    approval = (
+        await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == target.approval_id))
+    ).scalar_one()
+    approver = (
+        await session.execute(
+            select(TiqoraApprovalApprover).where(TiqoraApprovalApprover.id == target.approver_id)
+        )
+    ).scalar_one()
+    step = (
+        await session.execute(
+            select(TiqoraApprovalStep).where(TiqoraApprovalStep.id == approver.step_id)
+        )
+    ).scalar_one()
+    labels = await detail.principal_labels(session, [approver.principal])
+    number, ticket_title = await detail._load_ticket(session, approval.ticket_id)  # noqa: SLF001
+    return LinkInspectOut(
+        valid=True,
+        approver_name=labels[approver.principal],
+        title=approval.title,
+        description=approval.description,
+        ticket_number=number,
+        ticket_title=ticket_title,
+        step_name=step.name,
+        rule=step.rule,
+        due_at=step.due_at,
+        describe_lines=await notify._describe_lines(session, approval),  # noqa: SLF001
+    )
+
+
+@links_router.post("/inspect", response_model=LinkInspectOut)
+async def post_link_inspect(
+    body: LinkInspectIn,
+    request: Request,
+    session: DbSession,
+    settings: AppSettings,
+    redis: Annotated[Any, Depends(get_redis)],
+) -> LinkInspectOut:
+    """What a decision link stands for, without using it (the confirm page reads this).
+
+    A bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock.
+    """
+    limiter, ip = await _link_gate(request, settings, redis, body.token)
+    try:
+        if not (await load_approval_settings(session, settings)).email_links_enabled:
+            raise ApprovalError("link_invalid", 410)
+        target = await tokens.resolve_link(session, body.token)
+        out = await _link_view(session, target, settings)
+    except ApprovalError as err:
+        await session.rollback()
+        if not err.code.startswith("link_"):
+            raise _http(err) from err
+        await limiter.record_auth_failure(ip)
+        return LinkInspectOut(valid=False, code=_public_link_error(err).code)
+    await session.rollback()  # read only: end the transaction
+    return out
+
+
+@links_router.post("/decide", response_model=LinkDecisionOut)
+async def post_link_decide(
+    body: LinkDecideIn,
+    request: Request,
+    session: DbSession,
+    settings: AppSettings,
+    redis: Annotated[Any, Depends(get_redis)],
+) -> LinkDecisionOut:
+    """Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``
+    for a link that was already used, 410 ``link_invalid`` for any other dead or unknown link."""
+    limiter, ip = await _link_gate(request, settings, redis, body.token)
+    try:
+        result = await tokens.redeem_link(
+            session, body.token, decision=body.decision, comment=body.comment, settings=settings
+        )
+    except ApprovalError as err:
+        await session.rollback()  # nothing is committed after a refusal (used_at included)
+        if not err.code.startswith("link_"):
+            raise _http(err) from err
+        await limiter.record_auth_failure(ip)
+        raise _http(_public_link_error(err)) from err
+    await session.commit()
+    await _publish(settings, result.affected_user_ids)
+    return LinkDecisionOut(decision=body.decision, status=result.info.status)

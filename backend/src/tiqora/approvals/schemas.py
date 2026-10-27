@@ -215,3 +215,44 @@ class DelegationOut(BaseModel):
     valid_from: UtcDateTime
     valid_until: UtcDateTime | None = None
     created_at: UtcDateTime
+
+
+class LinkInspectIn(BaseModel):
+    """The link's secret travels in the body, never in a URL (no access-log or referrer leak)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1, max_length=200)
+
+
+class LinkInspectOut(BaseModel):
+    """What the confirm page shows. Only the link holder's own view: no requester, no other
+    approvers, no comments (F25). ``code`` is ``link_invalid`` (unknown, expired, revoked,
+    closed or not yours any more: deliberately one answer) or ``link_used``."""
+
+    valid: bool
+    code: str | None = None
+    approver_name: str | None = None
+    title: str | None = None
+    description: str | None = None
+    ticket_number: str | None = None
+    ticket_title: str | None = None
+    step_name: str | None = None
+    rule: str | None = None
+    due_at: UtcDateTime | None = None
+    describe_lines: list[str] = Field(default_factory=list)
+
+
+class LinkDecideIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1, max_length=200)
+    decision: DecisionName
+    #: at most 2000 characters (the service answers ``comment_too_long``)
+    comment: str | None = None
+
+
+class LinkDecisionOut(BaseModel):
+    decision: DecisionName
+    #: the request's status after the vote ("pending" while the step or stage is still open)
+    status: str

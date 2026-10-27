@@ -6693,6 +6693,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/approval-links/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Link Decide
+         * @description Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``
+         *     for a link that was already used, 410 ``link_invalid`` for any other dead or unknown link.
+         */
+        post: operations["post_link_decide_api_v1_approval_links_decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approval-links/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Link Inspect
+         * @description What a decision link stands for, without using it (the confirm page reads this).
+         *
+         *     A bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock.
+         */
+        post: operations["post_link_inspect_api_v1_approval_links_inspect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/approvals/delegations": {
         parameters: {
             query?: never;
@@ -22112,6 +22155,28 @@ export interface components {
             /** Supported */
             supported: boolean;
         };
+        /** LinkDecideIn */
+        LinkDecideIn: {
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Token */
+            token: string;
+        };
+        /** LinkDecisionOut */
+        LinkDecisionOut: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Status */
+            status: string;
+        };
         /** LinkGraphEdgeOut */
         LinkGraphEdgeOut: {
             /**
@@ -22184,6 +22249,44 @@ export interface components {
              * @enum {string}
              */
             target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+        };
+        /**
+         * LinkInspectIn
+         * @description The link's secret travels in the body, never in a URL (no access-log or referrer leak).
+         */
+        LinkInspectIn: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * LinkInspectOut
+         * @description What the confirm page shows. Only the link holder's own view: no requester, no other
+         *     approvers, no comments (F25). ``code`` is ``link_invalid`` (unknown, expired, revoked,
+         *     closed or not yours any more: deliberately one answer) or ``link_used``.
+         */
+        LinkInspectOut: {
+            /** Approver Name */
+            approver_name?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Describe Lines */
+            describe_lines?: string[];
+            /** Description */
+            description?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Rule */
+            rule?: string | null;
+            /** Step Name */
+            step_name?: string | null;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Valid */
+            valid: boolean;
         };
         /** LinkOut */
         LinkOut: {
@@ -48970,6 +49073,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiRefineAvailabilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_link_decide_api_v1_approval_links_decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDecideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkDecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_link_inspect_api_v1_approval_links_inspect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkInspectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkInspectOut"];
                 };
             };
             /** @description Validation Error */

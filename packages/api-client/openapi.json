@@ -24973,6 +24973,64 @@
         "title": "LegacySchemaOut",
         "type": "object"
       },
+      "LinkDecideIn": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "decision"
+        ],
+        "title": "LinkDecideIn",
+        "type": "object"
+      },
+      "LinkDecisionOut": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "status"
+        ],
+        "title": "LinkDecisionOut",
+        "type": "object"
+      },
       "LinkGraphEdgeOut": {
         "properties": {
           "kind": {
@@ -25190,6 +25248,144 @@
           "link_type"
         ],
         "title": "LinkIn",
+        "type": "object"
+      },
+      "LinkInspectIn": {
+        "additionalProperties": false,
+        "description": "The link's secret travels in the body, never in a URL (no access-log or referrer leak).",
+        "properties": {
+          "token": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "LinkInspectIn",
+        "type": "object"
+      },
+      "LinkInspectOut": {
+        "description": "What the confirm page shows. Only the link holder's own view: no requester, no other\napprovers, no comments (F25). ``code`` is ``link_invalid`` (unknown, expired, revoked,\nclosed or not yours any more: deliberately one answer) or ``link_used``.",
+        "properties": {
+          "approver_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "describe_lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Describe Lines",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "step_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Name"
+          },
+          "ticket_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Number"
+          },
+          "ticket_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Title"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "title": "LinkInspectOut",
         "type": "object"
       },
       "LinkOut": {
@@ -89242,6 +89438,90 @@
         "summary": "Refine Availability",
         "tags": [
           "ai"
+        ]
+      }
+    },
+    "/api/v1/approval-links/decide": {
+      "post": {
+        "description": "Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``\nfor a link that was already used, 410 ``link_invalid`` for any other dead or unknown link.",
+        "operationId": "post_link_decide_api_v1_approval_links_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkDecideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkDecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Link Decide",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/approval-links/inspect": {
+      "post": {
+        "description": "What a decision link stands for, without using it (the confirm page reads this).\n\nA bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock.",
+        "operationId": "post_link_inspect_api_v1_approval_links_inspect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkInspectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkInspectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Link Inspect",
+        "tags": [
+          "approvals"
         ]
       }
     },

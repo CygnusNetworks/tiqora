@@ -69,6 +69,7 @@ def test_path_to_area_mapping() -> None:
     assert path_to_area("/api/v1/kb/articles") == "kb"
     assert path_to_area("/api/v1/admin/api-keys") == "admin"
     assert path_to_area("/api/v1/auth/me") is None
+    assert path_to_area("/api/v1/approval-links/inspect") is None
     assert path_to_area("/znuny-compat/TicketGet") == "compat"
     assert path_to_area("/api/v1/unknown-thing") == "_unknown"
     assert path_to_area("/api/plugins/org.example.hello/hello") == "plugins"

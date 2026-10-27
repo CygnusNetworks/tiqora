@@ -349,6 +349,19 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_API_KEY_RATE_LIMIT_WINDOW"
     )
 
+    # Public approval decision links (/api/v1/approval-links): per-IP lockout after bad links
+    # (own counters, not shared with agent login) and a per-link request budget in the same
+    # window. Switched on/off with auth_rate_limit_enabled.
+    approval_link_fail_max: int = Field(
+        default=20, validation_alias="TIQORA_APPROVAL_LINK_FAIL_MAX"
+    )
+    approval_link_fail_window_seconds: int = Field(
+        default=600, validation_alias="TIQORA_APPROVAL_LINK_FAIL_WINDOW"
+    )
+    approval_link_lockout_seconds: int = Field(
+        default=900, validation_alias="TIQORA_APPROVAL_LINK_LOCKOUT"
+    )
+
     # SCIM provisioning (/scim/v2): per-token request throttle, per-IP failed-auth
     # lockout (only bad tokens are counted; a valid token is never IP-locked) and limits.
     scim_rate_limit_enabled: bool = Field(

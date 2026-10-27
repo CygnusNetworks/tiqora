@@ -68,6 +68,101 @@ class ApiKeyRateLimiter:
             return RateLimitDecision(allowed=True)
 
 
+_APPROVAL_LINK_FAIL_IP_PREFIX = "tiqora:approval-link:fail:ip:"
+_APPROVAL_LINK_LOCK_IP_PREFIX = "tiqora:approval-link:lock:ip:"
+_APPROVAL_LINK_TOKEN_PREFIX = "tiqora:approval-link:rl:token:"
+
+
+class ApprovalLinkRateLimiter:
+    """Throttles for the public decision-link endpoints (``/api/v1/approval-links``).
+
+    A per-IP lock after ``approval_link_fail_max`` bad links in the window, and a per-link
+    request budget (keyed by the token's hash, never the token) of the same size in the same
+    window, so rotating source addresses does not reset the budget of one link. Own key
+    namespace: nothing is shared with agent/portal login or SCIM, and there is deliberately no
+    per-login counter (it would let anyone lock every approver's links). All methods fail open
+    when Redis raises. Enabled with ``auth_rate_limit_enabled``.
+    """
+
+    def __init__(self, client: Any, settings: Settings) -> None:
+        self._client = client
+        self._enabled = settings.auth_rate_limit_enabled
+        self._fail_max = max(1, settings.approval_link_fail_max)
+        self._fail_window = max(1, settings.approval_link_fail_window_seconds)
+        self._lockout = max(1, settings.approval_link_lockout_seconds)
+
+    @staticmethod
+    def _norm_ip(ip: str) -> str:
+        return (ip or "").strip() or "unknown"
+
+    def _active(self) -> bool:
+        return self._enabled and self._client is not None
+
+    async def check_ip(self, ip: str) -> RateLimitDecision:
+        """Locked IP -> not allowed, ``retry_after`` = remaining lock time."""
+        if not self._active():
+            return RateLimitDecision(allowed=True)
+        try:
+            raw = await self._client.ttl(f"{_APPROVAL_LINK_LOCK_IP_PREFIX}{self._norm_ip(ip)}")
+            ttl = int(raw) if raw is not None else 0
+        except Exception:  # noqa: BLE001 — fail open
+            logger.warning("approval_link_ratelimit_unavailable", op="check_ip")
+            return RateLimitDecision(allowed=True)
+        if ttl == -1:
+            ttl = self._lockout  # present without expiry: treat as a full lock window
+        if ttl > 0:
+            return RateLimitDecision(
+                allowed=False, retry_after=ttl, reason="approval_link_ip_lockout"
+            )
+        return RateLimitDecision(allowed=True)
+
+    async def check_token(self, digest: str) -> RateLimitDecision:
+        """Fixed-window request counter per link hash (counts the request being checked)."""
+        if not self._active():
+            return RateLimitDecision(allowed=True)
+        key = f"{_APPROVAL_LINK_TOKEN_PREFIX}{digest}"
+        try:
+            count = int(await self._client.incr(key))
+            if count == 1:
+                await self._client.expire(key, self._fail_window)
+            if count <= self._fail_max:
+                return RateLimitDecision(allowed=True)
+            ttl = int(await self._client.ttl(key) or self._fail_window)
+        except Exception:  # noqa: BLE001 — fail open
+            logger.warning("approval_link_ratelimit_unavailable", op="check_token")
+            return RateLimitDecision(allowed=True)
+        return RateLimitDecision(
+            allowed=False, retry_after=max(1, ttl), reason="approval_link_token_limit"
+        )
+
+    async def record_auth_failure(self, ip: str) -> RateLimitDecision | None:
+        """Count one bad link; lock the IP once the maximum is reached."""
+        if not self._active():
+            return None
+        ip_n = self._norm_ip(ip)
+        key = f"{_APPROVAL_LINK_FAIL_IP_PREFIX}{ip_n}"
+        try:
+            count = int(await self._client.incr(key))
+            if count == 1:
+                await self._client.expire(key, self._fail_window)
+            if count < self._fail_max:
+                return None
+            await self._client.set(f"{_APPROVAL_LINK_LOCK_IP_PREFIX}{ip_n}", "1", ex=self._lockout)
+        except Exception:  # noqa: BLE001 — fail open
+            logger.warning("approval_link_ratelimit_unavailable", op="record_auth_failure")
+            return None
+        logger.warning(
+            "approval_link_lockout",
+            ip=ip_n,
+            failures=count,
+            window_seconds=self._fail_window,
+            lockout_seconds=self._lockout,
+        )
+        return RateLimitDecision(
+            allowed=False, retry_after=self._lockout, reason="approval_link_ip_lockout"
+        )
+
+
 _SCIM_TOKEN_PREFIX = "tiqora:scim:rl:token:"
 _SCIM_FAIL_IP_PREFIX = "tiqora:scim:fail:ip:"
 _SCIM_LOCK_IP_PREFIX = "tiqora:scim:lock:ip:"
