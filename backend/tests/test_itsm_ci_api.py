@@ -443,7 +443,12 @@ async def test_unavailable_provider_maps_to_409_code(
 def test_routes_map_to_the_cmdb_and_tickets_areas() -> None:
     app = create_app(Settings(environment="test"))
     paths = set(app.openapi()["paths"])  # FastAPI wraps included routers
-    itsm = {p for p in paths if p.startswith("/api/v1/itsm/")}
+    # the change-management routes (own tests) are ticket-scoped, see ``_PATH_PREFIX_TO_AREA``
+    itsm = {
+        p
+        for p in paths
+        if p.startswith("/api/v1/itsm/") and not p.startswith("/api/v1/itsm/change")
+    }
     assert {"/api/v1/itsm/status", "/api/v1/itsm/cis", "/api/v1/itsm/cis/{source}/{ci_id}"} <= itsm
     assert {path_to_area(p) for p in itsm} == {"cmdb"}
     assert "/api/v1/tickets/{ticket_id}/cis" in paths

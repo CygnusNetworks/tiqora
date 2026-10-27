@@ -27,10 +27,20 @@ from tiqora.api.v1.itsm_change_schemas import (
     task_out,
     template_summary,
 )
+from tiqora.db.tiqora.models import TiqoraJob
+from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.gate import change_availability, require_change_mode
+from tiqora.itsm.change.impact import (
+    ChangeImpactOut,
+    enqueue_impact,
+    read_impact,
+)
+from tiqora.itsm.change.phases import FINAL_PHASES
 from tiqora.itsm.change.service import (
     ChangeCreateIn,
     ChangeUpdateIn,
+    _row,
+    _ticket,
     adopt_ticket,
     create_change,
     get_change,
@@ -46,6 +56,7 @@ from tiqora.itsm.change.tasks import (
     update_task,
 )
 from tiqora.itsm.change.templates import list_templates
+from tiqora.jobs.schemas import JobAccepted
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/itsm", tags=["itsm-change"])
@@ -136,6 +147,44 @@ async def get_change_events(
         session, settings, ticket_id=ticket_id, user_id=user.id, limit=limit, before_id=before_id
     )
     return [event_out(r) for r in rows]
+
+
+@router.get("/changes/{ticket_id:int}/impact", response_model=ChangeImpactOut)
+async def get_change_impact(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ChangeImpactOut:
+    """The stored impact set: CIs and services of the change and the open incidents on them.
+
+    Only what the caller may read: CIs of classes without ``ro`` are counted, not named.
+    """
+    return await read_impact(
+        session, settings, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
+    )
+
+
+@router.post(
+    "/changes/{ticket_id:int}/impact/recompute",
+    response_model=JobAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def post_change_impact_recompute(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> JobAccepted:
+    """Compute the impact set again in the background; poll ``GET /api/v1/jobs/{job_id}``."""
+    await require_change_mode(session, settings)
+    await _ticket(session, ticket_id, user_id=user.id, write=True)
+    row = await _row(session, ticket_id)
+    if row.phase in FINAL_PHASES:
+        raise ChangeError("change_final", 409)
+    job_id = await enqueue_impact(session, ticket_id=ticket_id, user_id=user.id)
+    if job_id is None:  # pragma: no cover - the phase was checked above
+        raise ChangeError("change_final", 409)
+    job = await session.get(TiqoraJob, job_id)
+    out = JobAccepted(
+        job_id=job_id, status="running" if job is not None and job.status == "running" else "queued"
+    )
+    await session.commit()
+    return out
 
 
 @router.get("/changes/{ticket_id:int}/tasks", response_model=list[TaskOut])

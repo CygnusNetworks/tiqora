@@ -3480,6 +3480,10 @@
           "name": "Web-Chat aufräumen",
           "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."
         },
+        "itsm_change": {
+          "name": "Change-Auswirkung aktualisieren",
+          "description": "Stößt für aktive Changes, deren Auswirkung älter ist als die eingestellte Stundenzahl, eine neue Berechnung der betroffenen CIs und Services an."
+        },
         "deploy_watch": {
           "name": "Bereitstellung beobachten",
           "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
@@ -6739,6 +6743,7 @@
         "itsm_linked_articles": "Notiz an verknüpfte Tickets",
         "itsm_import": "Znuny-ITSM-Daten importieren",
         "itsm_change_tasks": "Change-Aufgaben anlegen",
+        "itsm_change_impact": "Auswirkung eines Changes berechnen",
         "itsm_switch": "ITSM auf Tiqora umstellen"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"

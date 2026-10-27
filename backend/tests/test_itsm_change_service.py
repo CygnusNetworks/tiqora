@@ -37,6 +37,7 @@ from tiqora.domain.ticket_write_service import InvalidInput, update_dynamic_fiel
 from tiqora.extensions import Registry, set_registry_for_tests
 from tiqora.itsm.change import service as change_service
 from tiqora.itsm.change.errors import ChangeError
+from tiqora.itsm.change.impact import ITSM_CHANGE_IMPACT_JOB
 from tiqora.itsm.change.models import (
     TiqoraItsmCab,
     TiqoraItsmChange,
@@ -61,6 +62,7 @@ from tiqora.itsm.change.service import (
     update_change,
 )
 from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
+from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
@@ -82,6 +84,7 @@ def _registry(
     listeners: Sequence[ChangeListener] = (),
 ) -> None:
     registry = Registry()
+    registry.add(JOB_HANDLERS, ITSM_CHANGE_IMPACT_JOB)  # create/update queue an impact job
     if provider is not None:
         registry.add(CI_PROVIDERS, CiProviderFactory(mode="tiqora", create=lambda _sc: provider))
     for listener in listeners:

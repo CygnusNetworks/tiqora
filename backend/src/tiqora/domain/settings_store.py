@@ -179,6 +179,11 @@ KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS = "daemon.scim_role_sync.interval_seconds"
 KEY_WEBCHAT_SWEEP_ENABLED = "daemon.webchat_sweep.enabled"
 KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS = "daemon.webchat_sweep.interval_seconds"
 
+# Change management: queues the refresh of stale change impact sets. Default ON: it only writes
+# tiqora_itsm_change* rows and jobs, and does nothing unless the ITSM mode is "tiqora".
+KEY_ITSM_CHANGE_ENABLED = "daemon.itsm_change.enabled"
+KEY_ITSM_CHANGE_INTERVAL_SECONDS = "daemon.itsm_change.interval_seconds"
+
 # Telegram inbound update_id cursor (Phase T3). Shared by both transports: the
 # poller advances it after each successfully processed getUpdates batch, the
 # webhook route advances it (dedup guard) after each delivered update. Not a

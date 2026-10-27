@@ -208,6 +208,10 @@ async def signal_ticket_link(
         session, event, ticket_id, {"target_object": _CI_TICKET_PAYLOAD, "target_key": ci_key}
     )
     await invalidate_ticket_cache(session, ticket_id)
+    # a change ticket gets a new impact set (lazy: the change module imports the CMDB)
+    from tiqora.itsm.change.impact import enqueue_impact_if_change
+
+    await enqueue_impact_if_change(session, ticket_id)
 
 
 class LinkService:
@@ -674,6 +678,41 @@ class LinkService:
                 if str(sk).isdigit() and str(tk).isdigit():
                     seen.add((int(sk), int(tk), str(name)))
         return sorted(seen)
+
+    async def ci_ids_for_tickets(self, ticket_ids: Sequence[int]) -> dict[int, set[int]]:
+        """CIs linked to each ticket (any link type), system scope: no permission check.
+
+        Tickets without a CI link are absent from the answer. Keys are strings in
+        ``tiqora_itsm_link``, so every IN list holds strings.
+        """
+        out: dict[int, set[int]] = {}
+        for chunk in _chunks(sorted({int(t) for t in ticket_ids})):
+            keys = [str(t) for t in chunk]
+            rows = await self._s.execute(
+                select(
+                    TiqoraItsmLink.source_kind,
+                    TiqoraItsmLink.source_key,
+                    TiqoraItsmLink.target_key,
+                ).where(
+                    or_(
+                        and_(
+                            TiqoraItsmLink.source_kind == "ticket",
+                            TiqoraItsmLink.target_kind == "ci",
+                            TiqoraItsmLink.source_key.in_(keys),
+                        ),
+                        and_(
+                            TiqoraItsmLink.target_kind == "ticket",
+                            TiqoraItsmLink.source_kind == "ci",
+                            TiqoraItsmLink.target_key.in_(keys),
+                        ),
+                    )
+                )
+            )
+            for skind, skey, tkey in rows.all():
+                ticket_key, ci_key = (skey, tkey) if skind == "ticket" else (tkey, skey)
+                if str(ticket_key).isdigit() and str(ci_key).isdigit():
+                    out.setdefault(int(ticket_key), set()).add(int(ci_key))
+        return out
 
 
 def _num(key: str) -> int:

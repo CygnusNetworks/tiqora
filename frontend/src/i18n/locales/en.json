@@ -3480,6 +3480,10 @@
           "name": "Web chat housekeeping",
           "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."
         },
+        "itsm_change": {
+          "name": "Change impact refresh",
+          "description": "Queues a new calculation of the affected CIs and services for active changes whose impact is older than the configured number of hours."
+        },
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
@@ -6739,6 +6743,7 @@
         "itsm_linked_articles": "Note to linked tickets",
         "itsm_import": "Import Znuny ITSM data",
         "itsm_change_tasks": "Create change tasks",
+        "itsm_change_impact": "Calculate change impact",
         "itsm_switch": "Switch ITSM to Tiqora"
       },
       "gi_mail": "Send email from a web service request"

@@ -9258,6 +9258,84 @@
         "title": "ChangeEventOut",
         "type": "object"
       },
+      "ChangeImpactOut": {
+        "properties": {
+          "cis": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactCiOut"
+            },
+            "title": "Cis",
+            "type": "array"
+          },
+          "computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Computed At"
+          },
+          "hidden_ci_count": {
+            "title": "Hidden Ci Count",
+            "type": "integer"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactIncidentOut"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "incidents_truncated": {
+            "title": "Incidents Truncated",
+            "type": "boolean"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactServiceOut"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "computed_at",
+          "requested_at",
+          "stale",
+          "truncated",
+          "cis",
+          "hidden_ci_count",
+          "services",
+          "incidents",
+          "incidents_truncated"
+        ],
+        "title": "ChangeImpactOut",
+        "type": "object"
+      },
       "ChangeOut": {
         "properties": {
           "actual_end": {
@@ -22712,6 +22790,73 @@
         "title": "IdentityTestStartOut",
         "type": "object"
       },
+      "ImpactCiOut": {
+        "properties": {
+          "ci_id": {
+            "title": "Ci Id",
+            "type": "integer"
+          },
+          "class_key": {
+            "title": "Class Key",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "direct": {
+            "title": "Direct",
+            "type": "boolean"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "incident_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident State"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "ci_id",
+          "number",
+          "name",
+          "class_key",
+          "class_name",
+          "incident_state",
+          "incident_functionality",
+          "direct"
+        ],
+        "title": "ImpactCiOut",
+        "type": "object"
+      },
       "ImpactEdgeOut": {
         "properties": {
           "link_type": {
@@ -22772,6 +22917,51 @@
           "root"
         ],
         "title": "ImpactGraphOut",
+        "type": "object"
+      },
+      "ImpactIncidentOut": {
+        "properties": {
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "service_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Id"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "queue_id",
+          "state",
+          "service_id"
+        ],
+        "title": "ImpactIncidentOut",
         "type": "object"
       },
       "ImpactNodeOut": {
@@ -22860,6 +23050,41 @@
           "depth"
         ],
         "title": "ImpactNodeOut",
+        "type": "object"
+      },
+      "ImpactServiceOut": {
+        "properties": {
+          "direct": {
+            "title": "Direct",
+            "type": "boolean"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "service_id",
+          "name",
+          "incident_functionality",
+          "direct"
+        ],
+        "title": "ImpactServiceOut",
         "type": "object"
       },
       "ImportIssueOut": {
@@ -102534,6 +102759,156 @@
           }
         },
         "summary": "Get Change Events",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/impact": {
+      "get": {
+        "description": "The stored impact set: CIs and services of the change and the open incidents on them.\n\nOnly what the caller may read: CIs of classes without ``ro`` are counted, not named.",
+        "operationId": "get_change_impact_api_v1_itsm_changes__ticket_id__impact_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeImpactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Impact",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/impact/recompute": {
+      "post": {
+        "description": "Compute the impact set again in the background; poll ``GET /api/v1/jobs/{job_id}``.",
+        "operationId": "post_change_impact_recompute_api_v1_itsm_changes__ticket_id__impact_recompute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Change Impact Recompute",
         "tags": [
           "itsm-change"
         ]

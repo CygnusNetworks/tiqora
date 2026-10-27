@@ -518,6 +518,7 @@ async def create_change(
     ``created`` event's ``template_warnings``.
     """
     # lazy: ``templates`` imports this module and ``tasks``, which imports this module too
+    from tiqora.itsm.change.impact import enqueue_impact
     from tiqora.itsm.change.tasks import enqueue_change_tasks
     from tiqora.itsm.change.templates import (
         ResolvedDefaults,
@@ -688,6 +689,7 @@ async def create_change(
         session,
         ChangeEvent(ticket_id, "created", None, "draft", user_id, now),
     )
+    await enqueue_impact(session, ticket_id=ticket_id, user_id=user_id)
     tasks_job_id: int | None = None
     if tview is not None and tview.tasks:
         job = await enqueue_change_tasks(
@@ -733,6 +735,8 @@ async def adopt_ticket(
     ticket (``ticket_closed``).
     """
     _ = sysconfig
+    from tiqora.itsm.change.impact import enqueue_impact
+
     await require_change_mode(session, settings)
     cfg = await load_change_settings(session, settings)
     itsm_cfg = await load_itsm_settings(session, settings)
@@ -777,6 +781,8 @@ async def adopt_ticket(
         session, ticket_id=ticket_id, event="phase", user_id=user_id, to_phase="draft"
     )
     await notify_listeners(session, ChangeEvent(ticket_id, "created", None, "draft", user_id, now))
+    # the ticket may carry CI links and a service already
+    await enqueue_impact(session, ticket_id=ticket_id, user_id=user_id)
     return await _loaded_view(session, cfg, ticket_id, user_id)
 
 
@@ -827,6 +833,8 @@ async def update_change(
     fields (none when nothing changed).
     """
     _ = sysconfig
+    from tiqora.itsm.change.impact import enqueue_impact
+
     await require_change_mode(session, settings)
     cfg = await load_change_settings(session, settings)
     facts = await _ticket(session, ticket_id, user_id=user_id, write=True)
@@ -917,4 +925,6 @@ async def update_change(
         await notify_listeners(
             session, ChangeEvent(ticket_id, "updated", row.phase, row.phase, user_id, now)
         )
+        if "services" in changed:
+            await enqueue_impact(session, ticket_id=ticket_id, user_id=user_id)
     return await _view(session, cfg, facts, row, user_id=user_id)

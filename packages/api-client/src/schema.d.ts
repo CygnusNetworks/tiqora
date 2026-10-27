@@ -9446,6 +9446,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/changes/{ticket_id}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Impact
+         * @description The stored impact set: CIs and services of the change and the open incidents on them.
+         *
+         *     Only what the caller may read: CIs of classes without ``ro`` are counted, not named.
+         */
+        get: operations["get_change_impact_api_v1_itsm_changes__ticket_id__impact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/impact/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Change Impact Recompute
+         * @description Compute the impact set again in the background; poll ``GET /api/v1/jobs/{job_id}``.
+         */
+        post: operations["post_change_impact_recompute_api_v1_itsm_changes__ticket_id__impact_recompute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/changes/{ticket_id}/tasks": {
         parameters: {
             query?: never;
@@ -16692,6 +16734,27 @@ export interface components {
             /** To Phase */
             to_phase: string | null;
         };
+        /** ChangeImpactOut */
+        ChangeImpactOut: {
+            /** Cis */
+            cis: components["schemas"]["ImpactCiOut"][];
+            /** Computed At */
+            computed_at: string | null;
+            /** Hidden Ci Count */
+            hidden_ci_count: number;
+            /** Incidents */
+            incidents: components["schemas"]["ImpactIncidentOut"][];
+            /** Incidents Truncated */
+            incidents_truncated: boolean;
+            /** Requested At */
+            requested_at: string | null;
+            /** Services */
+            services: components["schemas"]["ImpactServiceOut"][];
+            /** Stale */
+            stale: boolean;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** ChangeOut */
         ChangeOut: {
             /** Actual End */
@@ -21206,6 +21269,27 @@ export interface components {
             /** Test Id */
             test_id: string;
         };
+        /** ImpactCiOut */
+        ImpactCiOut: {
+            /** Ci Id */
+            ci_id: number;
+            /** Class Key */
+            class_key: string;
+            /** Class Name */
+            class_name: string;
+            /** Direct */
+            direct: boolean;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Incident State */
+            incident_state: string | null;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+            /** Ref */
+            ref: string;
+        };
         /** ImpactEdgeOut */
         ImpactEdgeOut: {
             /** Link Type */
@@ -21227,6 +21311,21 @@ export interface components {
             root: string;
             /** Truncated */
             truncated: boolean;
+        };
+        /** ImpactIncidentOut */
+        ImpactIncidentOut: {
+            /** Queue Id */
+            queue_id: number;
+            /** Service Id */
+            service_id: number | null;
+            /** State */
+            state: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /**
          * ImpactNodeOut
@@ -21254,6 +21353,17 @@ export interface components {
             name?: string | null;
             /** Number */
             number?: string | null;
+        };
+        /** ImpactServiceOut */
+        ImpactServiceOut: {
+            /** Direct */
+            direct: boolean;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Name */
+            name: string;
+            /** Service Id */
+            service_id: number;
         };
         /** ImportIssueOut */
         ImportIssueOut: {
@@ -55142,6 +55252,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangeEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_impact_api_v1_itsm_changes__ticket_id__impact_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeImpactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_impact_recompute_api_v1_itsm_changes__ticket_id__impact_recompute_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */
