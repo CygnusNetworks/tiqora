@@ -17434,6 +17434,8 @@ export interface components {
             change: components["schemas"]["ChangeOut"];
             /** Tasks Job Id */
             tasks_job_id: number | null;
+            /** Warnings */
+            warnings?: string[];
         };
         /** ChangeEventOut */
         ChangeEventOut: {

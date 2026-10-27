@@ -47,9 +47,11 @@ from tiqora.itsm.change.related import (
     unlink_related,
 )
 from tiqora.itsm.change.service import ChangeCreateIn, create_change
+from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
 from tiqora.itsm.change.tasks import TaskIn, add_task
 from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
 from tiqora.jobs.registry import JOB_HANDLERS
+from tiqora.settings_sections.store import save_section_values
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = [pytest.mark.db, pytest.mark.parametrize("url_fixture", URL_FIXTURES)]
@@ -565,3 +567,177 @@ async def test_related_and_create_from_api(
                 json={"title": "x", "change_type": "normal", "queue_id": Q_A},
             )
             assert denied.status_code == 404
+
+
+async def _count(w: ChangeWorld, sql: str, **params: object) -> int:
+    return int((await w.session.execute(text(sql), params)).scalar_one())
+
+
+async def test_link_refused_is_409_and_create_from_leaves_nothing(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with change_world(request, url_fixture) as w:
+        _registry(request)
+        change = await _change(w)
+        incident = await _ticket(w)
+        # a link type no PossibleLink allows: Znuny's rules refuse it
+        await save_section_values(
+            w.session,
+            ITSM_CHANGE_SECTION,
+            {"related_link_type": "Bogus94"},
+            secret_key=APP_SETTINGS.secret_key,
+        )
+        with pytest.raises(ChangeError) as refused:
+            await link_related(
+                w.session, APP_SETTINGS, ticket_id=change, other_ticket_id=incident, user_id=U_FULL
+            )
+        assert (refused.value.error_code, refused.value.status_code) == ("link_refused", 409)
+        assert refused.value.extra["reason"] == "not_possible"
+
+        tickets = await _count(w, "SELECT count(*) FROM ticket")
+        changes = await _count(w, "SELECT count(*) FROM tiqora_itsm_change")
+        events = await _count(w, "SELECT count(*) FROM tiqora_itsm_change_event")
+        jobs = await _count(w, "SELECT count(*) FROM tiqora_job")
+        with pytest.raises(ChangeError) as failed:
+            await create_from_ticket(
+                w.session,
+                APP_SETTINGS,
+                SysConfig(w.session),
+                source_ticket_id=incident,
+                data=ChangeCreateIn.model_validate(
+                    {"title": "Scheitert", "change_type": "normal", "queue_id": Q_A}
+                ),
+                user_id=U_FULL,
+                session_factory=w.factory,
+            )
+        assert failed.value.error_code == "link_refused"
+        # the savepoint took the ticket, record, events and the impact job with it
+        assert await _count(w, "SELECT count(*) FROM ticket") == tickets
+        assert await _count(w, "SELECT count(*) FROM tiqora_itsm_change") == changes
+        assert await _count(w, "SELECT count(*) FROM tiqora_itsm_change_event") == events
+        assert await _count(w, "SELECT count(*) FROM tiqora_job") == jobs
+
+
+async def test_hidden_other_ticket_answers_like_a_missing_one(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with change_world(request, url_fixture) as w:
+        _registry(request)
+        change = await _change(w)
+        hidden = await _ticket(w, queue_id=Q_B)
+        bodies = []
+        for other in (hidden, 946299):
+            for call in (link_related, unlink_related):
+                with pytest.raises(ChangeError) as err:
+                    await call(
+                        w.session,
+                        APP_SETTINGS,
+                        ticket_id=change,
+                        other_ticket_id=other,
+                        user_id=U_FULL,
+                    )
+                bodies.append((err.value.status_code, err.value.detail))
+        assert set(map(str, bodies)) == {str((404, {"code": "ticket_not_found"}))}
+
+
+async def test_related_lists_only_the_related_link_type_and_no_foreign_tasks(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with change_world(request, url_fixture) as w:
+        _registry(request)
+        change = await _change(w)
+        other_change = await _change(w, title="Anderer Change")
+        foreign_task = await add_task(
+            w.session,
+            APP_SETTINGS,
+            SysConfig(w.session),
+            change_ticket_id=other_change,
+            data=TaskIn.model_validate({"title": "Fremde Aufgabe"}),
+            user_id=U_FULL,
+            session_factory=w.factory,
+        )
+        child = await _ticket(w, type_name="Incident")
+        incident = await _ticket(w, type_name="Incident")
+        # a task of another change linked as Normal, a ParentChild link to a plain ticket
+        for source, target, kind in (
+            (change, foreign_task.ticket_id, "Normal"),
+            (change, child, "ParentChild"),
+            (change, incident, "Normal"),
+        ):
+            await link_objects(
+                w.session,
+                source_object="Ticket",
+                source_key=str(source),
+                target_object="Ticket",
+                target_key=str(target),
+                link_type=kind,
+                user_id=1,
+            )
+        seen = await list_related(w.session, APP_SETTINGS, ticket_id=change, user_id=U_FULL)
+        assert [r.ticket_id for r in seen] == [incident]
+        # what is listed can be unlinked
+        assert (
+            await unlink_related(
+                w.session, APP_SETTINGS, ticket_id=change, other_ticket_id=incident, user_id=U_FULL
+            )
+            == []
+        )
+
+
+async def test_create_from_explicit_services_and_provider_visibility(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with change_world(request, url_fixture) as w:
+        provider = FakeCiProvider(source="tiqora")
+        shown = provider.add_ci(7, "srv-db-01.example.org", incident=OPERATIONAL)
+        provider.add_ci(8, "srv-db-02.example.org", incident=OPERATIONAL, hidden_for=[U_FULL])
+        _registry(request, provider)
+        problem = await _ticket(w, type_name="Problem", service_id=SERVICE)
+        await provider.link_ticket(
+            w.session, ticket_id=problem, ref=shown, link_type="RelevantTo", user_id=U_FULL
+        )
+        provider._links.add((problem, 8, "RelevantTo"))  # hidden from the caller
+
+        view, _ = await create_from_ticket(
+            w.session,
+            APP_SETTINGS,
+            SysConfig(w.session),
+            source_ticket_id=problem,
+            data=ChangeCreateIn.model_validate(
+                {
+                    "title": "Mit Services",
+                    "change_type": "normal",
+                    "queue_id": Q_A,
+                    "service_ids": [SERVICE_B],
+                }
+            ),
+            user_id=U_FULL,
+            session_factory=w.factory,
+        )
+        new_id = view.record.ticket_id
+        # the explicit list stands as given: the source's service is not added to it
+        assert view.service_ids == (SERVICE_B,) and view.ticket.service_id is None
+        assert view.warnings == ()
+        assert {c for t, c, _ in provider._links if t == new_id} == {7}
+
+
+async def test_create_from_warns_when_source_cis_are_cut(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with change_world(request, url_fixture) as w:
+        provider = FakeCiProvider(source="tiqora")
+        for ci_id in range(1, 53):
+            provider.add_ci(ci_id, f"srv-{ci_id}.example.org", incident=OPERATIONAL)
+        incident = await _ticket(w)
+        for ci_id in range(1, 53):
+            provider._links.add((incident, ci_id, "RelevantTo"))
+        _registry(request, provider)
+        async with _client(w) as client:
+            created = await client.post(
+                f"/api/v1/tickets/{incident}/change/create-from",
+                json={"title": "Viele CIs", "change_type": "normal", "queue_id": Q_A},
+            )
+        assert created.status_code == 201, created.text
+        assert created.json()["warnings"] == ["ci_refs_truncated"]
+        new_id = created.json()["change"]["ticket_id"]
+        assert len({c for t, c, _ in provider._links if t == new_id}) == 50

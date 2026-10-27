@@ -87,6 +87,8 @@ class ChangeCreatedOut(BaseModel):
     change: ChangeOut
     #: job that creates the template tasks; ``None`` when there is nothing to create
     tasks_job_id: int | None
+    #: notes of the create, e.g. ``ci_refs_truncated`` (create-from cut the source's CIs)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ChangeEventOut(BaseModel):

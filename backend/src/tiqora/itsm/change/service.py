@@ -159,6 +159,8 @@ class ChangeView:
     can_manage: bool
     #: the ticket later became a process ticket: only ``cancelled`` (manager) is possible
     process_ticket: bool
+    #: notes of the creating call (``ci_refs_truncated``); empty when read later
+    warnings: tuple[str, ...] = ()
 
 
 class ChangeCreateIn(BaseModel):
@@ -967,3 +969,10 @@ async def update_change(
         if "services" in changed:
             await enqueue_impact(session, ticket_id=ticket_id, user_id=user_id)
     return await _view(session, cfg, facts, row, user_id=user_id)
+
+
+# Public names of the helpers the sibling modules of this package share.
+existing_services = _existing_services
+parse_ci_refs = _parse_ci_refs
+change_row = _row
+ticket_facts = _ticket

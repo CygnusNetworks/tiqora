@@ -275,7 +275,7 @@ async def post_change(
     )
     out = change_out(view)
     await session.commit()
-    return ChangeCreatedOut(change=out, tasks_job_id=tasks_job_id)
+    return ChangeCreatedOut(change=out, tasks_job_id=tasks_job_id, warnings=list(view.warnings))
 
 
 @router.get("/changes/{ticket_id:int}", response_model=ChangeOut)
@@ -589,7 +589,7 @@ async def post_ticket_change_create_from(
     )
     out = change_out(view)
     await session.commit()
-    return ChangeCreatedOut(change=out, tasks_job_id=tasks_job_id)
+    return ChangeCreatedOut(change=out, tasks_job_id=tasks_job_id, warnings=list(view.warnings))
 
 
 @router.get("/changes/{ticket_id:int}/related", response_model=list[RelatedTicketOut])
