@@ -3468,6 +3468,10 @@
           "name": "Clean up report runs",
           "description": "Deletes the run history of scheduled reports, including the generated files, after the retention period."
         },
+        "approvals": {
+          "name": "Approvals",
+          "description": "Reports and acts on approval deadlines: sends reminders, escalates or closes steps whose deadline passed, removes approvers who are no longer valid, cancels requests of deleted tickets and cleans up old decision links."
+        },
         "webchat_sweep": {
           "name": "Web chat housekeeping",
           "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."

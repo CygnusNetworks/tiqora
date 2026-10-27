@@ -608,6 +608,12 @@ class Settings(BaseSettings):
         default=15, validation_alias="TIQORA_WEBCHAT_SWEEP_INTERVAL"
     )
 
+    # Approval sweeper (deadlines, reminders, escalation, invalid approvers, link purge).
+    # ``daemon.approvals.enabled`` (default ON) switches it off; this is only the poll interval.
+    approvals_sweep_interval_seconds: int = Field(
+        default=60, ge=15, le=3600, validation_alias="TIQORA_APPROVALS_SWEEP_INTERVAL"
+    )
+
     # AI worker (tiqora-ai-worker, separate process/compose service — see
     # ~/TIQORA_LLM_PLAN.md §3.0/§3.4). ``daemon.ai_worker.enabled``
     # (default OFF) is the takeover switch; this is only the tick cadence.

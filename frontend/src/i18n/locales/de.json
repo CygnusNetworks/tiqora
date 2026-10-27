@@ -3476,6 +3476,10 @@
           "name": "Berichtsläufe aufräumen",
           "description": "Löscht den Verlauf der geplanten Berichte samt erzeugter Dateien nach Ablauf der Aufbewahrungsfrist."
         },
+        "approvals": {
+          "name": "Freigaben",
+          "description": "Überwacht Freigabefristen: versendet Erinnerungen, eskaliert oder beendet Stufen nach Fristablauf, entfernt Freigeber, die nicht mehr gültig sind, zieht Freigaben gelöschter Tickets zurück und räumt alte Entscheidungslinks auf."
+        },
         "webchat_sweep": {
           "name": "Web-Chat aufräumen",
           "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."

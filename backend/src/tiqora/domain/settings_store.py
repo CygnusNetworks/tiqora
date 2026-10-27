@@ -179,6 +179,11 @@ KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS = "daemon.scim_role_sync.interval_seconds"
 KEY_WEBCHAT_SWEEP_ENABLED = "daemon.webchat_sweep.enabled"
 KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS = "daemon.webchat_sweep.interval_seconds"
 
+# Approval sweeper (deadlines, reminders, escalation, invalid approvers, link purge). Default ON:
+# it only writes tiqora_approval* rows and mail jobs.
+KEY_APPROVALS_ENABLED = "daemon.approvals.enabled"
+KEY_APPROVALS_INTERVAL_SECONDS = "daemon.approvals.interval_seconds"
+
 # Telegram inbound update_id cursor (Phase T3). Shared by both transports: the
 # poller advances it after each successfully processed getUpdates batch, the
 # webhook route advances it (dedup guard) after each delivered update. Not a

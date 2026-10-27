@@ -19,6 +19,8 @@ from tiqora.domain.settings_store import (
     KEY_AI_AUDIT_CLEANUP_ENABLED,
     KEY_AI_WORKER_ENABLED,
     KEY_AI_WORKER_INTERVAL_SECONDS,
+    KEY_APPROVALS_ENABLED,
+    KEY_APPROVALS_INTERVAL_SECONDS,
     KEY_ESCALATION_ENABLED,
     KEY_ESCALATION_INTERVAL_SECONDS,
     KEY_GDPR_ERASURE_PURGE_ENABLED,
@@ -373,6 +375,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
         interval_settings_attr="webchat_sweep_interval_seconds",
+    ),
+    # Approval deadlines, reminders, escalation, invalid approvers and link clean-up.
+    DaemonService(
+        slug="approvals",
+        enabled_key=KEY_APPROVALS_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_APPROVALS_INTERVAL_SECONDS,
+        interval_settings_attr="approvals_sweep_interval_seconds",
     ),
 )
 
