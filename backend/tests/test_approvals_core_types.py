@@ -19,18 +19,20 @@ from tests._approvals_helpers import (
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
+    ApproverResolver,
     Principal,
     ResolveContext,
 )
 from tiqora.approvals.core_types import core_resolvers
+from tiqora.extensions import core as extensions_core
 from tiqora.extensions.core import get_registry, set_registry_for_tests
+from tiqora.permissions.engine import PermissionEngine
 
-pytestmark = pytest.mark.db
-
+_TITLE = text("SELECT title FROM ticket WHERE id = 970501")
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 
 
-def _resolver(key: str):  # type: ignore[no-untyped-def]
+def _resolver(key: str) -> ApproverResolver:
     return {r.key: r for r in core_resolvers()}[key]
 
 
@@ -41,6 +43,7 @@ def _ctx(ticket_id: int) -> ResolveContext:
 
 
 def test_core_registry_has_ticket_type_and_resolvers() -> None:
+    old = extensions_core._REGISTRY
     set_registry_for_tests(None)
     try:
         registry = get_registry()
@@ -53,7 +56,7 @@ def test_core_registry_has_ticket_type_and_resolvers() -> None:
         assert registry.require(APPROVER_RESOLVERS, "ticket.owner").yields_customers is False
         assert registry.require(APPROVER_RESOLVERS, "ticket.responsible").yields_customers is False
     finally:
-        set_registry_for_tests(None)
+        set_registry_for_tests(old)
 
 
 def test_registry_with_adds_test_items_to_core() -> None:
@@ -65,6 +68,7 @@ def test_registry_with_adds_test_items_to_core() -> None:
     assert get_registry().get(APPROVAL_SUBJECT_TYPES, "test.subject") is None
 
 
+@pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_resolver_ticket_customer_user(
     url_fixture: str, request: pytest.FixtureRequest
@@ -79,6 +83,7 @@ async def test_resolver_ticket_customer_user(
         assert await _resolver("ticket.customer_user").resolve(session, _ctx(T1)) == []
 
 
+@pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_resolver_ticket_owner_and_responsible(
     url_fixture: str, request: pytest.FixtureRequest
@@ -95,6 +100,7 @@ async def test_resolver_ticket_owner_and_responsible(
         assert await owner.resolve(session, _ctx(T2)) == []  # owner is the system user
 
 
+@pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_resolver_missing_ticket_returns_empty(
     url_fixture: str, request: pytest.FixtureRequest
@@ -104,6 +110,7 @@ async def test_resolver_missing_ticket_returns_empty(
             assert await resolver.resolve(session, _ctx(970599)) == []
 
 
+@pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_seed_world_shape(url_fixture: str, request: pytest.FixtureRequest) -> None:
     async with approvals_session(request, url_fixture) as session:
@@ -120,6 +127,28 @@ async def test_seed_world_shape(url_fixture: str, request: pytest.FixtureRequest
             )
         ).scalar_one()
         assert groups == 3
+        ro_only = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT user_id FROM group_user"
+                        " WHERE group_id = 970201 AND permission_key = 'ro'"
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert ro_only == [970107]
+        # AG4 is a CAB member through the role as well: the engine finds it via group_role
+        members = await PermissionEngine(session).users_for_group_permission(970201, "rw")
+        assert members == {970103, 970104, 970105}
+        via_role = (
+            await session.execute(
+                text("SELECT count(*) FROM group_role WHERE role_id = 970301 AND group_id = 970201")
+            )
+        ).scalar_one()
+        assert via_role == 1
         company = (
             await session.execute(
                 text("SELECT customer_id FROM customer_user WHERE email = 'fremd@example.org'")
@@ -128,6 +157,7 @@ async def test_seed_world_shape(url_fixture: str, request: pytest.FixtureRequest
         assert company == "appr97-andere"
 
 
+@pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_delete_world_removes_every_seeded_row(
     url_fixture: str, request: pytest.FixtureRequest
@@ -135,12 +165,13 @@ async def test_delete_world_removes_every_seeded_row(
     async with approvals_session(request, url_fixture) as session:
         await delete_world(session)
         for table, column, values in (
-            ("users", "id", "970101, 970106"),
+            ("users", "id", "970101, 970106, 970107"),
             ("ticket", "id", "970501, 970502"),
             ("queue", "id", "970221, 970222"),
             ("customer_user", "login", "'appr97-k1', 'appr97-fremd'"),
             ("customer_company", "customer_id", "'appr97-firma', 'appr97-andere'"),
             ("role_user", "role_id", "970301"),
+            ("group_role", "role_id", "970301"),
             ("group_user", "group_id", "970201, 970211"),
         ):
             sql = f"SELECT count(*) FROM {table} WHERE {column} IN ({values})"
@@ -157,6 +188,7 @@ def test_capturing_mail_replaces_the_outbound_sender(monkeypatch: pytest.MonkeyP
     assert sender is mail.sender and mail.sent == []
 
 
+@pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_as_client_acts_as_the_agent(
     url_fixture: str, request: pytest.FixtureRequest
@@ -166,3 +198,25 @@ async def test_as_client_acts_as_the_agent(
             got = await client.get("/api/v1/auth/me")
         assert got.status_code == 200, got.text
         assert got.json()["id"] == AG1
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_world_survives_session_rollback_and_commit(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Routes roll back before deciding (F1(a)); the savepoint-bound session keeps the world."""
+    async with approvals_session(request, url_fixture) as session:
+        await session.execute(text("UPDATE ticket SET title = 'appr97 changed' WHERE id = 970501"))
+        await session.rollback()
+        title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = 970501"))
+        ).scalar_one()
+        assert title == "appr97 ticket"  # the uncommitted change is gone, the world is not
+        await session.execute(text("UPDATE ticket SET title = 'appr97 kept' WHERE id = 970501"))
+        await session.commit()
+        await session.rollback()
+        title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = 970501"))
+        ).scalar_one()
+        assert title == "appr97 kept"

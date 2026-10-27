@@ -18,6 +18,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from tests._itsm_adapter_helpers import seed_company, seed_customer, seed_user
 from tiqora.approvals import models as _approval_models  # noqa: F401  (registers the tables)
@@ -38,7 +39,7 @@ from tiqora.extensions.registry import Registry
 
 NOW = datetime(2026, 10, 15, 8, 0, 0)  # noqa: DTZ001 - Znuny stores naive UTC
 
-AG1, AG2, AG3, AG4, AG5, AG6 = 970101, 970102, 970103, 970104, 970105, 970106
+AG1, AG2, AG3, AG4, AG5, AG6, AG7 = 970101, 970102, 970103, 970104, 970105, 970106, 970107
 GROUP_QA, GROUP_QB, GROUP_CAB = 970211, 970212, 970201
 ROLE = 970301
 QUEUE_A, QUEUE_B = 970221, 970222
@@ -56,6 +57,7 @@ _AGENTS = {
     AG4: "appr97-agent4",
     AG5: "appr97-agent5",
     AG6: "appr97-agent6",
+    AG7: "appr97-agent7",
 }
 # login -> (email, company)
 _CUSTOMERS = {
@@ -73,6 +75,7 @@ class World:
     ag4: int = AG4
     ag5: int = AG5
     ag6: int = AG6
+    ag7: int = AG7
     queue_a: int = QUEUE_A
     queue_b: int = QUEUE_B
     t1: int = T1
@@ -81,7 +84,7 @@ class World:
     andere: str = ANDERE
     group_cab: int = GROUP_CAB
     role: int = ROLE
-    customers: dict[str, str] = field(default_factory=lambda: dict(_CUSTOMERS))
+    customers: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(_CUSTOMERS))
 
 
 async def _grant(session: AsyncSession, user_id: int, group_id: int, key: str) -> None:
@@ -95,7 +98,11 @@ async def _grant(session: AsyncSession, user_id: int, group_id: int, key: str) -
 
 
 async def seed_world(session: AsyncSession) -> World:
-    """Flushes the helper world into *session* (the caller decides to commit or roll back)."""
+    """Flushes the helper world into *session* (the caller decides to commit or roll back).
+
+    CAB group ``appr97-cab`` (970201): AG3, AG4, AG5 hold ``rw`` directly, AG4 also through role
+    ``appr97-role`` (``group_role`` rw), and AG7 is an ``ro``-only member (not an approver).
+    """
     for uid, login in _AGENTS.items():
         await seed_user(session, uid, login, "Appr", login)
     await session.execute(text("UPDATE users SET valid_id = 2 WHERE id = :u"), {"u": AG6})
@@ -115,6 +122,7 @@ async def seed_world(session: AsyncSession) -> World:
     await _grant(session, AG2, GROUP_QA, "ro")
     for uid in (AG3, AG4, AG5):
         await _grant(session, uid, GROUP_CAB, "rw")
+    await _grant(session, AG7, GROUP_CAB, "ro")
     await session.execute(
         text(
             "INSERT INTO roles (id, name, valid_id, create_time, create_by, change_time,"
@@ -128,6 +136,14 @@ async def seed_world(session: AsyncSession) -> World:
             " change_by) VALUES (:u, :r, :t, 1, :t, 1)"
         ),
         {"u": AG4, "r": ROLE, "t": NOW},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO group_role (role_id, group_id, permission_key, permission_value,"
+            " create_time, create_by, change_time, change_by)"
+            " VALUES (:r, :g, 'rw', 1, :t, 1, :t, 1)"
+        ),
+        {"r": ROLE, "g": GROUP_CAB, "t": NOW},
     )
     for qid, gid, name in ((QUEUE_A, GROUP_QA, "appr97-qa"), (QUEUE_B, GROUP_QB, "appr97-qb")):
         await session.execute(
@@ -180,6 +196,7 @@ async def delete_world(session: AsyncSession) -> None:
     statements: list[tuple[str, dict[str, Any]]] = [
         ("DELETE FROM ticket WHERE id IN :ids", {"ids": (T1, T2)}),
         ("DELETE FROM queue WHERE id IN :ids", {"ids": (QUEUE_A, QUEUE_B)}),
+        ("DELETE FROM group_role WHERE role_id IN :ids", {"ids": (ROLE,)}),
         ("DELETE FROM role_user WHERE role_id IN :ids", {"ids": (ROLE,)}),
         ("DELETE FROM roles WHERE id IN :ids", {"ids": (ROLE,)}),
         ("DELETE FROM group_user WHERE user_id IN :ids", {"ids": users}),
@@ -217,19 +234,33 @@ def ensure_tiqora_tables(sync_url: str) -> None:
 async def approvals_session(
     request: pytest.FixtureRequest, url_fixture: str, *, world: bool = True
 ) -> AsyncIterator[AsyncSession]:
-    """A session on the dialect's database that is rolled back at the end (the world with it)."""
+    """A session whose whole transaction is rolled back at the end (the world with it).
+
+    The session is bound to an outer connection transaction with savepoints, and the world is
+    committed (released) into it: ``session.commit()`` and ``session.rollback()`` inside the
+    code under test (routes roll back before deciding, F1(a)) only touch the savepoint, the
+    seeded rows survive.
+    """
     url = request.getfixturevalue(url_fixture)
     ensure_tiqora_tables(url)
-    engine = create_async_engine(to_async_url(url))
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    engine = create_async_engine(to_async_url(url), poolclass=NullPool)
     try:
-        async with factory() as session:
+        async with engine.connect() as conn:
+            outer = await conn.begin()
+            factory = async_sessionmaker(
+                conn,
+                class_=AsyncSession,
+                expire_on_commit=False,
+                join_transaction_mode="create_savepoint",
+            )
             try:
-                if world:
-                    await seed_world(session)
-                yield session
+                async with factory() as session:
+                    if world:
+                        await seed_world(session)
+                        await session.commit()
+                    yield session
             finally:
-                await session.rollback()
+                await outer.rollback()
     finally:
         await engine.dispose()
 
@@ -315,7 +346,7 @@ async def as_client(
 ) -> AsyncClient:
     """An app on *session* acting as agent *agent* or portal customer *customer* (a login).
 
-    The routes' ``commit`` becomes ``flush`` so the test owns the transaction. Use as
+    Over an :func:`approvals_session` the routes' commit/rollback act on a savepoint. Use as
     ``async with await as_client(...) as client``.
     """
     from tiqora.api.app import create_app
@@ -326,7 +357,6 @@ async def as_client(
     async def _db() -> Any:
         yield session
 
-    session.commit = session.flush  # type: ignore[method-assign]
     app = create_app(Settings(environment="test"))
     app.dependency_overrides[get_db] = _db
     if agent is not None:
@@ -357,7 +387,12 @@ async def as_client(
 
 
 class CapturingMail:
-    """Replaces ``build_outbound_sender`` with one shared :class:`CapturingMailSender`."""
+    """Replaces ``build_outbound_sender`` with one shared :class:`CapturingMailSender`.
+
+    Patches the module attribute: code under test must call
+    ``mail_outbound.build_outbound_sender(...)`` through the module (a
+    ``from ... import build_outbound_sender`` binding bypasses the patch).
+    """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from tiqora.domain import mail_outbound
