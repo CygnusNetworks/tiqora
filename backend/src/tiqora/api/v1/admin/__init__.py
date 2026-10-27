@@ -40,6 +40,7 @@ from tiqora.api.v1.admin import (
     identity_providers,
     identity_scim,
     itsm,
+    itsm_change,
     itsm_import,
     mail_accounts,
     mail_log,
@@ -134,6 +135,7 @@ admin_router.include_router(dashboard_templates.router)
 admin_router.include_router(dashboard_kiosk_links.router)
 admin_router.include_router(webservices.router)
 admin_router.include_router(itsm.router)
+admin_router.include_router(itsm_change.router)
 admin_router.include_router(itsm_import.router)
 
 __all__ = ["admin_router"]

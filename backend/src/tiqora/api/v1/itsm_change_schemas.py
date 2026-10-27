@@ -12,6 +12,7 @@ from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
 from tiqora.itsm.change.service import ChangeView
 from tiqora.itsm.change.tasks import TaskKind, TaskView
+from tiqora.itsm.change.templates import TemplateDefaults, TemplateView
 
 
 class ChangeStatusOut(BaseModel):
@@ -179,3 +180,27 @@ class TaskOrderIn(BaseModel):
 
 def task_out(view: TaskView) -> TaskOut:
     return TaskOut.model_validate(view.model_dump())
+
+
+class ChangeTemplateSummaryOut(BaseModel):
+    """What the create dialog needs from a valid template (no task texts)."""
+
+    id: int
+    name: str
+    description: str | None
+    change_type: ChangeType
+    is_standard: bool
+    task_count: int
+    defaults: TemplateDefaults
+
+
+def template_summary(view: TemplateView) -> ChangeTemplateSummaryOut:
+    return ChangeTemplateSummaryOut(
+        id=view.id,
+        name=view.name,
+        description=view.description,
+        change_type=view.change_type,
+        is_standard=view.is_standard,
+        task_count=len(view.tasks),
+        defaults=view.defaults,
+    )

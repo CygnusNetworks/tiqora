@@ -55,6 +55,7 @@ from tiqora.itsm.change.models import (
     TiqoraItsmCab,
     TiqoraItsmChange,
     TiqoraItsmChangeEvent,
+    TiqoraItsmChangeRiskAnswer,
     TiqoraItsmChangeService,
     TiqoraItsmChangeTemplate,
 )
@@ -510,9 +511,21 @@ async def create_change(
 ) -> tuple[ChangeView, int | None]:
     """A new change ticket with its record in phase ``draft``.
 
-    Returns the view and the id of the template-task job (``None`` here: the impact and task
-    jobs are wired by the tasks and impact modules). Needs ``create`` on the queue (403).
+    Returns the view and the id of the template-task job (``None`` when the template has no
+    tasks or none was used; the impact job is wired by the impact module). Needs ``create`` on the
+    queue (403). A template prefills what the caller left out (see ``apply_template_defaults``);
+    references that went stale since the template was saved are dropped and named in the
+    ``created`` event's ``template_warnings``.
     """
+    # lazy: ``templates`` imports this module and ``tasks``, which imports this module too
+    from tiqora.itsm.change.tasks import enqueue_change_tasks
+    from tiqora.itsm.change.templates import (
+        ResolvedDefaults,
+        apply_template_defaults,
+        resolve_defaults,
+        template_view,
+    )
+
     await require_change_mode(session, settings)
     cfg = await load_change_settings(session, settings)
     itsm_cfg = await load_itsm_settings(session, settings)
@@ -522,6 +535,15 @@ async def create_change(
         raise ChangeError("standard_needs_template", 422)
     if template is not None and template.change_type != data.change_type:
         raise ChangeError("template_type_mismatch", 422)
+    tview = None if template is None else template_view(template)
+    resolved: ResolvedDefaults | None = None
+    if tview is not None:
+        if tview.broken:
+            raise ChangeError("template_invalid", 409)
+        resolved = await resolve_defaults(session, tview)
+        tview = tview.model_copy(update={"defaults": resolved.defaults})
+        data = apply_template_defaults(data, tview)
+    defaults = None if tview is None else tview.defaults
     queue_id = data.queue_id or cfg.change_queue_id
     if not queue_id:
         raise ChangeError("queue_required", 422)
@@ -561,7 +583,11 @@ async def create_change(
                 title=data.title,
                 queue_id=queue_id,
                 state_id=state_id,
-                priority_id=await _priority_id(session),
+                priority_id=(
+                    defaults.priority_id
+                    if defaults is not None and defaults.priority_id is not None
+                    else await _priority_id(session)
+                ),
                 owner_id=user_id,
                 type_id=type_id,
                 service_id=data.service_id,
@@ -595,6 +621,10 @@ async def create_change(
             planned_start=_naive(data.planned_start),
             planned_end=_naive(data.planned_end),
             reason=_clean(data.reason),
+            implementation_plan=None if defaults is None else _clean(defaults.implementation_plan),
+            backout_plan=None if defaults is None else _clean(defaults.backout_plan),
+            test_plan=None if defaults is None else _clean(defaults.test_plan),
+            portal_visible=False if defaults is None else defaults.portal_visible,
             approval_round=0,
             created_at=now,
             created_by=user_id,
@@ -605,6 +635,18 @@ async def create_change(
     await session.flush()
     for service_id in extra_services:
         session.add(TiqoraItsmChangeService(ticket_id=ticket_id, service_id=service_id))
+    if resolved is not None:
+        for question_key, answer_key, points in resolved.risk_answers:
+            session.add(
+                TiqoraItsmChangeRiskAnswer(
+                    ticket_id=ticket_id,
+                    question_key=question_key,
+                    answer_key=answer_key,
+                    points=points,
+                    answered_at=now,
+                    answered_by=user_id,
+                )
+            )
     await session.flush()
 
     if provider is not None:
@@ -629,7 +671,15 @@ async def create_change(
         event="created",
         user_id=user_id,
         to_phase="draft",
-        detail={"change_type": data.change_type},
+        detail={
+            "change_type": data.change_type,
+            **({} if template is None else {"template_id": template.id}),
+            **(
+                {"template_warnings": list(resolved.warnings)}
+                if resolved is not None and resolved.warnings
+                else {}
+            ),
+        },
     )
     await record_event(
         session, ticket_id=ticket_id, event="phase", user_id=user_id, to_phase="draft"
@@ -638,7 +688,13 @@ async def create_change(
         session,
         ChangeEvent(ticket_id, "created", None, "draft", user_id, now),
     )
-    return await _loaded_view(session, cfg, ticket_id, user_id), None
+    tasks_job_id: int | None = None
+    if tview is not None and tview.tasks:
+        job = await enqueue_change_tasks(
+            session, change_ticket_id=ticket_id, template_id=tview.id, user_id=user_id
+        )
+        tasks_job_id = job.id
+    return await _loaded_view(session, cfg, ticket_id, user_id), tasks_job_id
 
 
 def _parse_ci_refs(raw: Sequence[str]) -> list[CiRef]:
@@ -784,6 +840,11 @@ async def update_change(
     if data.change_type is not None and data.change_type != row.change_type:
         if row.phase != "draft":
             raise ChangeError("change_type_locked", 409)
+        if row.template_id is not None:
+            # a change created from a template keeps the template's type
+            used = await session.get(TiqoraItsmChangeTemplate, row.template_id)
+            if used is not None and used.change_type != data.change_type:
+                raise ChangeError("template_type_mismatch", 422)
         if data.change_type == "standard":
             template = await _template(session, row.template_id)
             if template is None or not template.is_standard:

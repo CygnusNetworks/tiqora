@@ -9716,6 +9716,150 @@
         "title": "ChangeStatusOut",
         "type": "object"
       },
+      "ChangeTemplateOut": {
+        "properties": {
+          "broken": {
+            "title": "Broken",
+            "type": "boolean"
+          },
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/TemplateDefaults"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_standard": {
+            "title": "Is Standard",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateTask"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "change_type",
+          "is_standard",
+          "valid",
+          "broken",
+          "defaults",
+          "tasks",
+          "created_at",
+          "created_by",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "ChangeTemplateOut",
+        "type": "object"
+      },
+      "ChangeTemplateSummaryOut": {
+        "description": "What the create dialog needs from a valid template (no task texts).",
+        "properties": {
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/TemplateDefaults"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_standard": {
+            "title": "Is Standard",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "task_count": {
+            "title": "Task Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "change_type",
+          "is_standard",
+          "task_count",
+          "defaults"
+        ],
+        "title": "ChangeTemplateSummaryOut",
+        "type": "object"
+      },
       "ChangeUpdateIn": {
         "additionalProperties": false,
         "description": "PATCH body. There is no ``phase``: unknown fields are refused (422), so a phase can only\nchange through the phase machine.",
@@ -44877,6 +45021,141 @@
         "title": "TemplateAttachmentsReplace",
         "type": "object"
       },
+      "TemplateDefaults": {
+        "additionalProperties": false,
+        "description": "What a change created from the template starts with (all optional, plain text).",
+        "properties": {
+          "backout_plan": {
+            "anyOf": [
+              {
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backout Plan"
+          },
+          "cab_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cab Id"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "maximum": 525600.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "implementation_plan": {
+            "anyOf": [
+              {
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implementation Plan"
+          },
+          "portal_visible": {
+            "default": false,
+            "title": "Portal Visible",
+            "type": "boolean"
+          },
+          "priority_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Id"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "risk_answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 100,
+            "title": "Risk Answers",
+            "type": "object"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "test_plan": {
+            "anyOf": [
+              {
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Plan"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "TemplateDefaults",
+        "type": "object"
+      },
       "TemplateEditorsOut": {
         "description": "Who may edit a Standard Template (per-template ACL: groups + users).",
         "properties": {
@@ -44924,6 +45203,66 @@
         "title": "TemplateEditorsUpdate",
         "type": "object"
       },
+      "TemplateIn": {
+        "additionalProperties": false,
+        "description": "Body of the admin create/update.",
+        "properties": {
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/TemplateDefaults"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_standard": {
+            "default": false,
+            "title": "Is Standard",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateTask"
+            },
+            "maxItems": 200,
+            "title": "Tasks",
+            "type": "array"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "change_type"
+        ],
+        "title": "TemplateIn",
+        "type": "object"
+      },
       "TemplateOut": {
         "properties": {
           "content_type": {
@@ -44967,6 +45306,91 @@
           "text"
         ],
         "title": "TemplateOut",
+        "type": "object"
+      },
+      "TemplateTask": {
+        "properties": {
+          "body": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Body",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "maximum": 525600.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "key": {
+            "pattern": "^[a-z0-9_]{1,50}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "offset_minutes": {
+            "default": 0,
+            "maximum": 525600.0,
+            "minimum": -43200.0,
+            "title": "Offset Minutes",
+            "type": "integer"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "position": {
+            "default": 0,
+            "title": "Position",
+            "type": "integer"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "task_kind": {
+            "default": "workorder",
+            "enum": [
+              "workorder",
+              "backout",
+              "decision",
+              "pir"
+            ],
+            "title": "Task Kind",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title"
+        ],
+        "title": "TemplateTask",
         "type": "object"
       },
       "TemplateUpdateApplyIn": {
@@ -71667,6 +72091,372 @@
         "summary": "Get Itsm Admin",
         "tags": [
           "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/templates": {
+      "get": {
+        "description": "All templates, valid or not.",
+        "operationId": "get_templates_api_v1_admin_itsm_change_templates_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeTemplateOut"
+                  },
+                  "title": "Response Get Templates Api V1 Admin Itsm Change Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Templates",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "post": {
+        "operationId": "post_template_api_v1_admin_itsm_change_templates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Template",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/templates/{template_id}": {
+      "delete": {
+        "description": "Delete the template; changes created from it stay (their ``template_id`` becomes empty).",
+        "operationId": "delete_template_route_api_v1_admin_itsm_change_templates__template_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Template Route",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "get": {
+        "operationId": "get_template_detail_api_v1_admin_itsm_change_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Detail",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "put": {
+        "description": "Replace the template. Changes created from it earlier keep what they got.",
+        "operationId": "put_template_api_v1_admin_itsm_change_templates__template_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Template",
+        "tags": [
+          "admin:itsm-change"
         ]
       }
     },
@@ -101268,6 +102058,76 @@
         "summary": "Get Catalog",
         "tags": [
           "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/change-templates": {
+      "get": {
+        "description": "Valid change templates for the create dialog (Mode B).",
+        "operationId": "get_change_templates_api_v1_itsm_change_templates_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeTemplateSummaryOut"
+                  },
+                  "title": "Response Get Change Templates Api V1 Itsm Change Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Templates",
+        "tags": [
+          "itsm-change"
         ]
       }
     },

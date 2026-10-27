@@ -19,13 +19,15 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeEventOut,
     ChangeOut,
     ChangeStatusOut,
+    ChangeTemplateSummaryOut,
     TaskOrderIn,
     TaskOut,
     change_out,
     event_out,
     task_out,
+    template_summary,
 )
-from tiqora.itsm.change.gate import change_availability
+from tiqora.itsm.change.gate import change_availability, require_change_mode
 from tiqora.itsm.change.service import (
     ChangeCreateIn,
     ChangeUpdateIn,
@@ -43,6 +45,7 @@ from tiqora.itsm.change.tasks import (
     reorder_tasks,
     update_task,
 )
+from tiqora.itsm.change.templates import list_templates
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/itsm", tags=["itsm-change"])
@@ -65,6 +68,16 @@ async def get_change_status(
         can_see_legacy=availability.can_see_legacy,
         setup_complete_change=availability.setup_complete_change,
     )
+
+
+@router.get("/change-templates", response_model=list[ChangeTemplateSummaryOut])
+async def get_change_templates(
+    user: CurrentUser, session: DbSession, settings: AppSettings
+) -> list[ChangeTemplateSummaryOut]:
+    """Valid change templates for the create dialog (Mode B)."""
+    _ = user
+    await require_change_mode(session, settings)
+    return [template_summary(v) for v in await list_templates(session, include_invalid=False)]
 
 
 @router.post("/changes", response_model=ChangeCreatedOut, status_code=status.HTTP_201_CREATED)

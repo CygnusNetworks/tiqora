@@ -4146,6 +4146,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/change/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Templates
+         * @description All templates, valid or not.
+         */
+        get: operations["get_templates_api_v1_admin_itsm_change_templates_get"];
+        put?: never;
+        /** Post Template */
+        post: operations["post_template_api_v1_admin_itsm_change_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template Detail */
+        get: operations["get_template_detail_api_v1_admin_itsm_change_templates__template_id__get"];
+        /**
+         * Put Template
+         * @description Replace the template. Changes created from it earlier keep what they got.
+         */
+        put: operations["put_template_api_v1_admin_itsm_change_templates__template_id__put"];
+        post?: never;
+        /**
+         * Delete Template Route
+         * @description Delete the template; changes created from it stay (their ``template_id`` becomes empty).
+         */
+        delete: operations["delete_template_route_api_v1_admin_itsm_change_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/itsm/import/release-lock": {
         parameters: {
             query?: never;
@@ -9288,6 +9334,26 @@ export interface paths {
          * @description Classes the user may read and the deployment / incident states, for the search filters.
          */
         get: operations["get_catalog_api_v1_itsm_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Templates
+         * @description Valid change templates for the create dialog (Mode B).
+         */
+        get: operations["get_change_templates_api_v1_itsm_change_templates_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16748,6 +16814,65 @@ export interface components {
             reason: "ok" | "itsm_off" | "mode_a" | "setup_missing";
             /** Setup Complete Change */
             setup_complete_change: boolean;
+        };
+        /** ChangeTemplateOut */
+        ChangeTemplateOut: {
+            /** Broken */
+            broken: boolean;
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            defaults: components["schemas"]["TemplateDefaults"];
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Standard */
+            is_standard: boolean;
+            /** Name */
+            name: string;
+            /** Tasks */
+            tasks: components["schemas"]["TemplateTask"][];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+            /** Valid */
+            valid: boolean;
+        };
+        /**
+         * ChangeTemplateSummaryOut
+         * @description What the create dialog needs from a valid template (no task texts).
+         */
+        ChangeTemplateSummaryOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            defaults: components["schemas"]["TemplateDefaults"];
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Standard */
+            is_standard: boolean;
+            /** Name */
+            name: string;
+            /** Task Count */
+            task_count: number;
         };
         /**
          * ChangeUpdateIn
@@ -28445,6 +28570,41 @@ export interface components {
             attachment_ids: number[];
         };
         /**
+         * TemplateDefaults
+         * @description What a change created from the template starts with (all optional, plain text).
+         */
+        TemplateDefaults: {
+            /** Backout Plan */
+            backout_plan?: string | null;
+            /** Cab Id */
+            cab_id?: number | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Implementation Plan */
+            implementation_plan?: string | null;
+            /**
+             * Portal Visible
+             * @default false
+             */
+            portal_visible: boolean;
+            /** Priority Id */
+            priority_id?: number | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Risk Answers */
+            risk_answers?: {
+                [key: string]: string;
+            };
+            /** Service Ids */
+            service_ids?: number[];
+            /** Test Plan */
+            test_plan?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /**
          * TemplateEditorsOut
          * @description Who may edit a Standard Template (per-template ACL: groups + users).
          */
@@ -28467,6 +28627,34 @@ export interface components {
              */
             user_ids: number[];
         };
+        /**
+         * TemplateIn
+         * @description Body of the admin create/update.
+         */
+        TemplateIn: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            defaults?: components["schemas"]["TemplateDefaults"];
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Standard
+             * @default false
+             */
+            is_standard: boolean;
+            /** Name */
+            name: string;
+            /** Tasks */
+            tasks?: components["schemas"]["TemplateTask"][];
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
         /** TemplateOut */
         TemplateOut: {
             /** Content Type */
@@ -28479,6 +28667,40 @@ export interface components {
             template_type?: string | null;
             /** Text */
             text: string;
+        };
+        /** TemplateTask */
+        TemplateTask: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Key */
+            key: string;
+            /**
+             * Offset Minutes
+             * @default 0
+             */
+            offset_minutes: number;
+            /** Owner Id */
+            owner_id?: number | null;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            /** Queue Id */
+            queue_id?: number | null;
+            /**
+             * Task Kind
+             * @default workorder
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Title */
+            title: string;
         };
         /** TemplateUpdateApplyIn */
         TemplateUpdateApplyIn: {
@@ -40933,6 +41155,183 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ItsmAdminOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_templates_api_v1_admin_itsm_change_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_template_api_v1_admin_itsm_change_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_detail_api_v1_admin_itsm_change_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_template_api_v1_admin_itsm_change_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_route_api_v1_admin_itsm_change_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -54528,6 +54927,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_templates_api_v1_itsm_change_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateSummaryOut"][];
                 };
             };
             /** @description Validation Error */
