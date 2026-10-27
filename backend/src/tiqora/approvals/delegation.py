@@ -22,7 +22,7 @@ from tiqora.permissions.engine import PermissionEngine
 
 _CHUNK = 500
 # Znuny's root@localhost never substitutes anybody.
-_SYSTEM_USER_ID = 1
+SYSTEM_USER_ID = 1
 
 
 def _naive_utc(value: datetime) -> datetime:
@@ -87,13 +87,18 @@ async def create_delegation(
     """
     start = _naive_utc(valid_from)
     end = _naive_utc(valid_until) if valid_until is not None else None
-    if substitute_user_id in (user_id, _SYSTEM_USER_ID):
+    if substitute_user_id in (user_id, SYSTEM_USER_ID):
         raise ApprovalError("forward_target_invalid", 422, "a substitute must be another agent")
     valid = (
         await session.execute(select(Users.valid_id).where(Users.id == substitute_user_id))
     ).scalar_one_or_none()
     if valid != 1:
         raise ApprovalError("forward_target_invalid", 422, "the substitute is not a valid agent")
+    delegator_valid = (
+        await session.execute(select(Users.valid_id).where(Users.id == user_id))
+    ).scalar_one_or_none()
+    if user_id == SYSTEM_USER_ID or delegator_valid != 1:
+        raise ApprovalError("invalid_definition", 422, "the delegator is not a valid agent")
     if end is not None and end <= start:
         raise ApprovalError("invalid_definition", 422, "valid_until must be after valid_from")
     clash = select(TiqoraApprovalDelegation.id).where(

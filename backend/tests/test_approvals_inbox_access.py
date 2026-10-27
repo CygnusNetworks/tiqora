@@ -421,3 +421,40 @@ async def test_ticket_link_allowed_only_with_ro(
         assert await access.ticket_link_allowed(session, T2, Actor.agent(ADMIN)) is True
         assert await access.ticket_link_allowed(session, T1, Actor.customer(K1)) is False
         assert await access.ticket_link_allowed(session, 971299, Actor.agent(ADMIN)) is False
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_inbox_marks_rows_the_actor_cannot_vote_on(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            await _delegate(session, AG5, AG1)
+            # AG1 holds an own row and AG5's; after AG1 votes their own, AG5's row is dead for AG1
+            voted = await _request(
+                session,
+                _defn(_step("CAB", _user(AG1), _user(AG5), _user(AG3), rule="all")),
+                key="v",
+            )
+            # the requester is the delegate: AG5's row can never be voted by AG1
+            own = await _request(
+                session, _defn(_step("X", _user(AG5), _user(AG3))), key="o", requester=AG1
+            )
+            open_ = await _request(session, _defn(_step("Y", _user(AG5), _user(AG3))), key="y")
+            before = await _pending(session, AG1)
+            flags = {i.approval_id: (i.can_vote, i.blocked_reason) for i in before.items}
+            assert flags[voted] == (True, None)  # own row preferred, so listed once as votable
+            assert flags[own] == (False, "own_request")
+            assert flags[open_] == (True, None)
+            assert await inbox.pending_count(session, Actor.agent(AG1)) == 3
+            await _decide(session, voted, AG1)
+            after = await _pending(session, AG1)
+            flags = {
+                (i.approval_id, i.on_behalf_of): (i.can_vote, i.blocked_reason) for i in after.items
+            }
+            assert flags[(voted, AG5)] == (False, "already_voted")
+            assert after.total == 3  # still listed, just marked
+            assert await inbox.pending_count(session, Actor.agent(AG1)) == 1
+            decided = await _decided(session, AG1)
+            assert all(i.can_vote is False for i in decided.items)

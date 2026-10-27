@@ -72,7 +72,6 @@ _CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
 _REASON_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
 _COMMENT_MAX = 2000
 _VOTED = frozenset({"approved", "rejected"})
-_SYSTEM_USER_ID = 1
 
 
 def _info(approval: TiqoraApproval) -> ApprovalInfo:
@@ -893,6 +892,16 @@ async def _voters(
     return [rules.VoterState(a.status, a.decisive) for a in eligible]  # type: ignore[arg-type]
 
 
+async def _voters_in_step(session: AsyncSession, step_id: int) -> set[str]:
+    """Principal keys that cast a vote in the step, on their own or on behalf (F8)."""
+    rows = await session.execute(
+        select(TiqoraApprovalVote.decided_by)
+        .where(TiqoraApprovalVote.step_id == step_id)
+        .with_for_update()
+    )
+    return {str(r) for r in rows.scalars()}
+
+
 async def _revoke_approver_tokens(
     session: AsyncSession, approver_ids: Sequence[int], *, redeemed: int | None = None
 ) -> None:
@@ -1059,6 +1068,28 @@ async def decide(
     )
     await audit.history(session, approval, "voted", actor=actor, extra=decision, settings=asettings)
 
+    # F8: this person voted in the step, so another row of theirs there can never be voted
+    dead = [
+        a
+        for a in approvers
+        if a.step_id == step.id and a.status == "pending" and a.principal == key
+    ]
+    for other in dead:
+        other.status = "not_needed"
+    if dead:
+        await session.flush()
+        await _revoke_approver_tokens(session, [a.id for a in dead])
+        for other in dead:
+            await audit.record(
+                session,
+                approval=approval,
+                action="approver_removed",
+                actor=actor,
+                step_id=step.id,
+                approver_id=other.id,
+                detail={"reason": "already_voted"},
+            )
+
     outcome = rules.evaluate_step(step.rule, step.quorum, await _voters(session, step, approvers))  # type: ignore[arg-type]
     if outcome != "pending":
         await _close_step(
@@ -1143,7 +1174,7 @@ async def forward(
     if row.source_kind == "forward" or not StepSpec.model_validate_json(step.spec).allow_delegation:
         raise ApprovalError("forward_not_allowed", 409)
 
-    if to_user_id == principal.user_id or to_user_id == _SYSTEM_USER_ID:
+    if to_user_id == principal.user_id or to_user_id == delegation.SYSTEM_USER_ID:
         raise ApprovalError("forward_target_invalid", 422, "choose another agent")
     valid = (
         await session.execute(select(Users.valid_id).where(Users.id == to_user_id))
@@ -1155,6 +1186,8 @@ async def forward(
         raise ApprovalError("self_approval_forbidden", 403)
     if any(a.step_id == step.id and a.principal == target.key for a in approvers):
         raise ApprovalError("forward_target_invalid", 422, "the agent is already an approver")
+    if target.key in await _voters_in_step(session, step.id):
+        raise ApprovalError("already_decided", 409, "the agent already voted in this step")
 
     new_id = await _add_approver(
         session,
@@ -1245,7 +1278,7 @@ async def refresh_approvers(
                     approver_id=row.id,
                     detail={"reason": "departed"},
                 )
-        have = {a.principal for a in rows}
+        have = {a.principal for a in rows} | await _voters_in_step(session, step.id)
         for resolved in resolution.approvers:
             if resolved.principal.key not in have:
                 have.add(resolved.principal.key)

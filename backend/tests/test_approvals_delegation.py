@@ -270,7 +270,11 @@ async def test_delegate_decides_on_behalf(url_fixture: str, request: pytest.Fixt
             assert rows[AG5].status == "approved" and rows[AG3].status == "pending"
             vote = (
                 await session.execute(
-                    text("SELECT decided_by, on_behalf, approver_id FROM tiqora_approval_vote")
+                    text(
+                        "SELECT decided_by, on_behalf, approver_id FROM tiqora_approval_vote"
+                        " WHERE approval_id = :a"
+                    ),
+                    {"a": aid},
                 )
             ).one()
             assert (vote[0], bool(vote[1]), int(vote[2])) == (f"agent:{AG1}", True, rows[AG5].id)
@@ -813,3 +817,93 @@ async def test_refresh_permission(url_fixture: str, request: pytest.FixtureReque
             err = await _refused(service.refresh_approvers(session, 971197, actor=Actor.agent(AG1)))
             assert (err.code, err.http_status) == ("approval_not_found", 404)
             await service.refresh_approvers(session, aid, actor=Actor.agent(AG1))
+
+
+# --- F8: no row that nobody can vote on ----------------------------------------------------------
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_delegate_vote_closes_own_pending_row(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            await _delegate(session, AG5, AG1)
+            aid = await _request(
+                session, _defn(_step("CAB", _user(AG1), _user(AG5), _user(AG3), rule="all"))
+            )
+            rows = {a.user_id: a for a in await _approvers(session, aid)}
+            # explicit id of the delegator's row while the own row is pending
+            result = await _decide(session, aid, AG1, approver_id=rows[AG5].id)
+            assert result.on_behalf is True
+            assert await _status_of(session, aid) == {
+                AG1: "not_needed",
+                AG5: "approved",
+                AG3: "pending",
+            }
+            assert {"reason": "already_voted"} in await _events(session, aid, "approver_removed")
+            err = await _refused(_decide(session, aid, AG1))
+            assert err.code == "already_decided"
+            # the step finishes without a timeout
+            await _decide(session, aid, AG3)
+            assert (await _approval(session, aid)).status == "approved"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_forward_to_target_who_voted_on_behalf_refused(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            await _delegate(session, AG5, AG1)
+            aid = await _request(
+                session, _defn(_step("CAB", _user(AG5), _user(AG3), _user(AG4), rule="all"))
+            )
+            await _decide(session, aid, AG1)  # on behalf of AG5
+            row = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
+            err = await _refused(
+                service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
+            )
+            assert (err.code, err.http_status) == ("already_decided", 409)
+            assert len(await _approvers(session, aid)) == 3
+            await _decide(session, aid, AG3)
+            await _decide(session, aid, AG4)
+            assert (await _approval(session, aid)).status == "approved"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_refresh_does_not_add_principal_who_voted_in_step(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            await _delegate(session, AG5, AG1)
+            aid = await _request(session, _defn(_step("CAB", CAB_GROUP, rule="all")))
+            await _decide(session, aid, AG1)  # on behalf of AG5
+            await session.execute(
+                text(
+                    "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+                    " create_by, change_time, change_by) VALUES (:u, :g, 'rw', :t, 1, :t, 1)"
+                ),
+                {"u": AG1, "g": GROUP_CAB, "t": utc_now()},
+            )
+            result = await service.refresh_approvers(session, aid, actor=Actor.agent(AG1))
+            assert (result.added, result.removed) == (0, 0)
+            assert AG1 not in await _status_of(session, aid)
+            await _decide(session, aid, AG3)
+            await _decide(session, aid, AG4)
+            assert (await _approval(session, aid)).status == "approved"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_delegation_for_invalid_delegator_refused(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        for delegator in (AG6, NO_SUCH_USER, 1):
+            err = await _refused(_delegate(session, delegator, AG1))
+            assert (err.code, err.http_status) == ("invalid_definition", 422)

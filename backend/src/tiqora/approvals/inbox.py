@@ -27,6 +27,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalVote,
 )
 from tiqora.approvals.resolve import canonical_principal
+from tiqora.approvals.service import _excluded_keys
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.jobs.service import utc_now
 
@@ -57,6 +58,10 @@ class InboxItem:
     decided_at: datetime | None
     #: the vote on this row ("approved" | "rejected"), None while it is open or was forwarded
     my_decision: str | None
+    #: False for rows the actor cannot vote on any more (F8) and for the decided tab
+    can_vote: bool = False
+    #: "already_voted" (voted in this step) | "own_request" (delegated row, actor is requester)
+    blocked_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +181,38 @@ async def _tickets(
     return out
 
 
-async def _items(session: AsyncSession, key: str, rows: Sequence[_Row]) -> list[InboxItem]:
+async def _blocked(session: AsyncSession, key: str, rows: Sequence[_Row]) -> dict[int, str | None]:
+    """``{approver_id: reason}`` for pending rows the actor cannot vote on (None = can vote)."""
+    step_ids = sorted({r.step.id for r in rows})
+    voted: set[int] = set()
+    for start in range(0, len(step_ids), _CHUNK):
+        found = await session.execute(
+            select(V.step_id).where(
+                V.step_id.in_(step_ids[start : start + _CHUNK]), V.decided_by == key
+            )
+        )
+        voted.update(int(i) for i in found.scalars())
+    excluded: dict[int, frozenset[str]] = {}
+    out: dict[int, str | None] = {}
+    for row in rows:
+        if row.step.id in voted:
+            out[row.approver.id] = "already_voted"
+        elif row.approver.principal != key:  # delegated: requester/creator never vote
+            if row.approval.id not in excluded:
+                excluded[row.approval.id] = await _excluded_keys(session, row.approval)
+            keys = excluded[row.approval.id]
+            out[row.approver.id] = (
+                "own_request" if key in keys or row.approver.principal in keys else None
+            )
+        else:
+            out[row.approver.id] = None
+    return out
+
+
+async def _items(
+    session: AsyncSession, key: str, rows: Sequence[_Row], *, pending: bool = False
+) -> list[InboxItem]:
+    blocked = await _blocked(session, key, rows) if pending else {}
     progress = await _progress(session, [r.step.id for r in rows])
     tickets = await _tickets(session, [r.approval.ticket_id for r in rows])
     now = utc_now()
@@ -208,6 +244,8 @@ async def _items(session: AsyncSession, key: str, rows: Sequence[_Row]) -> list[
                 status=row.approval.status,
                 decided_at=row.vote.decided_at if row.vote is not None else None,
                 my_decision=row.vote.decision if row.vote is not None else None,
+                can_vote=pending and blocked[row.approver.id] is None,
+                blocked_reason=blocked.get(row.approver.id),
             )
         )
     return items
@@ -227,12 +265,16 @@ async def inbox(
         return InboxPage([], 0)
     if state == "pending":
         rows = await _pending_rows(session, actor)
-        total, page = len(rows), rows[offset : offset + limit]
-    else:
-        page, total = await _decided_rows(session, key, limit=limit, offset=offset)
+        items = await _items(session, key, rows[offset : offset + limit], pending=True)
+        return InboxPage(items, len(rows))
+    page, total = await _decided_rows(session, key, limit=limit, offset=offset)
     return InboxPage(await _items(session, key, page), total)
 
 
 async def pending_count(session: AsyncSession, actor: Actor) -> int:
-    """Open rows of the actor (own and delegated) - the badge in the sidebar."""
-    return len(await _pending_rows(session, actor))
+    """Open rows the actor can still vote on (own and delegated) - the sidebar badge."""
+    key = await _actor_key(session, actor)
+    if key is None:
+        return 0
+    rows = await _pending_rows(session, actor)
+    return sum(1 for reason in (await _blocked(session, key, rows)).values() if reason is None)
