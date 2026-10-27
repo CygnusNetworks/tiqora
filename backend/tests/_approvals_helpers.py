@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -25,6 +26,8 @@ from tiqora.approvals import models as _approval_models  # noqa: F401  (register
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
+    JOB_HOOK,
+    JOB_MAIL,
     ApprovalOutcome,
     ApprovalSubjectType,
     ApproverResolver,
@@ -36,6 +39,7 @@ from tiqora.domain.customer_auth import AuthenticatedCustomer
 from tiqora.extensions import core as extensions_core
 from tiqora.extensions.core import register_core, set_registry_for_tests
 from tiqora.extensions.registry import Registry
+from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
 
 NOW = datetime(2026, 10, 15, 8, 0, 0)  # noqa: DTZ001 - Znuny stores naive UTC
 
@@ -294,10 +298,26 @@ def make_fake_subject_type(
     return FakeSubjectType(key, allow_customer_approvers=allow_customer_approvers)
 
 
+class _AnyPayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+async def _noop_job(ctx: Any, payload: Any) -> dict[str, Any] | None:
+    return None
+
+
 def registry_with(*items: ApprovalSubjectType | ApproverResolver | FakeSubjectType) -> Registry:
     """A fresh frozen registry: everything ``register_core`` adds plus the given test items."""
     registry = Registry()
     register_core(registry)
+    # no-op handlers so enqueue_job accepts the approval jobs until the real ones are registered
+    for kind in (JOB_HOOK, JOB_MAIL):
+        if registry.get(JOB_HANDLERS, kind) is None:
+            registry.add(
+                JOB_HANDLERS,
+                JobHandler(kind=kind, payload_model=_AnyPayload, run=_noop_job, title_key=kind),
+                owner="test",
+            )
     for item in items:
         if isinstance(item, FakeSubjectType):
             item = item.item

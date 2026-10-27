@@ -126,6 +126,19 @@ async def customer_in_ticket_company(session: AsyncSession, login: str, ticket_i
     return (await _companies_of(session, rows, company))[rows[login.lower()][0]]
 
 
+async def canonical_principal(session: AsyncSession, principal: Principal) -> Principal:
+    """A customer principal with the login spelled as stored in ``customer_user``.
+
+    Unknown logins and agents come back unchanged. Used wherever principal keys are compared
+    (requester self-exclusion), because ``customer:Kunde1`` and ``customer:kunde1`` are one person.
+    """
+    if principal.login is None:
+        return principal
+    rows = await _customer_rows(session, [principal.login])
+    found = rows.get(principal.login.lower())
+    return Principal.customer(found[0]) if found is not None else principal
+
+
 @dataclass(frozen=True, slots=True)
 class _Candidate:
     principal: Principal

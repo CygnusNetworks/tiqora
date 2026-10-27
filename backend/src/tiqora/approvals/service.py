@@ -1,0 +1,794 @@
+"""The approval engine's service API (A7), stable for consumers.
+
+Request, activation, auto decision, cancel and the read functions live here; voting, forwarding
+and refreshing are added by the decision tasks. Every function takes an ``AsyncSession``,
+flushes and never commits: the caller owns the transaction. Every state-changing function locks
+``tiqora_approval`` first (``FOR UPDATE``, ``populate_existing``) and reads the step/approver rows
+it is about to change with locking reads, so InnoDB hands out the latest committed versions
+instead of the REPEATABLE-READ snapshot - a consumer calling from inside its own transaction
+cannot roll back to please the engine. Lock order: consumer row, ``tiqora_approval``,
+step/approver/token rows. Timestamps are naive UTC (``utc_now``).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import timedelta
+from typing import Literal
+
+from sqlalchemy import select, text, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.approvals import access, audit, rules, templates
+from tiqora.approvals.contract import (
+    APPROVAL_SUBJECT_TYPES,
+    APPROVER_RESOLVERS,
+    EVENT_CANCELLED,
+    EVENT_DECIDED,
+    EVENT_REQUESTED,
+    JOB_HOOK,
+    JOB_MAIL,
+    Actor,
+    ApprovalDefinition,
+    ApprovalError,
+    ApprovalInfo,
+    ApprovalStatus,
+    ApproverEntry,
+    Principal,
+    ResolveContext,
+    StepSpec,
+    StepStatus,
+)
+from tiqora.approvals.models import (
+    TiqoraApproval,
+    TiqoraApprovalApprover,
+    TiqoraApprovalStep,
+    TiqoraApprovalToken,
+)
+from tiqora.approvals.resolve import canonical_principal, resolve_entries
+from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
+from tiqora.config import Settings, get_settings
+from tiqora.extensions.core import get_registry
+from tiqora.extensions.registry import Registry
+from tiqora.jobs.service import enqueue_job, utc_now
+
+_TITLE_MAX = 250
+_KEY_MAX = 100
+_SYSTEM = Actor.system()
+_CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
+
+
+def _info(approval: TiqoraApproval) -> ApprovalInfo:
+    status: ApprovalStatus = approval.status  # type: ignore[assignment]
+    return ApprovalInfo(
+        approval_id=approval.id,
+        ticket_id=approval.ticket_id,
+        subject_type=approval.subject_type,
+        subject_ref=approval.subject_ref,
+        approval_key=approval.approval_key,
+        status=status,
+        reason=approval.reason,
+        current_stage=approval.current_stage,
+        created_at=approval.created_at,
+        decided_at=approval.decided_at,
+    )
+
+
+async def _settings(session: AsyncSession, settings: Settings | None) -> ApprovalSettings:
+    return await load_approval_settings(session, settings or get_settings())
+
+
+async def _lock_approval(session: AsyncSession, approval_id: int) -> TiqoraApproval:
+    """``SELECT … FOR UPDATE`` on the request, refreshing an instance the session already has."""
+    approval = (
+        await session.execute(
+            select(TiqoraApproval)
+            .where(TiqoraApproval.id == approval_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if approval is None:
+        raise ApprovalError("approval_not_found", 404)
+    return approval
+
+
+async def _locked_steps(session: AsyncSession, approval_id: int) -> list[TiqoraApprovalStep]:
+    result = await session.execute(
+        select(TiqoraApprovalStep)
+        .where(TiqoraApprovalStep.approval_id == approval_id)
+        .order_by(TiqoraApprovalStep.position)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return list(result.scalars())
+
+
+async def _locked_approvers(
+    session: AsyncSession, approval_id: int, *, step_ids: Sequence[int] | None = None
+) -> list[TiqoraApprovalApprover]:
+    stmt = select(TiqoraApprovalApprover).where(TiqoraApprovalApprover.approval_id == approval_id)
+    if step_ids is not None:
+        stmt = stmt.where(TiqoraApprovalApprover.step_id.in_(list(step_ids)))
+    result = await session.execute(
+        stmt.order_by(TiqoraApprovalApprover.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return list(result.scalars())
+
+
+def _excluded_keys(approval: TiqoraApproval) -> frozenset[str]:
+    """Requester and creator never approve their own request unless it allows self-approval."""
+    if approval.allow_self_approval:
+        return frozenset()
+    return frozenset({approval.requester, f"agent:{approval.created_by}"})
+
+
+def _allow_customers(
+    approval: TiqoraApproval, settings: ApprovalSettings, registry: Registry
+) -> bool:
+    subject = registry.get(APPROVAL_SUBJECT_TYPES, approval.subject_type)
+    return bool(
+        settings.customer_approvers_enabled
+        and subject is not None
+        and subject.allow_customer_approvers
+    )
+
+
+async def _enqueue_mail(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    kind: str,
+    *,
+    approver_ids: Sequence[int] = (),
+    include_requester: bool = False,
+    registry: Registry,
+) -> int | None:
+    """Queues one ``core.approval_mail`` job; None when there is nobody to mail."""
+    if not approver_ids and not include_requester:
+        return None
+    job = await enqueue_job(
+        session,
+        kind=JOB_MAIL,
+        payload={
+            "approval_id": approval.id,
+            "kind": kind,
+            "approver_ids": list(approver_ids),
+            "include_requester": include_requester,
+        },
+        created_by=None,
+        registry=registry,
+    )
+    return int(job.id)
+
+
+async def _close_open_steps(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    steps: Sequence[TiqoraApprovalStep],
+    reason: str,
+) -> None:
+    """Waiting/active steps -> cancelled, their pending approvers -> not_needed."""
+    now = utc_now()
+    open_steps = [s for s in steps if s.status in ("waiting", "active")]
+    if not open_steps:
+        return
+    for approver in await _locked_approvers(
+        session, approval.id, step_ids=[s.id for s in open_steps]
+    ):
+        if approver.status == "pending":
+            approver.status = "not_needed"
+    for step in open_steps:
+        step.status = "cancelled"
+        step.reason = reason
+        step.decided_at = now
+    await session.flush()
+
+
+async def _revoke_tokens(session: AsyncSession, approval_id: int) -> None:
+    await session.execute(
+        update(TiqoraApprovalToken)
+        .where(
+            TiqoraApprovalToken.approval_id == approval_id,
+            TiqoraApprovalToken.used_at.is_(None),
+            TiqoraApprovalToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=utc_now())
+    )
+
+
+async def _finalize(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    status: Literal["approved", "rejected", "cancelled"],
+    reason: str,
+    *,
+    actor: Actor,
+    settings: ApprovalSettings,
+    registry: Registry | None = None,
+    auto: bool = False,
+) -> None:
+    """Closes a request (A7c): row, open steps, tokens, audit, outbox, history, hook, mail."""
+    reg = registry or get_registry()
+    notified: list[int] = []
+    if status == "cancelled" and approval.status == "pending":
+        notified = [
+            a.id
+            for a in await _locked_approvers(session, approval.id)
+            if a.status == "pending" and a.last_notified_at is not None
+        ]
+    steps = await _locked_steps(session, approval.id)
+    await _close_open_steps(session, approval, steps, reason)
+    approval.status = status
+    approval.reason = reason
+    approval.decided_at = utc_now()
+    approval.current_stage = None
+    await session.flush()
+    await _revoke_tokens(session, approval.id)
+
+    detail: dict[str, object] = {"status": status, "reason": reason}
+    if approval.superseded_by is not None:
+        detail["superseded_by"] = approval.superseded_by
+    if auto:
+        action = "auto_decided"
+    elif status == "cancelled":
+        action = "superseded" if reason == "superseded" else "cancelled"
+    else:
+        action = "decided"
+    await audit.record(session, approval=approval, action=action, actor=actor, detail=detail)
+    if status == "cancelled":
+        await audit.emit(session, approval, EVENT_CANCELLED, reason=reason)
+        await audit.history(session, approval, "cancelled", actor=actor, settings=settings)
+    else:
+        await audit.emit(session, approval, EVENT_DECIDED, reason=reason)
+        extra = f"{status} ({reason})" if reason != "votes" else status
+        await audit.history(
+            session, approval, "decided", actor=actor, extra=extra, settings=settings
+        )
+    await enqueue_job(
+        session,
+        kind=JOB_HOOK,
+        payload={"approval_id": approval.id, "status": status},
+        created_by=None,
+        dedupe_key=f"approval:{approval.id}:{status}",
+        registry=reg,
+    )
+    if status == "cancelled":
+        await _enqueue_mail(session, approval, "cancelled", approver_ids=notified, registry=reg)
+    elif not auto and settings.mail_requester_on_decision and approval.requester != "system":
+        await _enqueue_mail(session, approval, "decided", include_requester=True, registry=reg)
+
+
+def _result_reason(steps: Sequence[TiqoraApprovalStep], result: ApprovalStatus) -> str:
+    """The request's reason: that of the step that decided it (``votes`` when it has none)."""
+    if result == "rejected":
+        for step in steps:
+            if step.status == "rejected":
+                return step.reason or "votes"
+        return "votes"
+    reasons = {s.reason or "votes" for s in steps}
+    if reasons == {"no_approvers"}:
+        return "no_approvers"
+    if reasons == {"timeout"}:
+        return "timeout"
+    return "votes"
+
+
+async def _activate_step(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    step: TiqoraApprovalStep,
+    *,
+    settings: ApprovalSettings,
+    registry: Registry,
+    actor: Actor,
+) -> list[int]:
+    """Resolves and activates one step; returns the ids of the approver rows it added."""
+    spec = StepSpec.model_validate_json(step.spec)
+    ctx = ResolveContext(
+        ticket_id=approval.ticket_id,
+        subject_type=approval.subject_type,
+        subject_ref=approval.subject_ref,
+        approval_id=approval.id,
+    )
+    resolution = await resolve_entries(
+        session,
+        spec.approvers,
+        ctx=ctx,
+        excluded_principals=_excluded_keys(approval),
+        allow_customers=_allow_customers(approval, settings, registry),
+        registry=registry,
+    )
+    now = utc_now()
+    due_hours = spec.due_hours if spec.due_hours is not None else settings.default_due_hours
+    step.status = "active"
+    step.activated_at = now
+    step.due_at = now + timedelta(hours=due_hours) if due_hours else None
+    approval.current_stage = step.stage
+    await session.flush()
+    await audit.record(
+        session,
+        approval=approval,
+        action="step_activated",
+        actor=actor,
+        step_id=step.id,
+        detail={"rule": step.rule, "quorum": step.quorum, "approvers": len(resolution.approvers)},
+    )
+    for principal, why in resolution.excluded:
+        who: dict[str, object] = (
+            {"user_id": principal.user_id} if principal.kind == "agent" else {"kind": "customer"}
+        )
+        await audit.record(
+            session,
+            approval=approval,
+            action="approver_excluded",
+            actor=actor,
+            step_id=step.id,
+            detail={**who, "reason": why},
+        )
+    for entry, why in resolution.unresolved:
+        await audit.record(
+            session,
+            approval=approval,
+            action="approver_excluded",
+            actor=actor,
+            step_id=step.id,
+            detail={"kind": entry.kind, "ref": entry.ref, "reason": why},
+        )
+    count = len(resolution.approvers)
+    if count == 0 or not rules.quorum_reachable(spec.rule, spec.quorum, count):
+        step.status = "approved" if spec.on_no_approver == "approve" else "rejected"
+        step.reason = "no_approvers"
+        step.decided_at = now
+        await session.flush()
+        await audit.record(
+            session,
+            approval=approval,
+            action="step_decided",
+            actor=actor,
+            step_id=step.id,
+            detail={"decision": step.status, "reason": "no_approvers", "valid": count},
+        )
+        return []
+    added: list[int] = []
+    for resolved in resolution.approvers:
+        row = TiqoraApprovalApprover(
+            approval_id=approval.id,
+            step_id=step.id,
+            ticket_id=approval.ticket_id,
+            principal=resolved.principal.key,
+            user_id=resolved.principal.user_id,
+            customer_login=resolved.principal.login,
+            source_kind=resolved.source_kind,
+            source_ref=resolved.source_ref,
+            source_label=(resolved.source_label or None) and resolved.source_label[:200],
+            decisive=False,
+            status="pending",
+            added_at=now,
+        )
+        session.add(row)
+        await session.flush()
+        await audit.record(
+            session,
+            approval=approval,
+            action="approver_added",
+            actor=actor,
+            step_id=step.id,
+            approver_id=row.id,
+            detail={"source": resolved.source_kind},
+        )
+        added.append(row.id)
+    return added
+
+
+async def _activate_next_stage(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    *,
+    settings: ApprovalSettings,
+    registry: Registry,
+    actor: Actor = _SYSTEM,
+) -> list[int]:
+    """Activates the next stage (A7a) and returns the approver ids that are now pending.
+
+    Does nothing while a step is still active. A stage whose steps all end at activation
+    (no valid approver, unreachable quorum) is followed by the next one in the same call; a
+    rejected step closes the request, the last approved step approves it.
+    """
+    added: list[int] = []
+    while approval.status == "pending":
+        steps = await _locked_steps(session, approval.id)
+        pairs: list[tuple[int, StepStatus]] = [(s.stage, s.status) for s in steps]  # type: ignore[misc]
+        result = rules.request_result(pairs)
+        if result == "rejected":
+            await _finalize(
+                session,
+                approval,
+                "rejected",
+                _result_reason(steps, result),
+                actor=actor,
+                settings=settings,
+                registry=registry,
+            )
+            break
+        if any(s.status == "active" for s in steps):
+            break
+        stage = rules.next_stage(pairs)
+        if stage is None:
+            if result == "approved":
+                await _finalize(
+                    session,
+                    approval,
+                    "approved",
+                    _result_reason(steps, result),
+                    actor=actor,
+                    settings=settings,
+                    registry=registry,
+                )
+            break
+        for step in steps:
+            if step.stage == stage and step.status == "waiting":
+                added += await _activate_step(
+                    session, approval, step, settings=settings, registry=registry, actor=actor
+                )
+    if not added:
+        return []
+    still_pending = {
+        a.id for a in await _locked_approvers(session, approval.id) if a.status == "pending"
+    }
+    return [i for i in added if i in still_pending]
+
+
+# --- request ---------------------------------------------------------------------------------
+
+
+def _check_text(title: str, approval_key: str) -> tuple[str, str]:
+    title = title.strip()
+    if not title or len(title) > _TITLE_MAX:
+        raise ApprovalError("invalid_definition", 422, f"title must be 1-{_TITLE_MAX} characters")
+    if not approval_key or len(approval_key) > _KEY_MAX:
+        raise ApprovalError(
+            "invalid_definition", 422, f"approval_key must be 1-{_KEY_MAX} characters"
+        )
+    return title, approval_key
+
+
+async def _require_subject_and_ticket(
+    session: AsyncSession, subject_type: str, ticket_id: int, registry: Registry
+) -> None:
+    if registry.get(APPROVAL_SUBJECT_TYPES, subject_type) is None:
+        raise ApprovalError("unknown_subject_type", 422, subject_type)
+    row = await session.execute(
+        text("SELECT id, queue_id FROM ticket WHERE id = :t"), {"t": ticket_id}
+    )
+    if row.first() is None:
+        raise ApprovalError("ticket_not_found", 404)
+
+
+def _customer_entries(defn: ApprovalDefinition, registry: Registry) -> list[ApproverEntry]:
+    entries: list[ApproverEntry] = []
+    for step in defn.steps:
+        for entry in (*step.approvers, *step.escalation):
+            if entry.kind == "customer_user":
+                entries.append(entry)
+            elif entry.kind == "resolver":
+                resolver = registry.get(APPROVER_RESOLVERS, entry.ref)
+                if resolver is not None and resolver.yields_customers:
+                    entries.append(entry)
+    return entries
+
+
+async def _validated_definition(
+    session: AsyncSession,
+    *,
+    subject_type: str,
+    definition: ApprovalDefinition | None,
+    template_key: str | None,
+    settings: ApprovalSettings,
+    registry: Registry,
+) -> tuple[ApprovalDefinition, int | None]:
+    if (definition is None) == (template_key is None):
+        raise ApprovalError(
+            "invalid_definition", 422, "give exactly one of definition and template_key"
+        )
+    template_id: int | None = None
+    if template_key is not None:
+        template = await templates.get_template_by_key(session, template_key)
+        if not template.valid:
+            raise ApprovalError("template_not_found", 404)
+        if template.subject_types and subject_type not in template.subject_types:
+            raise ApprovalError(
+                "invalid_definition",
+                422,
+                f"template {template_key!r} is not meant for subject type {subject_type!r}",
+            )
+        definition, template_id = template.definition, template.id
+    assert definition is not None
+    rules.validate_definition(definition)
+    check = await templates.validate_definition_refs(
+        session, definition, subject_types=[subject_type]
+    )
+    for error in check.errors:
+        if error == "customer_entry_not_allowed":
+            raise ApprovalError("customer_approvers_not_allowed", 422)
+        if error.startswith("unknown_resolver:"):
+            raise ApprovalError("unknown_resolver", 422, error.partition(":")[2])
+        raise ApprovalError("invalid_definition", 422, error)
+    if not settings.customer_approvers_enabled and _customer_entries(definition, registry):
+        raise ApprovalError("customer_approvers_not_allowed", 422)
+    return definition, template_id
+
+
+async def _lock_pending_same_key(
+    session: AsyncSession, ticket_id: int, approval_key: str
+) -> list[TiqoraApproval]:
+    result = await session.execute(
+        select(TiqoraApproval)
+        .where(
+            TiqoraApproval.ticket_id == ticket_id,
+            TiqoraApproval.approval_key == approval_key,
+            TiqoraApproval.status == "pending",
+        )
+        .order_by(TiqoraApproval.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return list(result.scalars())
+
+
+async def _supersede(
+    session: AsyncSession,
+    olds: Sequence[TiqoraApproval],
+    new: TiqoraApproval,
+    *,
+    actor: Actor,
+    settings: ApprovalSettings,
+    registry: Registry,
+) -> None:
+    for old in olds:
+        old.superseded_by = new.id
+        await _finalize(
+            session,
+            old,
+            "cancelled",
+            "superseded",
+            actor=actor,
+            settings=settings,
+            registry=registry,
+        )
+
+
+async def _requester_key(session: AsyncSession, requester: Principal | None, actor: Actor) -> str:
+    principal = requester if requester is not None else actor.principal
+    if principal is None:
+        return "system"
+    return (await canonical_principal(session, principal)).key
+
+
+async def request_approval(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    subject_type: str,
+    title: str,
+    actor: Actor,
+    requester: Principal | None = None,
+    subject_ref: str | None = None,
+    approval_key: str = "default",
+    description: str | None = None,
+    definition: ApprovalDefinition | None = None,
+    template_key: str | None = None,
+    allow_self_approval: bool = False,
+    supersede: bool = True,
+    settings: Settings | None = None,
+    registry: Registry | None = None,
+) -> ApprovalInfo:
+    """Creates a request, activates stage one and queues the mails. Flushes, never commits.
+
+    Raises ``unknown_subject_type``, ``ticket_not_found``, ``invalid_definition``,
+    ``template_not_found``, ``customer_approvers_not_allowed`` or ``unknown_resolver``. With
+    *supersede* a pending request with the same ``(ticket_id, approval_key)`` is cancelled
+    (reason ``superseded``) and points at the new one through ``superseded_by``.
+    """
+    reg = registry or get_registry()
+    title, approval_key = _check_text(title, approval_key)
+    await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
+    asettings = await _settings(session, settings)
+    defn, template_id = await _validated_definition(
+        session,
+        subject_type=subject_type,
+        definition=definition,
+        template_key=template_key,
+        settings=asettings,
+        registry=reg,
+    )
+    requester_key = await _requester_key(session, requester, actor)
+    olds = await _lock_pending_same_key(session, ticket_id, approval_key) if supersede else []
+
+    now = utc_now()
+    approval = TiqoraApproval(
+        ticket_id=ticket_id,
+        subject_type=subject_type,
+        subject_ref=subject_ref,
+        approval_key=approval_key,
+        title=title,
+        description=description,
+        template_id=template_id,
+        status="pending",
+        current_stage=None,
+        allow_self_approval=allow_self_approval,
+        requester=requester_key,
+        created_by=actor.write_user_id,
+        created_at=now,
+    )
+    session.add(approval)
+    await session.flush()
+    for position, spec in enumerate(defn.steps, start=1):
+        session.add(
+            TiqoraApprovalStep(
+                approval_id=approval.id,
+                ticket_id=ticket_id,
+                position=position,
+                stage=spec.stage,
+                name=spec.name,
+                rule=spec.rule,
+                quorum=spec.quorum,
+                status="waiting",
+                spec=spec.model_dump_json(),
+            )
+        )
+    await session.flush()
+    await _supersede(session, olds, approval, actor=actor, settings=asettings, registry=reg)
+
+    await audit.record(
+        session,
+        approval=approval,
+        action="requested",
+        actor=actor,
+        detail={"steps": len(defn.steps), "template_id": template_id},
+    )
+    await audit.emit(session, approval, EVENT_REQUESTED)
+    await audit.history(session, approval, "requested", actor=actor, settings=asettings)
+    new_ids = await _activate_next_stage(
+        session, approval, settings=asettings, registry=reg, actor=actor
+    )
+    if approval.status == "pending":
+        await _enqueue_mail(session, approval, "request", approver_ids=new_ids, registry=reg)
+    return _info(approval)
+
+
+async def record_auto_decision(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    subject_type: str,
+    title: str,
+    actor: Actor,
+    status: Literal["approved", "rejected"],
+    reason: str = "auto",
+    subject_ref: str | None = None,
+    approval_key: str = "default",
+    description: str | None = None,
+    supersede: bool = True,
+    settings: Settings | None = None,
+    registry: Registry | None = None,
+) -> ApprovalInfo:
+    """Records an already decided request without steps (e.g. a pre-approved standard change).
+
+    Audit ``auto_decided``, outbox ``TiqoraApprovalDecided``, history line and the hook job;
+    no mails. Flushes, never commits.
+    """
+    if status not in ("approved", "rejected"):
+        raise ApprovalError("invalid_definition", 422, "status must be approved or rejected")
+    reg = registry or get_registry()
+    title, approval_key = _check_text(title, approval_key)
+    await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
+    asettings = await _settings(session, settings)
+    requester_key = await _requester_key(session, None, actor)
+    olds = await _lock_pending_same_key(session, ticket_id, approval_key) if supersede else []
+    approval = TiqoraApproval(
+        ticket_id=ticket_id,
+        subject_type=subject_type,
+        subject_ref=subject_ref,
+        approval_key=approval_key,
+        title=title,
+        description=description,
+        status="pending",
+        allow_self_approval=False,
+        requester=requester_key,
+        created_by=actor.write_user_id,
+        created_at=utc_now(),
+    )
+    session.add(approval)
+    await session.flush()
+    await _supersede(session, olds, approval, actor=actor, settings=asettings, registry=reg)
+    await _finalize(
+        session, approval, status, reason, actor=actor, settings=asettings, registry=reg, auto=True
+    )
+    return _info(approval)
+
+
+async def cancel_approval(
+    session: AsyncSession,
+    approval_id: int,
+    *,
+    actor: Actor,
+    reason: str = "cancelled",
+    note: str | None = None,
+    check_permission: bool = True,
+    settings: Settings | None = None,
+    registry: Registry | None = None,
+) -> ApprovalInfo:
+    """Cancels a pending request: open steps cancelled, approvers ``not_needed``, links dead.
+
+    ``approval_closed`` (409) when it is already decided, ``forbidden`` (403) without
+    :func:`access.can_cancel`. Consumers pass ``check_permission=False`` for their own
+    automation. *note* is not stored (audit rows never carry free text); only that one was
+    given is recorded.
+    """
+    if reason not in _CANCEL_REASONS:
+        raise ValueError(f"unknown cancel reason: {reason!r}")
+    reg = registry or get_registry()
+    approval = await _lock_approval(session, approval_id)
+    if check_permission and not await access.can_cancel(session, approval, actor):
+        raise ApprovalError("forbidden", 403)
+    if approval.status != "pending":
+        raise ApprovalError("approval_closed", 409)
+    asettings = await _settings(session, settings)
+    await _finalize(
+        session, approval, "cancelled", reason, actor=actor, settings=asettings, registry=reg
+    )
+    return _info(approval)
+
+
+# --- reads -----------------------------------------------------------------------------------
+
+
+async def get_info(session: AsyncSession, approval_id: int) -> ApprovalInfo:
+    approval = (
+        await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == approval_id))
+    ).scalar_one_or_none()
+    if approval is None:
+        raise ApprovalError("approval_not_found", 404)
+    return _info(approval)
+
+
+async def approval_status(
+    session: AsyncSession, *, ticket_id: int, approval_key: str
+) -> ApprovalStatus | None:
+    """Status of the newest request (highest id) for the key; None when there is none."""
+    status = (
+        await session.execute(
+            select(TiqoraApproval.status)
+            .where(
+                TiqoraApproval.ticket_id == ticket_id, TiqoraApproval.approval_key == approval_key
+            )
+            .order_by(TiqoraApproval.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return status  # type: ignore[return-value]
+
+
+async def approval_statuses(session: AsyncSession, *, ticket_id: int) -> dict[str, ApprovalStatus]:
+    """``{approval_key: status}`` of the newest request per key."""
+    rows = await session.execute(
+        select(TiqoraApproval.approval_key, TiqoraApproval.status)
+        .where(TiqoraApproval.ticket_id == ticket_id)
+        .order_by(TiqoraApproval.id)
+    )
+    out: dict[str, ApprovalStatus] = {}
+    for key, status in rows:
+        out[str(key)] = status  # ascending ids: the last write per key is the newest
+    return out
+
+
+async def list_for_ticket(session: AsyncSession, ticket_id: int) -> list[ApprovalInfo]:
+    """All requests of the ticket, newest first."""
+    rows = await session.execute(
+        select(TiqoraApproval)
+        .where(TiqoraApproval.ticket_id == ticket_id)
+        .order_by(TiqoraApproval.id.desc())
+    )
+    return [_info(a) for a in rows.scalars()]
