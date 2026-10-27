@@ -1109,6 +1109,40 @@ async def test_invalid_scan_pages_through_all_requests(
 
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_invalid_scan_resumes_across_ticks(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With one tiny scan page per tick the cursor carries the scan to rows beyond it."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            ids = [
+                await _request(session, _defn(_step("Prüfung", AG3)), approval_key=f"c{n}")
+                for n in range(5)
+            ]
+            await session.execute(text("UPDATE users SET valid_id = 2 WHERE id = :u"), {"u": AG3})
+            await session.commit()
+            monkeypatch.setattr(sweep, "_SCAN", 2)
+            monkeypatch.setattr(sweep, "_SCAN_PAGES", 1)
+            monkeypatch.setattr(sweep, "_MAX_PAGES", 1)
+
+            removed = [(await _tick(session, _now()))["removed"] for _ in range(8)]
+
+            assert removed[0] < 5  # the first tick stopped at its page limit
+            assert sum(removed) == 5
+            for aid in ids:
+                assert (await _row(session, aid)).status == "rejected"
+            cursor = (
+                await session.execute(
+                    select(TiqoraSettings.value).where(
+                        TiqoraSettings.key == sweep.KEY_INVALID_CURSOR
+                    )
+                )
+            ).scalar_one()
+            assert cursor == "0"  # wrapped at the end of the table
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_timeout_history_line(url_fixture: str, request: pytest.FixtureRequest) -> None:
     """F12: the timeout decision shows up as plain text in the Znuny ticket history."""
     async with approvals_session(request, url_fixture) as session:

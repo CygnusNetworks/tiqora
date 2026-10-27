@@ -27,7 +27,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalVote,
 )
 from tiqora.approvals.resolve import canonical_principal
-from tiqora.approvals.service import _excluded_keys
+from tiqora.approvals.service import _excluded_keys, _in_rule
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.jobs.service import utc_now
 
@@ -146,22 +146,29 @@ async def _decided_rows(
 
 
 async def _progress(session: AsyncSession, step_ids: Sequence[int]) -> dict[int, tuple[int, int]]:
-    """``{step_id: (regular voters, approved)}`` over the eligible, non-decisive rows."""
+    """``{step_id: (voters in the rule, approved)}`` over the eligible rows.
+
+    Escalation-only approvers are outside the rule; a regular approver an escalation made
+    decisive still counts (same notion as ``service._voters``).
+    """
     voters: Counter[int] = Counter()
     approved: Counter[int] = Counter()
     ids = sorted(set(step_ids))
     for start in range(0, len(ids), _CHUNK):
-        rows = await session.execute(
-            select(A.step_id, A.status).where(
-                A.step_id.in_(ids[start : start + _CHUNK]),
-                A.status.in_(("pending", "approved", "rejected")),
-                A.decisive.is_(False),
+        rows = (
+            await session.execute(
+                select(A)
+                .where(A.step_id.in_(ids[start : start + _CHUNK]))
+                .execution_options(populate_existing=True)
             )
-        )
-        for step_id, status in rows:
-            voters[int(step_id)] += 1
-            if status == "approved":
-                approved[int(step_id)] += 1
+        ).scalars()
+        all_rows = list(rows)
+        by_id = {a.id: a for a in all_rows}
+        for row in all_rows:
+            if row.status in ("pending", "approved", "rejected") and _in_rule(row, by_id):
+                voters[row.step_id] += 1
+                if row.status == "approved":
+                    approved[row.step_id] += 1
     return {i: (voters[i], approved[i]) for i in ids}
 
 

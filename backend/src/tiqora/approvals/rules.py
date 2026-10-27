@@ -39,14 +39,15 @@ class VoterState:
 def evaluate_step(rule: Rule, quorum: int | None, voters: Sequence[VoterState]) -> VoteResult:
     """Outcome of one step. Callers pass voters ordered by ``decided_at`` (pending last).
 
-    1. The first decisive voter who has voted decides alone (a pending decisive voter never
-       blocks and never rejects).
-    2. Otherwise every rule looks at the voters that count in the rule (all non-decisive ones,
-       plus regular approvers an escalation made decisive); none of them -> ``pending``
-       (no voters at all: the caller applies ``on_no_approver``).
+    1. The first decisive voter who has voted decides alone.
+    2. Otherwise every rule looks at the voters that count in the rule (``VoterState.in_rule``:
+       all non-decisive voters, plus regular approvers an escalation made decisive; escalation-only
+       voters stay outside). A pending decisive voter that is in the rule is an ordinary pending
+       voter; one that is outside it never blocks and never rejects. No voter in the rule ->
+       ``pending`` (no voters at all: the caller applies ``on_no_approver``).
     3. ``any``: the first non-pending voter decides ("the first decision counts"). ``all``: any
        rejection rejects, all approved approves. ``quorum`` n / ``majority`` (n = k // 2 + 1,
-       k = number of non-decisive voters): approved >= n approves, approved + pending < n rejects.
+       k = number of voters in the rule): approved >= n approves, approved + pending < n rejects.
     """
     for voter in voters:
         if voter.decisive and voter.status != "pending":

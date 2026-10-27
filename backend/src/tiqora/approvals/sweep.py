@@ -36,6 +36,7 @@ from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
+from tiqora.domain.settings_store import get_setting_int, set_setting
 from tiqora.events.pubsub import publish_approval_changed
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import Registry
@@ -48,6 +49,8 @@ _CHUNK: Final = 500  # IN-list size
 _MAX_PAGES: Final = 5  # keyset pages per phase and tick
 _SCAN: Final = 2000  # approver rows per scan page of the invalid-approver phase
 _SCAN_PAGES: Final = 5
+#: tiqora_settings key: request id the next invalid-approver scan continues after
+KEY_INVALID_CURSOR: Final = "approvals.sweep.invalid_cursor"
 _LINK_RETENTION: Final = timedelta(days=30)
 _SYSTEM = Actor.system()
 
@@ -443,14 +446,16 @@ async def _reminder_candidates(
 
 async def _invalid_candidates(
     factory: async_sessionmaker[AsyncSession], after: int
-) -> list[tuple[int, int]]:
-    """Approvals with a pending approver whose agent/customer user is gone or invalid.
+) -> tuple[list[tuple[int, int]], int, bool]:
+    """``(candidates, next cursor, table end reached)`` for the invalid-approver phase.
 
-    Scans the pending approver rows ``_SCAN`` at a time (ordered by request id), at most
-    ``_SCAN_PAGES`` scans per call.
+    Approvals with a pending approver whose agent/customer user is gone or invalid. Scans the
+    pending approver rows ``_SCAN`` at a time (ordered by request id), at most ``_SCAN_PAGES``
+    scans per call; the caller continues at the returned cursor.
     """
     found: set[int] = set()
     cursor = after
+    exhausted = False
     async with factory() as session:
         for _ in range(_SCAN_PAGES):
             rows = (
@@ -469,9 +474,11 @@ async def _invalid_candidates(
                     .limit(_SCAN)
                 )
             ).all()
+            full = len(rows) == _SCAN
+            if not full:
+                exhausted = True
             if not rows:
                 break
-            full = len(rows) == _SCAN
             last = int(rows[-1][0])
             if full and (cut := [r for r in rows if int(r[0]) < last]):
                 rows, cursor = cut, last - 1  # the last request's rows may go on: rescan it
@@ -479,9 +486,12 @@ async def _invalid_candidates(
                 cursor = last
             invalid = await _invalid_principals(session, [(p, u, c) for _, p, u, c in rows])
             found |= {int(a) for a, p, _, _ in rows if p in invalid}
-            if not full or len(found) >= _BATCH:
+            if exhausted or len(found) >= _BATCH:
                 break
-    return [(a, a) for a in sorted(found)[:_BATCH]]
+    ordered = sorted(found)
+    if len(ordered) > _BATCH:
+        ordered, cursor, exhausted = ordered[:_BATCH], ordered[_BATCH - 1], False
+    return [(a, a) for a in ordered], cursor, exhausted
 
 
 async def _orphan_candidates(
@@ -620,11 +630,25 @@ async def run_approvals_sweep(
     ) -> int | None:
         return await _drop_invalid(session, approval, loaded, registry=registry, now=moment)
 
-    async for _, approval_id in _pages(lambda after: _invalid_candidates(session_factory, after)):
-        removed = await _item(
-            session_factory, approval_id, drop, settings=settings, redis_client=redis_client
-        )
-        counts["removed"] += removed or 0
+    # the invalid-approver scan resumes where the last tick stopped (wraps at the table end)
+    async with session_factory() as session:
+        start = await get_setting_int(session, KEY_INVALID_CURSOR, 0)
+    cursor, finished = start, False
+    for _ in range(_MAX_PAGES):
+        candidates, cursor, finished = await _invalid_candidates(session_factory, cursor)
+        for _, approval_id in candidates:
+            removed = await _item(
+                session_factory, approval_id, drop, settings=settings, redis_client=redis_client
+            )
+            counts["removed"] += removed or 0
+        if finished:
+            cursor = 0
+            break
+    else:
+        logger.info("approval_sweep_page_limit", phase="invalid_approvers", cursor=cursor)
+    if cursor != start:
+        async with session_factory() as session:
+            await set_setting(session, KEY_INVALID_CURSOR, str(cursor))
 
     async with session_factory() as session:
         counts["links_purged"] = await tokens.purge_links(

@@ -199,6 +199,56 @@ async def test_inbox_overdue_and_progress(url_fixture: str, request: pytest.Fixt
 
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_inbox_progress_counts_the_voters_in_the_rule(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """An escalation-upgraded approver still counts; an escalation-only approver does not."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, _defn(_step("CAB", _user(AG3), _user(AG4), rule="all")))
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT id, user_id FROM tiqora_approval_approver"
+                        " WHERE approval_id = :a ORDER BY id"
+                    ),
+                    {"a": aid},
+                )
+            ).all()
+            step_id = (
+                await session.execute(
+                    text("SELECT id FROM tiqora_approval_step WHERE approval_id = :a"), {"a": aid}
+                )
+            ).scalar_one()
+            ag4_row = next(i for i, u in rows if u == AG4)
+            await session.execute(
+                text("UPDATE tiqora_approval_approver SET decisive = :t WHERE id = :i"),
+                {"t": True, "i": ag4_row},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_approval_approver (approval_id, step_id, ticket_id,"
+                    " principal, user_id, source_kind, decisive, status, added_at)"
+                    " VALUES (:a, :s, :t, :p, :u, 'escalation', :d, 'pending', :n)"
+                ),
+                {
+                    "a": aid,
+                    "s": step_id,
+                    "t": T1,
+                    "p": f"agent:{AG5}",
+                    "u": AG5,
+                    "d": True,
+                    "n": utc_now(),
+                },
+            )
+            await session.commit()
+            (item,) = (await _pending(session, AG3)).items
+            # AG3 and AG4 count (rule all: 2 of 2); AG5 decides alone but is outside the rule
+            assert (item.rule, item.required, item.approved_count) == ("all", 2, 0)
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_inbox_excludes_waiting_and_closed(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
