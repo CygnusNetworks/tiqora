@@ -45,6 +45,13 @@ _STATUS_TEXT: Final = {
     "rejected": "abgelehnt",
     "cancelled": "zurückgezogen",
 }
+_STEP_STATUS_TEXT: Final = {
+    "waiting": "wartet",
+    "active": "offen",
+    "approved": "freigegeben",
+    "rejected": "abgelehnt",
+    "cancelled": "zurückgezogen",
+}
 _REASON_TEXT: Final = {
     "timeout": "Die Frist ist abgelaufen.",
     "no_approvers": "Es gab keine gültigen Freigeber.",
@@ -120,7 +127,7 @@ async def _note_text(session: AsyncSession, approval: TiqoraApproval) -> tuple[s
         lines.append("")
         lines.append("Stufen:")
         for step in steps:
-            lines.append(f"- Stufe {step.stage}, {step.name}: {step.status}")
+            lines.append(f"- Stufe {step.stage}: {_STEP_STATUS_TEXT.get(step.status, step.status)}")
     return subject, "\n".join(lines)
 
 

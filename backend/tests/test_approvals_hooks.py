@@ -39,6 +39,7 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraJob
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL, publish_approval_changed
 from tiqora.jobs.context import JobFailed, JobRetry
+from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.jobs.service import enqueue_job
 from tiqora.plugins import sync_hooks
 from tiqora.settings_sections.store import save_section_values
@@ -228,9 +229,7 @@ async def test_hook_idempotent_dedupe(url_fixture: str, request: pytest.FixtureR
     fake = make_fake_subject_type()
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(fake) as registry:
-            handler = registry.get(
-                __import__("tiqora.jobs.registry", fromlist=["JOB_HANDLERS"]).JOB_HANDLERS, JOB_HOOK
-            )
+            handler = registry.get(JOB_HANDLERS, JOB_HOOK)
             assert handler is APPROVAL_HOOK_JOB
             assert (handler.max_attempts, handler.requeue_if_interrupted) == (5, True)
             approval_id, _ = await _decided(session)  # the decision queued one hook job
@@ -274,7 +273,9 @@ async def test_decision_note_written_when_enabled(
             assert (sender, visible) == ("system", 0)
             assert subject == f"Freigabe #{approval_id} (default): freigegeben"
             assert f"Die Freigabe #{approval_id} (default) wurde freigegeben." in body
-            assert "- Stufe 1, Prüfung: approved" in body
+            assert "- Stufe 1: freigegeben" in body
+            assert "Prüfung" not in body  # step names are free text: ids/statuses only
+            assert "approved" not in body  # German note, no raw enum
             assert "Freigabe appr97" not in body  # the request title (free text) stays out
             assert len(fake.decided) == 1
             # F31: nothing in the note can wake the AI reply worker or notify the customer

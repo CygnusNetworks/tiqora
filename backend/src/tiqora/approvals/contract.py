@@ -224,7 +224,8 @@ class ApprovalSubjectType:
     # deciding transaction, max_attempts=5), once per final status approved/rejected/cancelled.
     # Never inside the deciding transaction: a consumer bug cannot roll back a vote. Must be
     # idempotent (the job is retried). A timeout arrives as status rejected/approved with
-    # outcome.reason == "timeout" - there is no status "expired".
+    # outcome.reason == "timeout" - there is no status "expired". The job commits the hook's
+    # work together with its audit row: the hook must NOT commit or roll back the session itself.
     on_decided: DecidedHook | None = None
 
 

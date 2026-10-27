@@ -146,7 +146,9 @@ async def _vote_all(
                 )
             except ApprovalError as exc:
                 if exc.code in ("already_decided", "approval_closed", "step_not_active"):
-                    break  # the rule closed the step / request under us: re-read and go on
+                    # the rule closed the step / request under us: re-read and go on
+                    info = await service.get_info(session, approval_id)
+                    break
                 raise
             info = result.info
             if stop_after_first or info.status != "pending":
