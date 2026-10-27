@@ -28,6 +28,14 @@ merges the result into ``<out>/<profile>.json`` under the key ``"peer"``. The pi
     python tests/golden/itsm_survey.py znuny-6.5-itsm --behaviour \\
         --out backend/tests/fixtures/znuny-itsm/behaviour/
 
+``--change-behaviour`` (wave-5 itsm-change, Task 1) runs ``itsm_seed.pl`` (service, CIs, ticket,
+three ``chg94`` changes with work orders, CAB, links, dynamic fields, one template) and the read-only
+``itsm_change_probe.pl`` on the peer and merges what Znuny stored and answered into
+``<out>/change-<profile>.json`` under the key ``"peer"`` (the hand-maintained ``"questions"`` stay):
+
+    python tests/golden/itsm_survey.py znuny-6.5-itsm --change-behaviour \\
+        --out backend/tests/fixtures/znuny-itsm/behaviour/
+
 ``--verify`` loads the generated DDL once into a throw-away MariaDB and PostgreSQL container, on
 top of the peer's own core schema, and compares the resulting table list with the peer.
 """
@@ -62,6 +70,33 @@ NORMALISED_TIME = "2000-01-01 00:00:00"
 REMOTE_DIR = "/tmp/itsm_survey"  # noqa: S108 - inside the throw-away peer container
 BEHAVIOUR_SCRIPT = GOLDEN_DIR / "itsm_behaviour.pl"
 BEHAVIOUR_REMOTE = "/tmp/itsm_behaviour.pl"  # noqa: S108 - inside the throw-away peer container
+SEED_SCRIPT = GOLDEN_DIR / "itsm_seed.pl"
+SEED_REMOTE = "/tmp/itsm_seed.pl"  # noqa: S108 - inside the throw-away peer container
+CHANGE_PROBE_SCRIPT = GOLDEN_DIR / "itsm_change_probe.pl"
+CHANGE_PROBE_REMOTE = "/tmp/itsm_change_probe.pl"  # noqa: S108 - inside the throw-away peer container
+# The 15 change_* and 5 condition_* tables of the ITSMChangeManagement package.
+CHANGE_TABLES = (
+    "change_cab",
+    "change_cip_allocate",
+    "change_condition",
+    "change_history",
+    "change_history_type",
+    "change_item",
+    "change_notification",
+    "change_notification_grps",
+    "change_notification_message",
+    "change_notification_rec",
+    "change_number_counter",
+    "change_state_machine",
+    "change_template",
+    "change_template_type",
+    "change_workorder",
+    "condition_action",
+    "condition_attribute",
+    "condition_expression",
+    "condition_object",
+    "condition_operator",
+)
 # peer id -> fixture profile (backend/tests/fixtures/znuny-itsm/<profile>/)
 PEER_PROFILES = {"znuny-6.5-itsm": "itsm-6", "znuny-7.3-itsm": "itsm-7"}
 
@@ -521,6 +556,137 @@ def capture_behaviour(peer: str, env: dict[str, str], out: Path) -> Path:
     return target
 
 
+# --- change management vectors (wave-5 itsm-change, Task 1) ------------------------------------
+
+
+def _block(raw: str, tag: str) -> dict[str, Any]:
+    match = re.search(rf"{tag}_BEGIN\n(.*?)\n{tag}_END", raw, re.S)
+    if not match:
+        raise SystemExit(f"no {tag} block in the peer output: {raw[-2000:]!r}")
+    block: dict[str, Any] = json.loads(match.group(1))
+    return block
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, (dt.datetime, dt.date)):
+        return value.isoformat(sep=" ")
+    if isinstance(value, decimal.Decimal):
+        return str(value)
+    if isinstance(value, (bytes, bytearray)):
+        return value.decode("utf-8", "replace")
+    return value
+
+
+def _query(cur: Any, sql: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    cur.execute(sql, args or None)
+    names = [d[0] for d in cur.description]
+    return [{n: _jsonable(v) for n, v in zip(names, row, strict=True)} for row in cur.fetchall()]
+
+
+def _redact_notifications(history: dict[str, list[dict[str, Any]]]) -> None:
+    """``<recipient>%%<event>`` of a ``*NotificationSent`` row keeps the event, not the address."""
+    for rows in history.values():
+        for row in rows:
+            if str(row["type"]).endswith("NotificationSent"):
+                row["content_new"] = "<recipient>%%" + str(row["content_new"]).partition("%%")[2]
+
+
+def dump_change_rows(cur: Any) -> dict[str, Any]:
+    """What the package stored: counts of all 20 tables and normalised rows of the seeded ones."""
+    counts = {t: _query(cur, f"select count(*) as n from `{t}`")[0]["n"] for t in CHANGE_TABLES}  # noqa: S608
+    rows: dict[str, Any] = {
+        "change_item": _query(
+            cur,
+            "select id, title, description, description_plain, justification, justification_plain,"
+            " change_state_id, change_manager_id, change_builder_id, category_id, impact_id,"
+            " priority_id, requested_time from change_item order by id",
+        ),
+        "change_workorder": _query(
+            cur,
+            "select id, change_id, workorder_number, title, instruction, instruction_plain,"
+            " report, report_plain, workorder_state_id, workorder_type_id, workorder_agent_id,"
+            " planned_start_time, planned_end_time, actual_start_time, actual_end_time,"
+            " planned_effort, accounted_time from change_workorder order by id",
+        ),
+        "change_cab": _query(
+            cur, "select id, change_id, user_id, customer_user_id from change_cab order by id"
+        ),
+        "change_template": _query(
+            cur,
+            "select id, name, type_id, length(content) as content_length,"
+            " left(content, 24) as content_prefix from change_template order by id",
+        ),
+        "change_template_type": _query(
+            cur, "select id, name from change_template_type order by id"
+        ),
+        "link_relation": _query(
+            cur,
+            "select so.name as source_object, r.source_key, tobj.name as target_object,"
+            " r.target_key, t.name as link_type, s.name as link_state from link_relation r"
+            " join link_object so on so.id = r.source_object_id"
+            " join link_object tobj on tobj.id = r.target_object_id"
+            " join link_type t on t.id = r.type_id join link_state s on s.id = r.state_id"
+            " where so.name in ('ITSMChange', 'ITSMWorkOrder')"
+            " or tobj.name in ('ITSMChange', 'ITSMWorkOrder')"
+            " order by so.name, r.source_key, tobj.name, r.target_key, t.name",
+        ),
+        "dynamic_field_value": _query(
+            cur,
+            "select f.name, f.object_type, v.object_id, v.value_text from dynamic_field f"
+            " join dynamic_field_value v on v.field_id = f.id"
+            " where f.object_type in ('ITSMChange', 'ITSMWorkOrder') order by v.id",
+        ),
+        "change_history_by_type": _query(
+            cur,
+            "select t.name as type, h.fieldname, count(*) as n from change_history h"
+            " join change_history_type t on t.id = h.type_id"
+            " group by t.name, h.fieldname order by t.name, h.fieldname",
+        ),
+        "change_history_type": _query(cur, "select id, name from change_history_type order by id"),
+        "general_catalog": _query(
+            cur,
+            "select general_catalog_class as class, name from general_catalog"
+            " where general_catalog_class like 'ITSM::ChangeManagement::%' order by id",
+        ),
+    }
+    return {"counts": counts, "rows": rows}
+
+
+def capture_change_behaviour(peer: str, env: dict[str, str], out: Path) -> Path:
+    """Seed the changes, probe the package, merge both into ``change-<profile>.json``."""
+    profile = PEER_PROFILES.get(peer)
+    if profile is None:
+        raise SystemExit(f"no behaviour profile for peer {peer}")
+    _helpers.znuny_copy_in(SEED_SCRIPT, SEED_REMOTE)
+    _helpers.znuny_copy_in(CHANGE_PROBE_SCRIPT, CHANGE_PROBE_REMOTE)
+    seed = _block(peer_exec("perl", SEED_REMOTE), "GOLDEN_ITSM_SEED")
+    probe = _block(peer_exec("perl", CHANGE_PROBE_REMOTE), "GOLDEN_ITSM_CHANGE")
+    _redact_notifications(probe["history"])
+    conn = db_connect(env)
+    try:
+        stored = dump_change_rows(conn.cursor())
+    finally:
+        conn.close()
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / f"change-{profile}.json"
+    document = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+    document["profile"] = profile
+    document["peer"] = {
+        "peer": peer,
+        "znuny_version": env.get("GOLDEN_VERSION", ""),
+        "captured_with": (
+            "tests/golden/itsm_survey.py --change-behaviour"
+            " (tests/golden/itsm_seed.pl, tests/golden/itsm_change_probe.pl)"
+        ),
+        "results": {"seed": seed["changes"], "probe": probe, "stored": stored},
+    }
+    target.write_text(
+        json.dumps(document, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    log(f"change behaviour -> {target}")
+    return target
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -533,6 +699,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="run itsm_behaviour.pl on a fresh peer and merge the results into <out>/<profile>.json",
     )
+    parser.add_argument(
+        "--change-behaviour",
+        action="store_true",
+        help="seed + probe ITSMChangeManagement; merge into <out>/change-<profile>.json",
+    )
     args = parser.parse_args(argv)
 
     env = peer_env(args.peer)
@@ -540,6 +711,9 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"{args.peer} is not an ITSM peer")
     if args.behaviour:
         capture_behaviour(args.peer, env, args.out)
+        return 0
+    if args.change_behaviour:
+        capture_change_behaviour(args.peer, env, args.out)
         return 0
     args.out.mkdir(parents=True, exist_ok=True)
     conn = db_connect(env)

@@ -357,12 +357,82 @@ Die ITSM-Typen sind `AlternativeTo`, `ConnectedTo`, `DependsOn` (Quelle "Depends
 `ITSM::Core::IncidentLinkTypeDirection` (Vorgabe `DependsOn: Both`) bestimmt, welche Typen den
 Vorfallstatus in welche Richtung weitergeben.
 
-### Tabellen der Change-Verwaltung und des Import/Export-Pakets (nur dokumentiert)
+### Change-Verwaltung: Schema und Verhalten
 
-Tiqora liest und schreibt sie nicht, und der Importer übernimmt sie nicht. Sie werden nur gezählt, damit
-Zuordnungsbericht und "Umstellen ohne CI-Daten" wissen, was bei Znuny zurückbleibt:
+Die Change-Verwaltung (Paket ITSMChangeManagement 6.5.2 / 7.3.4) legt 20 Tabellen an: 15 `change_*` und 5
+`condition_*`. Die Tabellendefinitionen sind in beiden Profilen für MariaDB und PostgreSQL **identisch**
+(Unterschied der ITSM-Pakete insgesamt: nur `general_catalog_preferences`, siehe oben). Das Verhalten ist in
+`backend/tests/fixtures/znuny-itsm/behaviour/change-itsm-6.json` und `change-itsm-7.json` festgehalten: je neun
+Antworten mit Quelle (Datei:Zeile) und die Ergebnisse, die eine echte Znuny-Instanz geliefert hat
+(`tests/golden/itsm_survey.py --change-behaviour`; Test `test_itsm_change_vectors.py`).
 
-* Change-Verwaltung (20 Tabellen): `change_item`, `change_workorder`, `change_cab`, `change_history_type`, `change_history`, `change_template_type`, `change_template`, `change_cip_allocate`, `change_state_machine`, `condition_object`, `condition_attribute`, `condition_operator`, `change_condition`, `condition_expression`, `condition_action`, `change_notification`, `change_notification_message`, `change_notification_grps`, `change_notification_rec`, `change_number_counter`;
+| Tabellen | Inhalt |
+|---|---|
+| `change_item` | der Change: `change_number`, `title`, `description`/`description_plain`, `justification`/`justification_plain`, Status, Kategorie, Auswirkung und Priorität als `general_catalog`-Ids, `change_manager_id` (kann leer sein), `change_builder_id`, `requested_time` (NULL, wenn nicht gesetzt) |
+| `change_workorder` | Arbeitsauftrag eines Changes: `workorder_number` (ab 1 je Change), `instruction`/`report` (je mit `*_plain`), Status und Typ als Katalog-Ids, `workorder_agent_id`, geplante und tatsächliche Zeiten, `planned_effort`, `accounted_time` |
+| `change_cab` | ein Mitglied je Zeile, entweder `user_id` (Agent) oder `customer_user_id` (Kundenbenutzer, Login) |
+| `change_history`, `change_history_type` | Verlauf (42 Typen) |
+| `change_template`, `change_template_type` | Vorlagen für Change, Arbeitsauftrag, CAB und Bedingung |
+| `change_cip_allocate` | Prioritätsmatrix (Kategorie x Auswirkung, 25 Zeilen) |
+| `change_state_machine` | erlaubte Statusübergänge (33 Zeilen) |
+| `change_condition`, `condition_*` | Bedingungen und Aktionen |
+| `change_notification*`, `change_number_counter` | Benachrichtigungsregeln und Nummernzähler |
+
+Status, Kategorie, Auswirkung, Priorität sowie Arbeitsauftrags-Status und -Typ stehen im Allgemeinen Katalog
+(`ITSM::ChangeManagement::Change::State`, `::Category`, `::Impact`, `::Priority`, `::WorkOrder::State`,
+`::WorkOrder::Type`). Arbeitsauftragstypen: `approval`, `workorder`, `backout`, `decision`, `pir`.
+
+**Was das Paket tatsächlich tut** (Antworten 1 bis 9 der Vektoren):
+
+1. **Verknüpfungen.** Die Objektnamen sind `ITSMChange` und `ITSMWorkOrder`. Erlaubt sind (aus ITSMCore, nicht aus dem
+   Change-Paket): Change zu Ticket `Normal`; Arbeitsauftrag zu Ticket `Normal`, zu CI und zu Service `Normal` und
+   `DependsOn`. **Change zu CI, zu Service, zu Change oder zu Arbeitsauftrag ist nicht erlaubt**: ein Change hängt nur
+   über seine Arbeitsaufträge an CIs und Services. Quelle der gespeicherten Beziehung ist der Change bzw. der Arbeitsauftrag.
+2. **Zeiten.** `change_item` hat keine Zeitspalten außer `requested_time`. Geplanter und tatsächlicher Beginn/Ende eines
+   Changes werden aus den Arbeitsaufträgen abgeleitet (MIN/MAX). Nicht gesetzte Zeiten eines Arbeitsauftrags stehen als
+   `9999-01-01 00:00:00` in der Tabelle, nie als NULL. Weil dieser Wert der größte ist, ignorieren die MIN-Spalten ihn, die
+   MAX-Spalten dagegen nicht: **ein** Arbeitsauftrag ohne geplantes Ende lässt das geplante Ende des Changes leer, **ein**
+   unfertiger Arbeitsauftrag das tatsächliche Ende. Der geplante Beginn ist nur gesetzt, wenn jeder Arbeitsauftrag einen hat.
+   Aufwand und gebuchte Zeit werden summiert. Ein Change ohne Arbeitsaufträge hat keine Zeiten.
+3. **Verlauf.** `change_history.type_id` verweist auf `change_history_type`. Bei `*Add` steht die neue Id in `content_new`,
+   bei `*Update` je geänderter Eingabe eine Zeile (`fieldname` = Name des Parameters, z. B. `ChangeTitle`, `ChangeStateID`,
+   `WorkOrderStateID`; `content_old`/`content_new` die Rohwerte, bei `*ID`-Feldern also Ids). Ein Statuswechsel erzeugt zwei
+   Zeilen (`ChangeState` und `ChangeStateID`). CAB-Änderungen: `CABAgents`/`CABCustomers` mit Werten, die durch `%%`
+   getrennt sind. Verknüpfungen: `<Objekt>%%<Schlüssel>`. Benachrichtigungen (`*NotificationSent`) enthalten
+   `<Empfängeradresse>%%<Ereignis>`: der Verlauf einer echten Instanz enthält also E-Mail-Adressen. Zeilen von
+   Arbeitsauftrags-Ereignissen haben `workorder_id`, zugleich immer `change_id`.
+4. **Dynamische Felder.** Objekttypen `ITSMChange` und `ITSMWorkOrder`; die Werte stehen in `dynamic_field_value` mit
+   `object_id` = `change_item.id` bzw. `change_workorder.id` (getrennte Id-Räume, der Objekttyp des Feldes unterscheidet sie).
+   Das Paket liefert kein solches Feld aus.
+5. **CAB.** Pro Change, nicht als benannte Liste. Agenten und Kundenbenutzer werden getrennt ersetzt; doppelte Einträge
+   verhindert der Code, nicht der Unique-Index (NULL-Werte gelten als verschieden).
+6. **Texte.** `description`, `justification`, `instruction`, `report` stehen so, wie sie eingegeben wurden (HTML oder
+   Text); die `*_plain`-Spalten sind `HTMLUtils::ToAscii` davon und werden gesucht. Text ohne Markup bleibt unverändert,
+   bei einem Absatz fügt **6.5** vorn einen und hinten zwei Zeilenumbrüche ein, **7.3** nur hinten einen. Lesen Sie die
+   `*_plain`-Spalte daher immer mit entfernten Leerzeichen am Rand.
+7. **Vorlagen.** `change_template.content` ist **kein** Storable und kein JSON, sondern ein Perl-`Data::Dumper`-Text
+   (`$VAR1 = {` ... `}`), den Znuny mit `eval` ausführt. Ein Change hat die Schlüssel `ChangeAdd` und `Children` (Liste von
+   `WorkOrderAdd`); Benutzer, Katalog-Ids und Change-Id der Quellinstanz stecken darin. Tiqora führt diesen Text nie aus.
+8. **Gruppen.** `itsm-change` (lesen, bearbeiten, Arbeitsaufträge, CAB, Terminübersicht), `itsm-change-manager` (anlegen,
+   löschen, Manager-Übersicht), `itsm-change-builder` (zurücksetzen); Vorlagen und "Meine Changes" verlangen Builder oder
+   Manager. Alle Agentenmasken tragen die Gruppe in `GroupRo`; die Administrationsmasken (Prioritätsmatrix,
+   Benachrichtigungen, Statusautomat) verlangen `admin`.
+9. **Schema.** In beiden Profilen gleich, siehe oben.
+
+Außerdem (Antwort 10): Arbeitsauftragsnummern zählen je Change ab 1; beim Wechsel in einen Status der Einstellung
+`ITSMWorkOrder::ActualStartTimeSet::States` (Vorgabe `in progress`) setzt Znuny den tatsächlichen Beginn, beim Wechsel in
+einen Status ohne Folgestatus das tatsächliche Ende (jetzt + 1 Sekunde). Die Changenummer kommt aus
+`ITSMChange::NumberGenerator` (Vorgabe `DateChecksum`).
+
+**Was Tiqora damit tut** (ab Version mit Change-Management): Modus A zeigt Changes und Arbeitsaufträge lesend in
+Tiqora; es werden nie Zeilen der 20 Tabellen geschrieben. Der Importer übernimmt Changes, Arbeitsaufträge, CAB, Verlauf
+und Verknüpfungen in Tiqora-Tabellen (Zeiten nach obigen Regeln, ohne den Sentinel); Vorlagen, Bedingungen und
+Benachrichtigungsregeln werden nicht übernommen. Für das Archiv alter Changes gelten dieselben Regeln.
+
+### Tabellen des Import/Export-Pakets (nur dokumentiert)
+
+Tiqora liest und schreibt sie nicht, und der Importer übernimmt sie nicht:
+
 * Import/Export (7 Tabellen): `imexport_template`, `imexport_object`, `imexport_format`, `imexport_mapping`, `imexport_mapping_object`, `imexport_mapping_format`, `imexport_search`.
 
 Die Zeilen der Auslieferung stehen in `initial_insert.sql` (z. B. 42 `change_history_type`,
