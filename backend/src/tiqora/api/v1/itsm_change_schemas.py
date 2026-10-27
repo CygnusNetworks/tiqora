@@ -9,6 +9,16 @@ from pydantic import BaseModel, Field
 
 from tiqora.approvals.contract import ApprovalStatus
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.itsm.change.cab import (
+    MAX_AGENDA,
+    AgendaItemIn,
+    CabChangeItem,
+    CabView,
+    MeetingStatus,
+    MeetingView,
+    MemberKind,
+    Rule,
+)
 from tiqora.itsm.change.freeze import Enforcement, FreezeOccurrences, Scope
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
@@ -297,3 +307,89 @@ def approval_out(view: ChangeApprovalView) -> ChangeApprovalOut:
         ),
         history_missing=view.history_missing,
     )
+
+
+class ResolvedMemberOut(BaseModel):
+    member_kind: MemberKind
+    member_ref: str
+    #: a name for users, groups and roles; "Freigabegruppe #<id>" for a list; the login or key
+    label: str
+    #: voters a group or role stands for (``None`` for single entries, lists and resolvers)
+    count: int | None
+    missing: bool
+
+
+class CabOut(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    rule: Rule
+    quorum: int | None
+    is_emergency: bool
+    valid: bool
+    members: list[ResolvedMemberOut]
+    created_at: UtcDateTime
+    created_by: int
+    updated_at: UtcDateTime
+    updated_by: int
+
+
+def cab_out(view: CabView) -> CabOut:
+    return CabOut.model_validate(view.model_dump())
+
+
+class AgendaEntryOut(BaseModel):
+    """``hidden`` lines carry nothing but their ``position``."""
+
+    position: int
+    hidden: bool
+    change_ticket_id: int | None
+    tn: str | None
+    title: str | None
+    change_type: ChangeType | None
+    phase: Phase | None
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+    note: str | None
+    approval: ApprovalSnapshotOut | None
+
+
+class MeetingOut(BaseModel):
+    id: int
+    cab_id: int
+    cab_name: str
+    title: str
+    starts_at: UtcDateTime
+    ends_at: UtcDateTime
+    location: str | None
+    status: MeetingStatus
+    minutes: str | None
+    agenda_count: int
+    agenda: list[AgendaEntryOut]
+    created_at: UtcDateTime
+    created_by: int
+    updated_at: UtcDateTime
+    updated_by: int
+
+
+def meeting_out(view: MeetingView) -> MeetingOut:
+    return MeetingOut.model_validate(view.model_dump())
+
+
+class AgendaIn(BaseModel):
+    items: list[AgendaItemIn] = Field(default_factory=list, max_length=MAX_AGENDA)
+
+
+class CabChangeItemOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    change_type: ChangeType
+    phase: Phase
+    risk_level: str | None
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+
+
+def cab_change_item_out(item: CabChangeItem) -> CabChangeItemOut:
+    return CabChangeItemOut.model_validate(item, from_attributes=True)

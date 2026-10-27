@@ -1432,6 +1432,7 @@ async def run_erasure(
         # ---- related master tables (snapshot; delete mode removes) ----
         has_favorites = await _table_exists(session, "tiqora_customer_favorite")
         has_ai_pause = await _table_exists(session, "tiqora_ai_customer_pause")
+        has_cab_member = await _table_exists(session, "tiqora_itsm_cab_member")
         for old_login in logins:
             # customer_preferences (composite PK user_id + preferences_key)
             prefs = (
@@ -1595,6 +1596,24 @@ async def run_erasure(
                     text(
                         "DELETE FROM tiqora_ai_customer_pause"
                         " WHERE scope = 'user' AND customer_key = :u"
+                    ),
+                    {"u": old_login},
+                )
+            # CAB members of kind customer_user hold the login: anonymize follows the new
+            # login, delete drops the member (no backup, like the stars above)
+            if has_cab_member and mode == "anonymize":
+                await session.execute(
+                    text(
+                        "UPDATE tiqora_itsm_cab_member SET member_ref = :new_u"
+                        " WHERE member_kind = 'customer_user' AND member_ref = :old_u"
+                    ),
+                    {"new_u": login_to_new[old_login], "old_u": old_login},
+                )
+            elif has_cab_member:
+                await session.execute(
+                    text(
+                        "DELETE FROM tiqora_itsm_cab_member"
+                        " WHERE member_kind = 'customer_user' AND member_ref = :u"
                     ),
                     {"u": old_login},
                 )

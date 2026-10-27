@@ -436,3 +436,17 @@ def test_cmdb_area_levels_and_legacy_expansion() -> None:
     assert expand_scopes(frozenset({"write"}))["cmdb"] == "rw"  # type: ignore[index]
     assert "cmdb:ro" in all_areas_read_only_scopes().split(",")
     assert normalize_scopes("CMDB:rw, tickets:ro") == "cmdb:rw,tickets:ro"
+
+
+def test_cab_prefixes_share_the_tickets_area_with_changes() -> None:
+    """CAB lists and meeting agendas show change titles: like ``/itsm/changes`` they need a
+    ``tickets`` key, a ``cmdb`` key does not reach them."""
+    for path in (
+        "/api/v1/itsm/cabs",
+        "/api/v1/itsm/cab-meetings",
+        "/api/v1/itsm/cab-meetings/3/agenda",
+    ):
+        assert path_to_area(path) == path_to_area("/api/v1/itsm/changes") == "tickets"
+        assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=path)
+        assert not scopes_allow(frozenset({"cmdb:rw"}), method="GET", path=path)
+        assert not scopes_allow(frozenset({"tickets:ro"}), method="PUT", path=path)

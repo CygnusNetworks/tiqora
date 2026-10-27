@@ -800,6 +800,191 @@
         "title": "AffectedOut",
         "type": "object"
       },
+      "AgendaEntryOut": {
+        "description": "``hidden`` lines carry nothing but their ``position``.",
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalSnapshotOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change_ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Ticket Id"
+          },
+          "change_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standard",
+                  "normal",
+                  "emergency"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Type"
+          },
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "enum": [
+                  "draft",
+                  "submitted",
+                  "assessment",
+                  "approval",
+                  "scheduled",
+                  "implementing",
+                  "review",
+                  "closed",
+                  "rejected",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tn"
+          }
+        },
+        "required": [
+          "position",
+          "hidden",
+          "change_ticket_id",
+          "tn",
+          "title",
+          "change_type",
+          "phase",
+          "planned_start",
+          "planned_end",
+          "note",
+          "approval"
+        ],
+        "title": "AgendaEntryOut",
+        "type": "object"
+      },
+      "AgendaIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgendaItemIn"
+            },
+            "maxItems": 100,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "AgendaIn",
+        "type": "object"
+      },
+      "AgendaItemIn": {
+        "additionalProperties": false,
+        "properties": {
+          "change_ticket_id": {
+            "title": "Change Ticket Id",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "change_ticket_id"
+        ],
+        "title": "AgendaItemIn",
+        "type": "object"
+      },
       "AgentCustomerCreateOut": {
         "description": "Created customer-user ref for the ticket Kunde dialog.",
         "properties": {
@@ -8245,6 +8430,278 @@
           "target_key"
         ],
         "title": "BulkLinkIn",
+        "type": "object"
+      },
+      "CabChangeItemOut": {
+        "properties": {
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "draft",
+              "submitted",
+              "assessment",
+              "approval",
+              "scheduled",
+              "implementing",
+              "review",
+              "closed",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "change_type",
+          "phase",
+          "risk_level",
+          "planned_start",
+          "planned_end"
+        ],
+        "title": "CabChangeItemOut",
+        "type": "object"
+      },
+      "CabIn": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_emergency": {
+            "default": false,
+            "title": "Is Emergency",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "quorum": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quorum"
+          },
+          "rule": {
+            "default": "majority",
+            "enum": [
+              "any",
+              "all",
+              "majority",
+              "quorum"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CabIn",
+        "type": "object"
+      },
+      "CabMemberIn": {
+        "additionalProperties": false,
+        "properties": {
+          "member_kind": {
+            "enum": [
+              "user",
+              "group",
+              "role",
+              "list",
+              "customer_user",
+              "resolver"
+            ],
+            "title": "Member Kind",
+            "type": "string"
+          },
+          "member_ref": {
+            "maxLength": 190,
+            "minLength": 1,
+            "title": "Member Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "member_kind",
+          "member_ref"
+        ],
+        "title": "CabMemberIn",
+        "type": "object"
+      },
+      "CabOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_emergency": {
+            "title": "Is Emergency",
+            "type": "boolean"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedMemberOut"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quorum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quorum"
+          },
+          "rule": {
+            "enum": [
+              "any",
+              "all",
+              "majority",
+              "quorum"
+            ],
+            "title": "Rule",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "rule",
+          "quorum",
+          "is_emergency",
+          "valid",
+          "members",
+          "created_at",
+          "created_by",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "CabOut",
         "type": "object"
       },
       "CalendarOut": {
@@ -29773,6 +30230,245 @@
         "title": "MeasureRef",
         "type": "object"
       },
+      "MeetingIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cab_id": {
+            "title": "Cab Id",
+            "type": "integer"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cab_id",
+          "title",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "MeetingIn",
+        "type": "object"
+      },
+      "MeetingOut": {
+        "properties": {
+          "agenda": {
+            "items": {
+              "$ref": "#/components/schemas/AgendaEntryOut"
+            },
+            "title": "Agenda",
+            "type": "array"
+          },
+          "agenda_count": {
+            "title": "Agenda Count",
+            "type": "integer"
+          },
+          "cab_id": {
+            "title": "Cab Id",
+            "type": "integer"
+          },
+          "cab_name": {
+            "title": "Cab Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "held",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cab_id",
+          "cab_name",
+          "title",
+          "starts_at",
+          "ends_at",
+          "location",
+          "status",
+          "minutes",
+          "agenda_count",
+          "agenda",
+          "created_at",
+          "created_by",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "MeetingOut",
+        "type": "object"
+      },
+      "MeetingUpdateIn": {
+        "additionalProperties": false,
+        "description": "Only the fields that are sent change; the CAB of a meeting stays.",
+        "properties": {
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "maxLength": 100000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "planned",
+                  "held",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "MeetingUpdateIn",
+        "type": "object"
+      },
       "MentionCreate": {
         "properties": {
           "article_id": {
@@ -39913,6 +40609,54 @@
           "url"
         ],
         "title": "ResolvedCustomerLink",
+        "type": "object"
+      },
+      "ResolvedMemberOut": {
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "member_kind": {
+            "enum": [
+              "user",
+              "group",
+              "role",
+              "list",
+              "customer_user",
+              "resolver"
+            ],
+            "title": "Member Kind",
+            "type": "string"
+          },
+          "member_ref": {
+            "title": "Member Ref",
+            "type": "string"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "member_kind",
+          "member_ref",
+          "label",
+          "count",
+          "missing"
+        ],
+        "title": "ResolvedMemberOut",
         "type": "object"
       },
       "RestartIn": {
@@ -73424,6 +74168,390 @@
         ]
       }
     },
+    "/api/v1/admin/itsm/change/cabs": {
+      "get": {
+        "description": "All CABs with their members, valid or not.",
+        "operationId": "get_cabs_api_v1_admin_itsm_change_cabs_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CabOut"
+                  },
+                  "title": "Response Get Cabs Api V1 Admin Itsm Change Cabs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cabs",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "post": {
+        "description": "A new CAB without members; add them with ``PUT /cabs/{id}/members``.",
+        "operationId": "post_cab_api_v1_admin_itsm_change_cabs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CabIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Cab",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/cabs/{cab_id}": {
+      "delete": {
+        "description": "Delete the CAB; refused (409 ``cab_has_meetings``) while it has meetings.",
+        "operationId": "delete_cab_route_api_v1_admin_itsm_change_cabs__cab_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cab_id",
+            "required": true,
+            "schema": {
+              "title": "Cab Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Cab Route",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "put": {
+        "description": "Replace name, rule and flags; the members stay and must fit the rule.",
+        "operationId": "put_cab_api_v1_admin_itsm_change_cabs__cab_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cab_id",
+            "required": true,
+            "schema": {
+              "title": "Cab Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CabIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Cab",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/cabs/{cab_id}/members": {
+      "put": {
+        "description": "Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),\ncustomer_user (login), resolver (key); users, groups and roles must exist.",
+        "operationId": "put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cab_id",
+            "required": true,
+            "schema": {
+              "title": "Cab Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/CabMemberIn"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Cab Members",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
     "/api/v1/admin/itsm/change/freeze-windows": {
       "get": {
         "description": "All freeze windows (Sperrzeitr\u00e4ume), valid or not; times are UTC.",
@@ -104127,6 +105255,562 @@
         "summary": "Customer Tickets",
         "tags": [
           "integrations"
+        ]
+      }
+    },
+    "/api/v1/itsm/cab-meetings": {
+      "get": {
+        "description": "Meetings that overlap ``[start, end)`` (without their agenda lines); times are UTC.",
+        "operationId": "get_cab_meetings_api_v1_itsm_cab_meetings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingOut"
+                  },
+                  "title": "Response Get Cab Meetings Api V1 Itsm Cab Meetings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cab Meetings",
+        "tags": [
+          "itsm-change"
+        ]
+      },
+      "post": {
+        "description": "Plan a meeting (change managers).",
+        "operationId": "post_cab_meeting_api_v1_itsm_cab_meetings_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Cab Meeting",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/cab-meetings/{meeting_id}": {
+      "get": {
+        "description": "Meeting with agenda and minutes; lines of unreadable changes are ``hidden``.",
+        "operationId": "get_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "meeting_id",
+            "required": true,
+            "schema": {
+              "title": "Meeting Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cab Meeting",
+        "tags": [
+          "itsm-change"
+        ]
+      },
+      "patch": {
+        "description": "Title, time, place, status and minutes of a meeting (change managers).",
+        "operationId": "patch_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "meeting_id",
+            "required": true,
+            "schema": {
+              "title": "Meeting Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeetingUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Cab Meeting",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/cab-meetings/{meeting_id}/agenda": {
+      "put": {
+        "description": "Replace the agenda of a planned meeting (change managers).",
+        "operationId": "put_cab_meeting_agenda_api_v1_itsm_cab_meetings__meeting_id__agenda_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "meeting_id",
+            "required": true,
+            "schema": {
+              "title": "Meeting Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgendaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Cab Meeting Agenda",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/cab-meetings/{meeting_id}/suggestions": {
+      "get": {
+        "description": "Readable changes waiting for this meeting's CAB to decide.",
+        "operationId": "get_cab_meeting_suggestions_api_v1_itsm_cab_meetings__meeting_id__suggestions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "meeting_id",
+            "required": true,
+            "schema": {
+              "title": "Meeting Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CabChangeItemOut"
+                  },
+                  "title": "Response Get Cab Meeting Suggestions Api V1 Itsm Cab Meetings  Meeting Id  Suggestions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cab Meeting Suggestions",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/cabs": {
+      "get": {
+        "description": "Valid CABs with their members (for the change's CAB choice and the meeting pages).",
+        "operationId": "get_cabs_api_v1_itsm_cabs_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CabOut"
+                  },
+                  "title": "Response Get Cabs Api V1 Itsm Cabs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cabs",
+        "tags": [
+          "itsm-change"
         ]
       }
     },

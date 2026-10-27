@@ -17,6 +17,16 @@ from tiqora.api.v1.admin.itsm_change_schemas import (
     freeze_out,
     template_out,
 )
+from tiqora.api.v1.itsm_change_schemas import CabOut, cab_out
+from tiqora.itsm.change.cab import (
+    CabIn,
+    CabMemberIn,
+    create_cab,
+    delete_cab,
+    list_cabs,
+    set_members,
+    update_cab,
+)
 from tiqora.itsm.change.freeze import (
     FreezeIn,
     create_freeze,
@@ -138,6 +148,49 @@ async def put_freeze_window(
 async def delete_freeze_window(freeze_id: int, admin: AdminUser, session: DbSession) -> Response:
     _ = admin
     await delete_freeze(session, freeze_id=freeze_id)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/cabs", response_model=list[CabOut])
+async def get_cabs(admin: AdminUser, session: DbSession) -> list[CabOut]:
+    """All CABs with their members, valid or not."""
+    _ = admin
+    return [cab_out(v) for v in await list_cabs(session, include_invalid=True)]
+
+
+@router.post("/cabs", response_model=CabOut, status_code=status.HTTP_201_CREATED)
+async def post_cab(body: CabIn, admin: AdminUser, session: DbSession) -> CabOut:
+    """A new CAB without members; add them with ``PUT /cabs/{id}/members``."""
+    out = cab_out(await create_cab(session, data=body, user_id=admin.id))
+    await session.commit()
+    return out
+
+
+@router.put("/cabs/{cab_id}", response_model=CabOut)
+async def put_cab(cab_id: int, body: CabIn, admin: AdminUser, session: DbSession) -> CabOut:
+    """Replace name, rule and flags; the members stay and must fit the rule."""
+    out = cab_out(await update_cab(session, cab_id=cab_id, data=body, user_id=admin.id))
+    await session.commit()
+    return out
+
+
+@router.put("/cabs/{cab_id}/members", response_model=CabOut)
+async def put_cab_members(
+    cab_id: int, body: list[CabMemberIn], admin: AdminUser, session: DbSession
+) -> CabOut:
+    """Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),
+    customer_user (login), resolver (key); users, groups and roles must exist."""
+    out = cab_out(await set_members(session, cab_id=cab_id, members=body, user_id=admin.id))
+    await session.commit()
+    return out
+
+
+@router.delete("/cabs/{cab_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_cab_route(cab_id: int, admin: AdminUser, session: DbSession) -> Response:
+    """Delete the CAB; refused (409 ``cab_has_meetings``) while it has meetings."""
+    _ = admin
+    await delete_cab(session, cab_id=cab_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

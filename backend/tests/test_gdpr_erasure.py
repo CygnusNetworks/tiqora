@@ -2192,6 +2192,94 @@ async def test_run_erasure_customer_favorites(mariadb_znuny_url: str, mode: str)
 @pytest.mark.db
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_run_erasure_cab_member_customer_login(mariadb_znuny_url: str, mode: str) -> None:
+    """A CAB member of kind customer_user holds the login: anonymize follows the new login,
+    delete drops the member; other kinds and other customers stay."""
+    from sqlalchemy import create_engine
+
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+    sync_engine.dispose()
+
+    engine, factory = await _factory(mariadb_znuny_url)
+    login = f"erase.cab.{mode}@example.org"
+    company = f"ERASE-CAB-{mode.upper()}"
+    cab_id = 947190 if mode == "anonymize" else 947191
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_company(session, customer_id=company, name="Acme CAB")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_itsm_cab (id, name, rule, is_emergency, valid, created_at,"
+                " created_by, updated_at, updated_by)"
+                " VALUES (:id, :n, 'any', 0, 1, :t, 1, :t, 1)"
+            ),
+            {"id": cab_id, "n": f"chg94 erase {mode}", "t": NOW},
+        )
+        for kind, ref in (
+            ("customer_user", login),
+            ("customer_user", f"keep.{login}"),
+            ("resolver", login),  # same text, other kind: untouched
+        ):
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_member (cab_id, member_kind, member_ref)"
+                    " VALUES (:c, :k, :r)"
+                ),
+                {"c": cab_id, "k": kind, "r": ref},
+            )
+        await session.commit()
+
+    await run_erasure(
+        factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode=mode,
+        seed=19,
+        force_parallel=True,
+        actor="test",
+    )
+
+    try:
+        async with factory() as session:
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT member_kind, member_ref FROM tiqora_itsm_cab_member"
+                        " WHERE cab_id = :c"
+                    ),
+                    {"c": cab_id},
+                )
+            ).all()
+            members = {(str(k), str(r)) for k, r in rows}
+            assert ("customer_user", login) not in members
+            assert ("customer_user", f"keep.{login}") in members
+            assert ("resolver", login) in members
+            if mode == "anonymize":
+                new_login = (
+                    await session.execute(
+                        text("SELECT login FROM customer_user WHERE id = :id"), {"id": cuid}
+                    )
+                ).scalar_one()
+                assert new_login != login
+                assert ("customer_user", new_login) in members
+            else:
+                assert len(members) == 2
+    finally:
+        async with factory() as session:
+            await session.execute(text("DELETE FROM tiqora_itsm_cab WHERE id = :c"), {"c": cab_id})
+            await session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
 async def test_run_erasure_purges_customer_second_factors(
     mariadb_znuny_url: str, mode: str
 ) -> None:

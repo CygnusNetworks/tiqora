@@ -17,6 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession, get_session_factory_dep
 from tiqora.api.v1.itsm_change_schemas import (
     AdoptIn,
+    AgendaIn,
+    CabChangeItemOut,
+    CabOut,
     ChangeApprovalOut,
     ChangeCreatedOut,
     ChangeEventOut,
@@ -24,17 +27,32 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeStatusOut,
     ChangeTemplateSummaryOut,
     FreezeOccurrencesOut,
+    MeetingOut,
     TaskOrderIn,
     TaskOut,
     approval_out,
+    cab_change_item_out,
+    cab_out,
     change_out,
     event_out,
     freeze_occurrences_out,
+    meeting_out,
     task_out,
     template_summary,
 )
 from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.db.tiqora.models import TiqoraJob
+from tiqora.itsm.change.cab import (
+    MeetingIn,
+    MeetingUpdateIn,
+    create_meeting,
+    get_meeting,
+    list_cabs,
+    list_meetings,
+    set_agenda,
+    suggest_agenda,
+    update_meeting,
+)
 from tiqora.itsm.change.conflicts import ConflictOut, read_conflicts
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import occurrences
@@ -140,6 +158,95 @@ async def get_freeze_windows(
     if hi - lo > MAX_RANGE:
         raise ChangeError("range_too_large", 422)
     return freeze_occurrences_out(await occurrences(session, start=lo, end=hi))
+
+
+@router.get("/cabs", response_model=list[CabOut])
+async def get_cabs(user: CurrentUser, session: DbSession, settings: AppSettings) -> list[CabOut]:
+    """Valid CABs with their members (for the change's CAB choice and the meeting pages)."""
+    _ = user
+    await require_change_mode(session, settings)
+    return [cab_out(v) for v in await list_cabs(session, include_invalid=False)]
+
+
+@router.get("/cab-meetings", response_model=list[MeetingOut])
+async def get_cab_meetings(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    start: Annotated[datetime, Query()],
+    end: Annotated[datetime, Query()],
+) -> list[MeetingOut]:
+    """Meetings that overlap ``[start, end)`` (without their agenda lines); times are UTC."""
+    await require_change_mode(session, settings)
+    lo, hi = to_utc_naive(start), to_utc_naive(end)
+    if hi <= lo:
+        raise ChangeError("range_invalid", 422)
+    if hi - lo > MAX_RANGE:
+        raise ChangeError("range_too_large", 422)
+    return [meeting_out(v) for v in await list_meetings(session, start=lo, end=hi, user_id=user.id)]
+
+
+@router.post("/cab-meetings", response_model=MeetingOut, status_code=status.HTTP_201_CREATED)
+async def post_cab_meeting(
+    body: MeetingIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> MeetingOut:
+    """Plan a meeting (change managers)."""
+    await require_change_mode(session, settings)
+    out = meeting_out(await create_meeting(session, settings, data=body, user_id=user.id))
+    await session.commit()
+    return out
+
+
+@router.get("/cab-meetings/{meeting_id:int}", response_model=MeetingOut)
+async def get_cab_meeting(
+    meeting_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> MeetingOut:
+    """Meeting with agenda and minutes; lines of unreadable changes are ``hidden``."""
+    await require_change_mode(session, settings)
+    return meeting_out(await get_meeting(session, meeting_id=meeting_id, user_id=user.id))
+
+
+@router.patch("/cab-meetings/{meeting_id:int}", response_model=MeetingOut)
+async def patch_cab_meeting(
+    meeting_id: int,
+    body: MeetingUpdateIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> MeetingOut:
+    """Title, time, place, status and minutes of a meeting (change managers)."""
+    await require_change_mode(session, settings)
+    out = meeting_out(
+        await update_meeting(session, settings, meeting_id=meeting_id, data=body, user_id=user.id)
+    )
+    await session.commit()
+    return out
+
+
+@router.put("/cab-meetings/{meeting_id:int}/agenda", response_model=MeetingOut)
+async def put_cab_meeting_agenda(
+    meeting_id: int, body: AgendaIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> MeetingOut:
+    """Replace the agenda of a planned meeting (change managers)."""
+    await require_change_mode(session, settings)
+    out = meeting_out(
+        await set_agenda(
+            session, settings, meeting_id=meeting_id, items=body.items, user_id=user.id
+        )
+    )
+    await session.commit()
+    return out
+
+
+@router.get("/cab-meetings/{meeting_id:int}/suggestions", response_model=list[CabChangeItemOut])
+async def get_cab_meeting_suggestions(
+    meeting_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> list[CabChangeItemOut]:
+    """Readable changes waiting for this meeting's CAB to decide."""
+    await require_change_mode(session, settings)
+    meeting = await get_meeting(session, meeting_id=meeting_id, user_id=user.id)
+    items = await suggest_agenda(session, settings, cab_id=meeting.cab_id, user_id=user.id)
+    return [cab_change_item_out(i) for i in items]
 
 
 @router.post("/changes", response_model=ChangeCreatedOut, status_code=status.HTTP_201_CREATED)
