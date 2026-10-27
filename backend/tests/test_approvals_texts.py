@@ -95,13 +95,16 @@ def test_rule_texts() -> None:
     assert texts.rule_text("majority", None, "de") == "Mehrheit der Freigeber"
     assert texts.rule_text("quorum", 3, "en") == "At least 3 approvals"
     assert texts.rule_text("any", None, "en") == "One approval is enough"
+    with pytest.raises(KeyError):
+        texts.rule_text("unknown", None, "de")
 
 
 def test_locale_and_age_helpers() -> None:
     assert texts.text_locale("de") == "de"
     assert texts.text_locale("de_DE") == "de"
     assert texts.text_locale("en_GB") == "en"
-    assert texts.text_locale("fr") == "en"
+    assert texts.text_locale("en") == "en"
+    assert texts.text_locale("fr") == "de"  # unsupported: the bundled default
     assert texts.text_locale(None) == "de"
     assert texts.text_locale("") == "de"
     assert texts.age_text(timedelta(hours=3), "de") == "3 Stunden"
@@ -119,3 +122,9 @@ def test_deadline_text_is_utc_and_locale_formatted(locale: str) -> None:
     value = datetime(2026, 10, 27, 14, 30)  # noqa: DTZ001 - naive UTC like the table
     expected = "27.10.2026 14:30 UTC" if locale == "de" else "2026-10-27 14:30 UTC"
     assert texts.moment_text(value, locale) == expected
+
+
+def test_inbox_hint_can_be_left_out() -> None:
+    _, with_hint = texts.render("request", "de", title="T")
+    _, without = texts.render("request", "de", title="T", inbox_hint=False)
+    assert "Meine Freigaben" in with_hint and "Meine Freigaben" not in without

@@ -55,6 +55,7 @@ from tiqora.jobs.context import JobContext, JobRetry
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.jobs.service import utc_now
 from tiqora.settings_sections.store import save_section_values
+from tiqora.znuny.sysconfig import SysConfig
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 BASE = "https://tiqora.example.org"
@@ -91,7 +92,8 @@ async def _set(session: AsyncSession, **values: Any) -> None:
 async def _prepare(
     session: AsyncSession, *, sender: bool = True, languages: dict[int, str] | None = None
 ) -> None:
-    """Addresses for the agents, the notification sender, optional ``UserLanguage``."""
+    """Addresses (and ``UserLanguage`` de unless given) for the agents, the sender."""
+    languages = {**dict.fromkeys(EMAIL, "de"), **(languages or {})}
     for user_id, address in EMAIL.items():
         await session.execute(
             text(
@@ -100,7 +102,7 @@ async def _prepare(
             ),
             {"u": user_id, "v": address},
         )
-    for user_id, language in (languages or {}).items():
+    for user_id, language in languages.items():
         await session.execute(
             text(
                 "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
@@ -539,14 +541,18 @@ async def test_retry_does_not_resend(
                 await _run(session, approval_id, "request", ordered)
             assert excinfo.value.delay_seconds == 120
             assert [_to(m) for m in sender.sent] == [EMAIL[AG3]]
-            assert len(await _tokens(session, approval_id)) == 1  # the failed send left no link
+            # the failed send's link was committed before SMTP and is revoked again
+            live = [t for t in await _tokens(session, approval_id) if t.revoked_at is None]
+            assert len(live) == 1
 
             result = await _run(session, approval_id, "request", ordered, attempt=2)
             assert result["sent"] == 1
             assert [_to(m) for m in sender.sent] == [EMAIL[AG3], EMAIL[AG4]]
             notified = await _notified(session, approval_id)
             assert sorted(e.approver_id for e in notified if e.approver_id) == sorted(ordered)
-            assert len(await _tokens(session, approval_id)) == 2
+            assert len(await _tokens(session, approval_id)) == 3
+            live = [t for t in await _tokens(session, approval_id) if t.revoked_at is None]
+            assert sorted(t.approver_id for t in live) == sorted(ordered)
 
 
 @pytest.mark.db
@@ -701,7 +707,8 @@ async def test_permanent_smtp_failure_recorded(
                 )
             ).scalar_one()
             assert approver.last_notified_at is None
-            assert await _tokens(session, approval_id) == []
+            (dead,) = await _tokens(session, approval_id)  # issued before SMTP, revoked after
+            assert dead.revoked_at is not None
             log = (
                 await session.execute(select(TiqoraMailLog).where(TiqoraMailLog.ticket_id == T1))
             ).scalar_one()
@@ -799,3 +806,184 @@ def test_job_handler_is_registered_on_the_mail_lane() -> None:
     assert handler.title_key == "jobs.kinds.core.approval_mail"
     assert handler.requeue_if_interrupted is True
     assert handler.payload_model is ApprovalMailPayload
+
+
+def _default_language(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    async def _value(self: SysConfig) -> str:
+        return value
+
+    monkeypatch.setattr(SysConfig, "default_language", _value)
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+@pytest.mark.parametrize(
+    ("default", "expected"),
+    [("en", "Approval requested: "), ("de", "Freigabe erbeten: "), ("fr", "Freigabe erbeten: ")],
+)
+async def test_missing_language_uses_default_language(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    default: str,
+    expected: str,
+) -> None:
+    mail = CapturingMail(monkeypatch)
+    _default_language(monkeypatch, default)
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session, languages={AG4: ""})  # AG4 has no usable preference
+        await session.execute(
+            text(
+                "DELETE FROM user_preferences"
+                " WHERE user_id = :u AND preferences_key = 'UserLanguage'"
+            ),
+            {"u": AG4},
+        )
+        await session.commit()
+        with installed_registry(make_fake_subject_type()):
+            approval_id = await _request(session, TWO_ANY)
+            ids = await _approver_ids(session, approval_id)
+            await _run(session, approval_id, "request", list(ids.values()))
+            by_to = _by_to(mail.sent)
+            # AG3 has a preference (de) and keeps it; AG4 follows the site default
+            assert str(by_to[EMAIL[AG3]]["Subject"]).endswith("Freigabe erbeten: Freigabe appr97")
+            assert f"{expected}Freigabe appr97" in str(by_to[EMAIL[AG4]]["Subject"])
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_substitute_copy_has_no_link(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mail = CapturingMail(monkeypatch)
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session)
+        with installed_registry(make_fake_subject_type()):
+            now = utc_now()
+            await delegation.create_delegation(
+                session,
+                user_id=AG3,
+                substitute_user_id=AG5,
+                valid_from=now - timedelta(hours=1),
+                valid_until=now + timedelta(days=1),
+                created_by=AG1,
+            )
+            await session.commit()
+            approval_id = await _request(session, ONE)
+            ids = await _approver_ids(session, approval_id)
+            for job_id, kind in enumerate(("request", "reminder", "escalation"), start=1):
+                await _run(session, approval_id, kind, list(ids.values()), job_id=job_id)
+            copies = [m for m in mail.sent if _to(m) == EMAIL[AG5]]
+            assert len(copies) == 3
+            for message in copies:
+                assert "/approve#t=" not in _body(message)
+            # one live link per approver mail, none for the substitute: tokens bind the approver row
+            assert {t.approver_id for t in await _tokens(session, approval_id)} == {
+                ids[f"agent:{AG3}"]
+            }
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_customer_without_portal_gets_no_inbox_line(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mail = CapturingMail(monkeypatch)
+    customer = {"kind": "customer_user", "ref": "appr97-k1"}
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session)
+        with installed_registry(make_fake_subject_type("test.cust", allow_customer_approvers=True)):
+            await _set(session, customer_approvers_enabled=True, portal_approvals_enabled=False)
+            await session.commit()
+            approval_id = await _request(
+                session,
+                _defn({"name": "Kunde", "approvers": [customer], "allow_email": False}),
+                subject_type="test.cust",
+            )
+            ids = await _approver_ids(session, approval_id)
+            await _run(session, approval_id, "request", list(ids.values()))
+            (message,) = mail.sent
+            body = _body(message)
+            assert "Meine Freigaben" not in body and "/portal/approvals" not in body
+            assert "/approve#t=" not in body
+
+
+async def _close_by_timeout(session: AsyncSession, approval_id: int) -> None:
+    """What the sweeper leaves behind: step and request rejected by timeout, rows not_needed."""
+    now = utc_now().replace(microsecond=0)
+    await session.execute(
+        text(
+            "UPDATE tiqora_approval_step SET status = 'rejected', reason = 'timeout',"
+            " decided_at = :n WHERE approval_id = :a"
+        ),
+        {"n": now, "a": approval_id},
+    )
+    await session.execute(
+        text("UPDATE tiqora_approval_approver SET status = 'not_needed' WHERE approval_id = :a"),
+        {"a": approval_id},
+    )
+    await session.execute(
+        text(
+            "UPDATE tiqora_approval SET status = 'rejected', reason = 'timeout', decided_at = :n,"
+            " current_stage = NULL WHERE id = :a"
+        ),
+        {"n": now, "a": approval_id},
+    )
+    await session.commit()
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_overdue_notice_survives_step_closed_by_timeout(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mail = CapturingMail(monkeypatch)
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session)
+        with installed_registry(make_fake_subject_type()):
+            approval_id = await _request(session, ONE)
+            ids = await _approver_ids(session, approval_id)
+            await _close_by_timeout(session, approval_id)
+
+            result = await _run(
+                session, approval_id, "overdue", list(ids.values()), include_requester=True
+            )
+
+            assert (result["sent"], result["skipped"]) == (2, 0)
+            by_to = _by_to(mail.sent)
+            assert set(by_to) == {EMAIL[AG1], EMAIL[AG3]}
+            for message in mail.sent:
+                assert str(message["Subject"]).endswith("Frist überschritten: Freigabe appr97")
+                assert "/approve#t=" not in _body(message)
+            assert await _tokens(session, approval_id) == []
+
+            # a plain request mail for the same closed request is still skipped
+            again = await _run(session, approval_id, "request", list(ids.values()), job_id=2)
+            assert again["sent"] == 0
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_escalation_mail_with_and_without_open_step(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mail = CapturingMail(monkeypatch)
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session)
+        with installed_registry(make_fake_subject_type()):
+            approval_id = await _request(session, ONE)
+            ids = await _approver_ids(session, approval_id)
+
+            await _run(session, approval_id, "escalation", list(ids.values()), job_id=1)
+            (first,) = mail.sent
+            assert str(first["Subject"]).endswith(
+                "Eskalation: Sie können über diese Freigabe jetzt allein entscheiden"
+            )
+            assert "/approve#t=" in _body(first)
+            assert len(await _tokens(session, approval_id)) == 1
+
+            await _close_by_timeout(session, approval_id)
+            result = await _run(session, approval_id, "escalation", list(ids.values()), job_id=2)
+            assert result["sent"] == 1
+            assert "/approve#t=" not in _body(mail.sent[-1])
+            assert f"{BASE}/agent/approvals" in _body(mail.sent[-1])

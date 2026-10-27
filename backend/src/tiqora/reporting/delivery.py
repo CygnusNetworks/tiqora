@@ -49,7 +49,9 @@ from tiqora.db.tiqora.models import (
 )
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.mail_outbound import build_outbound_sender
-from tiqora.domain.settings_store import KEY_NOTIFICATION_SENDER_EMAIL, get_setting
+from tiqora.domain.notification_sender import (
+    resolve_notification_sender_address as resolve_report_sender,
+)
 from tiqora.domain.user_preferences import bulk_get_preferences
 from tiqora.filters import FilterError
 from tiqora.jobs.context import JobCancelled, JobContext, JobFailed, JobRetry
@@ -90,8 +92,6 @@ from tiqora.reporting.schemas import ReportResultOut
 from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout
 from tiqora.reporting.texts import ReportTexts, format_date_bucket, load_texts, server_export_labels
-from tiqora.worker.notification_templates import usable_sender_email
-from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -169,19 +169,6 @@ def apply_placeholders(template: str, values: Mapping[str, str]) -> str:
         return values[name] if name in values else match.group(0)
 
     return _PLACEHOLDER.sub(repl, template)
-
-
-async def resolve_report_sender(session: AsyncSession) -> str | None:
-    """Bare sender address: ``notification.sender_email``, else Znuny's
-    ``NotificationSenderEmail`` when it is a real address; ``None`` when neither is."""
-    override = usable_sender_email(await get_setting(session, KEY_NOTIFICATION_SENDER_EMAIL))
-    configured = usable_sender_email(await SysConfig(session).get_str("NotificationSenderEmail"))
-    for candidate in (override, configured):
-        if candidate:
-            address = normalise_address(candidate)
-            if address:
-                return address
-    return None
 
 
 def _day(value: date, texts: ReportTexts) -> str:

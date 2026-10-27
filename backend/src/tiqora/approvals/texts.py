@@ -115,10 +115,12 @@ _RULES: Final[dict[str, dict[str, str]]] = {
 
 
 def text_locale(raw: str | None) -> TextLocale:
-    """``de``, ``de_DE``, ``de-AT`` -> ``de``; unset -> ``de`` (the house language); else ``en``."""
-    if raw is None or not raw.strip():
-        return "de"
-    return "de" if re.split(r"[-_]", raw.strip().lower(), maxsplit=1)[0] == "de" else "en"
+    """``de``, ``de_DE``, ``de-AT`` -> ``de``; ``en``, ``en_GB`` -> ``en``.
+
+    Unset or unsupported languages give the bundled default, German.
+    """
+    base = re.split(r"[-_]", (raw or "").strip().lower(), maxsplit=1)[0]
+    return "en" if base == "en" else "de"
 
 
 def _lang(locale: str) -> TextLocale:
@@ -127,7 +129,7 @@ def _lang(locale: str) -> TextLocale:
 
 def rule_text(rule: str, quorum: int | None, locale: str) -> str:
     """The sentence naming the step's rule."""
-    template = _RULES[_lang(locale)].get(rule, _RULES[_lang(locale)]["any"])
+    template = _RULES[_lang(locale)][rule]
     return template.format(quorum=quorum if quorum is not None else 1)
 
 
@@ -182,12 +184,14 @@ def render(
     name: str | None = None,
     status: str = "approved",
     substitute_for: str | None = None,
+    inbox_hint: bool = True,
 ) -> tuple[str, str]:
     """``(subject, body)`` of one mail. Raises ``KeyError`` for an unknown *kind*.
 
     *rule* is a finished sentence (:func:`rule_line`), *deadline*/*expires* are finished
     moments (:func:`moment_text`). A *link* wins over *inbox_url*; without either an action mail
-    still says where the approval is. ``decided`` reads *status* (``approved``/``rejected``).
+    still says where the approval is unless *inbox_hint* is off (a customer without portal).
+    ``decided`` reads *status* (``approved``/``rejected``).
     """
     lang = _lang(locale)
     if kind not in KINDS:
@@ -229,7 +233,7 @@ def render(
             blocks.append("\n".join(action))
         elif inbox_url:
             blocks.append(parts["inbox"].format(inbox_url=inbox_url))
-        else:
+        elif inbox_hint:
             blocks.append(parts["inbox_plain"])
     blocks.append(parts["footer"])
     return subject, "\n\n".join(blocks) + "\n"

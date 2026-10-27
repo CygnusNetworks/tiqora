@@ -16,6 +16,10 @@ Rules the mails follow:
 * A mail holds the request's title, description, rule, deadline and the subject type's
   ``describe`` lines; never ticket articles, the step name, comments or the ticket title.
 * A customer approver is only mailed while the customer-approver setting is on.
+* The mail language is the recipient's ``UserLanguage``, else Znuny's ``DefaultLanguage``
+  (German when that is not de/en).
+* The link row is committed before SMTP, so no row lock is held while the relay is slow; a failed
+  send revokes exactly that link. The ``notified`` audit row is committed after a successful send.
 * A deleted ticket does not matter: the mail then goes without the ticket-number hook.
 * A permanent SMTP failure is recorded and not retried; a temporary one retries the job
   (``JobRetry``, 120 s) until the last attempt, where it is recorded as well.
@@ -31,7 +35,7 @@ from typing import Any, Final, Literal
 
 import structlog
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import audit, delegation, texts, tokens
@@ -57,9 +61,8 @@ from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
 from tiqora.domain import mail_outbound
 from tiqora.domain.mail_log import write_mail_log
-from tiqora.domain.quoting import build_ticket_subject
-from tiqora.domain.settings_store import KEY_NOTIFICATION_SENDER_EMAIL, get_setting
-from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
+from tiqora.domain.notification_sender import resolve_notification_sender_address
+from tiqora.domain.subject_hook import SubjectHookConfig, hooked_subject, load_subject_config
 from tiqora.domain.user_preferences import bulk_get_preferences
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import Registry
@@ -67,7 +70,6 @@ from tiqora.jobs.context import JobContext, JobRetry
 from tiqora.jobs.registry import MAIL_LANE, JobHandler
 from tiqora.jobs.service import enqueue_job, utc_now
 from tiqora.reporting.schedule_schemas import clean_line, normalise_address
-from tiqora.worker.notification_templates import usable_sender_email
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -75,8 +77,10 @@ logger = structlog.get_logger(__name__)
 MAX_ATTEMPTS: Final = 3
 _RETRY_DELAY_SECONDS: Final = 120
 _DEADLINE_GRACE: Final = timedelta(hours=24)  # the link's own limit past the step deadline
-#: kinds whose recipients must still be pending approvers of an active step
-_PENDING_KINDS: Final = texts.ACTION_KINDS
+#: kinds whose recipients must still be pending approvers of an active step. ``overdue`` and
+#: ``escalation`` are exempt: the sweeper may close the step (timeout) before the job runs, and
+#: the notice is still due (the requester gets it, too).
+_PENDING_KINDS: Final = frozenset({"request", "reminder", "forwarded"})
 #: kinds that may carry the decision link (an overdue notice points to the inbox)
 _LINK_KINDS: Final = frozenset({"request", "reminder", "escalation", "forwarded"})
 
@@ -116,6 +120,11 @@ class _Plan:
     tn: str | None
     hook: SubjectHookConfig | None
     recipients: list[_Recipient]
+    #: Znuny ``DefaultLanguage``: the language of recipients without a ``UserLanguage``
+    default_language: str = ""
+    #: ``UserEmail`` / ``UserLanguage`` of the agent recipients, loaded once
+    emails: dict[int, str] = field(default_factory=dict)
+    languages: dict[int, str] = field(default_factory=dict)
 
 
 def _result(
@@ -154,42 +163,31 @@ async def enqueue_notification(
 # ------------------------------------------------------------------ lookups
 
 
-async def _sender(session: AsyncSession) -> str | None:
-    """Bare sender address: ``notification.sender_email``, else Znuny's when it is real."""
-    override = usable_sender_email(await get_setting(session, KEY_NOTIFICATION_SENDER_EMAIL))
-    configured = usable_sender_email(await SysConfig(session).get_str("NotificationSenderEmail"))
-    for candidate in (override, configured):
-        if candidate and (address := normalise_address(candidate)):
-            return address
-    return None
-
-
 async def _address_and_language(
-    session: AsyncSession, principal: Principal
+    session: AsyncSession, plan: _Plan, principal: Principal
 ) -> tuple[str | None, texts.TextLocale]:
+    """Address and mail language: the recipient's ``UserLanguage``, else ``DefaultLanguage``."""
     if principal.kind == "agent":
         assert principal.user_id is not None  # noqa: S101 - Principal validates this
-        mail = (await bulk_get_preferences(session, [principal.user_id], "UserEmail")).get(
-            principal.user_id
-        )
-        language = (await bulk_get_preferences(session, [principal.user_id], "UserLanguage")).get(
-            principal.user_id
-        )
-        return (normalise_address(mail) if mail else None), texts.text_locale(language)
-    email = (
-        await session.execute(
-            select(CustomerUser.email).where(CustomerUser.login == principal.login)
-        )
-    ).scalar_one_or_none()
-    language = (
-        await session.execute(
-            select(CustomerPreferences.preferences_value).where(
-                CustomerPreferences.user_id == principal.login,
-                CustomerPreferences.preferences_key == "UserLanguage",
+        mail = plan.emails.get(principal.user_id)
+        language = plan.languages.get(principal.user_id)
+    else:
+        mail = (
+            await session.execute(
+                select(CustomerUser.email).where(CustomerUser.login == principal.login)
             )
-        )
-    ).scalar_one_or_none()
-    return (normalise_address(email) if email else None), texts.text_locale(language)
+        ).scalar_one_or_none()
+        language = (
+            await session.execute(
+                select(CustomerPreferences.preferences_value).where(
+                    CustomerPreferences.user_id == principal.login,
+                    CustomerPreferences.preferences_key == "UserLanguage",
+                )
+            )
+        ).scalar_one_or_none()
+    return (normalise_address(mail) if mail else None), texts.text_locale(
+        language or plan.default_language
+    )
 
 
 async def _display_name(session: AsyncSession, principal: Principal) -> str:
@@ -232,7 +230,7 @@ async def _plan(
     if approval is None:  # erased with its ticket (GDPR) since the job was queued
         return _result(payload.approval_id, note="gone")
     settings = await load_approval_settings(session, ctx.settings)
-    sender = await _sender(session)
+    sender = await resolve_notification_sender_address(session)
     if sender is None:
         logger.warning("approval_mail_no_sender", approval_id=approval.id, kind=payload.kind)
         return _result(approval.id, note="no_sender")
@@ -270,7 +268,17 @@ async def _plan(
 
     if payload.include_substitutes and payload.kind in texts.ACTION_KINDS:
         recipients.extend(await _substitutes(session, approval, rows))
-    return _Plan(sender, settings, str(tn) if tn else None, hook, recipients)
+    agent_ids = sorted({r.principal.user_id for r in recipients if r.principal.user_id})
+    return _Plan(
+        sender,
+        settings,
+        str(tn) if tn else None,
+        hook,
+        recipients,
+        default_language=await SysConfig(session).default_language(),
+        emails=await bulk_get_preferences(session, agent_ids, "UserEmail"),
+        languages=await bulk_get_preferences(session, agent_ids, "UserLanguage"),
+    )
 
 
 async def _substitutes(
@@ -366,8 +374,8 @@ async def _decision_link(
     row: TiqoraApprovalApprover,
     step: TiqoraApprovalStep,
     now: datetime,
-) -> tuple[str, datetime] | None:
-    """``(url, expires_at)`` of a fresh decision link, or None when none may be mailed."""
+) -> tuple[str, datetime, str] | None:
+    """``(url, expires_at, digest)`` of a fresh link, or None when none may be mailed."""
     base = ctx.settings.public_base_url.strip().rstrip("/")
     if not base or not settings.email_links_enabled:
         return None
@@ -386,7 +394,7 @@ async def _decision_link(
             )
         )
     ).scalar_one()
-    return f"{base}/approve#t={token}", expires_at
+    return f"{base}/approve#t={token}", expires_at, tokens.link_digest(token)
 
 
 def _inbox_url(ctx: JobContext, settings: ApprovalSettings, principal: Principal) -> str | None:
@@ -482,13 +490,13 @@ async def _deliver(
         and not settings.customer_approvers_enabled
     ):
         return "skipped"
-    address, locale = await _address_and_language(session, recipient.principal)
+    address, locale = await _address_and_language(session, plan, recipient.principal)
     if address is None:
         logger.info("approval_mail_no_address", approval_id=approval.id, role=recipient.role)
         return "skipped"
 
     now = utc_now().replace(microsecond=0)
-    link: tuple[str, datetime] | None = None
+    link: tuple[str, datetime, str] | None = None
     if (
         recipient.role == "approver"
         and kind in _LINK_KINDS
@@ -526,20 +534,14 @@ async def _deliver(
         link=link[0] if link else None,
         expires=texts.moment_text(link[1], locale) if link else None,
         inbox_url=_inbox_url(ctx, settings, recipient.principal) if action else None,
+        inbox_hint=recipient.principal.kind == "agent" or settings.portal_approvals_enabled,
         age=age or None,
         name=name or None,
         status="rejected" if approval.status == "rejected" else "approved",
         substitute_for=substitute_for or None,
     )
     subject = clean_line(subject)
-    if plan.hook is not None and plan.hook.enabled and plan.tn:
-        subject = build_ticket_subject(
-            subject,
-            hook=plan.hook.hook,
-            divider=plan.hook.divider,
-            tn=plan.tn,
-            subject_format=plan.hook.subject_format,
-        )
+    subject = hooked_subject(subject, hook_cfg=plan.hook, tn=plan.tn or "")
     message = build_message(
         from_addr=plan.sender,
         to_addrs=address,
@@ -556,10 +558,19 @@ async def _deliver(
     if recipient.marker:
         detail["recipient"] = recipient.marker
     mailer = await mail_outbound.build_outbound_sender(session, settings=ctx.settings)
+    # the link row is committed before SMTP: no row lock is held while talking to the relay
+    await session.commit()
     try:
         await mailer.send(message, envelope_from="")
     except Exception as exc:  # noqa: BLE001 - classified below, never swallowed silently
-        await session.rollback()  # drops the link that was never mailed; expires the ORM rows
+        await session.rollback()  # expires the ORM rows: reload what is needed below
+        if link is not None:  # the link that was never mailed
+            await session.execute(
+                update(TiqoraApprovalToken)
+                .where(TiqoraApprovalToken.token_hash == link[2])
+                .values(revoked_at=utc_now().replace(microsecond=0))
+            )
+            await session.commit()
         permanent = is_permanent_smtp_failure(exc)
         await write_mail_log(
             session,
@@ -608,20 +619,31 @@ async def _deliver(
         from_addr=plan.sender,
         to_addr=address,
         subject=subject,
-        ticket_id=approval.ticket_id,
+        ticket_id=ticket_id,
         smtp_code=getattr(mailer, "last_smtp_code", None),
     )
+    sent_for = (
+        await session.execute(
+            select(TiqoraApproval)
+            .where(TiqoraApproval.id == approval_id)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
     await audit.record(
         session,
-        approval=approval,
+        approval=sent_for,
         action="notified",
         actor=Actor.system(),
         approver_id=recipient.approver_id,
         detail=detail,
         job_id=ctx.job_id,
     )
-    if row is not None:
-        row.last_notified_at = now
+    if recipient.approver_id is not None:
+        await session.execute(
+            update(TiqoraApprovalApprover)
+            .where(TiqoraApprovalApprover.id == recipient.approver_id)
+            .values(last_notified_at=now)
+        )
     await session.commit()
     return "sent"
 
