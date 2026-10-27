@@ -561,7 +561,7 @@ async def read_impact(
     )
 
     facts = await readable_tickets(
-        session, await _open_incident_ids(session, settings, service_ids), user_id=user_id
+        session, await _open_incident_ids(session, settings, shown_ids), user_id=user_id
     )
     newest = sorted(facts.values(), key=lambda f: f.ticket_id, reverse=True)
     incidents = [

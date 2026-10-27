@@ -681,6 +681,10 @@ async def test_impact_omits_unreadable_ci(url_fixture: str, request: pytest.Fixt
         await _link(w, ("ci", shown), ("ci", secret), "DependsOn")
         # a service that only the hidden CI leads to
         await _link(w, ("service", SERVICE_IMPACTED), ("ci", secret), "DependsOn")
+        # a readable incident on that hidden service must not name the service either
+        on_hidden = await _ticket(
+            w, queue_id=Q_A, type_name="Incident", state="open", service_id=SERVICE_IMPACTED
+        )
         await run_change_impact_job(_ctx(w), ChangeImpactPayload(ticket_id=tid, user_id=U_FULL))
         assert len(await _rows(w, tid)) == 4  # both CIs and both services are stored
 
@@ -701,6 +705,8 @@ async def test_impact_omits_unreadable_ci(url_fixture: str, request: pytest.Fixt
             assert [s["service_id"] for s in body["services"]] == [SERVICE]
             assert body["hidden_service_count"] == 1
             assert "chg94-service-impacted" not in res.text
+            assert on_hidden not in {i["ticket_id"] for i in body["incidents"]}
+            assert str(SERVICE_IMPACTED) not in {str(i["service_id"]) for i in body["incidents"]}
 
             # a user without ro on the change ticket gets the same 404 as for a missing one
         async with _client(w, U_NONE) as outsider:
