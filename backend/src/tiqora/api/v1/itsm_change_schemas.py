@@ -8,7 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.itsm.change.freeze import FreezeOccurrence
+from tiqora.itsm.change.freeze import Enforcement, FreezeOccurrences, Scope
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
 from tiqora.itsm.change.service import ChangeView
@@ -210,22 +210,34 @@ def template_summary(view: TemplateView) -> ChangeTemplateSummaryOut:
 class FreezeOccurrenceOut(BaseModel):
     freeze_id: int
     name: str
-    enforcement: Literal["block", "warn"]
+    enforcement: Enforcement
     allow_emergency: bool
-    scope: Literal["all", "services"]
+    scope: Scope
     service_ids: list[int]
     start: UtcDateTime
     end: UtcDateTime
 
 
-def freeze_occurrence_out(occ: FreezeOccurrence) -> FreezeOccurrenceOut:
-    return FreezeOccurrenceOut(
-        freeze_id=occ.freeze_id,
-        name=occ.name,
-        enforcement=occ.enforcement,  # type: ignore[arg-type]
-        allow_emergency=occ.allow_emergency,
-        scope=occ.scope,  # type: ignore[arg-type]
-        service_ids=sorted(occ.service_ids),
-        start=occ.start,
-        end=occ.end,
+class FreezeOccurrencesOut(BaseModel):
+    items: list[FreezeOccurrenceOut]
+    #: the answer was cut at the occurrence limit; ask for a shorter range
+    truncated: bool
+
+
+def freeze_occurrences_out(result: FreezeOccurrences) -> FreezeOccurrencesOut:
+    return FreezeOccurrencesOut(
+        items=[
+            FreezeOccurrenceOut(
+                freeze_id=o.freeze_id,
+                name=o.name,
+                enforcement=o.enforcement,
+                allow_emergency=o.allow_emergency,
+                scope=o.scope,
+                service_ids=sorted(o.service_ids),
+                start=o.start,
+                end=o.end,
+            )
+            for o in result.items
+        ],
+        truncated=result.truncated,
     )

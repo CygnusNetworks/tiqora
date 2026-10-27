@@ -20663,6 +20663,13 @@ export interface components {
              */
             start: string;
         };
+        /** FreezeOccurrencesOut */
+        FreezeOccurrencesOut: {
+            /** Items */
+            items: components["schemas"]["FreezeOccurrenceOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
         /** FreezeRecurrenceOut */
         FreezeRecurrenceOut: {
             /** Count */
@@ -20690,8 +20697,11 @@ export interface components {
              * Format: date-time
              */
             ends_at: string;
-            /** Enforcement */
-            enforcement: string;
+            /**
+             * Enforcement
+             * @enum {string}
+             */
+            enforcement: "block" | "warn";
             /** Id */
             id: number;
             /** Name */
@@ -20699,8 +20709,11 @@ export interface components {
             /** Note */
             note: string | null;
             recurrence: components["schemas"]["FreezeRecurrenceOut"] | null;
-            /** Scope */
-            scope: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "all" | "services";
             /** Service Ids */
             service_ids: number[];
             /**
@@ -56039,7 +56052,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FreezeOccurrenceOut"][];
+                    "application/json": components["schemas"]["FreezeOccurrencesOut"];
                 };
             };
             /** @description Validation Error */

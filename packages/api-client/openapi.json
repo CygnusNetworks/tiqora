@@ -20805,6 +20805,27 @@
         "title": "FreezeOccurrenceOut",
         "type": "object"
       },
+      "FreezeOccurrencesOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FreezeOccurrenceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "FreezeOccurrencesOut",
+        "type": "object"
+      },
       "FreezeRecurrenceOut": {
         "properties": {
           "count": {
@@ -20869,6 +20890,10 @@
             "type": "string"
           },
           "enforcement": {
+            "enum": [
+              "block",
+              "warn"
+            ],
             "title": "Enforcement",
             "type": "string"
           },
@@ -20902,6 +20927,10 @@
             ]
           },
           "scope": {
+            "enum": [
+              "all",
+              "services"
+            ],
             "title": "Scope",
             "type": "string"
           },
@@ -104468,11 +104497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/FreezeOccurrenceOut"
-                  },
-                  "title": "Response Get Freeze Windows Api V1 Itsm Freeze Windows Get",
-                  "type": "array"
+                  "$ref": "#/components/schemas/FreezeOccurrencesOut"
                 }
               }
             },

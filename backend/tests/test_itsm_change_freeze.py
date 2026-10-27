@@ -26,7 +26,7 @@ from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
 from tiqora.calendar.recurrence import MAX_OCCURRENCES
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
-from tiqora.itsm.change.freeze import FreezeIn, create_freeze, occurrences
+from tiqora.itsm.change.freeze import FreezeIn, FreezeOccurrence, create_freeze, occurrences
 
 pytestmark = pytest.mark.db
 
@@ -60,6 +60,10 @@ def make_client(w: ChangeWorld) -> Callable[[int, str], AsyncClient]:
         return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
     return build
+
+
+async def _items(w: ChangeWorld, start: datetime, end: datetime) -> list[FreezeOccurrence]:
+    return (await occurrences(w.session, start=start, end=end)).items
 
 
 def _body(**fields: Any) -> dict[str, Any]:
@@ -104,6 +108,17 @@ async def test_freeze_crud_admin_only(
         assert win["service_ids"] == sorted([SERVICE, SERVICE_B])
         assert win["starts_at"].startswith("2026-11-06T18:00:00")
         assert win["recurrence"]["type"] == "Weekly" and win["recurrence"]["count"] == 4
+        assert win["recurrence"]["until"] is None
+        dated = await admin.post(
+            ADMIN,
+            json=_body(
+                name="chg94-until",
+                recurrence={"type": "Daily", "until": "2026-12-24T12:00:00+01:00"},
+            ),
+        )
+        assert dated.status_code == 201, dated.text
+        assert dated.json()["recurrence"]["until"].startswith("2026-12-24T11:00:00")
+        assert (await admin.delete(f"{ADMIN}/{dated.json()['id']}")).status_code == 204
         assert win["created_by"] == ADMIN_ID
 
         got = (await admin.get(f"{ADMIN}/{win['id']}")).json()
@@ -178,7 +193,9 @@ async def test_occurrences_one_off_and_weekly(w: ChangeWorld) -> None:
         ),
         user_id=ADMIN_ID,
     )
-    occ = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 12, 31))
+    occ = (
+        await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 12, 31))
+    ).items
     mine = [o for o in occ if o.freeze_id == weekly.id]
     assert [(o.start, o.end) for o in mine] == [
         (datetime(2026, 11, 6, 18), datetime(2026, 11, 9, 6)),
@@ -194,15 +211,17 @@ async def test_occurrences_one_off_and_weekly(w: ChangeWorld) -> None:
     ]
     # sorted by start; a range inside the third weekend finds that one only
     assert [o.start for o in occ] == sorted(o.start for o in occ)
-    third = await occurrences(w.session, start=datetime(2026, 11, 21), end=datetime(2026, 11, 22))
+    third = (
+        await occurrences(w.session, start=datetime(2026, 11, 21), end=datetime(2026, 11, 22))
+    ).items
     assert [(o.freeze_id, o.start) for o in third] == [(weekly.id, datetime(2026, 11, 20, 18))]
     # a window that ended before the range, or starts after it, is not returned
     assert (
-        await occurrences(w.session, start=datetime(2026, 12, 2), end=datetime(2026, 12, 9)) == []
-    )
+        await occurrences(w.session, start=datetime(2026, 12, 2), end=datetime(2026, 12, 9))
+    ).items == []
     assert (
-        await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 11, 6)) == []
-    )
+        await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 11, 6))
+    ).items == []
 
 
 async def test_occurrences_skip_invalid(
@@ -211,15 +230,17 @@ async def test_occurrences_skip_invalid(
     await create_freeze(w.session, data=_data(name="chg94-off", valid=False), user_id=ADMIN_ID)
     live = await create_freeze(w.session, data=_data(name="chg94-on"), user_id=ADMIN_ID)
     rng = {"start": "2026-11-01T00:00:00Z", "end": "2026-11-30T00:00:00Z"}
-    occ = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 11, 30))
+    occ = (
+        await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 11, 30))
+    ).items
     assert [o.freeze_id for o in occ] == [live.id]
 
     async with make_client(U_FULL, "chg94-full") as agent:
         res = await agent.get(READ, params=rng)
         assert res.status_code == 200, res.text
-        assert [(o["freeze_id"], o["name"]) for o in res.json()] == [(live.id, "chg94-on")]
-        assert res.json()[0]["start"].startswith("2026-11-06T18:00:00")
-        assert res.json()[0]["service_ids"] == []
+        assert [(o["freeze_id"], o["name"]) for o in res.json()["items"]] == [(live.id, "chg94-on")]
+        assert res.json()["items"][0]["start"].startswith("2026-11-06T18:00:00")
+        assert res.json()["items"][0]["service_ids"] == []
     async with make_client(ADMIN_ID, "root@localhost") as admin:
         assert len((await admin.get(ADMIN)).json()) == 2  # the admin list keeps invalid ones
 
@@ -233,12 +254,16 @@ async def test_occurrences_bounded(
         "recurrence": {"type": "Daily", "interval": 1},
     }
     await create_freeze(w.session, data=_data(name="chg94-d1", **daily), user_id=ADMIN_ID)
-    one = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2036, 11, 1))
+    one = (
+        await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2036, 11, 1))
+    ).items
     assert 0 < len(one) <= MAX_OCCURRENCES
     # many series together stay under the same bound
     await create_freeze(w.session, data=_data(name="chg94-d2", **daily), user_id=ADMIN_ID)
     await create_freeze(w.session, data=_data(name="chg94-d3", **daily), user_id=ADMIN_ID)
-    many = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2036, 11, 1))
+    many = (
+        await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2036, 11, 1))
+    ).items
     assert len(many) == MAX_OCCURRENCES
     assert [o.start for o in many] == sorted(o.start for o in many)
 
@@ -255,4 +280,87 @@ async def test_occurrences_bounded(
         ok = await agent.get(
             READ, params={"start": "2026-11-01T00:00:00Z", "end": "2027-01-31T00:00:00Z"}
         )
-        assert ok.status_code == 200 and len(ok.json()) == 3 * 86  # three series, 86 days
+        assert (
+            ok.status_code == 200
+            and len(ok.json()["items"]) == 3 * 86
+            and ok.json()["truncated"] is False
+        )  # three series, 86 days
+
+
+async def test_old_series_reach_the_range(w: ChangeWorld) -> None:
+    # a nightly window that began ~10 years before the range still blocks (the calendar helper
+    # alone stops after 2000 steps from the series start, i.e. ~5.5 years)
+    old = await create_freeze(
+        w.session,
+        data=_data(
+            name="chg94-nightly",
+            starts_at="2016-11-06T22:00:00Z",
+            ends_at="2016-11-07T02:00:00Z",
+            recurrence={"type": "Daily", "interval": 1},
+        ),
+        user_id=ADMIN_ID,
+    )
+    weekly = await create_freeze(
+        w.session,
+        data=_data(
+            name="chg94-old-weekly",
+            starts_at="2016-11-04T18:00:00Z",  # Friday
+            ends_at="2016-11-07T06:00:00Z",
+            recurrence={"type": "Weekly", "interval": 2},
+        ),
+        user_id=ADMIN_ID,
+    )
+    result = await occurrences(w.session, start=datetime(2026, 11, 8), end=datetime(2026, 11, 10))
+    assert not result.truncated
+    nightly = [(o.start, o.end) for o in result.items if o.freeze_id == old.id]
+    assert nightly == [
+        (datetime(2026, 11, 7, 22), datetime(2026, 11, 8, 2)),
+        (datetime(2026, 11, 8, 22), datetime(2026, 11, 9, 2)),
+        (datetime(2026, 11, 9, 22), datetime(2026, 11, 10, 2)),
+    ]
+    # every second Friday from 2016-11-04: 2026-11-06 is 522 weeks later (an even number), so
+    # that weekend is a freeze, the next one is not
+    assert [o.start for o in result.items if o.freeze_id == weekly.id] == [
+        datetime(2026, 11, 6, 18)
+    ]
+    other = await occurrences(w.session, start=datetime(2026, 11, 14), end=datetime(2026, 11, 16))
+    assert [o for o in other.items if o.freeze_id == weekly.id] == []
+    # a counted series that ran out before the range yields nothing
+    done = await create_freeze(
+        w.session,
+        data=_data(
+            name="chg94-done",
+            starts_at="2016-11-06T22:00:00Z",
+            ends_at="2016-11-07T02:00:00Z",
+            recurrence={"type": "Daily", "interval": 1, "count": 30},
+        ),
+        user_id=ADMIN_ID,
+    )
+    again = await occurrences(w.session, start=datetime(2026, 11, 8), end=datetime(2026, 11, 10))
+    assert [o for o in again.items if o.freeze_id == done.id] == []
+
+
+async def test_occurrences_truncated_flag(
+    w: ChangeWorld, make_client: Callable[[int, str], AsyncClient]
+) -> None:
+    daily: dict[str, Any] = {
+        "starts_at": "2026-11-06T18:00:00Z",
+        "ends_at": "2026-11-06T19:00:00Z",
+        "recurrence": {"type": "Daily", "interval": 1},
+    }
+    await create_freeze(w.session, data=_data(name="chg94-t1", **daily), user_id=ADMIN_ID)
+    short = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2026, 12, 1))
+    assert len(short.items) == 25 and not short.truncated
+    long = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2036, 11, 1))
+    assert len(long.items) == MAX_OCCURRENCES and long.truncated  # one series hit its limit
+    await create_freeze(w.session, data=_data(name="chg94-t2", **daily), user_id=ADMIN_ID)
+    await create_freeze(w.session, data=_data(name="chg94-t3", **daily), user_id=ADMIN_ID)
+    # three series of ~1000 each fit no single-series limit but overflow the total
+    mid = await occurrences(w.session, start=datetime(2026, 11, 1), end=datetime(2029, 8, 1))
+    assert len(mid.items) == MAX_OCCURRENCES and mid.truncated
+
+    async with make_client(U_FULL, "chg94-full") as agent:
+        res = await agent.get(
+            READ, params={"start": "2026-11-01T00:00:00Z", "end": "2027-01-31T00:00:00Z"}
+        )
+        assert res.status_code == 200 and res.json()["truncated"] is False

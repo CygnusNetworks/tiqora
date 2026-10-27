@@ -6,7 +6,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.itsm.change.freeze import FreezeView
+from tiqora.itsm.change.freeze import Enforcement, FreezeView, Scope
 from tiqora.itsm.change.phases import ChangeType
 from tiqora.itsm.change.templates import TemplateDefaults, TemplateTask, TemplateView
 
@@ -43,9 +43,9 @@ class FreezeWindowOut(BaseModel):
     id: int
     name: str
     note: str | None
-    enforcement: str
+    enforcement: Enforcement
     allow_emergency: bool
-    scope: str
+    scope: Scope
     service_ids: list[int]
     starts_at: UtcDateTime
     ends_at: UtcDateTime

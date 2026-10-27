@@ -15,8 +15,8 @@ import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Annotated, Literal, Self
+from datetime import datetime, timedelta
+from typing import Annotated, Literal, Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from sqlalchemy import delete, select
@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 MAX_FREEZE_SERVICES = 200
 
+Enforcement = Literal["block", "warn"]
+Scope = Literal["all", "services"]
+
 
 class FreezeIn(BaseModel):
     """Body of the admin create/update."""
@@ -42,9 +45,9 @@ class FreezeIn(BaseModel):
 
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     note: str | None = Field(default=None, max_length=5000)
-    enforcement: Literal["block", "warn"] = "block"
+    enforcement: Enforcement = "block"
     allow_emergency: bool = True
-    scope: Literal["all", "services"] = "all"
+    scope: Scope = "all"
     service_ids: list[int] = Field(default_factory=list, max_length=MAX_FREEZE_SERVICES)
     starts_at: datetime
     ends_at: datetime
@@ -54,7 +57,7 @@ class FreezeIn(BaseModel):
     @model_validator(mode="after")
     def _window(self) -> Self:
         if to_utc_naive(self.ends_at) <= to_utc_naive(self.starts_at):
-            raise ValueError("ends_at must be after starts_at")
+            raise ValueError("Das Ende des Sperrzeitraums muss nach dem Beginn liegen.")
         return self
 
 
@@ -69,9 +72,9 @@ class FreezeView(BaseModel):
     id: int
     name: str
     note: str | None
-    enforcement: str
+    enforcement: Enforcement
     allow_emergency: bool
-    scope: str
+    scope: Scope
     service_ids: list[int]
     starts_at: datetime
     ends_at: datetime
@@ -87,12 +90,21 @@ class FreezeView(BaseModel):
 class FreezeOccurrence:
     freeze_id: int
     name: str
-    enforcement: str
+    enforcement: Enforcement
     allow_emergency: bool
-    scope: str
+    scope: Scope
     service_ids: frozenset[int]
     start: datetime
     end: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class FreezeOccurrences:
+    """``truncated``: the result hit ``MAX_OCCURRENCES`` (one series or all together), so later
+    occurrences are missing; callers narrow the range or treat the answer as incomplete."""
+
+    items: list[FreezeOccurrence]
+    truncated: bool
 
 
 def _view(row: TiqoraItsmChangeFreeze, service_ids: Sequence[int]) -> FreezeView:
@@ -108,9 +120,9 @@ def _view(row: TiqoraItsmChangeFreeze, service_ids: Sequence[int]) -> FreezeView
         id=row.id,
         name=row.name,
         note=row.note,
-        enforcement=row.enforcement,
+        enforcement=cast(Enforcement, row.enforcement),
         allow_emergency=row.allow_emergency,
-        scope=row.scope,
+        scope=cast(Scope, row.scope),
         service_ids=sorted(service_ids),
         starts_at=row.starts_at,
         ends_at=row.ends_at,
@@ -237,12 +249,38 @@ async def delete_freeze(session: AsyncSession, *, freeze_id: int) -> None:
     await session.flush()
 
 
+def _fast_forward(
+    row: TiqoraItsmChangeFreeze, range_start: datetime
+) -> tuple[datetime, datetime, int | None] | None:
+    """Start, end and remaining count of the first occurrence that can reach the range.
+
+    ``expand_occurrences`` stops after ``MAX_OCCURRENCES`` steps counted from the series start, so
+    a daily window that began years ago would never reach the range. Daily and weekly steps are
+    fixed spans of UTC time (ruling F35), so they are skipped arithmetically. Monthly and yearly
+    steps clamp the day of the month one step at a time and keep their start (166 years of reach).
+    ``None``: the series is used up before the range.
+    """
+    count = row.recur_count
+    if row.recur_type not in ("Daily", "Weekly"):
+        return row.starts_at, row.ends_at, count
+    unit = timedelta(days=1) if row.recur_type == "Daily" else timedelta(weeks=1)
+    step = unit * max(row.recur_interval or 1, 1)
+    skip = max((range_start - row.ends_at) // step, 0)
+    if count is not None and skip >= count:
+        return None
+    return (
+        row.starts_at + skip * step,
+        row.ends_at + skip * step,
+        None if count is None else count - skip,
+    )
+
+
 async def occurrences(
     session: AsyncSession, *, start: datetime, end: datetime
-) -> list[FreezeOccurrence]:
+) -> FreezeOccurrences:
     """Occurrences of the valid windows that overlap ``[start, end)`` (naive UTC), by start.
 
-    Never more than ``MAX_OCCURRENCES`` in total, however many windows recur.
+    Never more than ``MAX_OCCURRENCES`` in total; ``truncated`` says when that cut something off.
     """
     range_start, range_end = to_utc_naive(start), to_utc_naive(end)
     rows = list(
@@ -256,33 +294,43 @@ async def occurrences(
     )
     services = await _services_of(session, [r.id for r in rows])
     out: list[FreezeOccurrence] = []
+    truncated = False
     for row in rows:
+        forwarded = _fast_forward(row, range_start)
+        if forwarded is None:
+            continue
+        first_start, first_end, count = forwarded
         sids = frozenset(services.get(row.id, ()))
+        found = 0
         for occ in expand_occurrences(
-            start_time=row.starts_at,
-            end_time=row.ends_at,
+            start_time=first_start,
+            end_time=first_end,
             recur_type=row.recur_type,
             recur_interval=row.recur_interval,
-            recur_count=row.recur_count,
+            recur_count=count,
             recur_until=row.recur_until,
             exclude=None,
             range_start=range_start,
             range_end=range_end,
         ):
+            found += 1
             out.append(
                 FreezeOccurrence(
                     freeze_id=row.id,
                     name=row.name,
-                    enforcement=row.enforcement,
+                    enforcement=cast(Enforcement, row.enforcement),
                     allow_emergency=row.allow_emergency,
-                    scope=row.scope,
+                    scope=cast(Scope, row.scope),
                     service_ids=sids,
                     start=occ.start,
                     end=occ.end,
                 )
             )
+        truncated = truncated or found >= MAX_OCCURRENCES
     out.sort(key=lambda o: (o.start, o.freeze_id))
     if len(out) > MAX_OCCURRENCES:
-        logger.warning("freeze occurrences truncated to %d", MAX_OCCURRENCES)
         del out[MAX_OCCURRENCES:]
-    return out
+        truncated = True
+    if truncated:
+        logger.warning("freeze occurrences truncated to %d", MAX_OCCURRENCES)
+    return FreezeOccurrences(out, truncated)

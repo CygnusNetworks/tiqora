@@ -21,12 +21,12 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeOut,
     ChangeStatusOut,
     ChangeTemplateSummaryOut,
-    FreezeOccurrenceOut,
+    FreezeOccurrencesOut,
     TaskOrderIn,
     TaskOut,
     change_out,
     event_out,
-    freeze_occurrence_out,
+    freeze_occurrences_out,
     task_out,
     template_summary,
 )
@@ -99,14 +99,14 @@ async def get_change_templates(
     return [template_summary(v) for v in await list_templates(session, include_invalid=False)]
 
 
-@router.get("/freeze-windows", response_model=list[FreezeOccurrenceOut])
+@router.get("/freeze-windows", response_model=FreezeOccurrencesOut)
 async def get_freeze_windows(
     user: CurrentUser,
     session: DbSession,
     settings: AppSettings,
     start: Annotated[datetime, Query()],
     end: Annotated[datetime, Query()],
-) -> list[FreezeOccurrenceOut]:
+) -> FreezeOccurrencesOut:
     """Occurrences of the valid freeze windows that overlap ``[start, end)``; times are UTC."""
     _ = user
     await require_change_mode(session, settings)
@@ -115,7 +115,7 @@ async def get_freeze_windows(
         raise ChangeError("range_invalid", 422)
     if hi - lo > MAX_RANGE:
         raise ChangeError("range_too_large", 422)
-    return [freeze_occurrence_out(o) for o in await occurrences(session, start=lo, end=hi)]
+    return freeze_occurrences_out(await occurrences(session, start=lo, end=hi))
 
 
 @router.post("/changes", response_model=ChangeCreatedOut, status_code=status.HTTP_201_CREATED)
