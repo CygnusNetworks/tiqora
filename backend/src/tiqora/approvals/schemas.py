@@ -311,3 +311,107 @@ class PortalApprovalOut(BaseModel):
     my_status: str
     my_decision: str | None = None
     can_decide: bool
+
+
+# --- admin (A13 admin rows) ------------------------------------------------------------
+
+
+class ApprovalAdminItemOut(BaseModel):
+    """One row of the admin overview: any request, whoever may see it."""
+
+    id: int
+    ticket_id: int
+    ticket_number: str | None = None
+    ticket_title: str | None = None
+    subject_type: str
+    subject_ref: str | None = None
+    approval_key: str
+    title: str
+    status: str
+    reason: str | None = None
+    current_stage: int | None = None
+    #: name of the first active step (None once the request is closed)
+    step_name: str | None = None
+    #: approver rows still waiting for a vote
+    open_approvers: int
+    #: an active step is past its deadline
+    overdue: bool
+    requester_label: str
+    created_at: UtcDateTime
+    decided_at: UtcDateTime | None = None
+    can_cancel: bool
+
+
+class ApprovalAdminPage(BaseModel):
+    items: list[ApprovalAdminItemOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class ApprovalTemplateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    template_key: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(None, max_length=20000)
+    #: empty = every subject type
+    subject_types: list[str] = Field(default_factory=list, max_length=50)
+    definition: ApprovalDefinition
+    valid: bool = True
+
+
+class ApprovalTemplateOut(BaseModel):
+    id: int
+    template_key: str
+    name: str
+    description: str | None = None
+    subject_types: list[str]
+    definition: ApprovalDefinition
+    origin: str
+    valid: bool
+    #: approvers the definition names that no longer exist (they do not block saving)
+    warnings: list[str]
+
+
+class DefinitionCheckIn(BaseModel):
+    """The definition is a plain object here: a broken one is answered in ``errors``, not 422."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    definition: dict[str, Any]
+    subject_type: str | None = Field(None, max_length=64)
+
+
+class DefinitionCheckOut(BaseModel):
+    errors: list[str]
+    warnings: list[str]
+
+
+class ApprovalListIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=190)
+    description: str | None = Field(None, max_length=20000)
+    member_ids: list[int] = Field(default_factory=list, max_length=500)
+    valid: bool = True
+
+
+class ApprovalListMemberOut(BaseModel):
+    id: int
+    label: str
+
+
+class ApprovalListOut(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    valid: bool
+    member_ids: list[int]
+    members: list[ApprovalListMemberOut]
+
+
+class AdminDelegationIn(DelegationIn):
+    """An admin names the delegator as well (``user_id`` = whose decisions are delegated)."""
+
+    user_id: int = Field(ge=1)
