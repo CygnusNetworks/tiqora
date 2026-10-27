@@ -450,3 +450,17 @@ def test_cab_prefixes_share_the_tickets_area_with_changes() -> None:
         assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=path)
         assert not scopes_allow(frozenset({"cmdb:rw"}), method="GET", path=path)
         assert not scopes_allow(frozenset({"tickets:ro"}), method="PUT", path=path)
+
+
+def test_change_related_and_create_from_routes_need_tickets_scope() -> None:
+    """Related tickets and create-from show ticket titles and write links: ``tickets`` area."""
+    for method, path in (
+        ("GET", "/api/v1/itsm/changes/3/related"),
+        ("POST", "/api/v1/itsm/changes/3/related"),
+        ("DELETE", "/api/v1/itsm/changes/3/related/4"),
+        ("POST", "/api/v1/tickets/3/change/create-from"),
+    ):
+        assert path_to_area(path) == "tickets"
+        assert scopes_allow(frozenset({"tickets:rw"}), method=method, path=path)
+        assert not scopes_allow(frozenset({"cmdb:rw"}), method=method, path=path)
+        assert not scopes_allow(frozenset({"tickets:ro"}), method="POST", path=path)

@@ -9837,6 +9837,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/changes/{ticket_id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Related
+         * @description Incidents, problems and other tickets linked to the change (tasks and unreadable
+         *     tickets left out).
+         */
+        get: operations["get_change_related_api_v1_itsm_changes__ticket_id__related_get"];
+        put?: never;
+        /**
+         * Post Change Related
+         * @description Link another ticket to the change (``rw`` on the change, ``ro`` on the other).
+         */
+        post: operations["post_change_related_api_v1_itsm_changes__ticket_id__related_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/related/{other_ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Change Related
+         * @description Remove the link between the change and another ticket.
+         */
+        delete: operations["delete_change_related_api_v1_itsm_changes__ticket_id__related__other_ticket_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/changes/{ticket_id}/risk": {
         parameters: {
             query?: never;
@@ -13146,6 +13191,27 @@ export interface paths {
          * @description Make an existing ticket of the change type a change (phase ``draft``).
          */
         post: operations["post_ticket_change_api_v1_tickets__ticket_id__change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/change/create-from": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Ticket Change Create From
+         * @description A new change from this ticket (``ro``): service, CIs and customer are prefilled and the
+         *     two are linked.
+         */
+        post: operations["post_ticket_change_create_from_api_v1_tickets__ticket_id__change_create_from_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17344,6 +17410,8 @@ export interface components {
             ci_refs?: string[];
             /** Customer User Id */
             customer_user_id?: string | null;
+            /** From Ticket Id */
+            from_ticket_id?: number | null;
             /** Planned End */
             planned_end?: string | null;
             /** Planned Start */
@@ -27028,6 +27096,33 @@ export interface components {
              * @enum {string}
              */
             kind: "ci" | "service" | "customer_user" | "customer_company" | "attachment" | "queue" | "agent" | "url";
+        };
+        /** RelatedLinkIn */
+        RelatedLinkIn: {
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /** RelatedTicketOut */
+        RelatedTicketOut: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** Role */
+            role: string | null;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /** RelativeTimeRange */
         RelativeTimeRange: {
@@ -57317,6 +57412,116 @@ export interface operations {
             };
         };
     };
+    get_change_related_api_v1_itsm_changes__ticket_id__related_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedTicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_related_api_v1_itsm_changes__ticket_id__related_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelatedLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedTicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_change_related_api_v1_itsm_changes__ticket_id__related__other_ticket_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                other_ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedTicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_change_risk_api_v1_itsm_changes__ticket_id__risk_get: {
         parameters: {
             query?: never;
@@ -64003,6 +64208,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ticket_change_create_from_api_v1_tickets__ticket_id__change_create_from_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeCreatedOut"];
                 };
             };
             /** @description Validation Error */

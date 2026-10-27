@@ -9714,6 +9714,17 @@
             ],
             "title": "Customer User Id"
           },
+          "from_ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Ticket Id"
+          },
           "planned_end": {
             "anyOf": [
               {
@@ -38349,6 +38360,78 @@
           "key"
         ],
         "title": "RefLinkOut",
+        "type": "object"
+      },
+      "RelatedLinkIn": {
+        "properties": {
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id"
+        ],
+        "title": "RelatedLinkIn",
+        "type": "object"
+      },
+      "RelatedTicketOut": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "state_type": {
+            "title": "State Type",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "state",
+          "state_type",
+          "role",
+          "link_type",
+          "direction"
+        ],
+        "title": "RelatedTicketOut",
         "type": "object"
       },
       "RelativeTimeRange": {
@@ -106662,6 +106745,260 @@
         ]
       }
     },
+    "/api/v1/itsm/changes/{ticket_id}/related": {
+      "get": {
+        "description": "Incidents, problems and other tickets linked to the change (tasks and unreadable\ntickets left out).",
+        "operationId": "get_change_related_api_v1_itsm_changes__ticket_id__related_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelatedTicketOut"
+                  },
+                  "title": "Response Get Change Related Api V1 Itsm Changes  Ticket Id  Related Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Related",
+        "tags": [
+          "itsm-change"
+        ]
+      },
+      "post": {
+        "description": "Link another ticket to the change (``rw`` on the change, ``ro`` on the other).",
+        "operationId": "post_change_related_api_v1_itsm_changes__ticket_id__related_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelatedLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelatedTicketOut"
+                  },
+                  "title": "Response Post Change Related Api V1 Itsm Changes  Ticket Id  Related Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Change Related",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/related/{other_ticket_id}": {
+      "delete": {
+        "description": "Remove the link between the change and another ticket.",
+        "operationId": "delete_change_related_api_v1_itsm_changes__ticket_id__related__other_ticket_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "other_ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Other Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelatedTicketOut"
+                  },
+                  "title": "Response Delete Change Related Api V1 Itsm Changes  Ticket Id  Related  Other Ticket Id  Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Change Related",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
     "/api/v1/itsm/changes/{ticket_id}/risk": {
       "get": {
         "description": "Questionnaire, answers and the stored risk evaluation; references the caller cannot read\nare left out of the findings and only counted.",
@@ -123727,6 +124064,91 @@
           }
         },
         "summary": "Post Ticket Change",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/change/create-from": {
+      "post": {
+        "description": "A new change from this ticket (``ro``): service, CIs and customer are prefilled and the\ntwo are linked.",
+        "operationId": "post_ticket_change_create_from_api_v1_tickets__ticket_id__change_create_from_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Ticket Change Create From",
         "tags": [
           "itsm-change"
         ]

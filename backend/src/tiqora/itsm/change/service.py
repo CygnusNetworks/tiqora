@@ -163,6 +163,9 @@ class ChangeView:
 
 class ChangeCreateIn(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
+    #: create from this incident/problem/any readable ticket: prefills what is left out and links
+    #: the two (``related.create_from_ticket``)
+    from_ticket_id: int | None = None
     change_type: ChangeType
     #: required unless ``change_queue_id`` is set
     queue_id: int | None = None
@@ -540,6 +543,18 @@ async def create_change(
         template_view,
     )
 
+    if data.from_ticket_id is not None:
+        from tiqora.itsm.change.related import create_from_ticket
+
+        return await create_from_ticket(
+            session,
+            settings,
+            sysconfig,
+            source_ticket_id=data.from_ticket_id,
+            data=data,
+            user_id=user_id,
+            session_factory=session_factory,
+        )
     await require_change_mode(session, settings)
     cfg = await load_change_settings(session, settings)
     itsm_cfg = await load_itsm_settings(session, settings)

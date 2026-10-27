@@ -28,6 +28,8 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeTemplateSummaryOut,
     FreezeOccurrencesOut,
     MeetingOut,
+    RelatedLinkIn,
+    RelatedTicketOut,
     TaskOrderIn,
     TaskOut,
     approval_out,
@@ -37,6 +39,7 @@ from tiqora.api.v1.itsm_change_schemas import (
     event_out,
     freeze_occurrences_out,
     meeting_out,
+    related_out,
     task_out,
     template_summary,
 )
@@ -64,6 +67,12 @@ from tiqora.itsm.change.impact import (
     read_impact,
 )
 from tiqora.itsm.change.phases import FINAL_PHASES
+from tiqora.itsm.change.related import (
+    create_from_ticket,
+    link_related,
+    list_related,
+    unlink_related,
+)
 from tiqora.itsm.change.risk import (
     ChangeRiskOut,
     evaluate_risk,
@@ -548,5 +557,87 @@ async def post_ticket_change(
         user_id=user.id,
     )
     out = change_out(view)
+    await session.commit()
+    return out
+
+
+@ticket_router.post(
+    "/{ticket_id}/change/create-from",
+    response_model=ChangeCreatedOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_ticket_change_create_from(
+    ticket_id: int,
+    body: ChangeCreateIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)],
+) -> ChangeCreatedOut:
+    """A new change from this ticket (``ro``): service, CIs and customer are prefilled and the
+    two are linked."""
+    if body.from_ticket_id not in (None, ticket_id):
+        raise ChangeError("from_ticket_mismatch", 422)
+    view, tasks_job_id = await create_from_ticket(
+        session,
+        settings,
+        SysConfig(session),
+        source_ticket_id=ticket_id,
+        data=body,
+        user_id=user.id,
+        session_factory=factory,
+    )
+    out = change_out(view)
+    await session.commit()
+    return ChangeCreatedOut(change=out, tasks_job_id=tasks_job_id)
+
+
+@router.get("/changes/{ticket_id:int}/related", response_model=list[RelatedTicketOut])
+async def get_change_related(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> list[RelatedTicketOut]:
+    """Incidents, problems and other tickets linked to the change (tasks and unreadable
+    tickets left out)."""
+    items = await list_related(session, settings, ticket_id=ticket_id, user_id=user.id)
+    return [related_out(i) for i in items]
+
+
+@router.post(
+    "/changes/{ticket_id:int}/related",
+    response_model=list[RelatedTicketOut],
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_change_related(
+    ticket_id: int,
+    body: RelatedLinkIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> list[RelatedTicketOut]:
+    """Link another ticket to the change (``rw`` on the change, ``ro`` on the other)."""
+    items = await link_related(
+        session, settings, ticket_id=ticket_id, other_ticket_id=body.ticket_id, user_id=user.id
+    )
+    out = [related_out(i) for i in items]
+    await session.commit()
+    return out
+
+
+@router.delete(
+    "/changes/{ticket_id:int}/related/{other_ticket_id:int}",
+    response_model=list[RelatedTicketOut],
+)
+async def delete_change_related(
+    ticket_id: int,
+    other_ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> list[RelatedTicketOut]:
+    """Remove the link between the change and another ticket."""
+    items = await unlink_related(
+        session, settings, ticket_id=ticket_id, other_ticket_id=other_ticket_id, user_id=user.id
+    )
+    out = [related_out(i) for i in items]
     await session.commit()
     return out

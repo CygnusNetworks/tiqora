@@ -22,6 +22,7 @@ from tiqora.itsm.change.cab import (
 from tiqora.itsm.change.freeze import Enforcement, FreezeOccurrences, Scope
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
+from tiqora.itsm.change.related import RelatedTicket
 from tiqora.itsm.change.service import ChangeView
 from tiqora.itsm.change.tasks import TaskKind, TaskView
 from tiqora.itsm.change.templates import TemplateDefaults, TemplateView
@@ -100,6 +101,36 @@ class ChangeEventOut(BaseModel):
 
 class AdoptIn(BaseModel):
     change_type: ChangeType
+
+
+class RelatedTicketOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    state: str
+    state_type: str
+    #: ITSM role of the ticket type: incident, major_incident, problem, …
+    role: str | None
+    link_type: str
+    #: the change's side of the link
+    direction: Literal["source", "target"]
+
+
+class RelatedLinkIn(BaseModel):
+    ticket_id: int
+
+
+def related_out(item: RelatedTicket) -> RelatedTicketOut:
+    return RelatedTicketOut(
+        ticket_id=item.ticket_id,
+        tn=item.tn,
+        title=item.title,
+        state=item.state,
+        state_type=item.state_type,
+        role=item.role,
+        link_type=item.link_type,
+        direction=item.direction,
+    )
 
 
 def change_out(view: ChangeView) -> ChangeOut:
