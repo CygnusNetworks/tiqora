@@ -1,0 +1,271 @@
+"""Customer portal: approvals the logged-in customer is an approver of (A13 portal rows).
+
+``/api/portal/approvals``. Customers only ever see requests they hold an approver row on, and only
+while they are still inside the ticket's company (A7b, re-checked on every read). Everything else
+is 404 ``approval_not_found``, the same body as a request that does not exist. A request shows its
+own step and rule, the customer's own row and vote; never other approvers or other comments.
+The whole router is 404 unless customer approvers and portal approvals are switched on.
+"""
+
+from __future__ import annotations
+
+from typing import Annotated, Literal, NoReturn
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.portal.deps import CurrentCustomer
+from tiqora.approvals import access, inbox, notify, service
+from tiqora.approvals.contract import Actor, ApprovalError, Principal
+from tiqora.approvals.models import (
+    TiqoraApproval,
+    TiqoraApprovalApprover,
+    TiqoraApprovalStep,
+    TiqoraApprovalVote,
+)
+from tiqora.approvals.resolve import canonical_principal, customer_in_ticket_company
+from tiqora.approvals.schemas import (
+    PortalApprovalItemOut,
+    PortalApprovalOut,
+    PortalApprovalPage,
+    PortalDecisionIn,
+)
+from tiqora.approvals.settings import load_approval_settings
+from tiqora.domain.customer_auth import AuthenticatedCustomer
+from tiqora.domain.portal_gate import portal_enabled
+from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
+
+_PAGE_SCAN = 100  # decided rows are scanned in pages of this size (the company filter is Python)
+
+
+def _not_found() -> NoReturn:
+    raise HTTPException(
+        status.HTTP_404_NOT_FOUND, detail={"code": "approval_not_found", "detail": None}
+    )
+
+
+async def require_portal_approvals(session: DbSession, settings: AppSettings) -> None:
+    """404 unless customers may approve, portal approvals are on and the portal itself is on."""
+    cfg = await load_approval_settings(session, settings)
+    if not (
+        cfg.customer_approvers_enabled
+        and cfg.portal_approvals_enabled
+        and await portal_enabled(session, settings)
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+
+router = APIRouter(
+    prefix="/approvals",
+    tags=["portal-approvals"],
+    dependencies=[Depends(require_portal_approvals)],
+)
+
+
+class _CompanyGate:
+    """Whether the customer is inside a ticket's company, one lookup per ticket."""
+
+    def __init__(self, session: AsyncSession, login: str) -> None:
+        self._session = session
+        self._login = login
+        self._seen: dict[int, bool] = {}
+
+    async def __call__(self, ticket_id: int) -> bool:
+        if ticket_id not in self._seen:
+            self._seen[ticket_id] = await customer_in_ticket_company(
+                self._session, self._login, ticket_id
+            )
+        return self._seen[ticket_id]
+
+
+async def _key(session: AsyncSession, customer: AuthenticatedCustomer) -> str:
+    return (await canonical_principal(session, Principal.customer(customer.login))).key
+
+
+def _item(item: inbox.InboxItem) -> PortalApprovalItemOut:
+    return PortalApprovalItemOut(
+        id=item.approval_id,
+        title=item.title,
+        ticket_number=item.ticket_number,
+        ticket_title=item.ticket_title,
+        status=item.status,
+        step_name=item.step_name,
+        due_at=item.due_at,
+        my_status="pending" if item.my_decision is None else item.my_decision,
+        my_decision=item.my_decision,
+        decided_at=item.decided_at,
+        can_decide=item.can_vote,
+    )
+
+
+@router.get("", response_model=PortalApprovalPage)
+async def list_approvals(
+    customer: CurrentCustomer,
+    session: DbSession,
+    state: Annotated[Literal["pending", "decided"], Query()] = "pending",
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PortalApprovalPage:
+    """The customer's open ("pending") or already decided requests, inside their company."""
+    key = await _key(session, customer)
+    actor = Actor.customer(customer.login)
+    in_company = _CompanyGate(session, customer.login)
+    if state == "pending":
+        rows = [
+            r
+            for r in await inbox._pending_rows(session, actor)
+            if await in_company(r.approval.ticket_id)
+        ]  # noqa: SLF001
+        items = await inbox._items(session, key, rows[offset : offset + limit], pending=True)  # noqa: SLF001
+        total = len(rows)
+    else:
+        kept: list[inbox._Row] = []  # noqa: SLF001
+        scanned, seen_total = 0, 1
+        while scanned < seen_total:
+            page, seen_total = await inbox._decided_rows(
+                session, key, limit=_PAGE_SCAN, offset=scanned
+            )  # noqa: SLF001
+            scanned += _PAGE_SCAN
+            for found in page:
+                if await in_company(found.approval.ticket_id):
+                    kept.append(found)
+        items = await inbox._items(session, key, kept[offset : offset + limit])  # noqa: SLF001
+        total = len(kept)
+    await session.rollback()  # read only: end the transaction
+    return PortalApprovalPage(
+        items=[_item(i) for i in items], total=total, limit=limit, offset=offset
+    )
+
+
+async def _own_row(
+    session: AsyncSession, approval_id: int, key: str
+) -> tuple[TiqoraApproval, inbox._Row] | None:  # noqa: SLF001
+    """The request and the customer's most relevant row on it (open one first), or None."""
+    approval = (
+        await session.execute(
+            select(TiqoraApproval)
+            .where(TiqoraApproval.id == approval_id)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if approval is None:
+        return None
+    result = await session.execute(
+        select(TiqoraApprovalApprover, TiqoraApprovalStep)
+        .join(TiqoraApprovalStep, TiqoraApprovalStep.id == TiqoraApprovalApprover.step_id)
+        .where(
+            TiqoraApprovalApprover.approval_id == approval_id,
+            TiqoraApprovalApprover.principal == key,
+        )
+        .order_by(TiqoraApprovalApprover.id)
+        .execution_options(populate_existing=True)
+    )
+    pairs = list(result)
+    if not pairs:
+        return None
+    open_pairs = [p for p in pairs if p[0].status == "pending" and p[1].status == "active"]
+    row, step = open_pairs[0] if open_pairs else pairs[-1]
+    vote = (
+        await session.execute(
+            select(TiqoraApprovalVote).where(TiqoraApprovalVote.approver_id == row.id)
+        )
+    ).scalar_one_or_none()
+    return approval, inbox._Row(row, step, approval, vote)  # noqa: SLF001
+
+
+async def _out(
+    session: AsyncSession,
+    customer: AuthenticatedCustomer,
+    approval_id: int,
+    *,
+    require_company: bool,
+) -> PortalApprovalOut:
+    key = await _key(session, customer)
+    found = await _own_row(session, approval_id, key)
+    if found is None:
+        _not_found()
+    approval, row = found
+    if require_company and not await customer_in_ticket_company(
+        session, customer.login, approval.ticket_id
+    ):
+        _not_found()
+    open_now = (
+        approval.status == "pending"
+        and row.step.status == "active"
+        and row.approver.status == "pending"
+    )
+    (item,) = await inbox._items(session, key, [row], pending=open_now)  # noqa: SLF001
+    return PortalApprovalOut(
+        id=approval.id,
+        title=approval.title,
+        description=approval.description,
+        describe_lines=await notify._describe_lines(session, approval),  # noqa: SLF001
+        ticket_number=item.ticket_number,
+        ticket_title=item.ticket_title,
+        status=approval.status,
+        step_name=row.step.name,
+        rule_text_key=f"approvals.rule.{row.step.rule}",
+        required=item.required,
+        approved_count=item.approved_count,
+        due_at=row.step.due_at,
+        my_status=row.approver.status,
+        my_decision=item.my_decision,
+        can_decide=item.can_vote,
+    )
+
+
+@router.get("/{approval_id:int}", response_model=PortalApprovalOut)
+async def get_approval(
+    approval_id: int, customer: CurrentCustomer, session: DbSession
+) -> PortalApprovalOut:
+    """One request the customer approves. 404 for any other, also outside their company."""
+    out = await _out(session, customer, approval_id, require_company=True)
+    await session.rollback()
+    return out
+
+
+@router.post("/{approval_id:int}/decision", response_model=PortalApprovalOut)
+async def post_decision(
+    approval_id: int,
+    body: PortalDecisionIn,
+    customer: CurrentCustomer,
+    session: DbSession,
+    settings: AppSettings,
+) -> PortalApprovalOut:
+    """Votes "Freigeben" / "Ablehnen" on the customer's own row (channel ``portal``).
+
+    A request the customer holds no row on is 404. Once the ticket left the customer's company
+    the engine refuses with 403 ``customer_approver_outside_company``; with customer approvers
+    switched off in the meantime, 403 ``forbidden``.
+    """
+    actor = Actor.customer(customer.login)
+    await session.rollback()  # the request lock must be the first read (F1(a))
+    try:
+        result = await service.decide(
+            session,
+            approval_id,
+            actor=actor,
+            decision=body.decision,
+            channel="portal",
+            comment=body.comment,
+            settings=settings,
+        )
+    except ApprovalError as err:
+        await session.rollback()
+        approval = (
+            await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == approval_id))
+        ).scalar_one_or_none()
+        visible = approval is not None and await access.can_view(session, approval, actor)
+        await session.rollback()
+        if not visible:
+            _not_found()
+        raise HTTPException(
+            err.http_status, detail={"code": err.code, "detail": err.detail}
+        ) from err
+    await session.commit()
+    await publish_approval_changed(get_pubsub_redis(settings), result.affected_user_ids)
+    out = await _out(session, customer, approval_id, require_company=False)
+    await session.rollback()
+    return out

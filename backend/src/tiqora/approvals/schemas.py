@@ -256,3 +256,58 @@ class LinkDecisionOut(BaseModel):
     decision: DecisionName
     #: the request's status after the vote ("pending" while the step or stage is still open)
     status: str
+
+
+# --- customer portal (A13 portal rows) -----------------------------------------------------------
+
+
+class PortalDecisionIn(BaseModel):
+    """A customer approver's vote. No ``approver_id``: a customer decides only their own row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: DecisionName
+    comment: str | None = Field(None, max_length=2000)  # the engine's limit, as on the link
+
+
+class PortalApprovalItemOut(BaseModel):
+    id: int
+    title: str
+    ticket_number: str | None = None
+    ticket_title: str | None = None
+    status: str
+    step_name: str
+    due_at: UtcDateTime | None = None
+    my_status: str
+    my_decision: str | None = None
+    decided_at: UtcDateTime | None = None
+    can_decide: bool
+
+
+class PortalApprovalPage(BaseModel):
+    items: list[PortalApprovalItemOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class PortalApprovalOut(BaseModel):
+    """One request as its customer approver sees it: no other approvers, no other comments."""
+
+    id: int
+    title: str
+    description: str | None = None
+    describe_lines: list[str] = Field(default_factory=list)
+    ticket_number: str | None = None
+    ticket_title: str | None = None
+    status: str
+    step_name: str
+    #: i18n key of the step's rule sentence ("approvals.rule.any" ...)
+    rule_text_key: str
+    required: int | None = None
+    approved_count: int
+    due_at: UtcDateTime | None = None
+    #: status of the caller's own approver row (pending, approved, rejected, forwarded, ...)
+    my_status: str
+    my_decision: str | None = None
+    can_decide: bool

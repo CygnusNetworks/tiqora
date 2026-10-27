@@ -322,6 +322,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Approvals
+         * @description The customer's open ("pending") or already decided requests, inside their company.
+         */
+        get: operations["list_approvals_api_portal_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/approvals/{approval_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Approval
+         * @description One request the customer approves. 404 for any other, also outside their company.
+         */
+        get: operations["get_approval_api_portal_approvals__approval_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/approvals/{approval_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Decision
+         * @description Votes "Freigeben" / "Ablehnen" on the customer's own row (channel ``portal``).
+         *
+         *     A request the customer holds no row on is 404. Once the ticket left the customer's company
+         *     the engine refuses with 403 ``customer_approver_outside_company``; with customer approvers
+         *     switched off in the meantime, 403 ``forbidden``.
+         */
+        post: operations["post_decision_api_portal_approvals__approval_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/auth/login": {
         parameters: {
             query?: never;
@@ -24875,6 +24939,78 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** PortalApprovalItemOut */
+        PortalApprovalItemOut: {
+            /** Can Decide */
+            can_decide: boolean;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Id */
+            id: number;
+            /** My Decision */
+            my_decision?: string | null;
+            /** My Status */
+            my_status: string;
+            /** Status */
+            status: string;
+            /** Step Name */
+            step_name: string;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * PortalApprovalOut
+         * @description One request as its customer approver sees it: no other approvers, no other comments.
+         */
+        PortalApprovalOut: {
+            /** Approved Count */
+            approved_count: number;
+            /** Can Decide */
+            can_decide: boolean;
+            /** Describe Lines */
+            describe_lines?: string[];
+            /** Description */
+            description?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Id */
+            id: number;
+            /** My Decision */
+            my_decision?: string | null;
+            /** My Status */
+            my_status: string;
+            /** Required */
+            required?: number | null;
+            /** Rule Text Key */
+            rule_text_key: string;
+            /** Status */
+            status: string;
+            /** Step Name */
+            step_name: string;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** PortalApprovalPage */
+        PortalApprovalPage: {
+            /** Items */
+            items: components["schemas"]["PortalApprovalItemOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
         /** PortalArticleOut */
         PortalArticleOut: {
             /** Content Md */
@@ -24963,6 +25099,19 @@ export interface components {
             items: components["schemas"]["PortalCiOut"][];
             /** Total */
             total: number;
+        };
+        /**
+         * PortalDecisionIn
+         * @description A customer approver's vote. No ``approver_id``: a customer decides only their own row.
+         */
+        PortalDecisionIn: {
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
         };
         /** PortalLanguageIn */
         PortalLanguageIn: {
@@ -31494,6 +31643,111 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_approvals_api_portal_approvals_get: {
+        parameters: {
+            query?: {
+                state?: "pending" | "decided";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalApprovalPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_approval_api_portal_approvals__approval_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_decision_api_portal_approvals__approval_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
