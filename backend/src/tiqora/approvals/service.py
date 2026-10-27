@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import select, text, update
@@ -52,12 +52,15 @@ from tiqora.approvals.models import (
     TiqoraApprovalVote,
 )
 from tiqora.approvals.resolve import (
+    Resolution,
+    ResolvedApprover,
     canonical_principal,
     customer_in_ticket_company,
     resolve_entries,
 )
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings, get_settings
+from tiqora.db.legacy.user import Users
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import enqueue_job, utc_now
@@ -69,6 +72,7 @@ _CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
 _REASON_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
 _COMMENT_MAX = 2000
 _VOTED = frozenset({"approved", "rejected"})
+_SYSTEM_USER_ID = 1
 
 
 def _info(approval: TiqoraApproval) -> ApprovalInfo:
@@ -297,6 +301,85 @@ def _result_reason(steps: Sequence[TiqoraApprovalStep], result: ApprovalStatus) 
     return "votes"
 
 
+async def _add_approver(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    step: TiqoraApprovalStep,
+    resolved: ResolvedApprover,
+    *,
+    actor: Actor,
+    now: datetime,
+) -> int:
+    row = TiqoraApprovalApprover(
+        approval_id=approval.id,
+        step_id=step.id,
+        ticket_id=approval.ticket_id,
+        principal=resolved.principal.key,
+        user_id=resolved.principal.user_id,
+        customer_login=resolved.principal.login,
+        source_kind=resolved.source_kind,
+        source_ref=resolved.source_ref,
+        source_label=resolved.source_label[:200] if resolved.source_label else None,
+        decisive=False,
+        status="pending",
+        added_at=now,
+    )
+    session.add(row)
+    await session.flush()
+    await audit.record(
+        session,
+        approval=approval,
+        action="approver_added",
+        actor=actor,
+        step_id=step.id,
+        approver_id=row.id,
+        detail={"source": resolved.source_kind},
+    )
+    return row.id
+
+
+async def _resolve_step(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    spec: StepSpec,
+    *,
+    settings: ApprovalSettings,
+    registry: Registry,
+) -> Resolution:
+    return await resolve_entries(
+        session,
+        spec.approvers,
+        ctx=ResolveContext(
+            ticket_id=approval.ticket_id,
+            subject_type=approval.subject_type,
+            subject_ref=approval.subject_ref,
+            approval_id=approval.id,
+        ),
+        excluded_principals=await _excluded_keys(session, approval),
+        allow_customers=_allow_customers(approval, settings, registry),
+        registry=registry,
+    )
+
+
+async def _audit_unresolved(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    step: TiqoraApprovalStep,
+    resolution: Resolution,
+    *,
+    actor: Actor,
+) -> None:
+    for entry, why in resolution.unresolved:
+        await audit.record(
+            session,
+            approval=approval,
+            action="approver_excluded",
+            actor=actor,
+            step_id=step.id,
+            detail={"kind": entry.kind, "ref": entry.ref, "reason": why},
+        )
+
+
 async def _activate_step(
     session: AsyncSession,
     approval: TiqoraApproval,
@@ -308,20 +391,7 @@ async def _activate_step(
 ) -> list[int]:
     """Resolves and activates one step; returns the ids of the approver rows it added."""
     spec = StepSpec.model_validate_json(step.spec)
-    ctx = ResolveContext(
-        ticket_id=approval.ticket_id,
-        subject_type=approval.subject_type,
-        subject_ref=approval.subject_ref,
-        approval_id=approval.id,
-    )
-    resolution = await resolve_entries(
-        session,
-        spec.approvers,
-        ctx=ctx,
-        excluded_principals=await _excluded_keys(session, approval),
-        allow_customers=_allow_customers(approval, settings, registry),
-        registry=registry,
-    )
+    resolution = await _resolve_step(session, approval, spec, settings=settings, registry=registry)
     now = utc_now()
     due_hours = spec.due_hours if spec.due_hours is not None else settings.default_due_hours
     step.status = "active"
@@ -349,15 +419,7 @@ async def _activate_step(
             step_id=step.id,
             detail={**who, "reason": why},
         )
-    for entry, why in resolution.unresolved:
-        await audit.record(
-            session,
-            approval=approval,
-            action="approver_excluded",
-            actor=actor,
-            step_id=step.id,
-            detail={"kind": entry.kind, "ref": entry.ref, "reason": why},
-        )
+    await _audit_unresolved(session, approval, step, resolution, actor=actor)
     count = len(resolution.approvers)
     if count == 0 or not rules.quorum_reachable(spec.rule, spec.quorum, count):
         step.status = "approved" if spec.on_no_approver == "approve" else "rejected"
@@ -375,32 +437,7 @@ async def _activate_step(
         return []
     added: list[int] = []
     for resolved in resolution.approvers:
-        row = TiqoraApprovalApprover(
-            approval_id=approval.id,
-            step_id=step.id,
-            ticket_id=approval.ticket_id,
-            principal=resolved.principal.key,
-            user_id=resolved.principal.user_id,
-            customer_login=resolved.principal.login,
-            source_kind=resolved.source_kind,
-            source_ref=resolved.source_ref,
-            source_label=resolved.source_label[:200] if resolved.source_label else None,
-            decisive=False,
-            status="pending",
-            added_at=now,
-        )
-        session.add(row)
-        await session.flush()
-        await audit.record(
-            session,
-            approval=approval,
-            action="approver_added",
-            actor=actor,
-            step_id=step.id,
-            approver_id=row.id,
-            detail={"source": resolved.source_kind},
-        )
-        added.append(row.id)
+        added.append(await _add_approver(session, approval, step, resolved, actor=actor, now=now))
     return added
 
 
@@ -781,8 +818,8 @@ class DecisionResult:
 
 
 def _refusal(candidates: Sequence[TiqoraApprovalApprover]) -> ApprovalError:
-    """Why none of the actor's rows can vote: already voted, step not active, or not theirs."""
-    if any(r.status in _VOTED for r in candidates):
+    """Why none of the actor's rows can vote: already handled, step not active, or not theirs."""
+    if any(r.status in _VOTED or r.status == "forwarded" for r in candidates):
         return ApprovalError("already_decided", 409)
     if any(r.status in ("pending", "not_needed") for r in candidates):  # pending: step not active
         return ApprovalError("step_not_active", 409)
@@ -797,8 +834,13 @@ async def _pick_approver(
     actor: Actor,
     key: str,
     approver_id: int | None,
+    voted_steps: frozenset[int],
 ) -> tuple[TiqoraApprovalApprover, bool]:
-    """The row the actor votes with and whether that is on behalf of a delegator."""
+    """The row the actor votes with and whether that is on behalf of a delegator.
+
+    Delegated rows count only in steps that allow delegation, and one person casts at most one
+    vote per step (*voted_steps* holds the steps where the actor already voted, own or on behalf).
+    """
     principal = actor.principal
     if principal is None:
         raise ApprovalError("not_an_approver", 403)
@@ -806,12 +848,13 @@ async def _pick_approver(
     if principal.user_id is not None:
         delegators = await delegation.active_delegators(session, principal.user_id, at=utc_now())
         delegators.discard(principal.user_id)
+    delegable = {s.id for s in steps if StepSpec.model_validate_json(s.spec).allow_delegation}
 
     def own(row: TiqoraApprovalApprover) -> bool:
         return row.principal == key
 
     def delegated(row: TiqoraApprovalApprover) -> bool:
-        return row.user_id is not None and row.user_id in delegators
+        return row.user_id is not None and row.user_id in delegators and row.step_id in delegable
 
     if approver_id is not None:
         # an explicit id must be one of this request's rows and be the actor's or a delegator's
@@ -820,10 +863,13 @@ async def _pick_approver(
         candidates = [r for r in approvers if own(r) or delegated(r)]
     active = {s.id for s in steps if s.status == "active"}
     usable = [r for r in candidates if r.status == "pending" and r.step_id in active]
-    if not usable:
+    free = [r for r in usable if r.step_id not in voted_steps]
+    if not free:
+        if usable:  # F8: this person already voted in the step(s) of every row left
+            raise ApprovalError("already_decided", 409)
         raise _refusal(candidates)
-    usable.sort(key=lambda r: (not own(r), r.id))
-    return usable[0], not own(usable[0])
+    free.sort(key=lambda r: (not own(r), r.id))
+    return free[0], not own(free[0])
 
 
 async def _voters(
@@ -875,6 +921,46 @@ async def _revoke_approver_tokens(
     )
 
 
+async def _close_step(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    step: TiqoraApprovalStep,
+    outcome: Literal["approved", "rejected"],
+    reason: str,
+    *,
+    settings: ApprovalSettings,
+    registry: Registry,
+    actor: Actor,
+    now: datetime,
+) -> None:
+    """A step has its result (A7b step 7): leftovers ``not_needed``, links dead, next stage."""
+    step.status = outcome
+    step.reason = reason
+    step.decided_at = now
+    leftover = [
+        a
+        for a in await _locked_approvers(session, approval.id, step_ids=[step.id])
+        if a.status == "pending"
+    ]
+    for other in leftover:
+        other.status = "not_needed"
+    await session.flush()
+    await _revoke_approver_tokens(session, [a.id for a in leftover])
+    await audit.record(
+        session,
+        approval=approval,
+        action="step_decided",
+        actor=actor,
+        step_id=step.id,
+        detail={"decision": outcome, "reason": reason},
+    )
+    new_ids = await _activate_next_stage(
+        session, approval, settings=settings, registry=registry, actor=actor
+    )
+    if approval.status == "pending":
+        await _enqueue_mail(session, approval, "request", approver_ids=new_ids, registry=registry)
+
+
 async def decide(
     session: AsyncSession,
     approval_id: int,
@@ -911,8 +997,19 @@ async def decide(
     approvers = await _locked_approvers(session, approval.id)
     principal = actor.principal
     key = actor.key if principal is None else (await canonical_principal(session, principal)).key
+    voted = await session.execute(
+        select(TiqoraApprovalVote.step_id)
+        .where(TiqoraApprovalVote.approval_id == approval.id, TiqoraApprovalVote.decided_by == key)
+        .with_for_update()
+    )
     row, on_behalf = await _pick_approver(
-        session, approvers, steps, actor=actor, key=key, approver_id=approver_id
+        session,
+        approvers,
+        steps,
+        actor=actor,
+        key=key,
+        approver_id=approver_id,
+        voted_steps=frozenset(int(i) for i in voted.scalars()),
     )
     step = next(s for s in steps if s.id == row.step_id)
 
@@ -963,29 +1060,18 @@ async def decide(
     await audit.history(session, approval, "voted", actor=actor, extra=decision, settings=asettings)
 
     outcome = rules.evaluate_step(step.rule, step.quorum, await _voters(session, step, approvers))  # type: ignore[arg-type]
-    new_ids: list[int] = []
     if outcome != "pending":
-        step.status = outcome
-        step.reason = "votes"
-        step.decided_at = now
-        leftover = [a for a in approvers if a.step_id == step.id and a.status == "pending"]
-        for other in leftover:
-            other.status = "not_needed"
-        await session.flush()
-        await _revoke_approver_tokens(session, [a.id for a in leftover])
-        await audit.record(
+        await _close_step(
             session,
-            approval=approval,
-            action="step_decided",
+            approval,
+            step,
+            outcome,
+            "votes",
+            settings=asettings,
+            registry=reg,
             actor=actor,
-            step_id=step.id,
-            detail={"decision": outcome, "reason": "votes"},
+            now=now,
         )
-        new_ids = await _activate_next_stage(
-            session, approval, settings=asettings, registry=reg, actor=actor
-        )
-        if approval.status == "pending":
-            await _enqueue_mail(session, approval, "request", approver_ids=new_ids, registry=reg)
 
     affected = {principal.user_id} if principal.user_id is not None else set()
     for after in await _locked_approvers(session, approval.id):
@@ -998,6 +1084,213 @@ async def decide(
         on_behalf=on_behalf,
         affected_user_ids=frozenset(affected),
     )
+
+
+# --- forward / refresh -----------------------------------------------------------------------
+
+
+async def forward(
+    session: AsyncSession,
+    approver_id: int,
+    *,
+    actor: Actor,
+    to_user_id: int,
+    comment: str | None = None,
+    registry: Registry | None = None,
+) -> int:
+    """Hands the actor's own pending row to another agent; returns the new approver id.
+
+    The old row becomes ``forwarded`` (its links die), the new one is a ``forward`` row of the
+    same step (decisive like the old one) and gets a ``forwarded`` mail. Only the approver
+    themselves forwards (never a delegate), a forward row cannot be forwarded again, and the
+    step must allow delegation. *comment* is accepted for API compatibility but not stored:
+    audit rows never carry free text. Raises ``forbidden`` (customers, system),
+    ``approval_closed``, ``not_an_approver``, ``already_decided``, ``step_not_active``,
+    ``forward_not_allowed``, ``forward_target_invalid`` and ``self_approval_forbidden``.
+    """
+    principal = actor.principal
+    if principal is None or principal.kind != "agent" or principal.user_id is None:
+        raise ApprovalError("forbidden", 403)
+    reg = registry or get_registry()
+    # the request lock is the first statement; the approver id only names which request
+    approval = (
+        await session.execute(
+            select(TiqoraApproval)
+            .where(
+                TiqoraApproval.id
+                == select(TiqoraApprovalApprover.approval_id)
+                .where(TiqoraApprovalApprover.id == approver_id)
+                .scalar_subquery()
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if approval is None:
+        raise ApprovalError("not_an_approver", 403)
+    if approval.status != "pending":
+        raise ApprovalError("approval_closed", 409)
+    steps = await _locked_steps(session, approval.id)
+    approvers = await _locked_approvers(session, approval.id)
+    row = next((a for a in approvers if a.id == approver_id), None)
+    if row is None or row.principal != actor.key:
+        raise ApprovalError("not_an_approver", 403)
+    if row.status in ("approved", "rejected", "forwarded"):
+        raise ApprovalError("already_decided", 409)
+    step = next(s for s in steps if s.id == row.step_id)
+    if row.status != "pending" or step.status != "active":
+        raise ApprovalError("step_not_active", 409)
+    if row.source_kind == "forward" or not StepSpec.model_validate_json(step.spec).allow_delegation:
+        raise ApprovalError("forward_not_allowed", 409)
+
+    if to_user_id == principal.user_id or to_user_id == _SYSTEM_USER_ID:
+        raise ApprovalError("forward_target_invalid", 422, "choose another agent")
+    valid = (
+        await session.execute(select(Users.valid_id).where(Users.id == to_user_id))
+    ).scalar_one_or_none()
+    if valid != 1:
+        raise ApprovalError("forward_target_invalid", 422, "the agent is not valid")
+    target = Principal.agent(to_user_id)
+    if target.key in await _excluded_keys(session, approval):
+        raise ApprovalError("self_approval_forbidden", 403)
+    if any(a.step_id == step.id and a.principal == target.key for a in approvers):
+        raise ApprovalError("forward_target_invalid", 422, "the agent is already an approver")
+
+    new_id = await _add_approver(
+        session,
+        approval,
+        step,
+        ResolvedApprover(target, "forward", str(row.id), None),
+        actor=actor,
+        now=utc_now(),
+    )
+    new = next(a for a in await _locked_approvers(session, approval.id) if a.id == new_id)
+    new.decisive = row.decisive
+    row.status = "forwarded"
+    await session.flush()
+    await _revoke_approver_tokens(session, [row.id])
+    await audit.record(
+        session,
+        approval=approval,
+        action="forwarded",
+        actor=actor,
+        step_id=step.id,
+        approver_id=row.id,
+        detail={"to_user_id": to_user_id, "new_approver_id": new_id},
+    )
+    await _enqueue_mail(session, approval, "forwarded", approver_ids=[new_id], registry=reg)
+    return new_id
+
+
+@dataclass(frozen=True, slots=True)
+class RefreshResult:
+    added: int
+    removed: int
+
+
+async def refresh_approvers(
+    session: AsyncSession,
+    approval_id: int,
+    *,
+    actor: Actor,
+    settings: Settings | None = None,
+    registry: Registry | None = None,
+) -> RefreshResult:
+    """Re-resolves the approvers of every active step ("Freigeber neu ermitteln").
+
+    Uses the step's stored spec. Principals that now qualify and have no row in the step yet
+    are added (``uq_tiqora_approval_approver``: a forwarded, removed or not-needed row counts as
+    a row); pending rows that no longer qualify are ``removed`` unless they are escalation or
+    forward rows or come from an entry that currently resolves to nothing; rows that voted stay.
+    Each active step is then re-evaluated like after a vote (no voter left: ``on_no_approver``).
+    Raises ``approval_not_found``, ``forbidden`` (without :func:`access.can_refresh`) and
+    ``approval_closed``.
+    """
+    reg = registry or get_registry()
+    approval = await _lock_approval(session, approval_id)
+    if not await access.can_refresh(session, approval, actor):
+        raise ApprovalError("forbidden", 403)
+    if approval.status != "pending":
+        raise ApprovalError("approval_closed", 409)
+    asettings = await _settings(session, settings)
+    steps = [s for s in await _locked_steps(session, approval.id) if s.status == "active"]
+    approvers = await _locked_approvers(session, approval.id)
+    now = utc_now()
+    added_ids: list[int] = []
+    removed = 0
+    for step in steps:
+        spec = StepSpec.model_validate_json(step.spec)
+        resolution = await _resolve_step(session, approval, spec, settings=asettings, registry=reg)
+        await _audit_unresolved(session, approval, step, resolution, actor=actor)
+        wanted = {r.principal.key for r in resolution.approvers}
+        silent = {(e.kind, e.ref) for e, _ in resolution.unresolved}
+        rows = [a for a in approvers if a.step_id == step.id]
+        for row in rows:
+            if (
+                row.status == "pending"
+                and row.source_kind not in ("escalation", "forward")
+                and row.principal not in wanted
+                and (row.source_kind, row.source_ref) not in silent
+            ):
+                row.status = "removed"
+                removed += 1
+                await session.flush()
+                await _revoke_approver_tokens(session, [row.id])
+                await audit.record(
+                    session,
+                    approval=approval,
+                    action="approver_removed",
+                    actor=actor,
+                    step_id=step.id,
+                    approver_id=row.id,
+                    detail={"reason": "departed"},
+                )
+        have = {a.principal for a in rows}
+        for resolved in resolution.approvers:
+            if resolved.principal.key not in have:
+                have.add(resolved.principal.key)
+                added_ids.append(
+                    await _add_approver(session, approval, step, resolved, actor=actor, now=now)
+                )
+    await audit.record(
+        session,
+        approval=approval,
+        action="refreshed",
+        actor=actor,
+        detail={"added": len(added_ids), "removed": removed},
+    )
+
+    for step in steps:
+        if approval.status != "pending" or step.status != "active":
+            continue
+        spec = StepSpec.model_validate_json(step.spec)
+        current = await _locked_approvers(session, approval.id)
+        voters = await _voters(session, step, current)
+        outcome = rules.evaluate_step(step.rule, step.quorum, voters)  # type: ignore[arg-type]
+        reason = "votes"
+        if outcome == "pending" and not voters:
+            outcome = "approved" if spec.on_no_approver == "approve" else "rejected"
+            reason = "no_approvers"
+        if outcome != "pending":
+            await _close_step(
+                session,
+                approval,
+                step,
+                outcome,
+                reason,
+                settings=asettings,
+                registry=reg,
+                actor=actor,
+                now=now,
+            )
+    if approval.status == "pending" and added_ids:
+        still_pending = [
+            a.id
+            for a in await _locked_approvers(session, approval.id)
+            if a.id in added_ids and a.status == "pending"
+        ]
+        await _enqueue_mail(session, approval, "request", approver_ids=still_pending, registry=reg)
+    return RefreshResult(added=len(added_ids), removed=removed)
 
 
 # --- reads -----------------------------------------------------------------------------------
