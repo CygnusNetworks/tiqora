@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -53,6 +53,7 @@ from tiqora.itsm.change.models import (
 )
 from tiqora.itsm.change.phases import (
     FINAL_PHASES,
+    SYSTEM_ONLY,
     TRANSITIONS,
     ChangeType,
     GuardContext,
@@ -92,6 +93,11 @@ SUPERSEDED: Final = "superseded"
 #: failures that mean "this step does not exist here"; no further guard is worth reporting
 _STRUCTURAL: Final = frozenset({"transition_not_allowed", "system_only", "process_ticket"})
 _WINDOW_TARGETS: Final = frozenset({"approval", "scheduled", "implementing"})
+#: steps that record the post-implementation review
+PIR_TARGETS: Final = frozenset({"review", "closed"})
+#: reason handed to the approval engine when the change itself ends a pending approval (a code;
+#: German text belongs to the UI)
+CANCEL_REASON: Final = "change_cancelled"
 
 OutcomeStatus = Literal["approved", "rejected", "cancelled"]
 
@@ -105,7 +111,14 @@ class TransitionIn(BaseModel):
     #: manager: passes open tasks, or a cancelled post-approval on close
     force: bool = False
     outcome: Outcome | None = None
+    #: the post-implementation review; only on the steps that record it (``review``, ``closed``)
     pir_notes: str | None = Field(None, max_length=20000)
+
+    @model_validator(mode="after")
+    def _pir_only_on_review(self) -> TransitionIn:
+        if self.pir_notes is not None and self.to not in PIR_TARGETS:
+            raise ValueError("Die Nachbetrachtung wird erst beim Abschluss erfasst.")
+        return self
 
 
 # --- CAB -------------------------------------------------------------------------------------
@@ -205,8 +218,12 @@ async def _post_approval(session: AsyncSession, row: TiqoraItsmChange) -> _PostA
         return _PostApproval()
     snap = await get_approval_port().snapshot(session, approval_id=int(row.approval_id))
     if snap is None:
-        # the approval set was erased (GDPR): nobody can decide any more, so it counts as
-        # cancelled - a manager may close past it with force and a reason
+        # the approval set was erased (GDPR). An approval handled before counts as approved
+        # (``approved_at``); otherwise nobody can decide any more, so it counts as cancelled and
+        # a manager may close past it with force and a reason (fail closed). Residual: a
+        # rejection erased afterwards is no longer known here (the F19 bar on "successful").
+        if row.approved_at is not None:
+            return _PostApproval()
         return _PostApproval(pending=True, cancelled=True)
     if snap.status == "pending":
         return _PostApproval(pending=True)
@@ -280,7 +297,11 @@ async def transition(
     manager = await is_change_manager(session, user_id, cfg)
     process = await get_ticket_process_state(session, ticket_id) is not None
     # facts are read only for a step that exists (bounded reads, nothing for a refused pair)
-    known = not process and change_type in TRANSITIONS.get(pair, frozenset())
+    known = (
+        not process
+        and pair not in SYSTEM_ONLY
+        and change_type in TRANSITIONS.get(pair, frozenset())
+    )
     auto_route = pair == ("assessment", "scheduled")
     requests_cab = to == "approval" or pair == ("draft", "implementing")
 
@@ -348,8 +369,9 @@ async def transition(
             failures.append(GuardFailure("cab_missing"))
         if cab is not None and not cab.members:
             failures.append(GuardFailure("cab_empty"))
-        # CX9: forcing past a guard needs a reason (the phase machine cannot see it)
-        if not failures and (forced_tasks or forced_approval) and not _clean(data.reason):
+        # CX9: forcing past a guard needs a reason (the phase machine cannot see it); listed
+        # together with the other failures, so the manager learns everything at once
+        if (forced_tasks or forced_approval) and not _clean(data.reason):
             failures.append(GuardFailure("reason_missing"))
     if failures:
         raise _refused(failures)
@@ -443,7 +465,7 @@ async def transition(
                 session,
                 approval_id=int(row.approval_id),
                 actor=actor,
-                reason=reason or "Change abgebrochen",
+                reason=reason or CANCEL_REASON,
             )
         await notify_listeners(
             session, ChangeEvent(ticket_id, "phase", from_phase, to, user_id, now)
@@ -464,7 +486,8 @@ def _apply_phase(
     if to == "closed":
         row.outcome = outcome
     if to == "draft":
-        # rework / re-plan: the next approval is a new round
+        # rework / re-plan: the next approval is a new round. ``approval_id`` stays and points
+        # at the previous round's set (the trail) until the next request replaces it.
         row.approval_via = None
         row.approved_at = None
     row.updated_at = now
@@ -512,7 +535,8 @@ async def _request(
         user_id=actor.write_user_id,
         detail={
             "approval_id": snap.approval_id,
-            "approvers": len(cab.members),
+            #: CAB entries (a group or list is one entry), not people
+            "cab_entries": len(cab.members),
             "cab_id": cab.id,
             "round": int(row.approval_round),
         },

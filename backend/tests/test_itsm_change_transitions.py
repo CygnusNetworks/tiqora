@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 from sqlalchemy import select, text
 
 from tests._change_fixtures import (
@@ -392,7 +393,7 @@ async def test_normal_happy_path(w: ChangeWorld, port: FakeApprovalPort) -> None
     (requested,) = await _events(w, tid, "approval_requested")
     assert _detail(requested) == {
         "approval_id": rec.approval_id,
-        "approvers": 2,
+        "cab_entries": 2,
         "cab_id": CAB,
         "round": 1,
     }
@@ -692,6 +693,8 @@ async def test_force_close_with_open_tasks_manager_only(
     w: ChangeWorld, port: FakeApprovalPort
 ) -> None:
     tid = await _create(w)
+    # created before any task ticket: an explicit ticket id moves MariaDB's auto increment
+    standard = await _create(w, "standard", template_id=await _standard_template(w))
     await _ready(w, tid, cab_id=None)
     await _at(w, tid, "implementing")
     await _open_task(w, tid)
@@ -704,6 +707,108 @@ async def test_force_close_with_open_tasks_manager_only(
     assert forced.created_by == U_MANAGER
     assert _detail(forced) == {"open_tasks": 1, "reason": "Aufgabe obsolet"}
     assert (await _phases(w, tid))[-1] == ("implementing", "review")
+
+    # a standard change closes straight from implementing; the missing reason is listed together
+    # with the step's other failures
+    await _ready(w, standard, cab_id=None)
+    await _at(w, standard, "implementing")
+    await _open_task(w, standard, T_TASK + 1)
+    assert await _refused(w, standard, "closed", U_MANAGER, force=True) == {
+        "outcome_missing": False,
+        "reason_missing": False,
+    }
+    await _go(w, standard, "closed", U_MANAGER, force=True, reason="ok", outcome="successful")
+    (forced,) = await _events(w, standard, "forced")
+    assert _detail(forced) == {"open_tasks": 1, "reason": "ok"}
+
+
+async def test_post_approval_outcome_delivered_twice(
+    w: ChangeWorld, port: FakeApprovalPort
+) -> None:
+    """The hook job is retried: after the phase stays put, the event trail decides."""
+    await _cabs(w)
+    await _settings(w, emergency_post_approval=True, emergency_cab_id=ECAB)
+
+    approved = await _create(w, "emergency")
+    await _ready(w, approved, cab_id=None)
+    await _go(w, approved, "implementing")
+    await _go(w, approved, "review")
+    assert await _outcome(w, approved, "approved") is True
+    first = (await _row(w, approved)).approved_at
+    assert first is not None
+    assert await _outcome(w, approved, "approved") is False
+    assert (await _row(w, approved)).approved_at == first
+    assert len(await _events(w, approved, "approval_outcome")) == 1
+
+    rejected = await _create(w, "emergency")
+    await _ready(w, rejected, cab_id=None)
+    await _go(w, rejected, "implementing")
+    assert await _outcome(w, rejected, "rejected") is True
+    assert await _outcome(w, rejected, "rejected") is False
+    assert await _outcome(w, rejected, "cancelled", "admin") is False
+    assert len(await _events(w, rejected, "forced")) == 1
+    assert len(await _events(w, rejected, "approval_outcome")) == 1
+    assert [p for p in await _phases(w, rejected) if p[0] == "implementing"] == [
+        ("implementing", "review")
+    ]
+
+    cancelled = await _create(w, "emergency")
+    await _ready(w, cancelled, cab_id=None)
+    await _go(w, cancelled, "implementing")
+    assert await _outcome(w, cancelled, "cancelled", "admin") is True
+    assert await _outcome(w, cancelled, "cancelled", "admin") is False
+    assert len(await _events(w, cancelled, "approval_outcome")) == 1
+
+    # before the decision (phase approval): the row alone answers the second delivery
+    pre = await _create(w)
+    await _ready(w, pre)
+    await _at(w, pre, "assessment")
+    await _go(w, pre, "approval")
+    assert await _outcome(w, pre, "rejected") is True
+    assert await _outcome(w, pre, "rejected") is False
+    assert len(await _events(w, pre, "approval_outcome")) == 1
+
+
+async def test_erased_post_approval_counts_by_approved_at(
+    w: ChangeWorld, port: FakeApprovalPort
+) -> None:
+    await _cabs(w)
+    await _settings(w, emergency_post_approval=True, emergency_cab_id=ECAB)
+    close = {"outcome": "successful", "pir_notes": "ok"}
+
+    # approved before the set was erased: closes like any approved change
+    approved = await _create(w, "emergency")
+    await _ready(w, approved, cab_id=None)
+    await _go(w, approved, "implementing")
+    await _go(w, approved, "review")
+    assert await _outcome(w, approved, "approved") is True
+    erased = (await _row(w, approved)).approval_id
+    port.snapshots.pop(int(erased or 0))
+    await _go(w, approved, "closed", **close)
+
+    # never decided: counts as cancelled (fail closed), a manager forces it with a reason
+    undecided = await _create(w, "emergency")
+    await _ready(w, undecided, cab_id=None)
+    await _go(w, undecided, "implementing")
+    await _go(w, undecided, "review")
+    port.snapshots.pop(int((await _row(w, undecided)).approval_id or 0))
+    assert await _refused(w, undecided, "closed", **close) == {"approval_pending": True}
+    await _go(w, undecided, "closed", U_MANAGER, **close, force=True, reason="Gelöscht")
+    (forced,) = await _events(w, undecided, "forced")
+    assert _detail(forced) == {"approval": "cancelled", "reason": "Gelöscht"}
+
+
+async def test_pir_notes_only_where_recorded(w: ChangeWorld, port: FakeApprovalPort) -> None:
+    with pytest.raises(ValidationError):
+        TransitionIn.model_validate({"to": "submitted", "pir_notes": "zu früh"})
+    assert TransitionIn(to="review", pir_notes="ok").pir_notes == "ok"
+    tid = await _create(w)
+    async with _api(w) as api:
+        got = await api.client.post(
+            f"/api/v1/itsm/changes/{tid}/transition", json={"to": "submitted", "pir_notes": "x"}
+        )
+        assert got.status_code == 422
+    assert (await _row(w, tid)).pir_notes is None
 
 
 async def test_cancel_cancels_pending_approval(w: ChangeWorld, port: FakeApprovalPort) -> None:
@@ -723,6 +828,14 @@ async def test_cancel_cancels_pending_approval(w: ChangeWorld, port: FakeApprova
     events = len(await _events(w, tid))
     assert await _outcome(w, tid, "cancelled", "Nicht mehr nötig") is False
     assert len(await _events(w, tid)) == events
+
+    # without a reason the engine gets a code, never UI text
+    other = await _create(w)
+    await _ready(w, other)
+    await _at(w, other, "assessment")
+    await _go(w, other, "approval")
+    await _go(w, other, "cancelled")
+    assert port.cancels[-1][1] == "change_cancelled"
 
 
 async def test_rejected_then_rework_starts_new_round(
@@ -936,7 +1049,16 @@ async def test_close_owner_follows_required_lock(w: ChangeWorld, port: FakeAppro
 
 _X1 = [
     "agent_submit",
+    "agent_return",
+    "agent_approval",
+    "agent_override",
+    "agent_replan",
+    "agent_rework",
     "agent_cancel",
+    "agent_cancel_in_approval",
+    "agent_close",
+    "auto_template",
+    "auto_risk",
     "manager_force",
     "approved",
     "rejected",
@@ -951,17 +1073,33 @@ _X1 = [
 async def test_every_phase_change_writes_one_phase_event(
     w: ChangeWorld, port: FakeApprovalPort, path: str
 ) -> None:
-    """X-1: one ``phase`` row per phase change on every path; extra rows only in addition."""
+    """X-1: one ``phase`` row per phase change on every non-engine path; extra rows only in
+    addition (Task 17 adds the engine paths)."""
     await _cabs(w)
-    await _settings(w, emergency_cab_id=ECAB, emergency_post_approval=True)
+    await _settings(
+        w, emergency_cab_id=ECAB, emergency_post_approval=True, auto_approve_low_risk=True
+    )
     emergency = path in ("cancelled_emergency", "post_rejected")
-    tid = await _create(w, "emergency" if emergency else "normal")
-    await _ready(w, tid, cab_id=None if emergency else CAB)
+    if path == "auto_template":
+        tid = await _create(w, "standard", template_id=await _standard_template(w))
+    else:
+        tid = await _create(w, "emergency" if emergency else "normal")
+    await _ready(w, tid, cab_id=None if emergency or path == "auto_template" else CAB)
     if path == "no_approvers":
         port.reject_at_once = "no_approvers"
-    if path in ("approved", "rejected", "no_approvers", "cancelled_normal"):
+    if path in (
+        "approved",
+        "rejected",
+        "no_approvers",
+        "cancelled_normal",
+        "agent_cancel_in_approval",
+    ):
         await _at(w, tid, "assessment")
         await _go(w, tid, "approval")
+    elif path in ("agent_approval", "agent_override", "auto_risk"):
+        await _at(w, tid, "assessment")
+        if path == "agent_override":
+            await _blocking_freeze(w)
     elif path == "cancelled_emergency":
         await _go(w, tid, "approval")
     elif path == "post_rejected":
@@ -969,35 +1107,74 @@ async def test_every_phase_change_writes_one_phase_event(
     elif path == "manager_force":
         await _at(w, tid, "implementing")
         await _open_task(w, tid)
+    elif path == "agent_return":
+        await _at(w, tid, "submitted")
+    elif path == "agent_replan":
+        await _at(w, tid, "scheduled", approval_via="cab", approved_at=_T)
+    elif path == "agent_rework":
+        await _at(w, tid, "rejected", approval_via="cab")
+    elif path == "agent_close":
+        await _at(w, tid, "review")
     before = {e.id for e in await _events(w, tid)}
 
-    expected: tuple[str, str]
-    extra: list[str] = []
-    if path == "agent_submit":
-        await _go(w, tid, "submitted")
-        expected = ("draft", "submitted")
-    elif path == "agent_cancel":
-        await _go(w, tid, "cancelled")
-        expected = ("draft", "cancelled")
-    elif path == "manager_force":
-        await _go(w, tid, "review", U_MANAGER, force=True, reason="obsolet")
-        expected, extra = ("implementing", "review"), ["forced"]
-    elif path == "approved":
-        assert await _outcome(w, tid, "approved") is True
-        expected, extra = ("approval", "scheduled"), ["approval_outcome"]
-    elif path in ("rejected", "no_approvers"):
-        reason = "no_approvers" if path == "no_approvers" else None
-        assert await _outcome(w, tid, "rejected", reason) is True
-        expected, extra = ("approval", "rejected"), ["approval_outcome"]
-    elif path == "cancelled_normal":
-        assert await _outcome(w, tid, "cancelled", "admin") is True
-        expected, extra = ("approval", "assessment"), ["approval_outcome"]
-    elif path == "cancelled_emergency":
-        assert await _outcome(w, tid, "cancelled", "admin") is True
-        expected, extra = ("approval", "draft"), ["approval_outcome"]
+    agent: dict[str, tuple[str, dict[str, Any], tuple[str, str], list[str]]] = {
+        "agent_submit": ("submitted", {}, ("draft", "submitted"), []),
+        "agent_return": ("draft", {}, ("submitted", "draft"), []),
+        "agent_approval": ("approval", {}, ("assessment", "approval"), ["approval_requested"]),
+        "agent_override": (
+            "approval",
+            {"override_reason": "Sicherheitsupdate"},
+            ("assessment", "approval"),
+            ["conflict_override", "approval_requested"],
+        ),
+        "agent_replan": ("draft", {}, ("scheduled", "draft"), []),
+        "agent_rework": ("draft", {}, ("rejected", "draft"), []),
+        "agent_cancel": ("cancelled", {}, ("draft", "cancelled"), []),
+        "agent_cancel_in_approval": ("cancelled", {}, ("approval", "cancelled"), []),
+        "agent_close": (
+            "closed",
+            {"outcome": "successful", "pir_notes": "ok"},
+            ("review", "closed"),
+            [],
+        ),
+        "auto_template": ("scheduled", {}, ("draft", "scheduled"), ["approval_outcome"]),
+        "auto_risk": ("scheduled", {}, ("assessment", "scheduled"), ["approval_outcome"]),
+        "manager_force": (
+            "review",
+            {"force": True, "reason": "obsolet"},
+            ("implementing", "review"),
+            ["forced"],
+        ),
+    }
+    system: dict[str, tuple[str, str | None, tuple[str, str], list[str]]] = {
+        "approved": ("approved", None, ("approval", "scheduled"), ["approval_outcome"]),
+        "rejected": ("rejected", None, ("approval", "rejected"), ["approval_outcome"]),
+        "no_approvers": (
+            "rejected",
+            "no_approvers",
+            ("approval", "rejected"),
+            ["approval_outcome"],
+        ),
+        "cancelled_normal": (
+            "cancelled",
+            "admin",
+            ("approval", "assessment"),
+            ["approval_outcome"],
+        ),
+        "cancelled_emergency": ("cancelled", "admin", ("approval", "draft"), ["approval_outcome"]),
+        "post_rejected": (
+            "rejected",
+            None,
+            ("implementing", "review"),
+            ["approval_outcome", "forced"],
+        ),
+    }
+    if path in agent:
+        to, fields, expected, extra = agent[path]
+        await _go(w, tid, to, U_MANAGER, **fields)
     else:
-        assert await _outcome(w, tid, "rejected") is True
-        expected, extra = ("implementing", "review"), ["approval_outcome", "forced"]
+        status, reason, expected, extra = system[path]
+        assert await _outcome(w, tid, status, reason) is True
 
     new = [e for e in await _events(w, tid) if e.id not in before]
     phase_rows = [(e.from_phase, e.to_phase) for e in new if e.event == "phase"]
