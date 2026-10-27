@@ -37,6 +37,8 @@ ACTIVE_PHASES: Final[frozenset[Phase]] = frozenset(
 )
 #: ``rejected`` is not final: the change can be reworked ("Überarbeiten") and requested again.
 FINAL_PHASES: Final[frozenset[Phase]] = frozenset({"closed", "cancelled"})
+#: Phases a change can still leave or be reworked in (everything but the final ones).
+REOPENABLE_PHASES: Final[frozenset[Phase]] = frozenset(PHASES) - FINAL_PHASES
 
 _NORMAL: Final = frozenset[ChangeType]({"normal"})
 _STANDARD: Final = frozenset[ChangeType]({"standard"})
@@ -119,6 +121,10 @@ class GuardContext:
     emergency_post_approval: bool = False
     #: setting ``standard_requires_review``
     standard_requires_review: bool = False
+    #: the pending approval of the current round was cancelled (not decided)
+    approval_cancelled: bool = False
+    #: manager forces the close past a CANCELLED approval; never past one still deciding
+    force_approval: bool = False
     #: setting ``auto_approve_low_risk`` is on AND the effective risk level is ``low``
     auto_low_risk: bool = False
 
@@ -155,8 +161,13 @@ def _pair_allowed(ctx: GuardContext, *, system: bool) -> bool:
 
 def check_transition(ctx: GuardContext, *, system: bool = False) -> tuple[GuardFailure, ...]:
     """Every guard failure of the step ``ctx.phase -> ctx.to`` (empty = allowed)."""
-    # A change whose ticket later became a process ticket may only be cancelled by a manager.
-    if ctx.process_ticket and not (ctx.to == "cancelled" and ctx.is_manager and not system):
+    # A change whose ticket later became a process ticket may only be cancelled by a manager,
+    # from any phase that is not final (also implementing/review: that is its only exit).
+    if ctx.process_ticket:
+        if ctx.to == "cancelled" and ctx.is_manager and not system:
+            if ctx.phase in REOPENABLE_PHASES:
+                return ()
+            return (GuardFailure("transition_not_allowed"),)
         return (GuardFailure("process_ticket"),)
     pair = (ctx.phase, ctx.to)
     if not _pair_allowed(ctx, system=system):
@@ -175,8 +186,12 @@ def check_transition(ctx: GuardContext, *, system: bool = False) -> tuple[GuardF
     if to in ("approval", "scheduled", "implementing"):
         if not ctx.has_window:
             failures.append(GuardFailure("window_missing"))
-        if ctx.block_conflicts > 0 and not (manager and (ctx.override_reason or "").strip()):
-            failures.append(GuardFailure("block_conflict", overridable=True))
+        if ctx.block_conflicts > 0:
+            # the auto-approval route needs "no block finding": an override cannot open it
+            # (the manager takes the CAB route instead)
+            auto = pair == ("assessment", "scheduled")
+            if auto or not (manager and (ctx.override_reason or "").strip()):
+                failures.append(GuardFailure("block_conflict", overridable=not auto))
 
     if pair == ("assessment", "scheduled") and not ctx.auto_low_risk:
         failures.append(GuardFailure("auto_approval_not_eligible"))
@@ -208,8 +223,10 @@ def check_transition(ctx: GuardContext, *, system: bool = False) -> tuple[GuardF
             failures.append(GuardFailure("outcome_missing"))
         if pair == ("review", "closed") and typ != "standard" and not ctx.pir_notes_present:
             failures.append(GuardFailure("pir_missing"))
-        if ctx.approval_pending and not (manager and ctx.force):
-            failures.append(GuardFailure("approval_pending", overridable=True))
+        # only a cancelled approval may be forced past; a decision still pending never
+        forced = manager and ctx.force_approval and ctx.approval_cancelled
+        if ctx.approval_pending and not forced:
+            failures.append(GuardFailure("approval_pending", overridable=ctx.approval_cancelled))
         if ctx.approval_rejected and ctx.outcome == "successful":
             failures.append(GuardFailure("transition_not_allowed"))
 
@@ -222,9 +239,14 @@ def allowed_targets(
     *,
     emergency_post_approval: bool,
     standard_requires_review: bool,
-    auto_approve_low_risk: bool = False,
+    auto_approve_low_risk: bool,
 ) -> tuple[Phase, ...]:
-    """Targets a person may offer for ``phase`` (SYSTEM-only targets are left out)."""
+    """Targets a person may offer for ``phase`` (SYSTEM-only targets are left out).
+
+    ``auto_approve_low_risk`` has no default (fail-closed: callers state it). Preconditions are
+    assumed met, including ``cab_chosen`` (for an emergency change: the emergency CAB, else the
+    default CAB, is chosen); the guards of ``check_transition`` decide at the actual step.
+    """
     out: list[Phase] = []
     for to in PHASES:
         pair = (phase, to)

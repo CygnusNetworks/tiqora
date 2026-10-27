@@ -11,6 +11,7 @@ from tiqora.itsm.change.phases import (
     FINAL_PHASES,
     OUTCOMES,
     PHASES,
+    REOPENABLE_PHASES,
     SYSTEM_ONLY,
     TRANSITIONS,
     ChangeType,
@@ -267,14 +268,35 @@ def test_emergency_post_approval_paths() -> None:
     # closing is blocked while the approval is still pending; a manager may force it
     close = ctx(change_type="emergency", phase="review", to="closed", approval_pending=True)
     assert codes(close) == {"approval_pending"}
-    assert codes(replace(close, force=True)) == {"approval_pending"}
-    assert codes(replace(close, is_manager=True, force=True)) == set()
+    assert check_transition(close)[0].overridable is False
+    # a decision still pending is never bypassed: not by force, not by force_approval
+    for kw in (dict(force=True), dict(force_approval=True), dict(force=True, force_approval=True)):
+        assert codes(replace(close, is_manager=True, **kw)) == {"approval_pending"}  # type: ignore[arg-type]
+    # cancelled approval: a manager may force past it, only with force_approval
+    cancelled = replace(close, approval_cancelled=True)
+    assert check_transition(cancelled)[0].overridable is True
+    assert codes(replace(cancelled, is_manager=True, force=True)) == {"approval_pending"}
+    assert codes(replace(cancelled, force_approval=True)) == {"approval_pending"}  # not a manager
+    assert codes(replace(cancelled, is_manager=True, force_approval=True)) == set()
+    # forcing past open tasks does not force past the approval
+    both = replace(cancelled, phase="implementing", to="review", open_tasks=2, is_manager=True)
+    assert codes(replace(both, force=True)) == set()  # review is no close: approval not asked
+    done = replace(close, phase="review", approval_cancelled=True, is_manager=True, force=True)
+    assert codes(done) == {"approval_pending"}
     # the post-approval flag does not matter for the normal path
     assert allowed_targets(
-        "draft", "emergency", emergency_post_approval=False, standard_requires_review=False
+        "draft",
+        "emergency",
+        emergency_post_approval=False,
+        standard_requires_review=False,
+        auto_approve_low_risk=False,
     ) == ("approval", "cancelled")
     assert allowed_targets(
-        "draft", "emergency", emergency_post_approval=True, standard_requires_review=False
+        "draft",
+        "emergency",
+        emergency_post_approval=True,
+        standard_requires_review=False,
+        auto_approve_low_risk=False,
     ) == ("approval", "implementing", "cancelled")
 
 
@@ -300,7 +322,11 @@ def test_process_ticket_refused_everywhere() -> None:
 
 def test_allowed_targets_respects_flags() -> None:
     def at(phase: Phase, typ: ChangeType, **kw: bool) -> tuple[Phase, ...]:
-        flags = dict(emergency_post_approval=False, standard_requires_review=False)
+        flags = dict(
+            emergency_post_approval=False,
+            standard_requires_review=False,
+            auto_approve_low_risk=False,
+        )
         flags.update(kw)
         return allowed_targets(phase, typ, **flags)
 
@@ -327,3 +353,37 @@ def test_allowed_targets_respects_flags() -> None:
     for phase, typ in product(PHASES, CHANGE_TYPES):
         for to in at(phase, typ, emergency_post_approval=True, auto_approve_low_risk=True):
             assert "transition_not_allowed" not in codes(ctx(change_type=typ, phase=phase, to=to))
+
+
+def test_auto_low_risk_route_ignores_block_override() -> None:
+    c = ctx(
+        phase="assessment", to="scheduled", block_conflicts=1,
+        is_manager=True, override_reason="Fenster abgestimmt",
+    )  # fmt: skip
+    failure = check_transition(c)
+    assert [f.code for f in failure] == ["block_conflict"]
+    assert failure[0].overridable is False
+    # the manager can still take the CAB route with the override
+    assert check_transition(replace(c, to="approval")) == ()
+
+
+def test_reopenable_phases() -> None:
+    assert frozenset(PHASES) - FINAL_PHASES == REOPENABLE_PHASES
+    assert "rejected" in REOPENABLE_PHASES and "draft" in REOPENABLE_PHASES
+    assert not {"closed", "cancelled"} & REOPENABLE_PHASES
+
+
+def test_process_ticket_exit_from_every_non_final_phase() -> None:
+    for phase, typ in product(PHASES, CHANGE_TYPES):
+        c = ctx(change_type=typ, phase=phase, to="cancelled", process_ticket=True, is_manager=True)
+        expected = set() if phase in REOPENABLE_PHASES else {"transition_not_allowed"}
+        assert codes(c) == expected, (phase, typ)
+        assert codes(replace(c, is_manager=False)) == {"process_ticket"}
+        assert codes(c, system=True) == {"process_ticket"}
+
+
+def test_allowed_targets_needs_explicit_auto_flag() -> None:
+    with pytest.raises(TypeError):
+        allowed_targets(  # type: ignore[call-arg]
+            "assessment", "normal", emergency_post_approval=False, standard_requires_review=False
+        )
