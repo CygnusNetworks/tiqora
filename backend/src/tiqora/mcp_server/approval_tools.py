@@ -54,13 +54,17 @@ async def _publish(user_ids: Iterable[int]) -> None:
     annotations=_READONLY,
 )
 async def approval_list_mine(
-    ctx: Context, state: Literal["pending", "decided"] = "pending", limit: int = 20
+    ctx: Context,
+    state: Literal["pending", "decided"] = "pending",
+    limit: int = 20,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     """List the caller's approvals.
 
     Args:
         state: 'pending' (default) or 'decided'.
         limit: Maximum results (1-100).
+        offset: Rows to skip (paging).
     """
     user_id = _server._get_user_id(ctx)
     _server._assert_tool_allowed("approval_list_mine")
@@ -70,7 +74,7 @@ async def approval_list_mine(
             Actor.agent(user_id),
             state=state,
             limit=max(1, min(int(limit), LIST_LIMIT_MAX)),
-            offset=0,
+            offset=max(0, int(offset)),
         )
         labels = await detail.user_labels(
             session, [i.on_behalf_of for i in page.items if i.on_behalf_of is not None]
@@ -129,7 +133,8 @@ async def approval_get(ctx: Context, approval_id: int) -> dict[str, Any]:
 
 def _decide_gate(user_scopes: frozenset[str] | None) -> str | None:
     """Error code while the key may not decide, else None (scope checks; the setting follows)."""
-    if user_scopes is not None and not ({"*", "tool:approval_decide"} & user_scopes):
+    # an unrestricted key (no scopes stored) is not an explicit opt-in either
+    if user_scopes is None or not ({"*", "tool:approval_decide"} & user_scopes):
         return "tool_not_allowed"
     if not mcp_scopes_allow_write(user_scopes):
         return "write_scope_required"
@@ -145,6 +150,7 @@ def _decide_gate(user_scopes: frozenset[str] | None) -> str | None:
         "instruction of the key's owner. The first decision of a step with rule 'any' counts. "
         "Returns {ok, status, step_status} or {'error': code}."
     ),
+    annotations={"readOnlyHint": False, "destructiveHint": True},
 )
 async def approval_decide(
     ctx: Context,

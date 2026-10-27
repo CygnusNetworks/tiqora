@@ -124,12 +124,16 @@ async def _fail(name: str, args: dict[str, Any]) -> str:
     return str(exc.value)
 
 
-async def _vote_channel(session: AsyncSession, approval_id: int) -> list[str]:
+async def _votes(session: AsyncSession, approval_id: int) -> list[tuple[str, str]]:
     rows = await session.execute(
-        text("SELECT channel FROM tiqora_approval_vote WHERE approval_id = :a"),
+        text("SELECT channel, decided_by FROM tiqora_approval_vote WHERE approval_id = :a"),
         {"a": approval_id},
     )
-    return [r[0] for r in rows]
+    return [(r[0], str(r[1])) for r in rows]
+
+
+async def _vote_channel(session: AsyncSession, approval_id: int) -> list[str]:
+    return [channel for channel, _ in await _votes(session, approval_id)]
 
 
 @pytest.mark.db
@@ -208,7 +212,7 @@ async def test_decide_needs_write_scope(url_fixture: str, request: pytest.Fixtur
                     {"approval_id": aid, "decision": "approved", "comment": "ok"},
                 )
             assert done == {"ok": True, "status": "approved", "step_status": "approved"}
-            assert await _vote_channel(session, aid) == ["mcp"]
+            assert await _votes(session, aid) == [("mcp", Actor.agent(AG3).key)]
 
 
 @pytest.mark.db
@@ -244,6 +248,8 @@ async def test_decide_needs_explicit_tool_scope(
             aid = await _request(session)
             await _enable(session)
             for scopes in (
+                None,  # an unrestricted key is no explicit opt-in
+                frozenset(),
                 frozenset({"mcp:rw"}),
                 frozenset({"write"}),
                 frozenset({"mcp:rw", "tool:approval_list_mine"}),
