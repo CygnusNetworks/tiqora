@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession, get_session_factory_dep
 from tiqora.api.v1.itsm_change_schemas import (
     AdoptIn,
+    ChangeApprovalOut,
     ChangeCreatedOut,
     ChangeEventOut,
     ChangeOut,
@@ -25,6 +26,7 @@ from tiqora.api.v1.itsm_change_schemas import (
     FreezeOccurrencesOut,
     TaskOrderIn,
     TaskOut,
+    approval_out,
     change_out,
     event_out,
     freeze_occurrences_out,
@@ -70,6 +72,7 @@ from tiqora.itsm.change.tasks import (
     update_task,
 )
 from tiqora.itsm.change.templates import list_templates
+from tiqora.itsm.change.transitions import TransitionIn, read_approval, transition
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -179,6 +182,43 @@ async def patch_change(
     out = change_out(view)
     await session.commit()
     return out
+
+
+@router.post("/changes/{ticket_id:int}/transition", response_model=ChangeOut)
+async def post_change_transition(
+    ticket_id: int,
+    body: TransitionIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)],
+) -> ChangeOut:
+    """Move the change to another phase (needs ``rw``). Guard failures answer 409
+    ``transition_refused`` with ``failures: [{code, overridable}]``; a manager passes block
+    conflicts with ``override_reason`` and open tasks with ``force`` plus ``reason``."""
+    view = await transition(
+        session,
+        settings,
+        SysConfig(session),
+        ticket_id=ticket_id,
+        data=body,
+        user_id=user.id,
+        session_factory=factory,
+    )
+    out = change_out(view)
+    await session.commit()
+    return out
+
+
+@router.get("/changes/{ticket_id:int}/approval", response_model=ChangeApprovalOut)
+async def get_change_approval(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ChangeApprovalOut:
+    """The CAB approval of the current round as the approval engine sees it; votes are cast in
+    the approvals section. ``history_missing`` when the approval set was erased."""
+    return approval_out(
+        await read_approval(session, settings, ticket_id=ticket_id, user_id=user.id)
+    )
 
 
 @router.get("/changes/{ticket_id:int}/events", response_model=list[ChangeEventOut])

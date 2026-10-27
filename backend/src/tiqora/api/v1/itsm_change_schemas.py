@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from tiqora.approvals.contract import ApprovalStatus
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.itsm.change.freeze import Enforcement, FreezeOccurrences, Scope
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
@@ -14,6 +15,7 @@ from tiqora.itsm.change.phases import ChangeType, Phase
 from tiqora.itsm.change.service import ChangeView
 from tiqora.itsm.change.tasks import TaskKind, TaskView
 from tiqora.itsm.change.templates import TemplateDefaults, TemplateView
+from tiqora.itsm.change.transitions import ChangeApprovalView
 
 
 class ChangeStatusOut(BaseModel):
@@ -240,4 +242,58 @@ def freeze_occurrences_out(result: FreezeOccurrences) -> FreezeOccurrencesOut:
             for o in result.items
         ],
         truncated=result.truncated,
+    )
+
+
+class ApprovalSnapshotOut(BaseModel):
+    """The engine's view of one CAB approval round (vote counts ``None`` until it exposes them)."""
+
+    approval_id: int
+    approval_key: str
+    status: ApprovalStatus
+    reason: str | None
+    round: int
+    current_stage: int | None
+    created_at: UtcDateTime
+    decided_at: UtcDateTime | None
+    votes_total: int | None
+    votes_approved: int | None
+    votes_rejected: int | None
+
+
+class ChangeApprovalOut(BaseModel):
+    approval_id: int | None
+    approval_round: int
+    #: ``cab|template|risk|post``
+    approval_via: str | None
+    approved_at: UtcDateTime | None
+    snapshot: ApprovalSnapshotOut | None
+    #: an approval was requested but the engine no longer has it (erased):
+    #: "Freigabeverlauf nicht mehr vorhanden"
+    history_missing: bool
+
+
+def approval_out(view: ChangeApprovalView) -> ChangeApprovalOut:
+    snap = view.snapshot
+    return ChangeApprovalOut(
+        approval_id=view.approval_id,
+        approval_round=view.approval_round,
+        approval_via=view.approval_via,
+        approved_at=view.approved_at,
+        snapshot=None
+        if snap is None
+        else ApprovalSnapshotOut(
+            approval_id=snap.approval_id,
+            approval_key=snap.approval_key,
+            status=snap.status,
+            reason=snap.reason,
+            round=snap.round,
+            current_stage=snap.current_stage,
+            created_at=snap.created_at,
+            decided_at=snap.decided_at,
+            votes_total=snap.votes_total,
+            votes_approved=snap.votes_approved,
+            votes_rejected=snap.votes_rejected,
+        ),
+        history_missing=view.history_missing,
     )

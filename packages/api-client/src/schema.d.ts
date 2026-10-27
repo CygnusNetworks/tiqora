@@ -9554,6 +9554,27 @@ export interface paths {
         patch: operations["patch_change_api_v1_itsm_changes__ticket_id__patch"];
         trace?: never;
     };
+    "/api/v1/itsm/changes/{ticket_id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Approval
+         * @description The CAB approval of the current round as the approval engine sees it; votes are cast in
+         *     the approvals section. ``history_missing`` when the approval set was erased.
+         */
+        get: operations["get_change_approval_api_v1_itsm_changes__ticket_id__approval_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/changes/{ticket_id}/conflicts": {
         parameters: {
             query?: never;
@@ -9782,6 +9803,28 @@ export interface paths {
          * @description Kind, planned/actual window, effort and owner of one task.
          */
         patch: operations["patch_change_task_api_v1_itsm_changes__ticket_id__tasks__task_ticket_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/transition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Change Transition
+         * @description Move the change to another phase (needs ``rw``). Guard failures answer 409
+         *     ``transition_refused`` with ``failures: [{code, overridable}]``; a manager passes block
+         *     conflicts with ``override_reason`` and open tasks with ``force`` plus ``reason``.
+         */
+        post: operations["post_change_transition_api_v1_itsm_changes__ticket_id__transition_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/itsm/cis": {
@@ -15642,6 +15685,40 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /**
+         * ApprovalSnapshotOut
+         * @description The engine's view of one CAB approval round (vote counts ``None`` until it exposes them).
+         */
+        ApprovalSnapshotOut: {
+            /** Approval Id */
+            approval_id: number;
+            /** Approval Key */
+            approval_key: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Stage */
+            current_stage: number | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Round */
+            round: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "cancelled";
+            /** Votes Approved */
+            votes_approved: number | null;
+            /** Votes Rejected */
+            votes_rejected: number | null;
+            /** Votes Total */
+            votes_total: number | null;
+        };
         /** ArticleAttachmentIn */
         ArticleAttachmentIn: {
             /** Content Base64 */
@@ -16922,6 +16999,20 @@ export interface components {
             sort?: number | null;
             /** Valid */
             valid?: boolean | null;
+        };
+        /** ChangeApprovalOut */
+        ChangeApprovalOut: {
+            /** Approval Id */
+            approval_id: number | null;
+            /** Approval Round */
+            approval_round: number;
+            /** Approval Via */
+            approval_via: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** History Missing */
+            history_missing: boolean;
+            snapshot: components["schemas"]["ApprovalSnapshotOut"] | null;
         };
         /** ChangeCreateIn */
         ChangeCreateIn: {
@@ -30425,6 +30516,27 @@ export interface components {
              * @default false
              */
             rows: boolean;
+        };
+        /** TransitionIn */
+        TransitionIn: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /** Outcome */
+            outcome?: ("successful" | "failed" | "backed_out") | null;
+            /** Override Reason */
+            override_reason?: string | null;
+            /** Pir Notes */
+            pir_notes?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * To
+             * @enum {string}
+             */
+            to: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
         };
         /** TypeRefOut */
         TypeRefOut: {
@@ -56179,6 +56291,41 @@ export interface operations {
             };
         };
     };
+    get_change_approval_api_v1_itsm_changes__ticket_id__approval_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_change_conflicts_api_v1_itsm_changes__ticket_id__conflicts_get: {
         parameters: {
             query?: never;
@@ -56610,6 +56757,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_transition_api_v1_itsm_changes__ticket_id__transition_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
                 };
             };
             /** @description Validation Error */

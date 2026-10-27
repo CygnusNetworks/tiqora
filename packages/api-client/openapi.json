@@ -5253,6 +5253,120 @@
         "title": "AppointmentUpdateIn",
         "type": "object"
       },
+      "ApprovalSnapshotOut": {
+        "description": "The engine's view of one CAB approval round (vote counts ``None`` until it exposes them).",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "integer"
+          },
+          "approval_key": {
+            "title": "Approval Key",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_stage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Stage"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "votes_approved": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Votes Approved"
+          },
+          "votes_rejected": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Votes Rejected"
+          },
+          "votes_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Votes Total"
+          }
+        },
+        "required": [
+          "approval_id",
+          "approval_key",
+          "status",
+          "reason",
+          "round",
+          "current_stage",
+          "created_at",
+          "decided_at",
+          "votes_total",
+          "votes_approved",
+          "votes_rejected"
+        ],
+        "title": "ApprovalSnapshotOut",
+        "type": "object"
+      },
       "ArticleAttachmentIn": {
         "properties": {
           "content_base64": {
@@ -9028,6 +9142,72 @@
           }
         },
         "title": "CategoryUpdateIn",
+        "type": "object"
+      },
+      "ChangeApprovalOut": {
+        "properties": {
+          "approval_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "approval_round": {
+            "title": "Approval Round",
+            "type": "integer"
+          },
+          "approval_via": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Via"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "history_missing": {
+            "title": "History Missing",
+            "type": "boolean"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalSnapshotOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "approval_id",
+          "approval_round",
+          "approval_via",
+          "approved_at",
+          "snapshot",
+          "history_missing"
+        ],
+        "title": "ChangeApprovalOut",
         "type": "object"
       },
       "ChangeCreateIn": {
@@ -49280,6 +49460,88 @@
           }
         },
         "title": "Totals",
+        "type": "object"
+      },
+      "TransitionIn": {
+        "properties": {
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "successful",
+                  "failed",
+                  "backed_out"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Reason"
+          },
+          "pir_notes": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pir Notes"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to": {
+            "enum": [
+              "draft",
+              "submitted",
+              "assessment",
+              "approval",
+              "scheduled",
+              "implementing",
+              "review",
+              "closed",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
+        ],
+        "title": "TransitionIn",
         "type": "object"
       },
       "TypeRefOut": {
@@ -104304,6 +104566,81 @@
         ]
       }
     },
+    "/api/v1/itsm/changes/{ticket_id}/approval": {
+      "get": {
+        "description": "The CAB approval of the current round as the approval engine sees it; votes are cast in\nthe approvals section. ``history_missing`` when the approval set was erased.",
+        "operationId": "get_change_approval_api_v1_itsm_changes__ticket_id__approval_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeApprovalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Approval",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
     "/api/v1/itsm/changes/{ticket_id}/conflicts": {
       "get": {
         "description": "Freeze windows, overlapping changes and tasks off the window, from stored data only.\n\nAn overlapping change the caller cannot read is listed as ``hidden`` with its window and\ncounts, without a reference.",
@@ -105301,6 +105638,91 @@
           }
         },
         "summary": "Patch Change Task",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/transition": {
+      "post": {
+        "description": "Move the change to another phase (needs ``rw``). Guard failures answer 409\n``transition_refused`` with ``failures: [{code, overridable}]``; a manager passes block\nconflicts with ``override_reason`` and open tasks with ``force`` plus ``reason``.",
+        "operationId": "post_change_transition_api_v1_itsm_changes__ticket_id__transition_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Change Transition",
         "tags": [
           "itsm-change"
         ]

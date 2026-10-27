@@ -89,6 +89,8 @@ MAX_TEXT: Final = 100000
 #: Znuny state types of a finished ticket
 CLOSED_STATE_TYPES: Final = frozenset({"closed", "removed", "merged"})
 MAX_SERVICES: Final = 50
+#: plans the CAB decides on (frozen while the change is in ``approval``)
+_APPROVAL_LOCKED_TEXTS: Final = frozenset({"implementation_plan", "backout_plan", "test_plan"})
 
 
 # --- models ----------------------------------------------------------------------------------
@@ -455,6 +457,17 @@ async def _row(session: AsyncSession, ticket_id: int, *, lock: bool = False) -> 
     return row
 
 
+def _auto_eligible(row: TiqoraItsmChange) -> bool:
+    """The stored risk would take the low-risk route: offer it only then (the transition
+    evaluates again before taking it)."""
+    from tiqora.itsm.change.risk import stored_evaluation  # risk imports this module
+
+    evaluation = stored_evaluation(row)
+    return (
+        evaluation.effective_level == "low" and not evaluation.blocked and not evaluation.incomplete
+    )
+
+
 async def _view(
     session: AsyncSession,
     cfg: ItsmChangeSettings,
@@ -479,7 +492,7 @@ async def _view(
             change_type,
             emergency_post_approval=cfg.emergency_post_approval,
             standard_requires_review=cfg.standard_requires_review,
-            auto_approve_low_risk=cfg.auto_approve_low_risk,
+            auto_approve_low_risk=cfg.auto_approve_low_risk and _auto_eligible(row),
         )
     extra = await _extra_services(session, facts.ticket_id)
     services = tuple(
@@ -829,8 +842,10 @@ async def update_change(
 ) -> ChangeView:
     """Change fields of the record (never the phase). Needs ``rw``; final changes are read-only.
 
-    The change type moves only in ``draft``. Writes one ``updated`` event naming the changed
-    fields (none when nothing changed).
+    The change type moves only in ``draft``. While the CAB decides (``approval``) what it decides
+    on is frozen: change type, window, the three plans and the CAB answer 409
+    ``change_locked_in_approval``; later phases stay editable. Writes one ``updated`` event
+    naming the changed fields (none when nothing changed).
     """
     _ = sysconfig
     from tiqora.itsm.change.impact import enqueue_impact
@@ -845,7 +860,12 @@ async def update_change(
     changed: list[str] = []
     fields_set = data.model_fields_set
 
+    def locked(name: str) -> None:
+        if row.phase == "approval":
+            raise ChangeError("change_locked_in_approval", 409, field=name)
+
     if data.change_type is not None and data.change_type != row.change_type:
+        locked("change_type")
         if row.phase != "draft":
             raise ChangeError("change_type_locked", 409)
         if row.template_id is not None:
@@ -864,6 +884,8 @@ async def update_change(
         if name in fields_set and getattr(data, name) is not None:
             value = _clean(getattr(data, name))
             if value != getattr(row, name):
+                if name in _APPROVAL_LOCKED_TEXTS:
+                    locked(name)
                 setattr(row, name, value)
                 changed.append(name)
 
@@ -876,6 +898,7 @@ async def update_change(
     if start is not None and end is not None and end <= start:
         raise ChangeError("window_invalid", 422)
     if (start, end) != (row.planned_start, row.planned_end):
+        locked("window")
         row.planned_start, row.planned_end = start, end
         changed.append("window")
 
@@ -894,6 +917,7 @@ async def update_change(
             changed.append("services")
 
     if "cab_id" in fields_set and data.cab_id != row.cab_id:
+        locked("cab_id")
         await _check_cab(session, data.cab_id)
         row.cab_id = data.cab_id
         changed.append("cab_id")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
@@ -26,7 +26,7 @@ from tiqora.itsm.change.approval_port import (
     ApprovalSnapshot,
     set_approval_port_for_tests,
 )
-from tiqora.itsm.change.models import TiqoraItsmChange
+from tiqora.itsm.change.models import TiqoraItsmCab, TiqoraItsmCabMember, TiqoraItsmChange
 from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
 from tiqora.itsm.settings import ItsmSettings
 from tiqora.itsm.setup import apply_setup
@@ -188,6 +188,38 @@ async def make_change(
     session.add(row)
     await session.flush()
     return row
+
+
+async def make_cab(
+    session: AsyncSession,
+    *,
+    cab_id: int,
+    rule: str = "any",
+    members: Sequence[tuple[str, str]] = (),
+    quorum: int | None = None,
+    name: str | None = None,
+    valid: bool = True,
+) -> TiqoraItsmCab:
+    """A CAB board with members as engine approver entries ``(kind, ref)`` (flushed, not
+    committed). Seed band of Task 12: ids 947000-947099."""
+    now = datetime(2026, 10, 1, 8, 0, 0)
+    cab = TiqoraItsmCab(
+        id=cab_id,
+        name=name or f"chg94 CAB {cab_id}",
+        rule=rule,
+        quorum=quorum,
+        valid=valid,
+        created_at=now,
+        created_by=1,
+        updated_at=now,
+        updated_by=1,
+    )
+    session.add(cab)
+    await session.flush()
+    for kind, ref in members:
+        session.add(TiqoraItsmCabMember(cab_id=cab_id, member_kind=kind, member_ref=ref))
+    await session.flush()
+    return cab
 
 
 # --- the service/API world -------------------------------------------------------------------
