@@ -17172,6 +17172,8 @@ export interface components {
             evaluated_at: string | null;
             /** Findings */
             findings: components["schemas"]["ChangeRiskFindingOut"][];
+            /** Incomplete */
+            incomplete: boolean;
             /** Level */
             level: string | null;
             /** Override Level */

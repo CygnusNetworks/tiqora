@@ -9905,6 +9905,10 @@
             "title": "Findings",
             "type": "array"
           },
+          "incomplete": {
+            "title": "Incomplete",
+            "type": "boolean"
+          },
           "level": {
             "anyOf": [
               {
@@ -9977,6 +9981,7 @@
           "evaluated_at",
           "findings",
           "blocked",
+          "incomplete",
           "thresholds",
           "can_answer",
           "can_override"

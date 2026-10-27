@@ -1137,3 +1137,176 @@ async def test_risk_finding_lists_only_readable_incidents(
         "ticket_not_found",
         404,
     )
+
+
+# --- review round 1 ----------------------------------------------------------------------------
+
+
+async def test_incomplete_flag_for_failed_check_and_truncated_impact(
+    w: ChangeWorld, make_client: Callable[[int, str], AsyncClient], request: pytest.FixtureRequest
+) -> None:
+    tid = await _change(w)
+    ev = await evaluate_risk(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    assert (ev.level, ev.incomplete, ev.blocked) == ("low", False, False)
+
+    row = await _row(w, tid)
+    row.impact_truncated = True
+    await w.session.flush()
+    cut = await evaluate_risk(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    assert cut.incomplete is True and cut.level == "low" and cut.blocked is False
+    async with make_client(U_FULL, "chg94-full") as agent:
+        body = (await agent.get(f"/api/v1/itsm/changes/{tid}/risk")).json()
+        assert body["incomplete"] is True
+    row.impact_truncated = False
+    await w.session.flush()
+
+    async def boom(_session: Any, _inp: RiskInput) -> list[RiskFinding]:
+        raise RuntimeError("check broke")
+
+    _with_checks(request, RiskCheck("test.boom", boom))
+    failed = await evaluate_risk(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    assert failed.incomplete is True and failed.blocked is False and failed.level == "low"
+    async with make_client(U_FULL, "chg94-full") as agent:
+        assert (await agent.get(f"/api/v1/itsm/changes/{tid}/risk")).json()["incomplete"] is True
+    set_registry_for_tests(None)
+    ok = await evaluate_risk(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    assert ok.incomplete is False
+
+
+async def test_extension_findings_are_bounded(
+    w: ChangeWorld, request: pytest.FixtureRequest
+) -> None:
+    async def noisy(_session: Any, _inp: RiskInput) -> list[RiskFinding]:
+        refs = tuple(f"ticket:{i}" for i in range(50)) + ("Titel mit Text", "ticket:abc", "x:1")
+        params = {f"p{i}": i for i in range(30)} | {"text": "freier Text", "flag": True}
+        one = RiskFinding("test.noisy", "info", 1, "m" * 500, params, refs)
+        return [one] * 40
+
+    _with_checks(request, RiskCheck("test.noisy", noisy))
+    tid = await _change(w)
+    ev = await evaluate_risk(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    found = [f for f in ev.findings if f.check_key == "test.noisy"]
+    assert len(found) == 20
+    first = found[0]
+    assert first.refs == tuple(f"ticket:{i}" for i in range(10))
+    assert len(first.params) == 10 and all(isinstance(v, int) for v in first.params.values())
+    assert "text" not in first.params and "flag" not in first.params
+    assert len(first.message_key) == 200
+
+
+async def test_failed_history_is_limited(w: ChangeWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tiqora.itsm.change import risk as risk_module
+
+    monkeypatch.setattr(risk_module, "FAILED_HISTORY_CAP", 2)
+    tid = await _change(w, services=[SVC_A])
+    for n in range(4):
+        ticket_id = 946955 + n
+        await make_change(
+            w.session, ticket_id, phase="closed", outcome="failed", actual_end=utc_now()
+        )
+        w.session.add(
+            TiqoraItsmChangeImpact(
+                ticket_id=ticket_id, kind="service", ref_key=str(SVC_A), direct=True
+            )
+        )
+    await w.session.flush()
+    (f,) = await _check(w, tid, "failed_history")
+    assert dict(f.params)["count"] == 2
+    assert f.refs == ("ticket:946958", "ticket:946957")  # the newest ones
+
+
+async def test_service_behind_unreadable_ci_is_not_named(
+    w: ChangeWorld, make_client: Callable[[int, str], AsyncClient]
+) -> None:
+    await _meta(w, SVC_B, "5 very high")
+    secret_ci = await _ci(w, "srv-db-11.example.org", group_id=G_B)
+    tid = await _change(w, services=[SVC_A], impacted_services=[SVC_B], impacted_cis=[secret_ci])
+    await evaluate_risk(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    assert f"service:{SVC_B}" in ((await _row(w, tid)).risk_findings or "")
+
+    (crit,) = [
+        f
+        for f in await read_findings(w.session, ticket_id=tid, user_id=U_FULL)
+        if f.check_key == "core.service_criticality"
+    ]
+    assert crit.refs == [] and crit.hidden_ref_count == 1 and crit.params["criticality"] == 5
+    async with make_client(U_FULL, "chg94-full") as agent:
+        res = await agent.get(f"/api/v1/itsm/changes/{tid}/risk")
+        assert f"service:{SVC_B}" not in res.text.replace(" ", "")
+
+    # access to the class that holds the CI is not enough alone to name a service the CI
+    # does not reach; with the class readable and the CI linked to the service it is named
+    from tiqora.cmdb.links import LinkEnd, LinkService
+    from tiqora.cmdb.service import system_access
+
+    for key in ("ro", "rw"):
+        await w.session.execute(
+            text(
+                "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+                " create_by, change_time, change_by) VALUES (:u, :g, :k, :t, 1, :t, 1)"
+            ),
+            {"u": U_FULL, "g": G_B, "k": key, "t": datetime(2026, 10, 1)},
+        )
+    await LinkService(w.session).add(
+        system_access(U_FULL),
+        source=LinkEnd("service", str(SVC_B)),
+        target=LinkEnd("ci", str(secret_ci)),
+        link_type_key="DependsOn",
+        enforce_permissions=False,
+    )
+    (crit,) = [
+        f
+        for f in await read_findings(w.session, ticket_id=tid, user_id=U_FULL)
+        if f.check_key == "core.service_criticality"
+    ]
+    assert crit.refs == [f"service:{SVC_B}"] and crit.hidden_ref_count == 0
+
+
+async def test_answers_to_invalid_questions_survive_a_put(w: ChangeWorld) -> None:
+    q1 = await create_question(w.session, data=_question("q1"), user_id=1)
+    q2 = await create_question(w.session, data=_question("q2"), user_id=1)
+    tid = await _change(w)
+    await set_answers(
+        w.session, APP_SETTINGS, ticket_id=tid, answers={"q1": "yes", "q2": "yes"}, user_id=U_FULL
+    )
+    await update_question(
+        w.session, question_id=q2.id, data=_question("q2", valid=False), user_id=1
+    )
+    ev = await set_answers(
+        w.session, APP_SETTINGS, ticket_id=tid, answers={"q1": "no"}, user_id=U_FULL
+    )
+    assert ev.score == 0  # the invalid question's answer is ignored in scoring
+    kept = (
+        (
+            await w.session.execute(
+                text(
+                    "SELECT answer_key FROM tiqora_itsm_change_risk_answer WHERE ticket_id = :t"
+                    " AND question_key = 'q2'"
+                ),
+                {"t": tid},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert kept == ["yes"]
+    # a question the PUT leaves out while it is valid is still cleared
+    await set_answers(w.session, APP_SETTINGS, ticket_id=tid, answers={}, user_id=U_FULL)
+    left = (
+        (
+            await w.session.execute(
+                text(
+                    "SELECT question_key FROM tiqora_itsm_change_risk_answer WHERE ticket_id = :t"
+                ),
+                {"t": tid},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert left == ["q2"]
+    # valid again: the old answer counts again
+    await update_question(w.session, question_id=q2.id, data=_question("q2"), user_id=1)
+    inp = await risk_input(w.session, APP_SETTINGS, ticket_id=tid)
+    assert dict(inp.answers) == {"q2": "yes"} and inp.answer_points == 4
+    assert q1.id != q2.id

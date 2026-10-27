@@ -72,6 +72,8 @@ REF_CAP: Final = 10
 _KEY: Final = "itsm.change.risk.findings."
 CHECK_FAILED_KEY: Final = _KEY + "check_failed"
 _MAX_POINTS: Final = 1000
+#: closed failed changes examined per direct-ref chunk
+FAILED_HISTORY_CAP: Final = 200
 _EXAMPLE_KEYS: Final = ("downtime", "backout_tested", "users_affected", "experience")
 
 
@@ -148,11 +150,24 @@ class RiskEvaluation:
     effective_level: str | None
     findings: tuple[RiskFinding, ...]
     evaluated_at: datetime | None
+    #: the change's impact set is cut off (the checks saw only part of it)
+    impact_truncated: bool = False
 
     @property
     def blocked(self) -> bool:
         """A ``block`` finding stops the change at its guards."""
         return any(f.severity == "block" for f in self.findings)
+
+    @property
+    def incomplete(self) -> bool:
+        """The evaluation may under-count: a check failed or the impact set is truncated.
+
+        An incomplete ``low`` is not evidence of low risk; guards must not use it to skip the
+        approval (the auto-approve route refuses it).
+        """
+        return self.impact_truncated or any(
+            f.message_key == CHECK_FAILED_KEY for f in self.findings
+        )
 
 
 def score_level(score: int, cfg: ItsmChangeSettings) -> str:
@@ -641,6 +656,9 @@ async def _failed_history(session: AsyncSession, inp: RiskInput) -> list[RiskFin
                     TiqoraItsmChangeImpact.direct.is_(True),
                     TiqoraItsmChangeImpact.ref_key.in_([str(i) for i in chunk]),
                 )
+                .distinct()
+                .order_by(TiqoraItsmChange.ticket_id.desc())
+                .limit(FAILED_HISTORY_CAP)
             )
             found.update(int(r[0]) for r in rows)
     if not found:
@@ -690,14 +708,30 @@ def core_risk_checks() -> list[RiskCheck]:
 # --- evaluation ------------------------------------------------------------------------------
 
 
+_REF_RE: Final = re.compile(r"^(ticket|ci|service|freeze):[0-9]{1,18}$")
+#: findings one check may report, params and text lengths (ruling F26)
+MAX_FINDINGS_PER_CHECK: Final = 20
+MAX_PARAMS: Final = 10
+
+
 def _sanitize(found: RiskFinding, check_key: str) -> RiskFinding:
+    """Bound what an extension check returns: ids only as ``kind:<digits>`` refs (at most
+    :data:`REF_CAP`), params only short-named numbers, keys and keys' lengths capped."""
     severity: Severity = found.severity if found.severity in _SEVERITIES else "warn"
+    params = {
+        str(k)[:50]: v
+        for k, v in list(found.params.items())[:MAX_PARAMS]
+        if isinstance(v, int | float) and not isinstance(v, bool | str)
+    }
+    refs = tuple(r for r in found.refs if isinstance(r, str) and _REF_RE.match(r))[:REF_CAP]
     return replace(
         found,
-        check_key=found.check_key or check_key,
+        check_key=(found.check_key or check_key)[:100],
         severity=severity,
         points=max(0, min(_MAX_POINTS, int(found.points))),
-        refs=tuple(found.refs),
+        message_key=str(found.message_key)[:200],
+        params=params,
+        refs=refs,
     )
 
 
@@ -713,7 +747,7 @@ async def _run_checks(session: AsyncSession, inp: RiskInput) -> list[RiskFinding
             )
             out.append(RiskFinding(check.key, "warn", 0, CHECK_FAILED_KEY, {}, ()))
             continue
-        out.extend(_sanitize(f, check.key) for f in found)
+        out.extend(_sanitize(f, check.key) for f in list(found)[:MAX_FINDINGS_PER_CHECK])
     return out
 
 
@@ -763,6 +797,7 @@ def stored_evaluation(row: TiqoraItsmChange) -> RiskEvaluation:
         effective_level=row.risk_override_level or row.risk_level,
         findings=_load_findings(row.risk_findings),
         evaluated_at=row.risk_evaluated_at,
+        impact_truncated=bool(row.impact_truncated),
     )
 
 
@@ -833,7 +868,8 @@ async def set_answers(
         ).scalars()
     }
     for question_key, old in existing.items():
-        if question_key not in points:
+        # answers to questions marked invalid stay (they are ignored in scoring)
+        if question_key in questions and question_key not in points:
             await session.delete(old)
     for question_key, (answer_key, answer_points) in points.items():
         current = existing.get(question_key)
@@ -937,6 +973,8 @@ class ChangeRiskOut(BaseModel):
     evaluated_at: UtcDateTime | None
     findings: list[ChangeRiskFindingOut]
     blocked: bool
+    #: the score may under-count (a check failed or the impact set is truncated)
+    incomplete: bool
     thresholds: ChangeRiskThresholdsOut
     can_answer: bool
     can_override: bool
@@ -1050,6 +1088,7 @@ async def read_risk(
         evaluated_at=evaluation.evaluated_at,
         findings=await _findings_out(session, ticket_id, user_id, evaluation.findings),
         blocked=evaluation.blocked,
+        incomplete=evaluation.incomplete,
         thresholds=ChangeRiskThresholdsOut(
             medium_from=cfg.risk_medium_from,
             high_from=cfg.risk_high_from,
