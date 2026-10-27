@@ -434,6 +434,15 @@ async def test_request_during_a_pass_runs_it_again_up_to_three_passes(
         row = await _row(w, tid)
         assert not impact_is_current(row)  # the newest request is still open
 
+        # the job gave up: the next refresh tick queues the change again, no 24 h wait
+        await w.session.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.dedupe_key == f"change:{tid}")
+            .values(status="succeeded")
+        )
+        assert await refresh_stale_impacts(w.session, ItsmChangeSettings()) == 1
+        assert len(await _jobs(w, tid)) == 2
+
 
 @pytest.mark.parametrize("url_fixture", URL_FIXTURES)
 async def test_create_and_update_enqueue_impact(
@@ -459,6 +468,7 @@ async def test_create_and_update_enqueue_impact(
         assert (await _row(w, tid)).impact_requested_at == mark
 
         # other services do; the queued job is joined, the request is stamped again
+        w.session.info.pop(impact_module._STAMPED_KEY, None)  # a new request = a new transaction
         await update_change(
             w.session,
             APP_SETTINGS,
@@ -471,6 +481,7 @@ async def test_create_and_update_enqueue_impact(
         assert (await _row(w, tid)).impact_requested_at > mark  # type: ignore[operator]
 
         # once the job is done a new request queues a new one
+        w.session.info.pop(impact_module._STAMPED_KEY, None)
         await w.session.execute(
             update(TiqoraJob).where(TiqoraJob.id == job.id).values(status="succeeded")
         )
@@ -563,7 +574,7 @@ async def test_refresh_stale_impacts_limit(
     url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async with _world(request, url_fixture) as w:
-        now = utc_now()
+        now = utc_now().replace(microsecond=0)  # MariaDB DATETIME drops fractions
         old = now - timedelta(hours=30)
         older = now - timedelta(hours=90)
         a, b, c, d, e, f, g = (T_PLAIN + i for i in range(7))
@@ -574,12 +585,21 @@ async def test_refresh_stale_impacts_limit(
         await make_change(w.session, e, phase="cancelled", impact_computed_at=None)  # final
         await make_change(w.session, f, phase="scheduled", impact_computed_at=now)  # fresh
         await make_change(w.session, g, phase="implementing", impact_computed_at=old)
+        # computed recently, but a request is newer than the computation (a missed trigger)
+        h = T_PLAIN + 7
+        await make_change(
+            w.session,
+            h,
+            phase="scheduled",
+            impact_computed_at=now - timedelta(minutes=5),
+            impact_requested_at=now - timedelta(minutes=1),
+        )
         cfg = ItsmChangeSettings()  # impact_refresh_hours = 24
 
-        monkeypatch.setattr(impact_module, "REFRESH_LIMIT", 2)
-        assert await refresh_stale_impacts(w.session, cfg) == 2
-        # never computed first, then the oldest
-        assert [bool(await _jobs(w, t)) for t in (a, b, c, d, e, f, g)] == [
+        monkeypatch.setattr(impact_module, "REFRESH_LIMIT", 3)
+        assert await refresh_stale_impacts(w.session, cfg) == 3
+        # never computed and pending requests first, then the oldest
+        assert [bool(await _jobs(w, t)) for t in (a, b, c, d, e, f, g, h)] == [
             False,
             True,
             True,
@@ -587,20 +607,23 @@ async def test_refresh_stale_impacts_limit(
             False,
             False,
             False,
+            True,
         ]
         # the stored set stays valid while it is refreshed: no request stamp
         assert (await _row(w, b)).impact_requested_at is None
+        assert (await _row(w, h)).impact_requested_at == now - timedelta(minutes=1)
 
         monkeypatch.setattr(impact_module, "REFRESH_LIMIT", 200)
         # b and c are joined (their jobs are still queued), a and g are new
-        assert await refresh_stale_impacts(w.session, cfg) == 4
-        assert [bool(await _jobs(w, t)) for t in (a, b, c, d, e, f, g)] == [
+        assert await refresh_stale_impacts(w.session, cfg) == 5
+        assert [bool(await _jobs(w, t)) for t in (a, b, c, d, e, f, g, h)] == [
             True,
             True,
             True,
             False,
             False,
             False,
+            True,
             True,
         ]
 
@@ -656,8 +679,10 @@ async def test_impact_omits_unreadable_ci(url_fixture: str, request: pytest.Fixt
         await _link(w, ("ci", shown), ("ticket", tid), "RelevantTo")
         await _link(w, ("ci", secret), ("ticket", tid), "RelevantTo")
         await _link(w, ("ci", shown), ("ci", secret), "DependsOn")
+        # a service that only the hidden CI leads to
+        await _link(w, ("service", SERVICE_IMPACTED), ("ci", secret), "DependsOn")
         await run_change_impact_job(_ctx(w), ChangeImpactPayload(ticket_id=tid, user_id=U_FULL))
-        assert len(await _rows(w, tid)) == 3  # both CIs and the service are stored
+        assert len(await _rows(w, tid)) == 4  # both CIs and both services are stored
 
         async with _client(w) as client:
             res = await client.get(f"/api/v1/itsm/changes/{tid}/impact")
@@ -672,7 +697,10 @@ async def test_impact_omits_unreadable_ci(url_fixture: str, request: pytest.Fixt
                 str(c["ci_id"]) for c in body["cis"]
             }
             assert body["stale"] is False and body["truncated"] is False
+            # the service reached only through the hidden CI is left out and counted
             assert [s["service_id"] for s in body["services"]] == [SERVICE]
+            assert body["hidden_service_count"] == 1
+            assert "chg94-service-impacted" not in res.text
 
             # a user without ro on the change ticket gets the same 404 as for a missing one
         async with _client(w, U_NONE) as outsider:
@@ -749,3 +777,20 @@ async def test_recompute_endpoint_queues_job(
                 user_id=U_FULL,
                 sysconfig=SysConfig(w.session),
             )
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_request_stamped_once_per_transaction(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with _world(request, url_fixture) as w:
+        refs = []
+        for i in range(8):
+            ci = await _ci(w, f"srv-app-{i:02d}.example.org", group_id=G_A, class_key="chg94srv")
+            refs.append(f"tiqora:{ci}")
+        tid = await _change(w, ci_refs=refs)  # eight links + the explicit request
+        stamp = (await _row(w, tid)).impact_requested_at
+        assert stamp is not None
+        # one stamp, not nine seconds ahead of the clock
+        assert stamp <= utc_now().replace(microsecond=0) + timedelta(seconds=1)
+        assert len(await _jobs(w, tid)) == 1

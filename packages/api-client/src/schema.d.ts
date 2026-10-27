@@ -16742,6 +16742,8 @@ export interface components {
             computed_at: string | null;
             /** Hidden Ci Count */
             hidden_ci_count: number;
+            /** Hidden Service Count */
+            hidden_service_count: number;
             /** Incidents */
             incidents: components["schemas"]["ImpactIncidentOut"][];
             /** Incidents Truncated */

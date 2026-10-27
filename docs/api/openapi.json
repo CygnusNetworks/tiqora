@@ -9283,6 +9283,10 @@
             "title": "Hidden Ci Count",
             "type": "integer"
           },
+          "hidden_service_count": {
+            "title": "Hidden Service Count",
+            "type": "integer"
+          },
           "incidents": {
             "items": {
               "$ref": "#/components/schemas/ImpactIncidentOut"
@@ -9329,6 +9333,7 @@
           "truncated",
           "cis",
           "hidden_ci_count",
+          "hidden_service_count",
           "services",
           "incidents",
           "incidents_truncated"

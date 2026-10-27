@@ -525,8 +525,11 @@ async def affected_set(
         reach |= found
         truncated = truncated or cut
         if len(reach) >= cap:
-            # the cap is shared: roots still to come would only be cut again
-            truncated = truncated or any(r not in reach for r in roots[index + 1 :])
+            # the cap is shared: roots still to come would only be cut again; they stay in the
+            # set (the trim below keeps roots first), their own reach is not followed
+            rest = {r for r in roots[index + 1 :] if r not in reach}
+            reach |= rest
+            truncated = truncated or bool(rest)
             break
     if len(reach) > cap:
         # the roots stay, the rest is cut in id order
@@ -541,6 +544,14 @@ async def affected_set(
         service_ids=frozenset(int(r.id) for r in services),
         truncated=truncated,
     )
+
+
+async def services_reached_from(session: AsyncSession, ci_ids: Iterable[int]) -> frozenset[int]:
+    """Services an incident at any of ``ci_ids`` travels to (the rule of :func:`affected`), no
+    permission filter: the caller decides which CIs to pass."""
+    props = await LinkTypeService(session).propagating()
+    found = await _affected_services(session, sorted(set(ci_ids)), props)
+    return frozenset(int(r.id) for r in found)
 
 
 async def _linked_customers(session: AsyncSession, ci_ids: Sequence[int]) -> list[CmdbNamedRefOut]:
@@ -628,4 +639,11 @@ async def affected(
     )
 
 
-__all__ = ["AffectedSet", "affected", "affected_set", "impact_graph", "tickets_for_ci"]
+__all__ = [
+    "AffectedSet",
+    "affected",
+    "affected_set",
+    "impact_graph",
+    "services_reached_from",
+    "tickets_for_ci",
+]

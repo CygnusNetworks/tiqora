@@ -12,9 +12,11 @@ Re-computation is requested by :func:`enqueue_impact`. Each request moves ``impa
 strictly forward (whole seconds: MariaDB ``DATETIME`` drops fractions, so two requests in one
 second would be indistinguishable otherwise). A pass remembers the request it answers, stores
 ``max(that request, start - 1 s)`` as ``impact_computed_at`` and, when the stamp moved while it
-ran, the job runs another pass (at most :data:`MAX_PASSES`). Any later request is greater than the
-stored computation time, so "computed" (``impact_is_current``) means "computed after the last
-request".
+ran, the job runs another pass (at most :data:`MAX_PASSES`). A request stamped after the pass
+started is greater than the stored computation time; one that was stamped earlier but committed
+after the pass read the row is caught by the loop's re-read. When the loop gives up (three
+passes) or such a request joined a job that was already past its re-read, ``impact_requested_at``
+stays above ``impact_computed_at`` and the next refresh tick queues the change again.
 
 Nothing here commits except the job; no JOIN between ``tiqora_*`` and Znuny tables.
 """
@@ -30,7 +32,7 @@ from pydantic import BaseModel
 from sqlalchemy import bindparam, case, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.cmdb.impact import affected_set
+from tiqora.cmdb.impact import affected_set, services_reached_from
 from tiqora.cmdb.links import LinkService
 from tiqora.cmdb.propagation import service_incident_states
 from tiqora.cmdb.settings import load_cmdb_settings
@@ -72,6 +74,7 @@ INCIDENT_LIST_CAP: Final = 50
 #: incident rows read before the permission filter
 INCIDENT_SCAN_CAP: Final = 500
 SYSTEM_USER_ID: Final = 1
+_STAMPED_KEY: Final = "itsm_change_impact_stamped"
 
 
 # --- recompute -------------------------------------------------------------------------------
@@ -196,6 +199,24 @@ async def recompute_impact(
 # --- queueing --------------------------------------------------------------------------------
 
 
+def _stamp_once(session: AsyncSession, row: TiqoraItsmChange) -> None:
+    """Move the request stamp forward, once per transaction and change.
+
+    Stamps written inside one transaction are invisible to the job until it commits, so one is
+    enough (``create_change`` links up to 50 CIs). Tracked in ``session.info`` by transaction,
+    because the flush in ``enqueue_job`` resets the attribute history.
+    """
+    txn = session.sync_session.get_transaction()
+    seen = session.info.get(_STAMPED_KEY)
+    if seen is None or seen[0] is not txn:
+        seen = (txn, set())
+        session.info[_STAMPED_KEY] = seen
+    if row.ticket_id in seen[1]:
+        return
+    seen[1].add(row.ticket_id)
+    row.impact_requested_at = _next_stamp(row.impact_requested_at)
+
+
 def _next_stamp(old: datetime | None) -> datetime:
     """A request time in whole seconds that is greater than every earlier one."""
     now = utc_now().replace(microsecond=0)
@@ -210,7 +231,7 @@ async def _enqueue(
         return None
     if mark_requested:
         # also when a job is queued or running already: its loop and the guard see the request
-        row.impact_requested_at = _next_stamp(row.impact_requested_at)
+        _stamp_once(session, row)
     job = await enqueue_job(
         session,
         kind=ITSM_CHANGE_IMPACT_KIND,
@@ -240,7 +261,9 @@ async def refresh_stale_impacts(session: AsyncSession, cfg: ItsmChangeSettings) 
     """Queue the active changes whose impact is older than ``impact_refresh_hours`` (or was never
     computed), oldest first, at most :data:`REFRESH_LIMIT` per call. Returns how many.
 
-    The refresh does not stamp ``impact_requested_at``: the stored set stays valid meanwhile.
+    Also picks changes with a request newer than the computation (a request the job missed, or
+    the three-pass bail-out). The refresh does not stamp ``impact_requested_at`` itself: a valid
+    stored set stays valid meanwhile.
     """
     cutoff = utc_now() - timedelta(hours=cfg.impact_refresh_hours)
     computed = TiqoraItsmChange.impact_computed_at
@@ -250,10 +273,18 @@ async def refresh_stale_impacts(session: AsyncSession, cfg: ItsmChangeSettings) 
                 select(TiqoraItsmChange.ticket_id)
                 .where(
                     TiqoraItsmChange.phase.in_(sorted(REOPENABLE_PHASES)),
-                    (computed.is_(None)) | (computed < cutoff),
+                    (computed.is_(None))
+                    | (computed < cutoff)
+                    | (TiqoraItsmChange.impact_requested_at > computed),
                 )
                 .order_by(
-                    case((computed.is_(None), 0), else_=1), computed, TiqoraItsmChange.ticket_id
+                    case(
+                        (computed.is_(None), 0),
+                        (TiqoraItsmChange.impact_requested_at > computed, 0),
+                        else_=1,
+                    ),
+                    computed,
+                    TiqoraItsmChange.ticket_id,
                 )
                 .limit(REFRESH_LIMIT)
             )
@@ -375,6 +406,8 @@ class ChangeImpactOut(BaseModel):
     cis: list[ImpactCiOut]
     #: CIs of the set the caller may not read, a number only
     hidden_ci_count: int
+    #: services reached only through hidden CIs, a number only
+    hidden_service_count: int
     services: list[ImpactServiceOut]
     #: open incidents on the services that the caller may read (at most 50, newest first)
     incidents: list[ImpactIncidentOut]
@@ -509,6 +542,10 @@ async def read_impact(
     service_ids = sorted(svc_direct)
     names = await _service_names(session, service_ids)
     states = await service_incident_states(session, service_ids)
+    # services reached only through CIs the caller cannot read stay hidden (like cmdb.affected)
+    via_visible = await services_reached_from(session, [ref.id for ref in summaries])
+    shown_ids = [sid for sid in service_ids if svc_direct[sid] or sid in via_visible]
+    hidden_services = sum(1 for sid in service_ids if sid in names and sid not in shown_ids)
     services = sorted(
         (
             ImpactServiceOut(
@@ -517,7 +554,7 @@ async def read_impact(
                 incident_functionality=_functionality(states[sid].state),
                 direct=svc_direct[sid],
             )
-            for sid in service_ids
+            for sid in shown_ids
             if sid in names
         ),
         key=lambda s: (not s.direct, s.name.casefold(), s.service_id),
@@ -545,6 +582,7 @@ async def read_impact(
         truncated=bool(row.impact_truncated),
         cis=cis,
         hidden_ci_count=len(ci_direct) - len(summaries),
+        hidden_service_count=hidden_services,
         services=services,
         incidents=incidents,
         incidents_truncated=len(newest) > INCIDENT_LIST_CAP,
