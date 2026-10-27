@@ -97,6 +97,40 @@ ITSM_TICKET_TABLES: tuple[str, ...] = (
     "tiqora_itsm_problem",
 )
 
+# ITSM change records (tiqora-owned): NOT in ITSM_TICKET_TABLES, because the anonymise path
+# keeps the change record (it drives phases, CAB and the calendar) and only blanks its texts
+# (``_CHANGE_TEXT_COLUMNS``). Hard delete removes them, child first; the agenda items and task
+# rows are reached through ``change_ticket_id`` before the change row itself (the FK cascade
+# would skip the backup). A task ticket's own row goes by its ``ticket_id``.
+_CHANGE_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
+    ("tiqora_itsm_cab_agenda_item", "change_ticket_id", "ticket"),
+    ("tiqora_itsm_change_task", "change_ticket_id", "ticket"),
+    ("tiqora_itsm_change_task", "ticket_id", "ticket"),
+    ("tiqora_itsm_change_event", "ticket_id", "ticket"),
+    ("tiqora_itsm_change_risk_answer", "ticket_id", "ticket"),
+    ("tiqora_itsm_change_impact", "ticket_id", "ticket"),
+    ("tiqora_itsm_change_service", "ticket_id", "ticket"),
+    ("tiqora_itsm_change", "ticket_id", "ticket"),
+)
+CHANGE_TICKET_TABLES: tuple[str, ...] = tuple(dict.fromkeys(t for t, _, _ in _CHANGE_DELETE_ORDER))
+#: Primary key columns of the change tables that have no single ``id``/``ticket_id`` key: a
+#: backup row must name the whole key, or rollback would restore one row of a ticket only.
+_BACKUP_PK_COLUMNS: dict[str, tuple[str, ...]] = {
+    "tiqora_itsm_change_task": ("ticket_id",),
+    "tiqora_itsm_change_risk_answer": ("ticket_id", "question_key"),
+    "tiqora_itsm_change_impact": ("ticket_id", "kind", "ref_key"),
+    "tiqora_itsm_change_service": ("ticket_id", "service_id"),
+}
+#: Free-text columns blanked (set NULL) on anonymise; the change record itself stays.
+_CHANGE_TEXT_COLUMNS: tuple[str, ...] = (
+    "reason",
+    "implementation_plan",
+    "backout_plan",
+    "test_plan",
+    "pir_notes",
+    "risk_override_reason",
+)
+
 # Optional ticket HARD-DELETE (delete_tickets): every table with a FK to
 # ticket/article, in FK-safe DELETE order (children → parents). Each entry is
 # (table, fk_column, scope) where scope selects ticket_ids vs article_ids. Rows
@@ -123,6 +157,7 @@ _TICKET_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
     # ticket (root cause, workaround, update bodies). Updates are deleted explicitly before
     # their major incident so every row is backed up (the FK cascade would skip the backup).
     *((table, "ticket_id", "ticket") for table in ITSM_TICKET_TABLES),
+    *_CHANGE_DELETE_ORDER,
     ("article_search_index", "ticket_id", "ticket"),  # FK to article + ticket
     ("time_accounting", "ticket_id", "ticket"),  # FK to article + ticket
     ("ticket_history", "ticket_id", "ticket"),  # FK to article + ticket
@@ -1172,6 +1207,7 @@ async def run_erasure(
         "tiqora_chat_message": 0,
         "tiqora_chat_session": 0,
         **{table: 0 for table in ITSM_TICKET_TABLES},
+        **{table: 0 for table in CHANGE_TICKET_TABLES},
         "customer_preferences": 0,
         "customer_user_customer": 0,
         "group_customer_user": 0,
@@ -1939,6 +1975,8 @@ async def run_erasure(
                     now=now,
                 )
                 counts[itsm_table] = counts.get(itsm_table, 0) + n_itsm
+            n_blank = await _blank_change_texts(session, job_id=job_id, ids=ticket_ids, now=now)
+            counts["tiqora_itsm_change"] = counts.get("tiqora_itsm_change", 0) + n_blank
 
         # ---- customer_company: anonymize PII (keep PK) or delete if orphan ----
         company_ids = sorted({str(c.customer_id) for c in ordered if c.customer_id})
@@ -2379,6 +2417,7 @@ async def rollback_job(
                     "tiqora_chat_message",
                     "tiqora_chat_session",
                     *ITSM_TICKET_TABLES,
+                    *CHANGE_TICKET_TABLES,
                 ):
                     await _insert_row(session, table, {**pk, **original})
                 else:
@@ -2699,6 +2738,76 @@ async def _table_exists(session: AsyncSession, table: str) -> bool:
     return row is not None
 
 
+async def _blank_change_texts(
+    session: AsyncSession, *, job_id: int, ids: list[int], now: datetime
+) -> int:
+    """Anonymise path: set the free-text columns of the change records of *ids* (and the
+    ``detail`` of their timeline events) to NULL. The records stay; only the columns that held
+    text are backed up (partial row), so ``rollback_job`` restores them with an UPDATE."""
+    if not ids or not await _table_exists(session, "tiqora_itsm_change"):
+        return 0
+    id_list = ",".join(str(int(i)) for i in ids)
+    cols = ", ".join(_qi(c) for c in _CHANGE_TEXT_COLUMNS)
+    changed = 0
+    rows = (
+        (
+            await session.execute(
+                text(
+                    f"SELECT ticket_id, {cols} FROM tiqora_itsm_change"  # noqa: S608
+                    f" WHERE ticket_id IN ({id_list})"
+                )
+            )
+        )
+        .mappings()
+        .all()
+    )
+    for row in rows:
+        old = {c: row[c] for c in _CHANGE_TEXT_COLUMNS if row[c] is not None}
+        if not old:
+            continue
+        await _add_backup(
+            session,
+            job_id=job_id,
+            table_name="tiqora_itsm_change",
+            row_pk={"ticket_id": row["ticket_id"]},
+            original_row=old,
+            created=now,
+        )
+        await _update_row(
+            session,
+            "tiqora_itsm_change",
+            {"ticket_id": row["ticket_id"]},
+            {c: None for c in old},
+        )
+        changed += 1
+    if await _table_exists(session, "tiqora_itsm_change_event"):
+        events = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT id, detail FROM tiqora_itsm_change_event"  # noqa: S608
+                        f" WHERE ticket_id IN ({id_list}) AND detail IS NOT NULL"
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        for ev in events:
+            await _add_backup(
+                session,
+                job_id=job_id,
+                table_name="tiqora_itsm_change_event",
+                row_pk={"id": ev["id"]},
+                original_row={"detail": ev["detail"]},
+                created=now,
+            )
+            await _update_row(
+                session, "tiqora_itsm_change_event", {"id": ev["id"]}, {"detail": None}
+            )
+    return changed
+
+
 async def _backup_and_delete_by(
     session: AsyncSession,
     *,
@@ -2730,7 +2839,11 @@ async def _backup_and_delete_by(
         return 0
     for row in rows:
         full = dict(row)
-        pk = {"id": full["id"]} if "id" in full else {fk_col: full[fk_col]}
+        pk_cols = _BACKUP_PK_COLUMNS.get(table)
+        if pk_cols is not None:
+            pk = {c: full[c] for c in pk_cols}
+        else:
+            pk = {"id": full["id"]} if "id" in full else {fk_col: full[fk_col]}
         await _add_backup(
             session, job_id=job_id, table_name=table, row_pk=pk, original_row=full, created=now
         )

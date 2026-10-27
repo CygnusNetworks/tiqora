@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 import tiqora.db.legacy  # noqa: F401  (registers the Znuny ORM classes)
+import tiqora.itsm.change.models  # noqa: F401  (registers the change ORM classes)
 import tiqora.itsm.models  # noqa: F401  (registers the itsm1 ORM classes)
 from tests._itsm_db import ITSM_FIXTURES
 from tiqora.bootstrap.schema_loader import schema_dir

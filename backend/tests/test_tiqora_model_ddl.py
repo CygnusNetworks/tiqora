@@ -454,3 +454,142 @@ def test_approvals_ddl_equals_migration() -> None:
     assert migration.count('server_default="[]"') == 1
     assert migration.count('server_default="admin"') == 1
     assert migration.count("MEDIUM_TEXT,") == 7
+
+
+def test_itsm_change_ddl_equals_migration() -> None:
+    """The change-management ORM tables carry the same server defaults, key widths and text
+    types as migration ``20261010_0084`` (database-level comparison:
+    ``test_itsm_change_models.py``)."""
+    from tiqora.itsm.change.models import (
+        TiqoraItsmCab,
+        TiqoraItsmCabAgendaItem,
+        TiqoraItsmCabMeeting,
+        TiqoraItsmCabMember,
+        TiqoraItsmChange,
+        TiqoraItsmChangeEvent,
+        TiqoraItsmChangeFreeze,
+        TiqoraItsmChangeFreezeService,
+        TiqoraItsmChangeImpact,
+        TiqoraItsmChangeRiskAnswer,
+        TiqoraItsmChangeRiskQuestion,
+        TiqoraItsmChangeService,
+        TiqoraItsmChangeTask,
+        TiqoraItsmChangeTemplate,
+        TiqoraItsmLegacyChange,
+        TiqoraItsmLegacyChangeRef,
+    )
+
+    classes = (
+        TiqoraItsmChange,
+        TiqoraItsmChangeService,
+        TiqoraItsmChangeImpact,
+        TiqoraItsmChangeTask,
+        TiqoraItsmChangeTemplate,
+        TiqoraItsmChangeRiskQuestion,
+        TiqoraItsmChangeRiskAnswer,
+        TiqoraItsmChangeFreeze,
+        TiqoraItsmChangeFreezeService,
+        TiqoraItsmCab,
+        TiqoraItsmCabMember,
+        TiqoraItsmCabMeeting,
+        TiqoraItsmCabAgendaItem,
+        TiqoraItsmChangeEvent,
+        TiqoraItsmLegacyChange,
+        TiqoraItsmLegacyChangeRef,
+    )
+    assert len(classes) == 16
+    for cls in classes:
+        # no foreign key leaves the tiqora_itsm_* family (Znuny rows are referenced by value)
+        assert all(
+            fk.column.table.name.startswith("tiqora_itsm_") for fk in cls.__table__.foreign_keys
+        ), cls.__tablename__
+    for dialect in (mysql.dialect(), postgresql.dialect()):
+        change = TiqoraItsmChange.__table__
+        assert "DEFAULT false" in _column_ddl(change, "impact_truncated", dialect)
+        assert "DEFAULT false" in _column_ddl(change, "portal_visible", dialect)
+        assert "DEFAULT '0'" in _column_ddl(change, "approval_round", dialect)
+        assert _column_ddl(change, "approval_id", dialect) == "approval_id BIGINT,"
+        assert _column_ddl(change, "impact_requested_at", dialect).startswith(
+            "impact_requested_at DATETIME"
+            if dialect.name == "mysql"
+            else "impact_requested_at TIMESTAMP"
+        )
+        assert "VARCHAR(1000)" in _column_ddl(change, "risk_override_reason", dialect)
+        assert "VARCHAR(10) NOT NULL" in _column_ddl(change, "change_type", dialect)
+        assert "AUTO_INCREMENT" not in _column_ddl(change, "ticket_id", dialect)
+        assert "SERIAL" not in _column_ddl(change, "ticket_id", dialect)
+        assert "AUTO_INCREMENT" not in _column_ddl(
+            TiqoraItsmChangeTask.__table__, "ticket_id", dialect
+        )
+        assert "DEFAULT false" in _column_ddl(TiqoraItsmCab.__table__, "is_emergency", dialect)
+        assert "DEFAULT true" in _column_ddl(TiqoraItsmCab.__table__, "valid", dialect)
+        member = TiqoraItsmCabMember.__table__
+        assert "VARCHAR(16) NOT NULL" in _column_ddl(member, "member_kind", dialect)
+        assert "VARCHAR(200) NOT NULL" in _column_ddl(member, "member_ref", dialect)
+        template = TiqoraItsmChangeTemplate.__table__
+        assert "DEFAULT false" in _column_ddl(template, "is_standard", dialect)
+        assert "DEFAULT true" in _column_ddl(template, "valid", dialect)
+        question = TiqoraItsmChangeRiskQuestion.__table__
+        assert "VARCHAR(50) NOT NULL" in _column_ddl(question, "question_key", dialect)
+        assert "DEFAULT true" in _column_ddl(question, "valid", dialect)
+        freeze = TiqoraItsmChangeFreeze.__table__
+        assert "DEFAULT true" in _column_ddl(freeze, "allow_emergency", dialect)
+        assert "DEFAULT true" in _column_ddl(freeze, "valid", dialect)
+        assert "DEFAULT '0'" in _column_ddl(
+            TiqoraItsmLegacyChange.__table__, "workorder_count", dialect
+        )
+        assert "DEFAULT '0'" in _column_ddl(
+            TiqoraItsmLegacyChangeRef.__table__, "workorder_number", dialect
+        )
+        assert "AUTO_INCREMENT" not in _column_ddl(
+            TiqoraItsmLegacyChangeRef.__table__, "legacy_change_id", dialect
+        )
+        assert "AUTO_INCREMENT" not in _column_ddl(
+            TiqoraItsmChangeFreezeService.__table__, "freeze_id", dialect
+        )
+        assert "SERIAL" not in _column_ddl(TiqoraItsmChangeService.__table__, "service_id", dialect)
+        assert "SERIAL" not in _column_ddl(TiqoraItsmChangeImpact.__table__, "ticket_id", dialect)
+        assert "SERIAL" not in _column_ddl(
+            TiqoraItsmChangeRiskAnswer.__table__, "ticket_id", dialect
+        )
+        assert "BIGINT NOT NULL" in _column_ddl(TiqoraItsmCabMeeting.__table__, "id", dialect) or (
+            "BIGSERIAL" in _column_ddl(TiqoraItsmCabMeeting.__table__, "id", dialect)
+        )
+        assert "BIGINT" in _column_ddl(TiqoraItsmCabAgendaItem.__table__, "meeting_id", dialect)
+        assert "BIGINT" in _column_ddl(TiqoraItsmChangeEvent.__table__, "ticket_id", dialect)
+    mysql_dialect = mysql.dialect()
+    for table, column in (
+        (TiqoraItsmChange.__table__, "reason"),
+        (TiqoraItsmChange.__table__, "implementation_plan"),
+        (TiqoraItsmChange.__table__, "backout_plan"),
+        (TiqoraItsmChange.__table__, "test_plan"),
+        (TiqoraItsmChange.__table__, "pir_notes"),
+        (TiqoraItsmChange.__table__, "risk_findings"),
+        (TiqoraItsmChangeTemplate.__table__, "defaults"),
+        (TiqoraItsmChangeTemplate.__table__, "tasks"),
+        (TiqoraItsmChangeRiskQuestion.__table__, "answers"),
+        (TiqoraItsmCabMeeting.__table__, "minutes"),
+        (TiqoraItsmChangeEvent.__table__, "detail"),
+        (TiqoraItsmLegacyChange.__table__, "data"),
+    ):
+        assert "MEDIUMTEXT" in _column_ddl(table, column, mysql_dialect), (table.name, column)
+        assert _column_ddl(table, column, postgresql.dialect()).split()[1].startswith("TEXT"), (
+            column
+        )
+    # short notes stay plain TEXT
+    assert "MEDIUMTEXT" not in _column_ddl(TiqoraItsmCabAgendaItem.__table__, "note", mysql_dialect)
+    # the reporting index of the timeline
+    event_indexes = {
+        i.name: [c.name for c in i.columns] for i in TiqoraItsmChangeEvent.__table__.indexes
+    }
+    assert event_indexes["ix_tiqora_itsm_change_event_time"] == ["event", "created_at"]
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261010_0084_itsm_change.py"
+    ).read_text()
+    assert 'revision: str = "20261010_0084"' in migration
+    assert 'down_revision: str | None = "20261010_0083"' in migration
+    # every boolean default of the ORM is a boolean default in the migration, and no other
+    assert migration.count("server_default=sa.false()") == 4
+    assert migration.count("server_default=sa.true()") == 5
+    assert migration.count('server_default="0"') == 3
+    assert migration.count("MEDIUM_TEXT,") == 12

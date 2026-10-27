@@ -2725,3 +2725,275 @@ async def test_gdpr_erasure_removes_itsm_rows(
                 {"p": "ERASE-ITSM-%"},
             )
         sync_engine.dispose()
+
+
+_CHG_CAB = 946110
+_CHG_MEETING = 946110
+_CHG_OTHER = 946119  # change ticket that is not erased
+_CHG_OTHER_TASK = 946118
+_CHG_TEXTS = (
+    "reason",
+    "implementation_plan",
+    "backout_plan",
+    "test_plan",
+    "pir_notes",
+    "risk_override_reason",
+)
+
+
+async def _seed_change_tree(session: AsyncSession, change_tid: int, task_tid: int) -> None:
+    """A change with a row in every child table, a task ticket row and an agenda item."""
+    await session.execute(
+        text(
+            "INSERT INTO tiqora_itsm_change (ticket_id, change_type, phase, reason,"
+            " implementation_plan, backout_plan, test_plan, pir_notes, risk_override_reason,"
+            " created_at, created_by, updated_at, updated_by)"
+            " VALUES (:t, 'normal', 'draft', 'chg94 reason', 'chg94 impl', 'chg94 backout',"
+            " 'chg94 test', 'chg94 pir', 'chg94 override', :now, 1, :now, 1)"
+        ),
+        {"t": change_tid, "now": NOW},
+    )
+    for service_id in (946101, 946102):
+        await session.execute(
+            text("INSERT INTO tiqora_itsm_change_service (ticket_id, service_id) VALUES (:t, :s)"),
+            {"t": change_tid, "s": service_id},
+        )
+    for ref in ("946101", "946102"):
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_itsm_change_impact (ticket_id, kind, ref_key, direct)"
+                " VALUES (:t, 'ci', :r, :d)"
+            ),
+            {"t": change_tid, "r": ref, "d": True},
+        )
+    for key in ("chg94-q1", "chg94-q2"):
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_itsm_change_risk_answer (ticket_id, question_key, answer_key,"
+                " points, answered_at, answered_by) VALUES (:t, :k, 'a', 3, :now, 1)"
+            ),
+            {"t": change_tid, "k": key, "now": NOW},
+        )
+    for event in ("created", "updated"):
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_itsm_change_event (ticket_id, created_at, created_by, event,"
+                ' detail) VALUES (:t, :now, 1, :e, \'{"note": "chg94 detail"}\')'
+            ),
+            {"t": change_tid, "now": NOW, "e": event},
+        )
+    await session.execute(
+        text(
+            "INSERT INTO tiqora_itsm_change_task (ticket_id, change_ticket_id, position,"
+            " task_kind, template_task_key, created_at, created_by)"
+            " VALUES (:task, :t, 1, 'workorder', 'chg94-k', :now, 1)"
+        ),
+        {"task": task_tid, "t": change_tid, "now": NOW},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO tiqora_itsm_cab_agenda_item (meeting_id, change_ticket_id, position)"
+            " VALUES (:m, :t, 1)"
+        ),
+        {"m": _CHG_MEETING, "t": change_tid},
+    )
+
+
+_CHG_TABLE_ORDER = (
+    ("tiqora_itsm_change", "ticket_id"),
+    ("tiqora_itsm_change_service", "ticket_id, service_id"),
+    ("tiqora_itsm_change_impact", "ticket_id, kind, ref_key"),
+    ("tiqora_itsm_change_risk_answer", "ticket_id, question_key"),
+    ("tiqora_itsm_change_event", "id"),
+    ("tiqora_itsm_change_task", "ticket_id"),
+    ("tiqora_itsm_cab_agenda_item", "id"),
+)
+
+
+async def _change_snapshot(
+    factory: async_sessionmaker[AsyncSession], change_tids: list[int]
+) -> dict[str, list[tuple[object, ...]]]:
+    ids = ",".join(str(int(i)) for i in change_tids)
+    out: dict[str, list[tuple[object, ...]]] = {}
+    async with factory() as session:
+        for table, order in _CHG_TABLE_ORDER:
+            col = "ticket_id" if table != "tiqora_itsm_cab_agenda_item" else "change_ticket_id"
+            if table == "tiqora_itsm_change_task":
+                col = "change_ticket_id"
+            rows = await session.execute(
+                text(f"SELECT * FROM {table} WHERE {col} IN ({ids}) ORDER BY {order}")
+            )
+            out[table] = [tuple(r) for r in rows]
+    return out
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_gdpr_ticket_delete_removes_change_rows(
+    url_fixture: str, mode: str, request: pytest.FixtureRequest
+) -> None:
+    """Hard delete removes the change record and every child row of an erased customer's change
+    ticket and the row of its task ticket (all backed up); the anonymise path keeps the change
+    record and its children and blanks only the free texts. Rollback restores both exactly;
+    another change is never touched."""
+    from sqlalchemy import create_engine
+
+    from tests._row_cleanup import delete_above_marks, snapshot_marks
+
+    url = request.getfixturevalue(url_fixture)
+    mysql = _is_mysql(url)
+    mark_tables = (
+        "tiqora_gdpr_backup",
+        "tiqora_gdpr_job",
+        "tiqora_gdpr_audit",
+        "tiqora_cache_invalidation",
+        "tiqora_event_outbox",
+        "ticket_history",
+        "article_search_index",
+        "article_data_mime_attachment",
+        "article_data_mime_plain",
+        "article_data_mime",
+        "article",
+        "ticket",
+        "customer_user",
+    )
+    marks = snapshot_marks(url, mark_tables)
+    engine, factory = await _factory(url)
+    tag = f"{url_fixture[:2]}{mode}"
+    login = f"erase.chg94.{tag}@example.com"
+    company = f"ERASE-CHG94-{tag.upper()}"
+
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session, mysql=mysql)
+            await _insert_company(session, customer_id=company, name=f"Acme Chg {tag}")
+            cuid = await _insert_customer(session, login=login, customer_id=company)
+            tid = await _insert_ticket(
+                session, customer_user_id=login, customer_id=company, tn=f"2026CH{tag}{cuid}"
+            )
+            task_tid = await _insert_ticket(
+                session, customer_user_id=login, customer_id=company, tn=f"2026CT{tag}{cuid}"
+            )
+            await _insert_article_bundle(session, ticket_id=tid, from_addr=login, body="Change")
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab (id, name, rule, created_at, created_by,"
+                    " updated_at, updated_by) VALUES (:i, :n, 'any', :now, 1, :now, 1)"
+                ),
+                {"i": _CHG_CAB, "n": f"chg94-cab-{tag}", "now": NOW},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_meeting (id, cab_id, title, starts_at, ends_at,"
+                    " status, created_at, created_by, updated_at, updated_by)"
+                    " VALUES (:i, :c, 'chg94 meeting', :now, :now, 'planned', :now, 1, :now, 1)"
+                ),
+                {"i": _CHG_MEETING, "c": _CHG_CAB, "now": NOW},
+            )
+            await _seed_change_tree(session, tid, task_tid)
+            await _seed_change_tree(session, _CHG_OTHER, _CHG_OTHER_TASK)
+            await session.commit()
+
+        before = await _change_snapshot(factory, [tid])
+        assert [len(rows) for rows in before.values()] == [1, 2, 2, 2, 2, 1, 1]
+        other_before = await _change_snapshot(factory, [_CHG_OTHER])
+        assert [len(rows) for rows in other_before.values()] == [1, 2, 2, 2, 2, 1, 1]
+
+        result = await run_erasure(
+            factory,
+            Settings(),
+            customer_user_ids=[cuid],
+            mode="delete" if mode == "delete" else "anonymize",
+            seed=29,
+            force_parallel=True,
+            actor="test",
+            delete_tickets=mode == "delete",
+        )
+        after = await _change_snapshot(factory, [tid])
+        if mode == "delete":
+            assert all(rows == [] for rows in after.values())
+            assert result.counts["tiqora_itsm_change"] == 1
+            assert result.counts["tiqora_itsm_change_service"] == 2
+            assert result.counts["tiqora_itsm_change_impact"] == 2
+            assert result.counts["tiqora_itsm_change_risk_answer"] == 2
+            assert result.counts["tiqora_itsm_change_event"] == 2
+            assert result.counts["tiqora_itsm_change_task"] == 1
+            assert result.counts["tiqora_itsm_cab_agenda_item"] == 1
+        else:
+            # the record and its children stay, the texts are blanked
+            assert [len(rows) for rows in after.values()] == [1, 2, 2, 2, 2, 1, 1]
+            async with factory() as session:
+                row = (
+                    (
+                        await session.execute(
+                            text(
+                                f"SELECT {', '.join(_CHG_TEXTS)}, change_type, phase"
+                                " FROM tiqora_itsm_change WHERE ticket_id = :t"
+                            ),
+                            {"t": tid},
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+                assert all(row[c] is None for c in _CHG_TEXTS)
+                assert (row["change_type"], row["phase"]) == ("normal", "draft")
+                details = (
+                    (
+                        await session.execute(
+                            text(
+                                "SELECT detail FROM tiqora_itsm_change_event WHERE ticket_id = :t"
+                            ),
+                            {"t": tid},
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                assert details == [None, None]
+        assert await _change_snapshot(factory, [_CHG_OTHER]) == other_before
+
+        await rollback_job(factory, Settings(), result.job_id, force_parallel=True, actor="test")
+        assert await _change_snapshot(factory, [tid]) == before
+        assert await _change_snapshot(factory, [_CHG_OTHER]) == other_before
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM tiqora_itsm_cab_agenda_item WHERE meeting_id = :m"),
+                {"m": _CHG_MEETING},
+            )
+            for ticket_id in (tid, _CHG_OTHER):
+                await session.execute(
+                    text("DELETE FROM tiqora_itsm_change WHERE ticket_id = :t"), {"t": ticket_id}
+                )
+            await session.execute(
+                text("DELETE FROM tiqora_itsm_cab_meeting WHERE id = :m"), {"m": _CHG_MEETING}
+            )
+            await session.execute(
+                text("DELETE FROM tiqora_itsm_cab WHERE id = :c"), {"c": _CHG_CAB}
+            )
+            await session.commit()
+        await engine.dispose()
+        delete_above_marks(
+            url,
+            marks,
+            first=[
+                (
+                    "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id > :m",
+                    {"m": marks["ticket"]},
+                )
+            ],
+        )
+        sync_engine = create_engine(url)
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM customer_user_customer WHERE user_id LIKE :p"),
+                {"p": "erase.chg94.%"},
+            )
+            conn.execute(
+                text("DELETE FROM customer_company WHERE customer_id LIKE :p"),
+                {"p": "ERASE-CHG94-%"},
+            )
+        sync_engine.dispose()
