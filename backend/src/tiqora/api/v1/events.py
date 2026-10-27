@@ -90,7 +90,7 @@ _QUEUE_SCOPED_EVENT_TYPES = frozenset({"ticket_new_in_queue", "ticket_changed"})
 # Message types addressed to explicit agents (``user_ids``): the CTI popup's
 # ``call_event`` names the caller's number, so it must only reach the agents
 # whose extension rang.
-_USER_SCOPED_EVENT_TYPES = frozenset({"call_event"})
+_USER_SCOPED_EVENT_TYPES = frozenset({"call_event", "approval_changed"})
 
 # Message types only admins receive: AI budget notices (tiqora.ai.limits).
 _ADMIN_SCOPED_EVENT_TYPES = frozenset({"ai_limit_changed"})
@@ -119,7 +119,7 @@ def _should_forward(
     function so the per-queue gate is unit-testable without a live SSE
     connection.
 
-    User-scoped types (``call_event``) are forwarded only when *user_id* is in
+    User-scoped types (``call_event``, ``approval_changed``) are forwarded only when *user_id* is in
     the message's ``user_ids`` list; anything malformed is dropped.
     Admin-scoped types (``ai_limit_changed``) reach admins only.
     """

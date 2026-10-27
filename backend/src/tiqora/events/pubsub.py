@@ -42,6 +42,11 @@ of two shapes:
   (``queue_id`` is the ticket's CURRENT queue). Carries no visitor name and no
   message text: clients refetch the inbox / ticket chat.
 
+* ``{"type": "approval_changed", "user_ids": [<int>]}`` — an approval request
+  changed for these agents (new request, vote, forward, decision). Addressed
+  like ``call_event``: the SSE endpoint forwards it only to the listed agents,
+  who re-read their approvals inbox. Carries no approval details.
+
 Publishing is always best-effort: this module never raises out of its
 publish functions, so callers (outbox drain, poller, presence writes) don't
 need their own try/except to stay safe. A failed publish only means
@@ -52,6 +57,7 @@ polling/refetch fallbacks, not that the underlying write failed.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from typing import Any, Final
 
 import redis.asyncio as redis
@@ -183,6 +189,17 @@ async def publish_call_event(
         "call": call,
     }
     await _publish(redis_client, payload)
+
+
+async def publish_approval_changed(redis_client: redis.Redis, user_ids: Iterable[int]) -> None:
+    """Publish an ``approval_changed`` notice to *user_ids* only. Best-effort — never raises.
+
+    Callers publish after their commit. An empty list publishes nothing.
+    """
+    targets = sorted({int(u) for u in user_ids})
+    if not targets:
+        return
+    await _publish(redis_client, {"type": "approval_changed", "user_ids": targets})
 
 
 async def publish_ai_limit_changed(redis_client: redis.Redis) -> None:
