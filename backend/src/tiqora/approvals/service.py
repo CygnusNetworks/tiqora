@@ -894,9 +894,8 @@ async def decide(
     calling, F1(a)); every later read of step/approver/vote rows is a locking read, so the
     latest committed state is evaluated, never a stale snapshot. Raises ``approval_not_found``,
     ``approval_closed``, ``not_an_approver``, ``already_decided``, ``step_not_active``,
-    ``self_approval_forbidden``, ``customer_approvers_not_allowed``,
-    ``customer_approver_outside_company``, ``forbidden`` (e-mail channel not allowed for the
-    step) and ``comment_too_long``.
+    ``self_approval_forbidden``, ``customer_approver_outside_company``, ``forbidden`` (customer
+    approvers switched off, or e-mail channel not allowed for the step) and ``comment_too_long``.
     """
     if decision not in _VOTED:
         raise ValueError(f"unknown decision: {decision!r}")
@@ -924,7 +923,7 @@ async def decide(
     if principal.kind == "customer":
         assert principal.login is not None
         if not _allow_customers(approval, asettings, reg):
-            raise ApprovalError("customer_approvers_not_allowed", 422)
+            raise ApprovalError("forbidden", 403, "customer approvers are not enabled")
         if not await customer_in_ticket_company(session, principal.login, approval.ticket_id):
             raise ApprovalError("customer_approver_outside_company", 403)
     if channel == "email" and not StepSpec.model_validate_json(step.spec).allow_email:

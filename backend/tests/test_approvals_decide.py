@@ -9,13 +9,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -59,6 +61,7 @@ from tiqora.approvals.models import (
 from tiqora.approvals.settings import APPROVALS_SECTION
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraJob
+from tiqora.domain.history_render import render_history_entry
 from tiqora.jobs.service import utc_now
 from tiqora.settings_sections.store import save_section_values
 
@@ -472,6 +475,8 @@ async def test_last_stage_finalizes(url_fixture: str, request: pytest.FixtureReq
                 f"Approval #{aid}: decided approved",
             ]
             assert result.info.status == "approved"
+            for line in await _history(session):
+                assert render_history_entry(history_type="Misc", name=line) == line
 
 
 @pytest.mark.db
@@ -771,7 +776,7 @@ async def test_customer_vote_refused_when_setting_turned_off(
             error = await _refused(
                 session, aid, actor=Actor.customer(K2), decision="approved", channel="portal"
             )
-            assert (error.code, error.http_status) == ("customer_approvers_not_allowed", 422)
+            assert (error.code, error.http_status) == ("forbidden", 403)
             assert await _votes(session, aid) == []
 
 
@@ -834,28 +839,50 @@ async def test_votes_ordered_for_any(
     url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """``evaluate_step`` gets the voters in vote order, the ones still pending last."""
-    seen: list[list[tuple[str, bool]]] = []
+    seen: list[list[str]] = []
     real = rules.evaluate_step
 
     def _spy(rule: Any, quorum: Any, voters: Sequence[rules.VoterState]) -> Any:
-        seen.append([(v.status, v.decisive) for v in voters])
+        seen.append([v.status for v in voters])
         return real(rule, quorum, voters)
 
     monkeypatch.setattr(rules, "evaluate_step", _spy)
+    definition = _defn(_step("CAB", _user(AG3), _user(AG4), _user(AG5), rule="majority"))
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type()):
-            aid = await _request(session, ALL_THREE)
-            rows = {a.user_id: a for a in await _approvers(session, aid)}
-            rows[AG3].decisive = True  # pending and decisive: first by id, but it has not voted
-            await session.flush()
-            await _decide(session, aid, AG5)
-            assert seen[-1] == [("approved", False), ("pending", True), ("pending", False)]
-            await _decide(session, aid, AG4)
-            assert seen[-1] == [
-                ("approved", False),
-                ("approved", False),
-                ("pending", True),
-            ]
+            aid = await _request(session, definition)
+            await _decide(session, aid, AG5, "rejected")  # highest approver id votes first
+            assert seen[-1] == ["rejected", "pending", "pending"]
+            await _decide(session, aid, AG4, "approved")
+            # vote order (AG5, AG4) then the pending AG3; approver-id order would be reversed
+            assert seen[-1] == ["rejected", "approved", "pending"]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_row_lock_is_the_first_statement(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """F1(a): decide starts with ``SELECT … FROM tiqora_approval … FOR UPDATE``."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, ONE_STEP)
+            seen: list[str] = []
+
+            def _capture(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+                seen.append(" ".join(statement.split()).lower())
+
+            bind = session.sync_session.get_bind()
+            event.listen(bind, "before_cursor_execute", _capture)
+            try:
+                await _decide(session, aid, AG3)
+            finally:
+                event.remove(bind, "before_cursor_execute", _capture)
+            real = [q for q in seen if not q.startswith(("savepoint", "release", "rollback"))]
+            assert real[0].startswith("select")
+            assert re.search(r"from tiqora_approval(?![_a-z])", real[0])
+            assert real[0].endswith("for update")
+            assert not any("tiqora_approval_" in q for q in real[:1])
 
 
 # --- locking and concurrency --------------------------------------------------------------------
@@ -904,8 +931,28 @@ async def _decide_and_commit(
         except ApprovalError as exc:
             await session.rollback()
             return exc.code
+        except DBAPIError as exc:  # deadlock, lock wait timeout
+            await session.rollback()
+            return f"db_error:{type(exc.orig).__name__}"
         await session.commit()
         return "ok"
+
+
+async def _race(
+    factory: async_sessionmaker[AsyncSession], approval_id: int, *user_ids: int
+) -> list[str]:
+    """Runs the callers at once; a lock regression fails fast instead of hanging the suite.
+
+    Cancelling on timeout closes every racer session (rolling back, releasing its locks) before
+    the world is cleaned up.
+    """
+    try:
+        return await asyncio.wait_for(
+            asyncio.gather(*(_decide_and_commit(factory, approval_id, u) for u in user_ids)),
+            timeout=45,
+        )
+    except TimeoutError:
+        pytest.fail("racing decisions did not finish within 45 s (lock regression?)")
 
 
 async def _final_counts(
@@ -938,9 +985,7 @@ async def test_parallel_votes_one_transition(
             async with factory() as setup:
                 aid = await _request(setup, definition)
                 await setup.commit()
-            outcomes = await asyncio.gather(
-                _decide_and_commit(factory, aid, AG3), _decide_and_commit(factory, aid, AG4)
-            )
+            outcomes = await _race(factory, aid, AG3, AG4)
             assert outcomes == ["ok", "ok"]
             assert await _final_counts(factory, aid) == ("approved", 2, 1, 1)
             async with factory() as check:
@@ -965,9 +1010,7 @@ async def test_parallel_votes_rule_any_second_gets_step_not_active(
             async with factory() as setup:
                 aid = await _request(setup, definition)
                 await setup.commit()
-            outcomes = await asyncio.gather(
-                _decide_and_commit(factory, aid, AG3), _decide_and_commit(factory, aid, AG4)
-            )
+            outcomes = await _race(factory, aid, AG3, AG4)
             assert sorted(outcomes) == ["ok", "step_not_active"]
             async with factory() as check:
                 assert len(await _votes(check, aid)) == 1
