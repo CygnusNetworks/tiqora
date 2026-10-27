@@ -1,11 +1,12 @@
-"""Schemas of ``/api/v1/admin/itsm/change`` (the template part; CAB, risk questions and freeze
-windows add theirs)."""
+"""Schemas of ``/api/v1/admin/itsm/change`` (templates and freeze windows; CAB and risk questions
+add theirs)."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel
 
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.itsm.change.freeze import FreezeView
 from tiqora.itsm.change.phases import ChangeType
 from tiqora.itsm.change.templates import TemplateDefaults, TemplateTask, TemplateView
 
@@ -29,3 +30,32 @@ class ChangeTemplateOut(BaseModel):
 
 def template_out(view: TemplateView) -> ChangeTemplateOut:
     return ChangeTemplateOut(**view.model_dump())
+
+
+class FreezeRecurrenceOut(BaseModel):
+    type: str
+    interval: int
+    count: int | None
+    until: UtcDateTime | None
+
+
+class FreezeWindowOut(BaseModel):
+    id: int
+    name: str
+    note: str | None
+    enforcement: str
+    allow_emergency: bool
+    scope: str
+    service_ids: list[int]
+    starts_at: UtcDateTime
+    ends_at: UtcDateTime
+    recurrence: FreezeRecurrenceOut | None
+    valid: bool
+    created_at: UtcDateTime
+    created_by: int
+    updated_at: UtcDateTime
+    updated_by: int
+
+
+def freeze_out(view: FreezeView) -> FreezeWindowOut:
+    return FreezeWindowOut(**view.model_dump())

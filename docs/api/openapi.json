@@ -20657,6 +20657,300 @@
         "title": "ForwardRequest",
         "type": "object"
       },
+      "FreezeIn": {
+        "additionalProperties": false,
+        "description": "Body of the admin create/update.",
+        "properties": {
+          "allow_emergency": {
+            "default": true,
+            "title": "Allow Emergency",
+            "type": "boolean"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "enforcement": {
+            "default": "block",
+            "enum": [
+              "block",
+              "warn"
+            ],
+            "title": "Enforcement",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecurrenceIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scope": {
+            "default": "all",
+            "enum": [
+              "all",
+              "services"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 200,
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "FreezeIn",
+        "type": "object"
+      },
+      "FreezeOccurrenceOut": {
+        "properties": {
+          "allow_emergency": {
+            "title": "Allow Emergency",
+            "type": "boolean"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "enforcement": {
+            "enum": [
+              "block",
+              "warn"
+            ],
+            "title": "Enforcement",
+            "type": "string"
+          },
+          "freeze_id": {
+            "title": "Freeze Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "services"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "freeze_id",
+          "name",
+          "enforcement",
+          "allow_emergency",
+          "scope",
+          "service_ids",
+          "start",
+          "end"
+        ],
+        "title": "FreezeOccurrenceOut",
+        "type": "object"
+      },
+      "FreezeRecurrenceOut": {
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "interval": {
+            "title": "Interval",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "required": [
+          "type",
+          "interval",
+          "count",
+          "until"
+        ],
+        "title": "FreezeRecurrenceOut",
+        "type": "object"
+      },
+      "FreezeWindowOut": {
+        "properties": {
+          "allow_emergency": {
+            "title": "Allow Emergency",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "enforcement": {
+            "title": "Enforcement",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreezeRecurrenceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "note",
+          "enforcement",
+          "allow_emergency",
+          "scope",
+          "service_ids",
+          "starts_at",
+          "ends_at",
+          "recurrence",
+          "valid",
+          "created_at",
+          "created_by",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "FreezeWindowOut",
+        "type": "object"
+      },
       "GdprCustomerRecordPreviewOut": {
         "properties": {
           "delete_summary": {
@@ -72324,6 +72618,371 @@
         ]
       }
     },
+    "/api/v1/admin/itsm/change/freeze-windows": {
+      "get": {
+        "description": "All freeze windows (Sperrzeitr\u00e4ume), valid or not; times are UTC.",
+        "operationId": "get_freeze_windows_api_v1_admin_itsm_change_freeze_windows_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FreezeWindowOut"
+                  },
+                  "title": "Response Get Freeze Windows Api V1 Admin Itsm Change Freeze Windows Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Freeze Windows",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "post": {
+        "operationId": "post_freeze_window_api_v1_admin_itsm_change_freeze_windows_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FreezeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreezeWindowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Freeze Window",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/freeze-windows/{freeze_id}": {
+      "delete": {
+        "operationId": "delete_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "freeze_id",
+            "required": true,
+            "schema": {
+              "title": "Freeze Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Freeze Window",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "get": {
+        "operationId": "get_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "freeze_id",
+            "required": true,
+            "schema": {
+              "title": "Freeze Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreezeWindowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Freeze Window",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "put": {
+        "description": "Replace the window.",
+        "operationId": "put_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "freeze_id",
+            "required": true,
+            "schema": {
+              "title": "Freeze Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FreezeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreezeWindowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Freeze Window",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
     "/api/v1/admin/itsm/change/templates": {
       "get": {
         "description": "All templates, valid or not.",
@@ -103743,6 +104402,96 @@
         "summary": "Get Ci Versions",
         "tags": [
           "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/freeze-windows": {
+      "get": {
+        "description": "Occurrences of the valid freeze windows that overlap ``[start, end)``; times are UTC.",
+        "operationId": "get_freeze_windows_api_v1_itsm_freeze_windows_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FreezeOccurrenceOut"
+                  },
+                  "title": "Response Get Freeze Windows Api V1 Itsm Freeze Windows Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Freeze Windows",
+        "tags": [
+          "itsm-change"
         ]
       }
     },

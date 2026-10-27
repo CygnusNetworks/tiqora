@@ -4146,6 +4146,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/change/freeze-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Freeze Windows
+         * @description All freeze windows (Sperrzeiträume), valid or not; times are UTC.
+         */
+        get: operations["get_freeze_windows_api_v1_admin_itsm_change_freeze_windows_get"];
+        put?: never;
+        /** Post Freeze Window */
+        post: operations["post_freeze_window_api_v1_admin_itsm_change_freeze_windows_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/freeze-windows/{freeze_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Freeze Window */
+        get: operations["get_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__get"];
+        /**
+         * Put Freeze Window
+         * @description Replace the window.
+         */
+        put: operations["put_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__put"];
+        post?: never;
+        /** Delete Freeze Window */
+        delete: operations["delete_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/itsm/change/templates": {
         parameters: {
             query?: never;
@@ -9626,6 +9669,26 @@ export interface paths {
          * @description The version history of one CI, newest first.
          */
         get: operations["get_ci_versions_api_v1_itsm_cis__source___ci_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/freeze-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Freeze Windows
+         * @description Occurrences of the valid freeze windows that overlap ``[start, end)``; times are UTC.
+         */
+        get: operations["get_freeze_windows_api_v1_itsm_freeze_windows_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -20523,6 +20586,137 @@ export interface components {
             subject?: string | null;
             /** To Address */
             to_address: string;
+        };
+        /**
+         * FreezeIn
+         * @description Body of the admin create/update.
+         */
+        FreezeIn: {
+            /**
+             * Allow Emergency
+             * @default true
+             */
+            allow_emergency: boolean;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Enforcement
+             * @default block
+             * @enum {string}
+             */
+            enforcement: "block" | "warn";
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            recurrence?: components["schemas"]["RecurrenceIn"] | null;
+            /**
+             * Scope
+             * @default all
+             * @enum {string}
+             */
+            scope: "all" | "services";
+            /** Service Ids */
+            service_ids?: number[];
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** FreezeOccurrenceOut */
+        FreezeOccurrenceOut: {
+            /** Allow Emergency */
+            allow_emergency: boolean;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * Enforcement
+             * @enum {string}
+             */
+            enforcement: "block" | "warn";
+            /** Freeze Id */
+            freeze_id: number;
+            /** Name */
+            name: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "all" | "services";
+            /** Service Ids */
+            service_ids: number[];
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+        };
+        /** FreezeRecurrenceOut */
+        FreezeRecurrenceOut: {
+            /** Count */
+            count: number | null;
+            /** Interval */
+            interval: number;
+            /** Type */
+            type: string;
+            /** Until */
+            until: string | null;
+        };
+        /** FreezeWindowOut */
+        FreezeWindowOut: {
+            /** Allow Emergency */
+            allow_emergency: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Enforcement */
+            enforcement: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string | null;
+            recurrence: components["schemas"]["FreezeRecurrenceOut"] | null;
+            /** Scope */
+            scope: string;
+            /** Service Ids */
+            service_ids: number[];
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+            /** Valid */
+            valid: boolean;
         };
         /** GdprCustomerRecordPreviewOut */
         GdprCustomerRecordPreviewOut: {
@@ -41279,6 +41473,183 @@ export interface operations {
             };
         };
     };
+    get_freeze_windows_api_v1_admin_itsm_change_freeze_windows_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_freeze_window_api_v1_admin_itsm_change_freeze_windows_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreezeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                freeze_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                freeze_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreezeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                freeze_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_templates_api_v1_admin_itsm_change_templates_get: {
         parameters: {
             query?: never;
@@ -55633,6 +56004,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CiVersionPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_freeze_windows_api_v1_itsm_freeze_windows_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeOccurrenceOut"][];
                 };
             };
             /** @description Validation Error */

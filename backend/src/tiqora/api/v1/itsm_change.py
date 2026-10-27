@@ -7,6 +7,7 @@ before ``/changes/{ticket_id:int}``. Handlers commit; the services do not.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -20,15 +21,19 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeOut,
     ChangeStatusOut,
     ChangeTemplateSummaryOut,
+    FreezeOccurrenceOut,
     TaskOrderIn,
     TaskOut,
     change_out,
     event_out,
+    freeze_occurrence_out,
     task_out,
     template_summary,
 )
+from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.db.tiqora.models import TiqoraJob
 from tiqora.itsm.change.errors import ChangeError
+from tiqora.itsm.change.freeze import occurrences
 from tiqora.itsm.change.gate import change_availability, require_change_mode
 from tiqora.itsm.change.impact import (
     ChangeImpactOut,
@@ -58,6 +63,9 @@ from tiqora.itsm.change.tasks import (
 from tiqora.itsm.change.templates import list_templates
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.znuny.sysconfig import SysConfig
+
+#: longest range one read covers (the calendar's bound)
+MAX_RANGE = timedelta(days=92)
 
 router = APIRouter(prefix="/itsm", tags=["itsm-change"])
 #: ticket sub-resources (``/tickets/{id}/change``, …)
@@ -89,6 +97,25 @@ async def get_change_templates(
     _ = user
     await require_change_mode(session, settings)
     return [template_summary(v) for v in await list_templates(session, include_invalid=False)]
+
+
+@router.get("/freeze-windows", response_model=list[FreezeOccurrenceOut])
+async def get_freeze_windows(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    start: Annotated[datetime, Query()],
+    end: Annotated[datetime, Query()],
+) -> list[FreezeOccurrenceOut]:
+    """Occurrences of the valid freeze windows that overlap ``[start, end)``; times are UTC."""
+    _ = user
+    await require_change_mode(session, settings)
+    lo, hi = to_utc_naive(start), to_utc_naive(end)
+    if hi <= lo:
+        raise ChangeError("range_invalid", 422)
+    if hi - lo > MAX_RANGE:
+        raise ChangeError("range_too_large", 422)
+    return [freeze_occurrence_out(o) for o in await occurrences(session, start=lo, end=hi)]
 
 
 @router.post("/changes", response_model=ChangeCreatedOut, status_code=status.HTTP_201_CREATED)
