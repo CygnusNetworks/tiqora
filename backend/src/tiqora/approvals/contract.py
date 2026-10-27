@@ -261,6 +261,7 @@ ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
         "self_approval_forbidden": 403,
         "customer_approver_outside_company": 403,
         "delegation_not_active": 403,
+        "comment_too_long": 422,
         "already_decided": 409,
         "approval_closed": 409,
         "step_not_active": 409,

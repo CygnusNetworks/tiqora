@@ -14,19 +14,21 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal
 
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.approvals import access, audit, rules, templates
+from tiqora.approvals import access, audit, delegation, rules, templates
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
     EVENT_CANCELLED,
     EVENT_DECIDED,
     EVENT_REQUESTED,
+    EVENT_VOTED,
     JOB_HOOK,
     JOB_MAIL,
     Actor,
@@ -35,6 +37,8 @@ from tiqora.approvals.contract import (
     ApprovalInfo,
     ApprovalStatus,
     ApproverEntry,
+    Channel,
+    Decision,
     Principal,
     ResolveContext,
     StepSpec,
@@ -45,8 +49,13 @@ from tiqora.approvals.models import (
     TiqoraApprovalApprover,
     TiqoraApprovalStep,
     TiqoraApprovalToken,
+    TiqoraApprovalVote,
 )
-from tiqora.approvals.resolve import canonical_principal, resolve_entries
+from tiqora.approvals.resolve import (
+    canonical_principal,
+    customer_in_ticket_company,
+    resolve_entries,
+)
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings, get_settings
 from tiqora.extensions.core import get_registry
@@ -58,6 +67,8 @@ _KEY_MAX = 100
 _SYSTEM = Actor.system()
 _CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
 _REASON_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
+_COMMENT_MAX = 2000
+_VOTED = frozenset({"approved", "rejected"})
 
 
 def _info(approval: TiqoraApproval) -> ApprovalInfo:
@@ -131,7 +142,8 @@ async def _excluded_keys(session: AsyncSession, approval: TiqoraApproval) -> fro
     keys = {approval.requester}
     creator = await audit.creator_key(session, approval)
     if creator is not None:
-        keys.add(creator)
+        # a portal actor's key carries the login as typed; compare the stored spelling
+        keys.add((await canonical_principal(session, Principal.parse(creator))).key)
     return frozenset(keys)
 
 
@@ -753,6 +765,240 @@ async def cancel_approval(
         session, approval, "cancelled", reason, actor=actor, settings=asettings, registry=reg
     )
     return _info(approval)
+
+
+# --- decide ----------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionResult:
+    info: ApprovalInfo
+    vote_id: int
+    step_status: StepStatus
+    on_behalf: bool
+    #: agents whose inbox changed (for SSE)
+    affected_user_ids: frozenset[int]
+
+
+def _refusal(candidates: Sequence[TiqoraApprovalApprover]) -> ApprovalError:
+    """Why none of the actor's rows can vote: already voted, step not active, or not theirs."""
+    if any(r.status in _VOTED for r in candidates):
+        return ApprovalError("already_decided", 409)
+    if any(r.status in ("pending", "not_needed") for r in candidates):  # pending: step not active
+        return ApprovalError("step_not_active", 409)
+    return ApprovalError("not_an_approver", 403)
+
+
+async def _pick_approver(
+    session: AsyncSession,
+    approvers: Sequence[TiqoraApprovalApprover],
+    steps: Sequence[TiqoraApprovalStep],
+    *,
+    actor: Actor,
+    key: str,
+    approver_id: int | None,
+) -> tuple[TiqoraApprovalApprover, bool]:
+    """The row the actor votes with and whether that is on behalf of a delegator."""
+    principal = actor.principal
+    if principal is None:
+        raise ApprovalError("not_an_approver", 403)
+    delegators: set[int] = set()
+    if principal.user_id is not None:
+        delegators = await delegation.active_delegators(session, principal.user_id, at=utc_now())
+        delegators.discard(principal.user_id)
+
+    def own(row: TiqoraApprovalApprover) -> bool:
+        return row.principal == key
+
+    def delegated(row: TiqoraApprovalApprover) -> bool:
+        return row.user_id is not None and row.user_id in delegators
+
+    if approver_id is not None:
+        # an explicit id must be one of this request's rows and be the actor's or a delegator's
+        candidates = [r for r in approvers if r.id == approver_id and (own(r) or delegated(r))]
+    else:
+        candidates = [r for r in approvers if own(r) or delegated(r)]
+    active = {s.id for s in steps if s.status == "active"}
+    usable = [r for r in candidates if r.status == "pending" and r.step_id in active]
+    if not usable:
+        raise _refusal(candidates)
+    usable.sort(key=lambda r: (not own(r), r.id))
+    return usable[0], not own(usable[0])
+
+
+async def _voters(
+    session: AsyncSession, step: TiqoraApprovalStep, approvers: Sequence[TiqoraApprovalApprover]
+) -> list[rules.VoterState]:
+    """Eligible voters of the step in vote order, the ones still pending last."""
+    votes = await session.execute(
+        select(TiqoraApprovalVote)
+        .where(TiqoraApprovalVote.step_id == step.id)
+        .order_by(TiqoraApprovalVote.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    voted_at = {v.approver_id: (v.decided_at, v.id) for v in votes.scalars()}
+    eligible = [
+        a
+        for a in approvers
+        if a.step_id == step.id and a.status in ("pending", "approved", "rejected")
+    ]
+    eligible.sort(key=lambda a: (a.status == "pending", voted_at.get(a.id, (utc_now(), 0)), a.id))
+    return [rules.VoterState(a.status, a.decisive) for a in eligible]  # type: ignore[arg-type]
+
+
+async def _revoke_approver_tokens(
+    session: AsyncSession, approver_ids: Sequence[int], *, redeemed: int | None = None
+) -> None:
+    """Links of these approvers die; the redeemed one (if any) is marked used instead."""
+    if not approver_ids:
+        return
+    now = utc_now()
+    if redeemed is not None:
+        await session.execute(
+            update(TiqoraApprovalToken)
+            .where(
+                TiqoraApprovalToken.id == redeemed,
+                TiqoraApprovalToken.approver_id.in_(list(approver_ids)),
+                TiqoraApprovalToken.used_at.is_(None),
+            )
+            .values(used_at=now)
+        )
+    await session.execute(
+        update(TiqoraApprovalToken)
+        .where(
+            TiqoraApprovalToken.approver_id.in_(list(approver_ids)),
+            TiqoraApprovalToken.used_at.is_(None),
+            TiqoraApprovalToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=now)
+    )
+
+
+async def decide(
+    session: AsyncSession,
+    approval_id: int,
+    *,
+    actor: Actor,
+    decision: Decision,
+    channel: Channel,
+    comment: str | None = None,
+    approver_id: int | None = None,
+    token_id: int | None = None,
+    settings: Settings | None = None,
+    registry: Registry | None = None,
+) -> DecisionResult:
+    """Records one vote (A7b) and moves the request on. Flushes, never commits.
+
+    The first statement is ``SELECT … FOR UPDATE`` on the request (callers roll back before
+    calling, F1(a)); every later read of step/approver/vote rows is a locking read, so the
+    latest committed state is evaluated, never a stale snapshot. Raises ``approval_not_found``,
+    ``approval_closed``, ``not_an_approver``, ``already_decided``, ``step_not_active``,
+    ``self_approval_forbidden``, ``customer_approvers_not_allowed``,
+    ``customer_approver_outside_company``, ``forbidden`` (e-mail channel not allowed for the
+    step) and ``comment_too_long``.
+    """
+    if decision not in _VOTED:
+        raise ValueError(f"unknown decision: {decision!r}")
+    text_ = comment.strip() if comment is not None else None
+    if text_ is not None and len(text_) > _COMMENT_MAX:
+        raise ApprovalError("comment_too_long", 422, f"at most {_COMMENT_MAX} characters")
+    reg = registry or get_registry()
+    approval = await _lock_approval(session, approval_id)
+    if approval.status != "pending":
+        raise ApprovalError("approval_closed", 409)
+    asettings = await _settings(session, settings)
+    steps = await _locked_steps(session, approval.id)
+    approvers = await _locked_approvers(session, approval.id)
+    principal = actor.principal
+    key = actor.key if principal is None else (await canonical_principal(session, principal)).key
+    row, on_behalf = await _pick_approver(
+        session, approvers, steps, actor=actor, key=key, approver_id=approver_id
+    )
+    step = next(s for s in steps if s.id == row.step_id)
+
+    excluded = await _excluded_keys(session, approval)
+    if excluded & ({key, row.principal} if on_behalf else {key}):
+        raise ApprovalError("self_approval_forbidden", 403)
+    assert principal is not None
+    if principal.kind == "customer":
+        assert principal.login is not None
+        if not _allow_customers(approval, asettings, reg):
+            raise ApprovalError("customer_approvers_not_allowed", 422)
+        if not await customer_in_ticket_company(session, principal.login, approval.ticket_id):
+            raise ApprovalError("customer_approver_outside_company", 403)
+    if channel == "email" and not StepSpec.model_validate_json(step.spec).allow_email:
+        raise ApprovalError("forbidden", 403, "this step does not accept decisions by e-mail")
+
+    before = {a.id: a.status for a in approvers}
+    now = utc_now().replace(microsecond=0)  # MariaDB DATETIME has no microseconds
+    vote = TiqoraApprovalVote(
+        approval_id=approval.id,
+        step_id=step.id,
+        approver_id=row.id,
+        ticket_id=approval.ticket_id,
+        decision=decision,
+        comment=text_ or None,
+        decided_by=key,
+        on_behalf=on_behalf,
+        channel=channel,
+        decided_at=now,
+    )
+    session.add(vote)
+    row.status = decision
+    await session.flush()
+    await _revoke_approver_tokens(session, [row.id], redeemed=token_id)
+    await audit.record(
+        session,
+        approval=approval,
+        action="voted",
+        actor=actor,
+        step_id=step.id,
+        approver_id=row.id,
+        channel=channel,
+        detail={"decision": decision, "on_behalf": on_behalf},
+    )
+    await audit.emit(
+        session, approval, EVENT_VOTED, step_id=step.id, decision=decision, channel=channel
+    )
+    await audit.history(session, approval, "voted", actor=actor, extra=decision, settings=asettings)
+
+    outcome = rules.evaluate_step(step.rule, step.quorum, await _voters(session, step, approvers))  # type: ignore[arg-type]
+    new_ids: list[int] = []
+    if outcome != "pending":
+        step.status = outcome
+        step.reason = "votes"
+        step.decided_at = now
+        leftover = [a for a in approvers if a.step_id == step.id and a.status == "pending"]
+        for other in leftover:
+            other.status = "not_needed"
+        await session.flush()
+        await _revoke_approver_tokens(session, [a.id for a in leftover])
+        await audit.record(
+            session,
+            approval=approval,
+            action="step_decided",
+            actor=actor,
+            step_id=step.id,
+            detail={"decision": outcome, "reason": "votes"},
+        )
+        new_ids = await _activate_next_stage(
+            session, approval, settings=asettings, registry=reg, actor=actor
+        )
+        if approval.status == "pending":
+            await _enqueue_mail(session, approval, "request", approver_ids=new_ids, registry=reg)
+
+    affected = {principal.user_id} if principal.user_id is not None else set()
+    for after in await _locked_approvers(session, approval.id):
+        if before.get(after.id) != after.status and after.user_id is not None:
+            affected.add(after.user_id)
+    return DecisionResult(
+        info=_info(approval),
+        vote_id=vote.id,
+        step_status=step.status,  # type: ignore[arg-type]
+        on_behalf=on_behalf,
+        affected_user_ids=frozenset(affected),
+    )
 
 
 # --- reads -----------------------------------------------------------------------------------
