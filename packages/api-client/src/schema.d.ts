@@ -9380,6 +9380,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/changes/{ticket_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Tasks
+         * @description The change's tasks in order; task tickets the caller cannot read are left out.
+         */
+        get: operations["get_change_tasks_api_v1_itsm_changes__ticket_id__tasks_get"];
+        put?: never;
+        /**
+         * Post Change Task
+         * @description Add a task ticket under the change (child ticket, position last unless given).
+         */
+        post: operations["post_change_task_api_v1_itsm_changes__ticket_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/tasks/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Change Task Order
+         * @description Put the caller's tasks in the given order (every readable task exactly once).
+         */
+        put: operations["put_change_task_order_api_v1_itsm_changes__ticket_id__tasks_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/tasks/{task_ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Change Task
+         * @description Kind, planned/actual window, effort and owner of one task.
+         */
+        patch: operations["patch_change_task_api_v1_itsm_changes__ticket_id__tasks__task_ticket_id__patch"];
+        trace?: never;
+    };
     "/api/v1/itsm/cis": {
         parameters: {
             query?: never;
@@ -28199,6 +28263,97 @@ export interface components {
             article_count: number;
             /** Name */
             name: string;
+        };
+        /** TaskIn */
+        TaskIn: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Planned Effort Minutes */
+            planned_effort_minutes?: number | null;
+            /** Planned End */
+            planned_end?: string | null;
+            /** Planned Start */
+            planned_start?: string | null;
+            /** Position */
+            position?: number | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /**
+             * Task Kind
+             * @default workorder
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Title */
+            title: string;
+        };
+        /** TaskOrderIn */
+        TaskOrderIn: {
+            /** Order */
+            order: number[];
+        };
+        /** TaskOut */
+        TaskOut: {
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Finished */
+            finished: boolean;
+            /** Owner Id */
+            owner_id: number;
+            /** Planned Effort Minutes */
+            planned_effort_minutes: number | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Queue Id */
+            queue_id: number;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /**
+             * Task Kind
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Template Task Key */
+            template_task_key: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
+        /**
+         * TaskUpdateIn
+         * @description Only the fields that are sent change; ``null`` clears a time or the effort.
+         */
+        TaskUpdateIn: {
+            /** Actual End */
+            actual_end?: string | null;
+            /** Actual Start */
+            actual_start?: string | null;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Planned Effort Minutes */
+            planned_effort_minutes?: number | null;
+            /** Planned End */
+            planned_end?: string | null;
+            /** Planned Start */
+            planned_start?: string | null;
+            /** Task Kind */
+            task_kind?: ("workorder" | "backout" | "decision" | "pir") | null;
         };
         /** TelegramButtonIn */
         TelegramButtonIn: {
@@ -54555,6 +54710,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangeEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_tasks_api_v1_itsm_changes__ticket_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_task_api_v1_itsm_changes__ticket_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_change_task_order_api_v1_itsm_changes__ticket_id__tasks_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_change_task_api_v1_itsm_changes__ticket_id__tasks__task_ticket_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                task_ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
                 };
             };
             /** @description Validation Error */

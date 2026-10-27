@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
 from tiqora.itsm.change.service import ChangeView
+from tiqora.itsm.change.tasks import TaskKind, TaskView
 
 
 class ChangeStatusOut(BaseModel):
@@ -151,3 +152,30 @@ def event_out(row: TiqoraItsmChangeEvent) -> ChangeEventOut:
         to_phase=row.to_phase,
         detail=detail,
     )
+
+
+class TaskOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    queue_id: int
+    owner_id: int
+    state: str
+    state_type: str
+    finished: bool
+    task_kind: TaskKind
+    position: int
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+    actual_start: UtcDateTime | None
+    actual_end: UtcDateTime | None
+    planned_effort_minutes: int | None
+    template_task_key: str | None
+
+
+class TaskOrderIn(BaseModel):
+    order: list[int] = Field(..., max_length=200)
+
+
+def task_out(view: TaskView) -> TaskOut:
+    return TaskOut.model_validate(view.model_dump())

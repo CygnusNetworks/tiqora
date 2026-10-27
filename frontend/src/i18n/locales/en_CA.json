@@ -6738,6 +6738,7 @@
         "cmdb_reindex": "Rebuild CMDB search",
         "itsm_linked_articles": "Note to linked tickets",
         "itsm_import": "Import Znuny ITSM data",
+        "itsm_change_tasks": "Create change tasks",
         "itsm_switch": "Switch ITSM to Tiqora"
       },
       "gi_mail": "Send email from a web service request"

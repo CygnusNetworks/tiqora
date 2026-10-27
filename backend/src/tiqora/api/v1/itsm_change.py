@@ -19,8 +19,11 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeEventOut,
     ChangeOut,
     ChangeStatusOut,
+    TaskOrderIn,
+    TaskOut,
     change_out,
     event_out,
+    task_out,
 )
 from tiqora.itsm.change.gate import change_availability
 from tiqora.itsm.change.service import (
@@ -31,6 +34,14 @@ from tiqora.itsm.change.service import (
     get_change,
     list_events,
     update_change,
+)
+from tiqora.itsm.change.tasks import (
+    TaskIn,
+    TaskUpdateIn,
+    add_task,
+    list_tasks,
+    reorder_tasks,
+    update_task,
 )
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -112,6 +123,82 @@ async def get_change_events(
         session, settings, ticket_id=ticket_id, user_id=user.id, limit=limit, before_id=before_id
     )
     return [event_out(r) for r in rows]
+
+
+@router.get("/changes/{ticket_id:int}/tasks", response_model=list[TaskOut])
+async def get_change_tasks(ticket_id: int, user: CurrentUser, session: DbSession) -> list[TaskOut]:
+    """The change's tasks in order; task tickets the caller cannot read are left out."""
+    tasks = await list_tasks(session, change_ticket_id=ticket_id, user_id=user.id)
+    return [task_out(t) for t in tasks]
+
+
+@router.post(
+    "/changes/{ticket_id:int}/tasks", response_model=TaskOut, status_code=status.HTTP_201_CREATED
+)
+async def post_change_task(
+    ticket_id: int,
+    body: TaskIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)],
+) -> TaskOut:
+    """Add a task ticket under the change (child ticket, position last unless given)."""
+    view = await add_task(
+        session,
+        settings,
+        SysConfig(session),
+        change_ticket_id=ticket_id,
+        data=body,
+        user_id=user.id,
+        session_factory=factory,
+    )
+    out = task_out(view)
+    await session.commit()
+    return out
+
+
+@router.put("/changes/{ticket_id:int}/tasks/order", response_model=list[TaskOut])
+async def put_change_task_order(
+    ticket_id: int,
+    body: TaskOrderIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> list[TaskOut]:
+    """Put the caller's tasks in the given order (every readable task exactly once)."""
+    tasks = await reorder_tasks(
+        session, settings, change_ticket_id=ticket_id, order=body.order, user_id=user.id
+    )
+    out = [task_out(t) for t in tasks]
+    await session.commit()
+    return out
+
+
+@router.patch("/changes/{ticket_id:int}/tasks/{task_ticket_id:int}", response_model=TaskOut)
+async def patch_change_task(
+    ticket_id: int,
+    task_ticket_id: int,
+    body: TaskUpdateIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)],
+) -> TaskOut:
+    """Kind, planned/actual window, effort and owner of one task."""
+    view = await update_task(
+        session,
+        settings,
+        SysConfig(session),
+        change_ticket_id=ticket_id,
+        task_ticket_id=task_ticket_id,
+        data=body,
+        user_id=user.id,
+        session_factory=factory,
+    )
+    out = task_out(view)
+    await session.commit()
+    return out
 
 
 @ticket_router.post("/{ticket_id}/change", response_model=ChangeOut)
