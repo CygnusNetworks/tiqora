@@ -34,7 +34,7 @@ from tests._itsm_adapter_helpers import seed_user
 from tiqora.api import app as api_app
 from tiqora.api.v1 import approvals as approvals_api
 from tiqora.approvals import delegation, lists, service, templates
-from tiqora.approvals.contract import Actor, ApprovalDefinition, ApprovalError
+from tiqora.approvals.contract import Actor, ApprovalDefinition, ApprovalError, Principal
 from tiqora.approvals.models import TiqoraApproval
 from tiqora.approvals.settings import APPROVALS_SECTION
 from tiqora.config import Settings
@@ -396,7 +396,7 @@ async def test_decision_errors_shape(url_fixture: str, request: pytest.FixtureRe
             assert self_vote.status_code == 403
             assert self_vote.json()["detail"]["code"] == "self_approval_forbidden"
             assert set(self_vote.json()["detail"]) == {"code", "detail"}
-            assert (stranger.status_code, _code(stranger)) == (403, "not_an_approver")
+            assert (stranger.status_code, _code(stranger)) == (404, "approval_not_found")
             assert (missing.status_code, _code(missing)) == (404, "approval_not_found")
             assert (long_comment.status_code, _code(long_comment)) == (422, "comment_too_long")
             assert bad_value.status_code == 422
@@ -934,3 +934,76 @@ def test_openapi_has_routes() -> None:
         assert path in paths, path
         assert methods <= set(paths[path]), path
     assert paths["/api/v1/tickets/{ticket_id}/approvals"]["post"]["responses"].keys() >= {"201"}
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_actions_on_invisible_request_answer_404(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session)
+            async with await as_client(session, agent=AG1) as client:
+                detail = (await client.get(f"{BASE}/{aid}")).json()
+            row = detail["steps"][0]["approvers"][0]["id"]
+            calls = (
+                ("post", f"{BASE}/{{}}/decision", {"decision": "approved"}),
+                ("post", f"{BASE}/{{}}/cancel", None),
+                ("post", f"{BASE}/{{}}/refresh-approvers", None),
+                ("post", f"{BASE}/{{}}/approvers/{row}/forward", {"user_id": AG5}),
+            )
+            async with await as_client(session, agent=AG7) as client:  # sees nothing
+                for _, path, body in calls:
+                    real = await client.post(path.format(aid), json=body)
+                    gone = await client.post(path.format(aid + 1000), json=body)
+                    assert (real.status_code, _code(real)) == (404, "approval_not_found"), path
+                    assert real.json() == gone.json(), path
+            # a caller who may see the request still gets the precise refusal
+            async with await as_client(session, agent=AG2) as client:
+                cancel = await client.post(f"{BASE}/{aid}/cancel")
+                vote = await client.post(f"{BASE}/{aid}/decision", json={"decision": "approved"})
+            assert (cancel.status_code, _code(cancel)) == (403, "forbidden")
+            assert (vote.status_code, _code(vote)) == (403, "not_an_approver")
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_creator_who_is_not_the_requester_can_view_and_cancel(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            info = await service.request_approval(
+                session,
+                ticket_id=T1,
+                subject_type=SUBJECT,
+                title="Im Auftrag appr97",
+                actor=Actor.agent(AG5),  # creator, no access to the ticket's queue
+                requester=Principal.agent(AG1),
+                definition=_defn(_step("Prüfung", _user(AG3))),
+                settings=SETTINGS,
+            )
+            await session.commit()
+            async with await as_client(session, agent=AG5) as client:
+                seen = await client.get(f"{BASE}/{info.approval_id}")
+                cancelled = await client.post(f"{BASE}/{info.approval_id}/cancel")
+            assert seen.status_code == 200 and seen.json()["can_cancel"] is True
+            assert cancelled.status_code == 200, cancelled.text
+            assert cancelled.json()["status"] == "cancelled"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_ticket_approvals_are_paged(url_fixture: str, request: pytest.FixtureRequest) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            ids = [await _request(session, key=f"k{i}") for i in range(3)]
+            url = f"/api/v1/tickets/{T1}/approvals"
+            async with await as_client(session, agent=AG1) as client:
+                first = await client.get(url, params={"limit": 2})
+                second = await client.get(url, params={"limit": 2, "offset": 2})
+                too_big = await client.get(url, params={"limit": 101})
+            assert [r["id"] for r in first.json()] == [ids[2], ids[1]]
+            assert [r["id"] for r in second.json()] == [ids[0]]
+            assert too_big.status_code == 422

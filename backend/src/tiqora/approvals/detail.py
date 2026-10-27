@@ -139,7 +139,7 @@ async def _my_rows(
     key = await inbox._actor_key(session, actor)
     if key is None:
         return []
-    rows = [r for r in await inbox._pending_rows(session, actor) if r.approval.id == approval.id]
+    rows = await inbox._pending_rows(session, actor, approval_ids=[approval.id])
     if not rows:
         return []
     blocked = await inbox._blocked(session, key, rows)
@@ -315,7 +315,7 @@ async def build_summaries(
     mine: set[int] = set()
     if actor.principal is not None and actor.principal.kind == "agent":
         key = await inbox._actor_key(session, actor)
-        rows = [r for r in await inbox._pending_rows(session, actor)]
+        rows = await inbox._pending_rows(session, actor, approval_ids=[a.id for a in approvals])
         if key is not None and rows:
             blocked = await inbox._blocked(session, key, rows)
             mine = {r.approval.id for r in rows if blocked[r.approver.id] is None}

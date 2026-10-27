@@ -12241,7 +12241,7 @@ export interface paths {
         };
         /**
          * List Ticket Approvals
-         * @description All approval requests of the ticket, newest first. Needs ``ro`` on the ticket.
+         * @description Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket.
          */
         get: operations["list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get"];
         put?: never;
@@ -60733,7 +60733,10 @@ export interface operations {
     };
     list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: {
                 authorization?: string | null;
             };

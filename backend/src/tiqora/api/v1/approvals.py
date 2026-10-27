@@ -53,9 +53,6 @@ from tiqora.permissions.engine import PermissionEngine
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 ticket_router = APIRouter(prefix="/tickets", tags=["approvals"])
 
-#: most requests one ticket lists
-TICKET_APPROVALS_MAX = 200
-
 
 def _http(err: ApprovalError) -> HTTPException:
     """``{"detail": {"code": ..., "detail": ...}}``: the frontend reads ``detail.code``."""
@@ -73,6 +70,33 @@ async def _run[T](session: AsyncSession, operation: Awaitable[T]) -> T:
     except ApprovalError as err:
         await session.rollback()
         raise _http(err) from err
+
+
+async def _run_on[T](
+    session: AsyncSession, approval_id: int, actor: Actor, operation: Awaitable[T]
+) -> T:
+    """Like :func:`_run` for a call on one request: a refusal for a request the caller may not
+    see is always 404 ``approval_not_found``, so 403/409 never reveal that it exists. The
+    visibility check runs after the rollback, keeping the service's request lock the first read.
+    """
+    try:
+        return await operation
+    except ApprovalError as err:
+        await session.rollback()
+        if err.code != "approval_not_found":
+            approval = (
+                await session.execute(
+                    select(TiqoraApproval).where(TiqoraApproval.id == approval_id)
+                )
+            ).scalar_one_or_none()
+            if approval is None or not await access.can_view(session, approval, actor):
+                await session.rollback()
+                _refuse("approval_not_found", status.HTTP_404_NOT_FOUND)
+        raise _http(err) from err
+
+
+async def _raise(err: ApprovalError) -> NoReturn:
+    raise err
 
 
 def _actor(user: CurrentUser) -> Actor:
@@ -339,8 +363,10 @@ async def post_decision(
     """Votes "Freigeben" / "Ablehnen". The first decision of a step with rule "einer" counts."""
     actor = _actor(user)
     await session.rollback()  # the request lock must be the first read (F1(a))
-    result = await _run(
+    result = await _run_on(
         session,
+        approval_id,
+        actor,
         service.decide(
             session,
             approval_id,
@@ -380,8 +406,18 @@ async def post_forward(
     ).first()
     await session.rollback()  # back to a clean transaction for the locking service call
     if owner is None or int(owner[0]) != approval_id:
-        _refuse("not_an_approver", status.HTTP_403_FORBIDDEN)
-    await _run(session, service.forward(session, approver_id, actor=actor, to_user_id=body.user_id))
+        await _run_on(
+            session,
+            approval_id,
+            actor,
+            _raise(ApprovalError("not_an_approver", status.HTTP_403_FORBIDDEN)),
+        )
+    await _run_on(
+        session,
+        approval_id,
+        actor,
+        service.forward(session, approver_id, actor=actor, to_user_id=body.user_id),
+    )
     await session.commit()
     await _publish(settings, await _affected_users(session, approval_id, step_id=int(owner[1])))
     return await _detail(session, approval_id, actor)
@@ -395,8 +431,11 @@ async def post_cancel(
     or an admin. There is no note: the audit trail never stores free text."""
     actor = _actor(user)
     await session.rollback()
-    await _run(
-        session, service.cancel_approval(session, approval_id, actor=actor, settings=settings)
+    await _run_on(
+        session,
+        approval_id,
+        actor,
+        service.cancel_approval(session, approval_id, actor=actor, settings=settings),
     )
     await session.commit()
     await _publish(settings, await _affected_users(session, approval_id))
@@ -410,8 +449,11 @@ async def post_refresh_approvers(
     """ "Freigeber neu ermitteln": re-resolves the approvers of the open steps."""
     actor = _actor(user)
     await session.rollback()
-    await _run(
-        session, service.refresh_approvers(session, approval_id, actor=actor, settings=settings)
+    await _run_on(
+        session,
+        approval_id,
+        actor,
+        service.refresh_approvers(session, approval_id, actor=actor, settings=settings),
     )
     await session.commit()
     await _publish(settings, await _affected_users(session, approval_id))
@@ -434,16 +476,21 @@ async def _require_ticket(
 
 @ticket_router.get("/{ticket_id}/approvals", response_model=list[ApprovalSummaryOut])
 async def list_ticket_approvals(
-    ticket_id: int, user: CurrentUser, session: DbSession
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ApprovalSummaryOut]:
-    """All approval requests of the ticket, newest first. Needs ``ro`` on the ticket."""
+    """Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket."""
     await _require_ticket(session, user, ticket_id)
     rows = (
         await session.execute(
             select(TiqoraApproval)
             .where(TiqoraApproval.ticket_id == ticket_id)
             .order_by(TiqoraApproval.id.desc())
-            .limit(TICKET_APPROVALS_MAX)
+            .limit(limit)
+            .offset(offset)
             .execution_options(populate_existing=True)
         )
     ).scalars()

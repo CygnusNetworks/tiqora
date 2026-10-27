@@ -67,15 +67,18 @@ async def can_refresh(session: AsyncSession, approval: TiqoraApproval, actor: Ac
 
 
 async def can_view(session: AsyncSession, approval: TiqoraApproval, actor: Actor) -> bool:
-    """Admin, ``ro`` on the ticket's queue, the requester, anyone with an approver row on the
-    request (any status), an active delegate of such an agent. Customers: own rows only.
+    """Admin, ``ro`` on the ticket's queue, the requester or creator (who may cancel), anyone
+    with an approver row on the request (any status), an active delegate of such an agent.
+    Customers: own rows only.
     """
     principal = actor.principal
     if principal is None:
         return True
     key = (await canonical_principal(session, principal)).key
     if principal.kind == "agent" and (
-        key == approval.requester or await _agent_may(session, actor, approval.ticket_id, "ro")
+        key == approval.requester
+        or key == await audit.creator_key(session, approval)
+        or await _agent_may(session, actor, approval.ticket_id, "ro")
     ):
         return True
     rows = await session.execute(

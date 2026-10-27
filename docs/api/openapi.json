@@ -116708,7 +116708,7 @@
     },
     "/api/v1/tickets/{ticket_id}/approvals": {
       "get": {
-        "description": "All approval requests of the ticket, newest first. Needs ``ro`` on the ticket.",
+        "description": "Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket.",
         "operationId": "list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get",
         "parameters": [
           {
@@ -116717,6 +116717,29 @@
             "required": true,
             "schema": {
               "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
               "type": "integer"
             }
           },

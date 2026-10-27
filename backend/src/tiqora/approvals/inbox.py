@@ -84,8 +84,13 @@ async def _actor_key(session: AsyncSession, actor: Actor) -> str | None:
     return (await canonical_principal(session, actor.principal)).key
 
 
-async def _pending_rows(session: AsyncSession, actor: Actor) -> list[_Row]:
-    """All pending rows of the actor in inbox order (deadline first, NULL last, then id)."""
+async def _pending_rows(
+    session: AsyncSession, actor: Actor, *, approval_ids: Sequence[int] | None = None
+) -> list[_Row]:
+    """Pending rows of the actor in inbox order (deadline first, NULL last, then id).
+
+    *approval_ids* limits the scan to those requests (detail and ticket views).
+    """
     key = await _actor_key(session, actor)
     if key is None:
         return []
@@ -97,11 +102,14 @@ async def _pending_rows(session: AsyncSession, actor: Actor) -> list[_Row]:
     mine: ColumnElement[bool] = A.principal == key
     if delegators:
         mine = or_(mine, A.user_id.in_(sorted(delegators)))
+    scope: list[ColumnElement[bool]] = []
+    if approval_ids is not None:
+        scope.append(P.id.in_(sorted(set(approval_ids))))
     result = await session.execute(
         select(A, S, P)
         .join(S, S.id == A.step_id)
         .join(P, P.id == A.approval_id)
-        .where(P.status == "pending", S.status == "active", A.status == "pending", mine)
+        .where(P.status == "pending", S.status == "active", A.status == "pending", mine, *scope)
         .order_by(S.due_at.is_(None), S.due_at, A.id)
         .execution_options(populate_existing=True)
     )
