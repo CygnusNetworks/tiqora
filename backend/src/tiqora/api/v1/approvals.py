@@ -1,0 +1,496 @@
+"""Approval endpoints for agents (A13): inbox, decisions, forwarding, ticket approvals.
+
+``/api/v1/approvals`` and ``/api/v1/tickets/{id}/approvals`` (API-key area ``tickets``). The
+engine in :mod:`tiqora.approvals` never commits: every handler commits and then, best-effort,
+tells the affected agents' browsers (``approval_changed``) that their inbox changed.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Iterable
+from typing import Annotated, Literal, NoReturn
+
+from fastapi import APIRouter, HTTPException, Query, Response, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.approvals import access, delegation, detail, inbox, lists, service, templates
+from tiqora.approvals.contract import (
+    APPROVAL_SUBJECT_TYPES,
+    APPROVER_RESOLVERS,
+    Actor,
+    ApprovalError,
+    Channel,
+)
+from tiqora.approvals.models import (
+    TiqoraApproval,
+    TiqoraApprovalApprover,
+    TiqoraApprovalDelegation,
+)
+from tiqora.approvals.schemas import (
+    ApprovalDetailOut,
+    ApprovalInboxPage,
+    ApprovalListOptionOut,
+    ApprovalRequestIn,
+    ApprovalSummaryOut,
+    ApprovalTemplateOptionOut,
+    DecisionIn,
+    DelegationIn,
+    DelegationOut,
+    ForwardIn,
+    InboxCountOut,
+    InboxItemOut,
+    ResolverOptionOut,
+)
+from tiqora.approvals.settings import load_approval_settings
+from tiqora.domain.ticket_access import TicketAccessDenied, require_ticket
+from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
+from tiqora.extensions.core import get_registry
+from tiqora.jobs.service import utc_now
+from tiqora.permissions.engine import PermissionEngine
+
+router = APIRouter(prefix="/approvals", tags=["approvals"])
+ticket_router = APIRouter(prefix="/tickets", tags=["approvals"])
+
+#: most requests one ticket lists
+TICKET_APPROVALS_MAX = 200
+
+
+def _http(err: ApprovalError) -> HTTPException:
+    """``{"detail": {"code": ..., "detail": ...}}``: the frontend reads ``detail.code``."""
+    return HTTPException(err.http_status, detail={"code": err.code, "detail": err.detail})
+
+
+def _refuse(code: str, http_status: int, detail_text: str | None = None) -> NoReturn:
+    raise _http(ApprovalError(code, http_status, detail_text))
+
+
+async def _run[T](session: AsyncSession, operation: Awaitable[T]) -> T:
+    """Awaits an engine call; an :class:`ApprovalError` rolls back and becomes an HTTP error."""
+    try:
+        return await operation
+    except ApprovalError as err:
+        await session.rollback()
+        raise _http(err) from err
+
+
+def _actor(user: CurrentUser) -> Actor:
+    return Actor.agent(user.id)
+
+
+def _channel(user: CurrentUser) -> Channel:
+    return "api" if user.auth_method == "api_key" else "ui"
+
+
+async def _publish(settings: AppSettings, user_ids: Iterable[int]) -> None:
+    """After the commit: the inbox of these agents changed (best-effort, never raises)."""
+    ids = set(user_ids)
+    if ids:
+        await publish_approval_changed(get_pubsub_redis(settings), ids)
+
+
+async def _affected_users(
+    session: AsyncSession, approval_id: int, *, step_id: int | None = None
+) -> set[int]:
+    """Agents whose inbox may have changed: the request's approvers (any row status, so the
+    previous and the new ones), their active substitutes and the requesting agent.
+    """
+    stmt = select(TiqoraApprovalApprover.user_id).where(
+        TiqoraApprovalApprover.approval_id == approval_id,
+        TiqoraApprovalApprover.user_id.is_not(None),
+    )
+    if step_id is not None:
+        stmt = stmt.where(TiqoraApprovalApprover.step_id == step_id)
+    users = {u for u in (await session.execute(stmt)).scalars() if u is not None}
+    for substitutes in (await delegation.active_substitutes(session, users, at=utc_now())).values():
+        users |= substitutes
+    if step_id is None:
+        requester = (
+            await session.execute(
+                select(TiqoraApproval.requester).where(TiqoraApproval.id == approval_id)
+            )
+        ).scalar_one_or_none()
+        if requester is not None and str(requester).startswith("agent:"):
+            users.add(int(str(requester).partition(":")[2]))
+    return users
+
+
+async def _viewable(session: AsyncSession, approval_id: int, actor: Actor) -> TiqoraApproval:
+    """The request, or 404 ``approval_not_found`` (also for one the caller may not see)."""
+    approval = (
+        await session.execute(
+            select(TiqoraApproval)
+            .where(TiqoraApproval.id == approval_id)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if approval is None or not await access.can_view(session, approval, actor):
+        _refuse("approval_not_found", status.HTTP_404_NOT_FOUND)
+    return approval
+
+
+async def _detail(session: AsyncSession, approval_id: int, actor: Actor) -> ApprovalDetailOut:
+    return await detail.build_detail(session, await _viewable(session, approval_id, actor), actor)
+
+
+# --- inbox -----------------------------------------------------------------------------------
+
+
+@router.get("/inbox", response_model=ApprovalInboxPage)
+async def get_inbox(
+    user: CurrentUser,
+    session: DbSession,
+    state: Annotated[Literal["pending", "decided"], Query()] = "pending",
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ApprovalInboxPage:
+    """ "Meine Freigaben": open rows of the caller (and of agents who delegated to them), or
+    the rows they decided."""
+    page = await inbox.inbox(session, _actor(user), state=state, limit=limit, offset=offset)
+    labels = await detail.user_labels(
+        session, [i.on_behalf_of for i in page.items if i.on_behalf_of is not None]
+    )
+    return ApprovalInboxPage(
+        items=[
+            InboxItemOut(
+                approval_id=i.approval_id,
+                approver_id=i.approver_id,
+                ticket_id=i.ticket_id,
+                ticket_number=i.ticket_number,
+                ticket_title=i.ticket_title,
+                title=i.title,
+                subject_type=i.subject_type,
+                step_name=i.step_name,
+                rule=i.rule,
+                required=i.required,
+                approved_count=i.approved_count,
+                due_at=i.due_at,
+                overdue=i.overdue,
+                on_behalf_of_label=(
+                    None if i.on_behalf_of is None else labels.get(i.on_behalf_of, "?")
+                ),
+                status=i.status,
+                decided_at=i.decided_at,
+                my_decision=i.my_decision,
+                can_vote=i.can_vote,
+                blocked_reason=i.blocked_reason,
+            )
+            for i in page.items
+        ],
+        total=page.total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/inbox/count", response_model=InboxCountOut)
+async def get_inbox_count(user: CurrentUser, session: DbSession) -> InboxCountOut:
+    """Open rows the caller can still vote on - the sidebar badge."""
+    return InboxCountOut(pending=await inbox.pending_count(session, _actor(user)))
+
+
+# --- pickers ---------------------------------------------------------------------------------
+
+
+@router.get("/templates", response_model=list[ApprovalTemplateOptionOut])
+async def get_templates(
+    user: CurrentUser,
+    session: DbSession,
+    subject_type: Annotated[str | None, Query(max_length=64)] = None,
+) -> list[ApprovalTemplateOptionOut]:
+    """Valid approval templates (for "Freigabe anfordern"), optionally for one subject type."""
+    _ = user
+    rows = await templates.list_templates(session, subject_type=subject_type)
+    return [
+        ApprovalTemplateOptionOut(
+            key=r.key,
+            name=r.name,
+            description=r.description,
+            subject_types=list(r.subject_types),
+        )
+        for r in rows
+    ]
+
+
+@router.get("/lists", response_model=list[ApprovalListOptionOut])
+async def get_lists(user: CurrentUser, session: DbSession) -> list[ApprovalListOptionOut]:
+    """Valid approval groups ("Freigabegruppe, z. B. CAB") for the approver picker."""
+    _ = user
+    return [
+        ApprovalListOptionOut(id=r.id, name=r.name, member_count=len(r.member_ids))
+        for r in await lists.list_lists(session)
+    ]
+
+
+@router.get("/resolvers", response_model=list[ResolverOptionOut])
+async def get_resolvers(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    subject_type: Annotated[str | None, Query(max_length=64)] = None,
+) -> list[ResolverOptionOut]:
+    """Dynamic approver sources. Those that name customers only appear where customers may
+    approve (the setting is on and the subject type allows them)."""
+    _ = user
+    registry = get_registry()
+    customers = (await load_approval_settings(session, settings)).customer_approvers_enabled
+    if customers and subject_type is not None:
+        subject = registry.get(APPROVAL_SUBJECT_TYPES, subject_type)
+        customers = subject is not None and subject.allow_customer_approvers
+    return [
+        ResolverOptionOut(key=r.key, title_key=r.title_key, yields_customers=r.yields_customers)
+        for r in sorted(registry.items(APPROVER_RESOLVERS), key=lambda r: r.key)
+        if customers or not r.yields_customers
+    ]
+
+
+# --- delegations -----------------------------------------------------------------------------
+
+
+async def _delegation_out(
+    session: AsyncSession, rows: Iterable[TiqoraApprovalDelegation]
+) -> list[DelegationOut]:
+    rows = list(rows)
+    labels = await detail.user_labels(session, [r.substitute_user_id for r in rows])
+    return [
+        DelegationOut(
+            id=r.id,
+            user_id=r.user_id,
+            substitute_user_id=r.substitute_user_id,
+            substitute_label=labels.get(r.substitute_user_id, "?"),
+            valid_from=r.valid_from,
+            valid_until=r.valid_until,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/delegations", response_model=list[DelegationOut])
+async def get_delegations(user: CurrentUser, session: DbSession) -> list[DelegationOut]:
+    """The caller's own delegations ("Vertretung"), running and future ones."""
+    return await _delegation_out(
+        session, await delegation.list_delegations(session, user_id=user.id)
+    )
+
+
+@router.post("/delegations", response_model=DelegationOut, status_code=status.HTTP_201_CREATED)
+async def post_delegation(
+    body: DelegationIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> DelegationOut:
+    """The caller names a substitute for a period; the substitute may then decide in their
+    place (one vote per person and step, never on the caller's own requests)."""
+    row = await _run(
+        session,
+        delegation.create_delegation(
+            session,
+            user_id=user.id,
+            substitute_user_id=body.substitute_user_id,
+            valid_from=body.valid_from or utc_now(),
+            valid_until=body.valid_until,
+            created_by=user.id,
+        ),
+    )
+    await session.commit()
+    await _publish(settings, {row.user_id, row.substitute_user_id})
+    return (await _delegation_out(session, [row]))[0]
+
+
+@router.delete("/delegations/{delegation_id:int}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_delegation(
+    delegation_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> Response:
+    """Ends one of the caller's delegations now. A foreign one is 404 (an admin may end any)."""
+    row = await session.get(TiqoraApprovalDelegation, delegation_id)
+    if row is None or (
+        row.user_id != user.id and not await PermissionEngine(session).is_admin(user.id)
+    ):
+        _refuse("delegation_not_found", status.HTTP_404_NOT_FOUND)
+    users = {row.user_id, row.substitute_user_id}
+    await session.rollback()
+    await _run(session, delegation.revoke_delegation(session, delegation_id, actor=_actor(user)))
+    await session.commit()
+    await _publish(settings, users)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- one request -----------------------------------------------------------------------------
+
+
+@router.get("/{approval_id:int}", response_model=ApprovalDetailOut)
+async def get_approval(
+    approval_id: int, user: CurrentUser, session: DbSession
+) -> ApprovalDetailOut:
+    """Steps, approvers, votes, audit trail and what the caller may do. 404 unless the caller
+    may see the request (admin, ``ro`` on the ticket, requester, approver or their delegate).
+    No ticket articles are part of it."""
+    return await _detail(session, approval_id, _actor(user))
+
+
+@router.post("/{approval_id:int}/decision", response_model=ApprovalDetailOut)
+async def post_decision(
+    approval_id: int,
+    body: DecisionIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ApprovalDetailOut:
+    """Votes "Freigeben" / "Ablehnen". The first decision of a step with rule "einer" counts."""
+    actor = _actor(user)
+    await session.rollback()  # the request lock must be the first read (F1(a))
+    result = await _run(
+        session,
+        service.decide(
+            session,
+            approval_id,
+            actor=actor,
+            decision=body.decision,
+            channel=_channel(user),
+            comment=body.comment,
+            approver_id=body.approver_id,
+            settings=settings,
+        ),
+    )
+    await session.commit()
+    await _publish(settings, result.affected_user_ids)
+    return await _detail(session, approval_id, actor)
+
+
+@router.post(
+    "/{approval_id:int}/approvers/{approver_id:int}/forward", response_model=ApprovalDetailOut
+)
+async def post_forward(
+    approval_id: int,
+    approver_id: int,
+    body: ForwardIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ApprovalDetailOut:
+    """Hands the caller's own open row to another agent."""
+    actor = _actor(user)
+    await session.rollback()
+    owner = (
+        await session.execute(
+            select(TiqoraApprovalApprover.approval_id, TiqoraApprovalApprover.step_id).where(
+                TiqoraApprovalApprover.id == approver_id
+            )
+        )
+    ).first()
+    await session.rollback()  # back to a clean transaction for the locking service call
+    if owner is None or int(owner[0]) != approval_id:
+        _refuse("not_an_approver", status.HTTP_403_FORBIDDEN)
+    await _run(session, service.forward(session, approver_id, actor=actor, to_user_id=body.user_id))
+    await session.commit()
+    await _publish(settings, await _affected_users(session, approval_id, step_id=int(owner[1])))
+    return await _detail(session, approval_id, actor)
+
+
+@router.post("/{approval_id:int}/cancel", response_model=ApprovalDetailOut)
+async def post_cancel(
+    approval_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ApprovalDetailOut:
+    """Withdraws an open request ("Zurückziehen"): requester, creator, ``rw`` on the ticket
+    or an admin. There is no note: the audit trail never stores free text."""
+    actor = _actor(user)
+    await session.rollback()
+    await _run(
+        session, service.cancel_approval(session, approval_id, actor=actor, settings=settings)
+    )
+    await session.commit()
+    await _publish(settings, await _affected_users(session, approval_id))
+    return await _detail(session, approval_id, actor)
+
+
+@router.post("/{approval_id:int}/refresh-approvers", response_model=ApprovalDetailOut)
+async def post_refresh_approvers(
+    approval_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ApprovalDetailOut:
+    """ "Freigeber neu ermitteln": re-resolves the approvers of the open steps."""
+    actor = _actor(user)
+    await session.rollback()
+    await _run(
+        session, service.refresh_approvers(session, approval_id, actor=actor, settings=settings)
+    )
+    await session.commit()
+    await _publish(settings, await _affected_users(session, approval_id))
+    return await _detail(session, approval_id, actor)
+
+
+# --- on a ticket -----------------------------------------------------------------------------
+
+
+async def _require_ticket(
+    session: AsyncSession, user: CurrentUser, ticket_id: int, *, write: bool = False
+) -> None:
+    """``ro`` on the ticket's queue, else 404 ``ticket_not_found``; with *write* also ``rw``,
+    else 403 ``forbidden``."""
+    try:
+        await require_ticket(session, ticket_id, user_id=user.id, write=write)
+    except TicketAccessDenied as exc:
+        _refuse(exc.code, exc.http_status)
+
+
+@ticket_router.get("/{ticket_id}/approvals", response_model=list[ApprovalSummaryOut])
+async def list_ticket_approvals(
+    ticket_id: int, user: CurrentUser, session: DbSession
+) -> list[ApprovalSummaryOut]:
+    """All approval requests of the ticket, newest first. Needs ``ro`` on the ticket."""
+    await _require_ticket(session, user, ticket_id)
+    rows = (
+        await session.execute(
+            select(TiqoraApproval)
+            .where(TiqoraApproval.ticket_id == ticket_id)
+            .order_by(TiqoraApproval.id.desc())
+            .limit(TICKET_APPROVALS_MAX)
+            .execution_options(populate_existing=True)
+        )
+    ).scalars()
+    return await detail.build_summaries(session, list(rows), _actor(user))
+
+
+@ticket_router.post(
+    "/{ticket_id}/approvals", response_model=ApprovalDetailOut, status_code=status.HTTP_201_CREATED
+)
+async def request_ticket_approval(
+    ticket_id: int,
+    body: ApprovalRequestIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ApprovalDetailOut:
+    """ "Freigabe anfordern" on the ticket (subject ``ticket``): a template or an own
+    definition. Needs ``rw`` on the ticket. An own definition may not approve when nobody can
+    decide or when the deadline passes: those outcomes are for admin templates (F9)."""
+    await _require_ticket(session, user, ticket_id, write=True)
+    subject = get_registry().get(APPROVAL_SUBJECT_TYPES, "ticket")
+    if subject is None or not subject.agent_requestable:
+        _refuse("subject_not_requestable", 422)
+    if body.definition is not None and any(
+        s.on_no_approver != "reject" or s.on_timeout == "approve" for s in body.definition.steps
+    ):
+        _refuse(
+            "invalid_definition",
+            422,
+            "an own definition cannot approve automatically",
+        )
+    actor = _actor(user)
+    info = await _run(
+        session,
+        service.request_approval(
+            session,
+            ticket_id=ticket_id,
+            subject_type="ticket",
+            title=body.title,
+            description=body.description,
+            approval_key=body.approval_key,
+            definition=body.definition,
+            template_key=body.template_key,
+            actor=actor,
+            settings=settings,
+        ),
+    )
+    await session.commit()
+    await _publish(settings, await _affected_users(session, info.approval_id))
+    return await _detail(session, info.approval_id, actor)
