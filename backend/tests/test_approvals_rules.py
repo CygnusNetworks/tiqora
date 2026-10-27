@@ -108,6 +108,13 @@ def test_validate_definition_semantics() -> None:
             )
         )
     assert dup.value.code == "invalid_definition"
+    dup_users = [{"kind": "user", "ref": "970103"}] * 2  # one person twice is one voter
+    with pytest.raises(ApprovalError):
+        validate_definition(
+            ApprovalDefinition(
+                steps=[StepSpec(name="a", rule="quorum", quorum=2, approvers=dup_users)]
+            )
+        )
     # 10 steps in one stage is the limit and fine
     validate_definition(
         ApprovalDefinition(steps=[StepSpec(name=f"s{i}", approvers=users) for i in range(10)])

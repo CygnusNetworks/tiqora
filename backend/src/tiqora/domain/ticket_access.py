@@ -1,4 +1,4 @@
-"""Ticket facts and the ``ro``/``rw`` rule shared by the ITSM modules.
+"""Ticket facts and the ``ro``/``rw`` rule shared by the ITSM modules and the approval engine.
 
 One place for the rule every ticket-scoped ITSM read and write follows: without ``ro`` on the
 ticket's queue the ticket does not exist for the caller (404, the same answer as for a missing

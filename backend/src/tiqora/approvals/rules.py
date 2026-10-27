@@ -124,10 +124,10 @@ def validate_definition(defn: ApprovalDefinition) -> None:
             step.rule == "quorum"
             and step.quorum is not None
             and all(e.kind in ("user", "customer_user") for e in step.approvers)
-            and step.quorum > len(step.approvers)
+            and step.quorum > len({(e.kind, e.ref) for e in step.approvers})
         ):
             raise ApprovalError(
                 "invalid_definition",
                 422,
-                f"step {step.name!r}: quorum {step.quorum} exceeds {len(step.approvers)} approvers",
+                f"step {step.name!r}: quorum {step.quorum} exceeds distinct approvers",
             )

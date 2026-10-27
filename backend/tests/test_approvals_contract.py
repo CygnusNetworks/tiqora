@@ -31,6 +31,30 @@ def test_principal_keys_round_trip() -> None:
             Principal.parse(bad)
 
 
+def test_principal_constructor_validates() -> None:
+    for kind, uid, login in [
+        ("agent", None, None),
+        ("agent", 0, None),
+        ("agent", True, None),
+        ("agent", 5, "x"),
+        ("customer", None, None),
+        ("customer", None, ""),
+        ("customer", 5, "k@example.org"),
+        ("system", None, None),
+    ]:
+        with pytest.raises(ValueError):
+            Principal(kind, user_id=uid, login=login)  # type: ignore[arg-type]
+    assert Principal("agent", user_id=3) == Principal.agent(3)
+
+
+def test_principal_keys_are_canonical() -> None:
+    for bad in ("agent:012", "agent:+5", "agent: 5", "agent:5 ", "agent:5.0", "agent:00"):
+        with pytest.raises(ValueError):
+            Principal.parse(bad)
+    for p in (Principal.agent(7), Principal.customer("a:b@example.org"), Principal.customer(" x ")):
+        assert Principal.parse(p.key) == p and Principal.parse(p.key).key == p.key
+
+
 def test_actor_write_user() -> None:
     assert Actor.agent(5).write_user_id == 5 and Actor.agent(5).key == "agent:5"
     assert (

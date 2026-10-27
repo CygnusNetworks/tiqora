@@ -43,11 +43,25 @@ def _imports(path: Path) -> list[tuple[str, bool]]:
         elif isinstance(node, ast.ImportFrom):
             assert node.level == 0, f"relative import in {path.name}"
             found.append((node.module or "", tc))
+
         else:
             visit(node, tc)
 
     visit(tree, False)
     return found
+
+
+def _forbidden_imports(path: Path) -> list[str]:
+    """Forbidden modules imported by the file, also via ``from tiqora import itsm``."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    names: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.extend(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names.append(node.module)
+            names.extend(f"{node.module}.{a.name}" for a in node.names)
+    return [n for n in names if _is_forbidden(n)]
 
 
 def _is_forbidden(module: str) -> bool:
@@ -58,8 +72,7 @@ def test_approvals_package_imports_no_consumer() -> None:
     files = sorted(PKG_DIR.rglob("*.py"))
     assert files, "approvals package is empty"
     for path in files:
-        for module, _ in _imports(path):
-            assert not _is_forbidden(module), f"{path.name} imports {module}"
+        assert not _forbidden_imports(path), f"{path.name} imports {_forbidden_imports(path)}"
 
 
 def test_contract_and_rules_are_pure() -> None:
@@ -79,10 +92,10 @@ def test_contract_and_rules_are_pure() -> None:
 def test_import_scanner_detects_forbidden(tmp_path: Path) -> None:
     bad = tmp_path / "bad.py"
     bad.write_text("from tiqora.itsm.models import X\nimport tiqora.api.deps\n", encoding="utf-8")
-    assert [m for m, _ in _imports(bad) if _is_forbidden(m)] == [
-        "tiqora.itsm.models",
-        "tiqora.api.deps",
-    ]
+    assert {"tiqora.itsm.models", "tiqora.api.deps"} <= set(_forbidden_imports(bad))
+    sub = tmp_path / "sub.py"
+    sub.write_text("from tiqora import itsm\n", encoding="utf-8")
+    assert _forbidden_imports(sub) == ["tiqora.itsm"]
     ok = tmp_path / "ok.py"
     ok.write_text(
         "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    import sqlalchemy.ext.asyncio\n",

@@ -44,6 +44,23 @@ class Principal:
     user_id: int | None = None  # agent
     login: str | None = None  # customer user login
 
+    def __post_init__(self) -> None:
+        if self.kind == "agent":
+            if (
+                isinstance(self.user_id, bool)
+                or not isinstance(self.user_id, int)
+                or self.user_id < 1
+                or self.login is not None
+            ):
+                raise ValueError(
+                    f"invalid agent principal: user_id={self.user_id!r}, login={self.login!r}"
+                )
+        elif self.kind == "customer":
+            if not isinstance(self.login, str) or not self.login or self.user_id is not None:
+                raise ValueError("invalid customer principal")
+        else:
+            raise ValueError(f"invalid principal kind: {self.kind!r}")
+
     @property
     def key(self) -> str:
         if self.kind == "agent":
@@ -69,7 +86,8 @@ class Principal:
         if not sep or not ref:
             raise ValueError(f"invalid principal key: {key!r}")
         if kind == "agent":
-            if not ref.isascii() or not ref.isdigit():
+            # canonical decimal only (no sign, whitespace or leading zeros): parse(k).key == k
+            if not ref.isascii() or not ref.isdigit() or str(int(ref)) != ref:
                 raise ValueError(f"invalid principal key: {key!r}")
             return cls.agent(int(ref))
         if kind == "customer":
