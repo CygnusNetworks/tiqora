@@ -18,10 +18,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import select, text, update
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.approvals import access, audit, delegation, rules, templates
+from tiqora.approvals import access, audit, delegation, rules, templates, tokens
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
@@ -48,7 +48,6 @@ from tiqora.approvals.models import (
     TiqoraApproval,
     TiqoraApprovalApprover,
     TiqoraApprovalStep,
-    TiqoraApprovalToken,
     TiqoraApprovalVote,
 )
 from tiqora.approvals.resolve import (
@@ -211,18 +210,6 @@ async def _close_open_steps(
     await session.flush()
 
 
-async def _revoke_tokens(session: AsyncSession, approval_id: int) -> None:
-    await session.execute(
-        update(TiqoraApprovalToken)
-        .where(
-            TiqoraApprovalToken.approval_id == approval_id,
-            TiqoraApprovalToken.used_at.is_(None),
-            TiqoraApprovalToken.revoked_at.is_(None),
-        )
-        .values(revoked_at=utc_now())
-    )
-
-
 async def _finalize(
     session: AsyncSession,
     approval: TiqoraApproval,
@@ -250,7 +237,7 @@ async def _finalize(
     approval.decided_at = utc_now().replace(microsecond=0)
     approval.current_stage = None
     await session.flush()
-    await _revoke_tokens(session, approval.id)
+    await tokens.revoke_approval_links(session, approval.id)
 
     detail: dict[str, object] = {"status": status, "reason": reason}
     if approval.superseded_by is not None:
@@ -902,34 +889,6 @@ async def _voters_in_step(session: AsyncSession, step_id: int) -> set[str]:
     return {str(r) for r in rows.scalars()}
 
 
-async def _revoke_approver_tokens(
-    session: AsyncSession, approver_ids: Sequence[int], *, redeemed: int | None = None
-) -> None:
-    """Links of these approvers die; the redeemed one (if any) is marked used instead."""
-    if not approver_ids:
-        return
-    now = utc_now()
-    if redeemed is not None:
-        await session.execute(
-            update(TiqoraApprovalToken)
-            .where(
-                TiqoraApprovalToken.id == redeemed,
-                TiqoraApprovalToken.approver_id.in_(list(approver_ids)),
-                TiqoraApprovalToken.used_at.is_(None),
-            )
-            .values(used_at=now)
-        )
-    await session.execute(
-        update(TiqoraApprovalToken)
-        .where(
-            TiqoraApprovalToken.approver_id.in_(list(approver_ids)),
-            TiqoraApprovalToken.used_at.is_(None),
-            TiqoraApprovalToken.revoked_at.is_(None),
-        )
-        .values(revoked_at=now)
-    )
-
-
 async def _close_step(
     session: AsyncSession,
     approval: TiqoraApproval,
@@ -954,7 +913,7 @@ async def _close_step(
     for other in leftover:
         other.status = "not_needed"
     await session.flush()
-    await _revoke_approver_tokens(session, [a.id for a in leftover])
+    await tokens.revoke_links(session, approver_ids=[a.id for a in leftover])
     await audit.record(
         session,
         approval=approval,
@@ -980,6 +939,7 @@ async def decide(
     comment: str | None = None,
     approver_id: int | None = None,
     token_id: int | None = None,
+    lock_held: bool = False,
     settings: Settings | None = None,
     registry: Registry | None = None,
 ) -> DecisionResult:
@@ -998,7 +958,9 @@ async def decide(
     if text_ is not None and len(text_) > _COMMENT_MAX:
         raise ApprovalError("comment_too_long", 422, f"at most {_COMMENT_MAX} characters")
     reg = registry or get_registry()
-    approval = await _lock_approval(session, approval_id)
+    # lock_held: the caller (redeem_link) took the request lock as its first statement already
+    held = await session.get(TiqoraApproval, approval_id) if lock_held else None
+    approval = held if held is not None else await _lock_approval(session, approval_id)
     if approval.status != "pending":
         raise ApprovalError("approval_closed", 409)
     asettings = await _settings(session, settings)
@@ -1052,7 +1014,7 @@ async def decide(
     session.add(vote)
     row.status = decision
     await session.flush()
-    await _revoke_approver_tokens(session, [row.id], redeemed=token_id)
+    await tokens.revoke_links(session, approver_ids=[row.id], redeemed=token_id)
     await audit.record(
         session,
         approval=approval,
@@ -1078,7 +1040,7 @@ async def decide(
         other.status = "not_needed"
     if dead:
         await session.flush()
-        await _revoke_approver_tokens(session, [a.id for a in dead])
+        await tokens.revoke_links(session, approver_ids=[a.id for a in dead])
         for other in dead:
             await audit.record(
                 session,
@@ -1201,7 +1163,7 @@ async def forward(
     new.decisive = row.decisive
     row.status = "forwarded"
     await session.flush()
-    await _revoke_approver_tokens(session, [row.id])
+    await tokens.revoke_links(session, approver_ids=[row.id])
     await audit.record(
         session,
         approval=approval,
@@ -1268,7 +1230,7 @@ async def refresh_approvers(
                 row.status = "removed"
                 removed += 1
                 await session.flush()
-                await _revoke_approver_tokens(session, [row.id])
+                await tokens.revoke_links(session, approver_ids=[row.id])
                 await audit.record(
                     session,
                     approval=approval,
