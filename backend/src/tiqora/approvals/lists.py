@@ -153,10 +153,14 @@ async def update_list(
     actor_id: int,
     name: str | None = None,
     description: str | None = None,
+    clear_description: bool = False,
     member_ids: Iterable[int] | None = None,
     valid: bool | None = None,
 ) -> ApprovalListRow:
-    """Changes the given fields; ``member_ids`` replaces the whole member set."""
+    """Changes the given fields; ``member_ids`` replaces the whole member set.
+
+    ``description=None`` leaves the text alone; ``clear_description=True`` empties it.
+    """
     entity = await session.get(TiqoraApprovalList, list_id)
     if entity is None:
         raise ApprovalError("list_not_found", 404)
@@ -165,7 +169,9 @@ async def update_list(
         if name != entity.name and await _name_taken(session, name, except_id=list_id):
             raise ApprovalError("list_name_taken", 409)
         entity.name = name
-    if description is not None:
+    if clear_description:
+        entity.description = None
+    elif description is not None:
         entity.description = description
     if valid is not None:
         entity.valid = valid

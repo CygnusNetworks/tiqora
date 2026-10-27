@@ -18603,6 +18603,10 @@
             "title": "User Id",
             "type": "integer"
           },
+          "user_label": {
+            "title": "User Label",
+            "type": "string"
+          },
           "valid_from": {
             "format": "date-time",
             "title": "Valid From",
@@ -18624,6 +18628,7 @@
         "required": [
           "id",
           "user_id",
+          "user_label",
           "substitute_user_id",
           "substitute_label",
           "valid_from",
@@ -60005,7 +60010,7 @@
     },
     "/api/v1/admin/approvals/delegations": {
       "get": {
-        "description": "Delegations of any agent (optionally of one delegator), running and future ones.",
+        "description": "Delegations of any agent (optionally of one delegator), running and future ones; with\n``include_ended`` the whole history. Oldest first, paged.",
         "operationId": "get_delegations_api_v1_admin_approvals_delegations_get",
         "parameters": [
           {
@@ -60033,6 +60038,29 @@
               "default": false,
               "title": "Include Ended",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
             }
           },
           {
@@ -60100,7 +60128,7 @@
         ]
       },
       "post": {
-        "description": "Names a substitute for *another* agent (``user_id``), e.g. for sick leave.",
+        "description": "Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422\n``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad\nsubstitute, ``invalid_definition`` for an empty or already ended period.",
         "operationId": "post_delegation_api_v1_admin_approvals_delegations_post",
         "parameters": [
           {

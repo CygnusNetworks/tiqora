@@ -12,7 +12,8 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from httpx import Response
+from fastapi import Request
+from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +35,8 @@ from tiqora.api import app as api_app
 from tiqora.approvals import service
 from tiqora.approvals.contract import Actor, ApprovalDefinition
 from tiqora.config import Settings
+from tiqora.domain.api_key_scopes import assert_scope_allows, path_to_area
+from tiqora.domain.auth import AuthenticatedUser
 from tiqora.jobs.service import utc_now
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
@@ -120,29 +123,115 @@ def _code(response: Response) -> str:
 # --- access ------------------------------------------------------------------------------------
 
 
+ADMIN_ROUTES: list[tuple[str, str, dict[str, Any] | None]] = [
+    ("GET", "", None),
+    ("GET", "/templates", None),
+    ("POST", "/templates", _template_body("appr97.x")),
+    ("POST", "/templates/validate", {"definition": _definition()}),
+    ("GET", "/templates/1", None),
+    ("PUT", "/templates/1", _template_body("appr97.x")),
+    ("DELETE", "/templates/1", None),
+    ("GET", "/lists", None),
+    ("POST", "/lists", {"name": "appr97 x"}),
+    ("GET", "/lists/1", None),
+    ("PUT", "/lists/1", {"name": "appr97 x"}),
+    ("DELETE", "/lists/1", None),
+    ("GET", "/delegations", None),
+    ("POST", "/delegations", {"user_id": AG1, "substitute_user_id": AG2}),
+    ("DELETE", "/delegations/1", None),
+]
+
+
+def test_admin_route_table_is_complete() -> None:
+    """Every admin approvals route of the app is in ADMIN_ROUTES (none escapes the 403 test)."""
+    ids = ("{template_id}", "{list_id}", "{delegation_id}")
+    documented: set[tuple[str, str]] = set()
+    for path, operations in api_app.create_app(SETTINGS).openapi()["paths"].items():
+        if path.startswith(BASE):
+            short = path.removeprefix(BASE)
+            for placeholder in ids:
+                short = short.replace(placeholder, "1")
+            documented |= {(method.upper(), short) for method in operations}
+    assert documented == {(method, path) for method, path, _ in ADMIN_ROUTES}
+
+
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
-async def test_non_admin_forbidden(url_fixture: str, request: pytest.FixtureRequest) -> None:
+@pytest.mark.parametrize(("method", "path", "body"), ADMIN_ROUTES)
+async def test_non_admin_forbidden(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    method: str,
+    path: str,
+    body: dict[str, Any] | None,
+) -> None:
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type()):
             async with await as_client(session, agent=AG5) as client:
-                responses = [
-                    await client.get(BASE),
-                    await client.get(f"{BASE}/templates"),
-                    await client.post(f"{BASE}/templates", json=_template_body("appr97.x")),
-                    await client.post(
-                        f"{BASE}/templates/validate", json={"definition": _definition()}
-                    ),
-                    await client.get(f"{BASE}/lists"),
-                    await client.post(f"{BASE}/lists", json={"name": "appr97 x"}),
-                    await client.get(f"{BASE}/delegations"),
-                    await client.post(
-                        f"{BASE}/delegations", json={"user_id": AG1, "substitute_user_id": AG2}
-                    ),
-                    await client.delete(f"{BASE}/delegations/1"),
-                ]
-            assert [r.status_code for r in responses] == [403] * 9
-            assert {r.json()["detail"] for r in responses} == {"Admin privileges required"}
+                response = await client.request(method, BASE + path, json=body)
+            assert response.status_code == 403
+            assert response.json() == {"detail": "Admin privileges required"}
+
+
+def _api_key(*scopes: str) -> AuthenticatedUser:
+    return AuthenticatedUser(
+        id=ADMIN,
+        login="appr97-admin",
+        first_name="Appr",
+        last_name="Admin",
+        auth_method="api_key",
+        api_key_scopes=frozenset(scopes),
+    )
+
+
+def _gated_client(session: AsyncSession, user: AuthenticatedUser) -> AsyncClient:
+    """The routes with *user* as caller and the API-key scope gate of ``get_current_user``."""
+    from tiqora.api.deps import get_current_user, get_db
+
+    async def _db() -> Any:
+        yield session
+
+    async def _current(request: Request) -> AuthenticatedUser:
+        assert user.api_key_scopes is not None
+        assert_scope_allows(user.api_key_scopes, method=request.method, path=request.url.path)
+        return user
+
+    app = api_app.create_app(SETTINGS)
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_current_user] = _current
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+def test_admin_approvals_belong_to_the_admin_api_key_area() -> None:
+    assert path_to_area(BASE) == "admin"
+    assert path_to_area(f"{BASE}/templates/validate") == "admin"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_api_key_needs_the_admin_area(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        await _seed_admin(session)
+        with installed_registry(make_fake_subject_type()):
+            async with _gated_client(session, _api_key("tickets:rw")) as client:
+                tickets_only = await client.get(BASE)
+                tickets_write = await client.post(
+                    f"{BASE}/lists", json={"name": "appr97 Schluessel"}
+                )
+            async with _gated_client(session, _api_key("admin:ro")) as client:
+                read = await client.get(BASE)
+                write = await client.post(f"{BASE}/lists", json={"name": "appr97 Schluessel"})
+            async with _gated_client(session, _api_key("admin:rw")) as client:
+                full = await client.post(f"{BASE}/lists", json={"name": "appr97 Schluessel"})
+            assert tickets_only.status_code == 403
+            assert tickets_only.json()["detail"] == "API key lacks admin:ro scope"
+            assert tickets_write.status_code == 403
+            assert read.status_code == 200
+            assert write.status_code == 403
+            assert write.json()["detail"] == "API key lacks admin:rw scope"
+            assert full.status_code == 201
 
 
 # --- overview ----------------------------------------------------------------------------------
@@ -258,6 +347,12 @@ async def test_template_crud_and_validate(url_fixture: str, request: pytest.Fixt
                         "appr97.vorlage", name="appr97 Umbenannt", description="Text"
                     ),
                 )
+                cleared = await client.put(
+                    f"{BASE}/templates/{tid}",
+                    json=_template_body(
+                        "appr97.vorlage", name="appr97 Umbenannt", description=None
+                    ),
+                )
                 key_change = await client.put(
                     f"{BASE}/templates/{tid}", json=_template_body("appr97.andere")
                 )
@@ -311,6 +406,7 @@ async def test_template_crud_and_validate(url_fixture: str, request: pytest.Fixt
                 "Text",
             )
             assert renamed.json()["subject_types"] == []
+            assert cleared.status_code == 200 and cleared.json()["description"] is None
             assert (key_change.status_code, _code(key_change)) == (422, "invalid_definition")
             assert (missing_put.status_code, _code(missing_put)) == (404, "template_not_found")
 
@@ -387,7 +483,16 @@ async def test_list_crud(url_fixture: str, request: pytest.FixtureRequest) -> No
                 got = await client.get(f"{BASE}/lists/{lid}")
                 updated = await client.put(
                     f"{BASE}/lists/{lid}",
-                    json={"name": "appr97 CAB neu", "member_ids": [AG5], "valid": True},
+                    json={
+                        "name": "appr97 CAB neu",
+                        "description": "Neu",
+                        "member_ids": [AG5],
+                        "valid": True,
+                    },
+                )
+                cleared = await client.put(
+                    f"{BASE}/lists/{lid}",
+                    json={"name": "appr97 CAB neu", "description": None, "member_ids": [AG5]},
                 )
                 listed = await client.get(f"{BASE}/lists")
                 picker = await client.get(f"{AGENT}/lists")
@@ -426,6 +531,8 @@ async def test_list_crud(url_fixture: str, request: pytest.FixtureRequest) -> No
                 "appr97 CAB neu",
                 [AG5],
             )
+            assert updated.json()["description"] == "Neu"
+            assert (cleared.status_code, cleared.json()["description"]) == (200, None)
             assert [(x["name"], x["valid"]) for x in listed.json()] == [
                 ("appr97 Aus", False),
                 ("appr97 CAB neu", True),
@@ -502,6 +609,104 @@ async def test_admin_delegation_for_other_user(
             assert after.json() == []
             assert [r["id"] for r in ended.json()] == [row["id"]]
             assert (twice.status_code, _code(twice)) == (403, "delegation_not_active")
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_admin_delegation_validation(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        await _seed_admin(session)
+        with installed_registry(make_fake_subject_type()):
+            now = utc_now()
+
+            def iso(delta: timedelta) -> str:
+                return (now + delta).isoformat() + "Z"
+
+            async with await as_client(session, agent=ADMIN) as client:
+                unknown_delegator = await client.post(
+                    f"{BASE}/delegations", json={"user_id": GONE_USER, "substitute_user_id": AG2}
+                )
+                system_delegator = await client.post(
+                    f"{BASE}/delegations", json={"user_id": 1, "substitute_user_id": AG2}
+                )
+                bad_substitute = await client.post(
+                    f"{BASE}/delegations", json={"user_id": AG1, "substitute_user_id": GONE_USER}
+                )
+                reversed_range = await client.post(
+                    f"{BASE}/delegations",
+                    json={
+                        "user_id": AG1,
+                        "substitute_user_id": AG2,
+                        "valid_from": iso(timedelta(days=2)),
+                        "valid_until": iso(timedelta(days=1)),
+                    },
+                )
+                ended = await client.post(
+                    f"{BASE}/delegations",
+                    json={
+                        "user_id": AG1,
+                        "substitute_user_id": AG2,
+                        "valid_from": iso(-timedelta(days=3)),
+                        "valid_until": iso(-timedelta(days=1)),
+                    },
+                )
+                nothing = await client.get(
+                    f"{BASE}/delegations", params={"user_id": AG1, "include_ended": "true"}
+                )
+            async with await as_client(session, agent=AG1) as client:
+                ended_own = await client.post(
+                    f"{AGENT}/delegations",
+                    json={"substitute_user_id": AG2, "valid_until": iso(-timedelta(hours=1))},
+                )
+            for refused in (unknown_delegator, system_delegator):
+                assert (refused.status_code, _code(refused)) == (422, "invalid_member")
+            assert (bad_substitute.status_code, _code(bad_substitute)) == (
+                422,
+                "forward_target_invalid",
+            )
+            for refused in (reversed_range, ended, ended_own):
+                assert (refused.status_code, _code(refused)) == (422, "invalid_definition")
+            assert ended.json()["detail"]["detail"] == "valid_until lies in the past"
+            assert nothing.json() == []  # nothing was stored by any refusal
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_admin_delegation_list_is_labelled_and_paged(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        await _seed_admin(session)
+        with installed_registry(make_fake_subject_type()):
+            ids: list[int] = []
+            async with await as_client(session, agent=ADMIN) as client:
+                for delegator, substitute in ((AG1, AG2), (AG3, AG4), (AG5, AG1)):
+                    made = await client.post(
+                        f"{BASE}/delegations",
+                        json={"user_id": delegator, "substitute_user_id": substitute},
+                    )
+                    ids.append(made.json()["id"])
+                first_page = await client.get(
+                    f"{BASE}/delegations", params={"include_ended": "true", "limit": 2}
+                )
+                second_page = await client.get(
+                    f"{BASE}/delegations",
+                    params={"include_ended": "true", "limit": 2, "offset": 2},
+                )
+                too_many = await client.get(f"{BASE}/delegations", params={"limit": 101})
+            assert [r["id"] for r in first_page.json()] == ids[:2]
+            assert [r["id"] for r in second_page.json()] == ids[2:]
+            assert (
+                first_page.json()[0]["user_label"],
+                first_page.json()[0]["substitute_label"],
+            ) == (
+                "Appr appr97-agent1",
+                "Appr appr97-agent2",
+            )
+            assert second_page.json()[0]["user_label"] == "Appr appr97-agent5"
+            assert too_many.status_code == 422
 
 
 # --- admin power over a request ------------------------------------------------------------------

@@ -124,7 +124,7 @@ async def _load_ticket(session: AsyncSession, ticket_id: int) -> tuple[str | Non
     return (None, None) if row is None else (str(row[0]), row[1])
 
 
-def _step_overdue(step: TiqoraApprovalStep, now: datetime) -> bool:
+def step_overdue(step: TiqoraApprovalStep, now: datetime) -> bool:
     return step.status == "active" and (
         step.overdue_at is not None or (step.due_at is not None and step.due_at < now)
     )
@@ -242,7 +242,7 @@ async def build_detail(
                 status=step.status,
                 reason=step.reason,
                 due_at=step.due_at,
-                overdue=_step_overdue(step, now),
+                overdue=step_overdue(step, now),
                 approvers=[
                     ApproverOut(
                         id=a.id,

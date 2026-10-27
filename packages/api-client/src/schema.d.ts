@@ -2068,13 +2068,16 @@ export interface paths {
         };
         /**
          * Get Delegations
-         * @description Delegations of any agent (optionally of one delegator), running and future ones.
+         * @description Delegations of any agent (optionally of one delegator), running and future ones; with
+         *     ``include_ended`` the whole history. Oldest first, paged.
          */
         get: operations["get_delegations_api_v1_admin_approvals_delegations_get"];
         put?: never;
         /**
          * Post Delegation
-         * @description Names a substitute for *another* agent (``user_id``), e.g. for sick leave.
+         * @description Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422
+         *     ``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad
+         *     substitute, ``invalid_definition`` for an empty or already ended period.
          */
         post: operations["post_delegation_api_v1_admin_approvals_delegations_post"];
         delete?: never;
@@ -20134,6 +20137,8 @@ export interface components {
             substitute_user_id: number;
             /** User Id */
             user_id: number;
+            /** User Label */
+            user_label: string;
             /**
              * Valid From
              * Format: date-time
@@ -35998,6 +36003,8 @@ export interface operations {
             query?: {
                 user_id?: number | null;
                 include_ended?: boolean;
+                limit?: number;
+                offset?: number;
             };
             header?: {
                 authorization?: string | null;

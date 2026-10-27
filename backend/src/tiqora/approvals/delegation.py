@@ -49,6 +49,8 @@ async def list_delegations(
     user_id: int | None = None,
     substitute_user_id: int | None = None,
     include_ended: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[TiqoraApprovalDelegation]:
     """Delegations of a delegator and/or to a substitute, oldest first.
 
@@ -67,6 +69,8 @@ async def list_delegations(
                 TiqoraApprovalDelegation.valid_until > utc_now(),
             ),
         )
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
     return list((await session.execute(stmt)).scalars())
 
 
@@ -82,7 +86,8 @@ async def create_delegation(
     """Creates a delegation.
 
     ``forward_target_invalid`` (422) when the substitute is the delegator, unknown or invalid;
-    ``invalid_definition`` (422) when the period is empty; ``delegation_overlap`` (409) when
+    ``invalid_member`` (422) when the delegator is unknown or invalid; ``invalid_definition`` (422)
+    when the period is empty; ``delegation_overlap`` (409) when
     the delegator has another non-revoked delegation overlapping the period.
     """
     start = _naive_utc(valid_from)
@@ -98,7 +103,7 @@ async def create_delegation(
         await session.execute(select(Users.valid_id).where(Users.id == user_id))
     ).scalar_one_or_none()
     if user_id == SYSTEM_USER_ID or delegator_valid != 1:
-        raise ApprovalError("invalid_definition", 422, "the delegator is not a valid agent")
+        raise ApprovalError("invalid_member", 422, "the delegator is not a valid agent")
     if end is not None and end <= start:
         raise ApprovalError("invalid_definition", 422, "valid_until must be after valid_from")
     clash = select(TiqoraApprovalDelegation.id).where(

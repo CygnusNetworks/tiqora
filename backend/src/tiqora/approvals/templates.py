@@ -278,10 +278,15 @@ async def update_template(
     name: str | None = None,
     description: str | None = None,
     definition: ApprovalDefinition | dict[str, object] | None = None,
+    clear_description: bool = False,
     subject_types: Iterable[str] | None = None,
     valid: bool | None = None,
 ) -> TemplateRow:
-    """Changes the given fields. The key is immutable (consumers address templates by it)."""
+    """Changes the given fields. The key is immutable (consumers address templates by it).
+
+    ``description=None`` leaves the text alone; ``clear_description=True`` empties it (a PUT
+    that replaces the whole record).
+    """
     entity = await session.get(TiqoraApprovalTemplate, template_id)
     if entity is None:
         raise ApprovalError("template_not_found", 404)
@@ -298,7 +303,9 @@ async def update_template(
             raise ApprovalError("invalid_definition", 422, ",".join(check.errors))
     if name is not None:
         entity.name = _clean_name(name)
-    if description is not None:
+    if clear_description:
+        entity.description = None
+    elif description is not None:
         entity.description = description
     if valid is not None:
         entity.valid = valid

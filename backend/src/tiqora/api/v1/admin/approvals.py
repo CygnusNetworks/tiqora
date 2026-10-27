@@ -9,22 +9,30 @@ power to decide in place of somebody else.
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Awaitable, Iterable
-from typing import Annotated, Any, NoReturn
+from collections.abc import Iterable
+from datetime import datetime
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Query, Response, status
 from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.v1._approvals_common import (
+    delegation_out as _delegation_out,
+)
+from tiqora.api.v1._approvals_common import (
+    ensure_period_open,
+)
+from tiqora.api.v1._approvals_common import refuse as _refuse
+from tiqora.api.v1._approvals_common import run_engine as _run
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.approvals import delegation, detail, lists, templates
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     Actor,
     ApprovalDefinition,
-    ApprovalError,
 )
 from tiqora.approvals.models import (
     TiqoraApproval,
@@ -54,24 +62,6 @@ from tiqora.jobs.service import utc_now
 router = APIRouter(prefix="/approvals", tags=["admin:approvals"])
 
 _CHUNK = 500
-
-
-def _http(err: ApprovalError) -> HTTPException:
-    """``{"detail": {"code": ..., "detail": ...}}``: the frontend reads ``detail.code``."""
-    return HTTPException(err.http_status, detail={"code": err.code, "detail": err.detail})
-
-
-def _refuse(code: str, http_status: int, detail_text: str | None = None) -> NoReturn:
-    raise _http(ApprovalError(code, http_status, detail_text))
-
-
-async def _run[T](session: AsyncSession, operation: Awaitable[T]) -> T:
-    """Awaits an engine call; an :class:`ApprovalError` rolls back and becomes an HTTP error."""
-    try:
-        return await operation
-    except ApprovalError as err:
-        await session.rollback()
-        raise _http(err) from err
 
 
 def _chunks(ids: list[int]) -> Iterable[list[int]]:
@@ -134,7 +124,7 @@ async def get_overview(
 
 
 async def _overview_items(
-    session: AsyncSession, approvals: list[TiqoraApproval], now: Any
+    session: AsyncSession, approvals: list[TiqoraApproval], now: datetime
 ) -> list[ApprovalAdminItemOut]:
     ids = [a.id for a in approvals]
     # tiqora_* and Znuny rows are loaded separately and matched in Python (collation 1267)
@@ -184,7 +174,7 @@ async def _overview_items(
             current_stage=a.current_stage,
             step_name=active[a.id][0].name if active[a.id] else None,
             open_approvers=open_rows[a.id],
-            overdue=any(detail._step_overdue(s, now) for s in active[a.id]),  # noqa: SLF001
+            overdue=any(detail.step_overdue(s, now) for s in active[a.id]),
             requester_label=labels[a.requester],
             created_at=a.created_at,
             decided_at=a.decided_at,
@@ -240,6 +230,7 @@ async def post_validate_template(
     try:
         definition = ApprovalDefinition.model_validate(body.definition)
     except ValidationError as exc:
+        await session.rollback()
         paths = sorted({".".join(str(p) for p in e["loc"]) for e in exc.errors()})
         return DefinitionCheckOut(
             errors=[f"invalid_definition:{p}" if p else "invalid_definition" for p in paths],
@@ -308,6 +299,7 @@ async def put_template(
             actor_id=admin.id,
             name=body.name,
             description=body.description,
+            clear_description=body.description is None,
             subject_types=body.subject_types,
             definition=body.definition,
             valid=body.valid,
@@ -401,6 +393,7 @@ async def put_list(
             actor_id=admin.id,
             name=body.name,
             description=body.description,
+            clear_description=body.description is None,
             member_ids=body.member_ids,
             valid=body.valid,
         ),
@@ -422,35 +415,21 @@ async def delete_list(list_id: int, admin: AdminUser, session: DbSession) -> Res
 # --- delegations -------------------------------------------------------------------------------
 
 
-async def _delegation_out(
-    session: AsyncSession, rows: Iterable[TiqoraApprovalDelegation]
-) -> list[DelegationOut]:
-    rows = list(rows)
-    labels = await detail.user_labels(session, [r.substitute_user_id for r in rows])
-    return [
-        DelegationOut(
-            id=r.id,
-            user_id=r.user_id,
-            substitute_user_id=r.substitute_user_id,
-            substitute_label=labels.get(r.substitute_user_id, "?"),
-            valid_from=r.valid_from,
-            valid_until=r.valid_until,
-            created_at=r.created_at,
-        )
-        for r in rows
-    ]
-
-
 @router.get("/delegations", response_model=list[DelegationOut])
 async def get_delegations(
     admin: AdminUser,
     session: DbSession,
     user_id: Annotated[int | None, Query(ge=1)] = None,
     include_ended: bool = False,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[DelegationOut]:
-    """Delegations of any agent (optionally of one delegator), running and future ones."""
+    """Delegations of any agent (optionally of one delegator), running and future ones; with
+    ``include_ended`` the whole history. Oldest first, paged."""
     _ = admin
-    rows = await delegation.list_delegations(session, user_id=user_id, include_ended=include_ended)
+    rows = await delegation.list_delegations(
+        session, user_id=user_id, include_ended=include_ended, limit=limit, offset=offset
+    )
     out = await _delegation_out(session, rows)
     await session.rollback()
     return out
@@ -460,7 +439,10 @@ async def get_delegations(
 async def post_delegation(
     body: AdminDelegationIn, admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> DelegationOut:
-    """Names a substitute for *another* agent (``user_id``), e.g. for sick leave."""
+    """Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422
+    ``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad
+    substitute, ``invalid_definition`` for an empty or already ended period."""
+    ensure_period_open(body.valid_until)
     row = await _run(
         session,
         delegation.create_delegation(

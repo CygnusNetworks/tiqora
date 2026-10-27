@@ -210,6 +210,7 @@ class DelegationIn(BaseModel):
 class DelegationOut(BaseModel):
     id: int
     user_id: int
+    user_label: str
     substitute_user_id: int
     substitute_label: str
     valid_from: UtcDateTime

@@ -15,6 +15,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession, get_redis
+from tiqora.api.v1._approvals_common import (
+    delegation_out as _delegation_out,
+)
+from tiqora.api.v1._approvals_common import (
+    ensure_period_open,
+)
+from tiqora.api.v1._approvals_common import http_error as _http
+from tiqora.api.v1._approvals_common import refuse as _refuse
+from tiqora.api.v1._approvals_common import run_engine as _run
 from tiqora.approvals import (
     access,
     delegation,
@@ -70,24 +79,6 @@ router = APIRouter(prefix="/approvals", tags=["approvals"])
 ticket_router = APIRouter(prefix="/tickets", tags=["approvals"])
 #: public: the link's secret is the credential (no session, no API-key scope, see CX12)
 links_router = APIRouter(prefix="/approval-links", tags=["approvals"])
-
-
-def _http(err: ApprovalError) -> HTTPException:
-    """``{"detail": {"code": ..., "detail": ...}}``: the frontend reads ``detail.code``."""
-    return HTTPException(err.http_status, detail={"code": err.code, "detail": err.detail})
-
-
-def _refuse(code: str, http_status: int, detail_text: str | None = None) -> NoReturn:
-    raise _http(ApprovalError(code, http_status, detail_text))
-
-
-async def _run[T](session: AsyncSession, operation: Awaitable[T]) -> T:
-    """Awaits an engine call; an :class:`ApprovalError` rolls back and becomes an HTTP error."""
-    try:
-        return await operation
-    except ApprovalError as err:
-        await session.rollback()
-        raise _http(err) from err
 
 
 async def _run_on[T](
@@ -290,25 +281,6 @@ async def get_resolvers(
 # --- delegations -----------------------------------------------------------------------------
 
 
-async def _delegation_out(
-    session: AsyncSession, rows: Iterable[TiqoraApprovalDelegation]
-) -> list[DelegationOut]:
-    rows = list(rows)
-    labels = await detail.user_labels(session, [r.substitute_user_id for r in rows])
-    return [
-        DelegationOut(
-            id=r.id,
-            user_id=r.user_id,
-            substitute_user_id=r.substitute_user_id,
-            substitute_label=labels.get(r.substitute_user_id, "?"),
-            valid_from=r.valid_from,
-            valid_until=r.valid_until,
-            created_at=r.created_at,
-        )
-        for r in rows
-    ]
-
-
 @router.get("/delegations", response_model=list[DelegationOut])
 async def get_delegations(user: CurrentUser, session: DbSession) -> list[DelegationOut]:
     """The caller's own delegations ("Vertretung"), running and future ones."""
@@ -323,6 +295,7 @@ async def post_delegation(
 ) -> DelegationOut:
     """The caller names a substitute for a period; the substitute may then decide in their
     place (one vote per person and step, never on the caller's own requests)."""
+    ensure_period_open(body.valid_until)
     row = await _run(
         session,
         delegation.create_delegation(

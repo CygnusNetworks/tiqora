@@ -907,4 +907,4 @@ async def test_delegation_for_invalid_delegator_refused(
     async with approvals_session(request, url_fixture) as session:
         for delegator in (AG6, NO_SUCH_USER, 1):
             err = await _refused(_delegate(session, delegator, AG1))
-            assert (err.code, err.http_status) == ("invalid_definition", 422)
+            assert (err.code, err.http_status) == ("invalid_member", 422)
