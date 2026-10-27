@@ -45,13 +45,6 @@
        "workorder_id": null
       },
       {
-       "content_new": "1",
-       "content_old": "",
-       "fieldname": "CABAgents",
-       "type": "ChangeCABUpdate",
-       "workorder_id": null
-      },
-      {
        "content_new": "4 high",
        "content_old": "3 normal",
        "fieldname": "Category",
@@ -303,13 +296,6 @@
        "content_old": "",
        "fieldname": "ChangeTitle",
        "type": "ChangeUpdate",
-       "workorder_id": null
-      },
-      {
-       "content_new": "1",
-       "content_old": "",
-       "fieldname": "CABAgents",
-       "type": "ChangeCABUpdate",
        "workorder_id": null
       },
       {
@@ -895,14 +881,12 @@
      "content_is_perl_dumper": 1,
      "content_is_storable": 0,
      "content_length_positive": 1,
-     "content_prefix": "$VAR1 = {\n  'ChangeAdd' => {\n    'CABAgents' => [\n      1\n    ],\n    'CABCustomers' => [],\n    'CategoryID' => 100,\n    ",
+     "content_prefix": "$VAR1 = {\n  'ChangeAdd' => {\n    'CABAgents' => [],\n    'CABCustomers' => [],\n    'CategoryID' => 100,\n    'ChangeBuilde",
      "type": "ITSMChange"
     },
     "texts": {
      "database": {
-      "cab_agents": [
-       "1"
-      ],
+      "cab_agents": [],
       "cab_customers": [],
       "description": "<p>Move db01.example.org to new storage</p>",
       "description_plain": "Move db01.example.org to new storage\n",
@@ -913,9 +897,7 @@
       "justification_plain": "Capacity\n"
      },
      "firmware": {
-      "cab_agents": [
-       "1"
-      ],
+      "cab_agents": [],
       "cab_customers": [],
       "description": "Plain text description",
       "description_plain": "Plain text description",
@@ -927,7 +909,7 @@
      },
      "mail": {
       "cab_agents": [
-       "2"
+       2
       ],
       "cab_customers": [
        "chg94-cust@example.org"
@@ -1091,10 +1073,10 @@
    },
    "stored": {
     "counts": {
-     "change_cab": 4,
+     "change_cab": 2,
      "change_cip_allocate": 25,
      "change_condition": 0,
-     "change_history": 118,
+     "change_history": 116,
      "change_history_type": 42,
      "change_item": 3,
      "change_notification": 27,
@@ -1125,18 +1107,6 @@
        "customer_user_id": "chg94-cust@example.org",
        "id": 2,
        "user_id": null
-      },
-      {
-       "change_id": 2,
-       "customer_user_id": null,
-       "id": 3,
-       "user_id": 1
-      },
-      {
-       "change_id": 3,
-       "customer_user_id": null,
-       "id": 4,
-       "user_id": 1
       }
      ],
      "change_history_by_type": [
@@ -1147,7 +1117,7 @@
       },
       {
        "fieldname": "CABAgents",
-       "n": 3,
+       "n": 1,
        "type": "ChangeCABUpdate"
       },
       {
@@ -1535,7 +1505,7 @@
      ],
      "change_template": [
       {
-       "content_length": 2332,
+       "content_length": 2319,
        "content_prefix": "$VAR1 = {\n  'ChangeAdd' ",
        "id": 1,
        "name": "chg94 template firmware",
@@ -2275,11 +2245,6 @@
       "change": "mail",
       "customer_user_id": "chg94-cust@example.org",
       "user_id": null
-     },
-     {
-      "change": "firmware",
-      "customer_user_id": null,
-      "user_id": 1
      }
     ],
     "peer_checks": [
@@ -2291,6 +2256,10 @@
      },
      {
       "path": "probe.texts.firmware.cab_customers",
+      "value": []
+     },
+     {
+      "path": "probe.texts.firmware.cab_agents",
       "value": []
      }
     ],

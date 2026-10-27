@@ -28,6 +28,7 @@ from tests._itsm_fixtures import (
     seed_change_link,
     seed_workorder,
     znuny_change_times,
+    znuny_plain,
 )
 
 pytestmark = pytest.mark.db
@@ -49,7 +50,7 @@ def _at(day: int, hour: int, minute: int = 0) -> datetime:
     return datetime(2026, 11, day, hour, minute, 0)  # noqa: DTZ001 - Znuny stores naive UTC
 
 
-async def _seed_mail_and_firmware(session) -> None:
+async def _seed_mail_and_firmware(session, profile: str = "itsm-7") -> None:
     await seed_user(session, MANAGER, "chg94.manager", "Erika", "Beispiel")
     await seed_user(session, AGENT, "chg94.agent", "Max", "Mustermann")
     await seed_change(
@@ -63,6 +64,7 @@ async def _seed_mail_and_firmware(session) -> None:
         builder_id=1,
         created_at=CREATED,
         description="<p>Replace the mail server</p>",
+        profile=profile,
         requested_time=_at(1, 0),
     )
     await seed_workorder(
@@ -74,6 +76,8 @@ async def _seed_mail_and_firmware(session) -> None:
         wo_type="workorder",
         state="closed",
         agent_id=AGENT,
+        report="<p>done</p>",
+        profile=profile,
         planned=(_at(2, 8), _at(2, 12)),
         actual=(_at(2, 8, 5), _at(2, 12, 30)),
         planned_effort=4,
@@ -132,7 +136,7 @@ async def _seed_mail_and_firmware(session) -> None:
 @pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
 async def test_seed_change_round_trip(dialect, profile, request) -> None:
     async with itsm_session(request, dialect, profile) as (session, _reader, _engine):
-        await _seed_mail_and_firmware(session)
+        await _seed_mail_and_firmware(session, profile)
 
         row = (
             await session.execute(
@@ -150,7 +154,11 @@ async def test_seed_change_round_trip(dialect, profile, request) -> None:
             )
         ).one()
         assert row[0] == "2026110110000015" and row[1] == "chg94 Mail server replacement"
-        assert row[2] == row[3] == "<p>Replace the mail server</p>"  # plain = text as given
+        assert row[2] == "<p>Replace the mail server</p>"
+        assert row[3] == znuny_plain(row[2], profile)  # ToAscii shape of the line, not a copy
+        assert row[3] == (
+            "\nReplace the mail server\n\n" if profile == "itsm-6" else "Replace the mail server\n"
+        )
         assert row[4] is None and row[5] == MANAGER and row[6] == 1
         assert row[7] == _at(1, 0) and row[8] == CREATED
         assert row[9] == await catalog_id(session, CHANGE_STATE_CATALOG, "in progress")
@@ -171,7 +179,7 @@ async def test_seeded_workorders_store_the_sentinel_and_derive_the_change_times(
     dialect, profile, request
 ) -> None:
     async with itsm_session(request, dialect, profile) as (session, _reader, _engine):
-        await _seed_mail_and_firmware(session)
+        await _seed_mail_and_firmware(session, profile)
         orders = (
             await session.execute(
                 text(
@@ -192,6 +200,12 @@ async def test_seeded_workorders_store_the_sentinel_and_derive_the_change_times(
         ]
         assert orders[0][3] == AGENT and orders[1][3] is None
         assert orders[0][4:8] == (_at(2, 8), _at(2, 12), _at(2, 8, 5), _at(2, 12, 30))
+        report_plain = (
+            await session.execute(
+                text("SELECT report_plain FROM change_workorder WHERE id = :i"), {"i": MAIL_WOS[0]}
+            )
+        ).scalar_one()
+        assert report_plain == ("\ndone\n\n" if profile == "itsm-6" else "done\n")
         assert float(orders[0][8]) == 4.0 and float(orders[0][9]) == 4.5
         # no times at all: Znuny's sentinel in all four columns, never NULL
         assert orders[2][4:8] == (CHANGE_TIME_SENTINEL,) * 4
@@ -242,7 +256,7 @@ async def test_seeded_workorders_store_the_sentinel_and_derive_the_change_times(
 @pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
 async def test_seeded_cab_links_and_history_read_back(dialect, profile, request) -> None:
     async with itsm_session(request, dialect, profile) as (session, _reader, _engine):
-        await _seed_mail_and_firmware(session)
+        await _seed_mail_and_firmware(session, profile)
         await seed_change_cab(session, change_id=MAIL, cab_id=946030, user_id=AGENT)
         await seed_change_cab(
             session, change_id=MAIL, cab_id=946031, customer_user_id="chg94-cust@example.org"
@@ -264,6 +278,25 @@ async def test_seeded_cab_links_and_history_read_back(dialect, profile, request)
         ).all()
         assert [tuple(r) for r in cab] == [(AGENT, None), (None, "chg94-cust@example.org")]
 
+        for target in ("ITSMConfigItem", "Service"):
+            with pytest.raises(ValueError, match="refuses"):
+                await seed_change_link(
+                    session,
+                    source_object=CHANGE_LINK_OBJECT,
+                    source_key=MAIL,
+                    target_object=target,
+                    target_key=946052,
+                    link_type="RelevantTo",
+                )
+        with pytest.raises(ValueError, match="refuses"):
+            await seed_change_link(
+                session,
+                source_object=CHANGE_LINK_OBJECT,
+                source_key=MAIL,
+                target_object="Ticket",
+                target_key=946053,
+                link_type="DependsOn",
+            )
         ticket = 946050
         await seed_change_link(
             session,

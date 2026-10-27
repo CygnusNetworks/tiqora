@@ -25,6 +25,7 @@ handled here deliberately.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Any
@@ -284,6 +285,18 @@ async def seed_ci_link(
 # --- change management (ITSMChangeManagement) ----------------------------------------------------
 
 
+def znuny_plain(value: str | None, profile: str = "itsm-7") -> str | None:
+    """The ``*_plain`` column Znuny stores for ``value`` (``HTMLUtils::ToAscii``, survey Q6).
+
+    Text without markup is unchanged; for a ``<p>`` block 7.3 ends with one newline, 6.5 starts
+    with one and ends with two. Tags are dropped; this covers the simple fragments tests use.
+    """
+    if value is None or "<" not in value:
+        return value
+    stripped = re.sub(r"<[^>]+>", "", value)
+    return f"\n{stripped}\n\n" if profile == "itsm-6" else f"{stripped}\n"
+
+
 async def seed_change(
     session: AsyncSession,
     *,
@@ -299,22 +312,26 @@ async def seed_change(
     created_at: datetime,
     description: str | None = None,
     justification: str | None = None,
+    description_plain: str | None = None,
+    justification_plain: str | None = None,
     requested_time: datetime | None = None,
+    profile: str = "itsm-7",
 ) -> int:
     """Insert one ``change_item`` row with explicit id; returns ``change_id``.
 
     ``state`` / ``category`` / ``impact`` / ``priority`` are catalog names (``"in progress"``,
     ``"3 normal"``); ``builder_id`` / ``manager_id`` must be existing users. The ``*_plain``
-    columns carry the text as given (what Znuny stores for a string without markup); a change
-    has no planned/actual time columns, those come from its work orders.
+    columns default to what Znuny stores (``znuny_plain`` of the text for ``profile``); pass them
+    to pin another value. A change has no planned/actual time columns, those come from its
+    work orders.
     """
     await session.execute(
         text(
             "INSERT INTO change_item (id, change_number, title, description, description_plain,"
             " justification, justification_plain, change_state_id, change_manager_id,"
             " change_builder_id, category_id, impact_id, priority_id, requested_time,"
-            " create_time, create_by, change_time, change_by) VALUES (:id, :num, :title, :d, :d,"
-            " :j, :j, :state, :manager, :builder, :cat, :imp, :prio, :req, :t, :builder, :t,"
+            " create_time, create_by, change_time, change_by) VALUES (:id, :num, :title, :d, :dp,"
+            " :j, :jp, :state, :manager, :builder, :cat, :imp, :prio, :req, :t, :builder, :t,"
             " :builder)"
         ),
         {
@@ -322,7 +339,13 @@ async def seed_change(
             "num": number,
             "title": title,
             "d": description,
+            "dp": description_plain
+            if description_plain is not None
+            else znuny_plain(description, profile),
             "j": justification,
+            "jp": justification_plain
+            if justification_plain is not None
+            else znuny_plain(justification, profile),
             "state": await catalog_id(session, CHANGE_STATE_CATALOG, state),
             "manager": manager_id,
             "builder": builder_id,
@@ -352,8 +375,11 @@ async def seed_workorder(
     created_at: datetime = _BASE_TIME,
     instruction: str | None = None,
     report: str | None = None,
+    instruction_plain: str | None = None,
+    report_plain: str | None = None,
     planned_effort: float = 0,
     accounted_time: float = 0,
+    profile: str = "itsm-7",
 ) -> int:
     """Insert one ``change_workorder`` row with explicit id; returns ``workorder_id``.
 
@@ -369,7 +395,7 @@ async def seed_workorder(
             " instruction_plain, report, report_plain, workorder_state_id, workorder_type_id,"
             " workorder_agent_id, planned_start_time, planned_end_time, actual_start_time,"
             " actual_end_time, planned_effort, accounted_time, create_time, create_by,"
-            " change_time, change_by) VALUES (:id, :change, :num, :title, :ins, :ins, :rep, :rep,"
+            " change_time, change_by) VALUES (:id, :change, :num, :title, :ins, :insp, :rep, :repp,"
             " :state, :type, :agent, :ps, :pe, :astart, :aend, :effort, :accounted, :t, 1, :t, 1)"
         ),
         {
@@ -378,7 +404,11 @@ async def seed_workorder(
             "num": number,
             "title": title,
             "ins": instruction,
+            "insp": instruction_plain
+            if instruction_plain is not None
+            else znuny_plain(instruction, profile),
             "rep": report,
+            "repp": report_plain if report_plain is not None else znuny_plain(report, profile),
             "state": await catalog_id(session, WORKORDER_STATE_CATALOG, state),
             "type": await catalog_id(session, WORKORDER_TYPE_CATALOG, wo_type),
             "agent": agent_id,
@@ -417,6 +447,15 @@ async def seed_change_cab(
     return cab_id
 
 
+# LinkObject::PossibleLink###3400-3420 (ITSMCore), survey Q1; source object first.
+_ALLOWED_CHANGE_LINKS: dict[tuple[str, str], tuple[str, ...]] = {
+    (CHANGE_LINK_OBJECT, "Ticket"): ("Normal",),
+    (WORKORDER_LINK_OBJECT, "Ticket"): ("Normal",),
+    (WORKORDER_LINK_OBJECT, "ITSMConfigItem"): ("Normal", "DependsOn"),
+    (WORKORDER_LINK_OBJECT, "Service"): ("Normal", "DependsOn"),
+}
+
+
 async def seed_change_link(
     session: AsyncSession,
     *,
@@ -429,6 +468,13 @@ async def seed_change_link(
     """Insert one valid ``link_relation`` row of a change or work order (``ITSMChange`` /
     ``ITSMWorkOrder`` as object name; the package allows ``Normal`` to a ticket for changes, and
     ``Normal`` / ``DependsOn`` to CIs and services for work orders)."""
+    if (source_object, target_object) not in _ALLOWED_CHANGE_LINKS or link_type not in (
+        _ALLOWED_CHANGE_LINKS[(source_object, target_object)]
+    ):
+        raise ValueError(
+            f"Znuny refuses a {link_type!r} link {source_object} -> {target_object}"
+            " (a change links to tickets only, CIs and services hang off work orders)"
+        )
     await seed_ci_link(
         session,
         source_object=source_object,

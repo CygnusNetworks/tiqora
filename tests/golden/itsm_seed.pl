@@ -245,7 +245,8 @@ sub _SeedChanges {
                 %{ $Spec->{update} },
                 ChangeManagerID => $AgentID,
                 ( $Spec->{ref} ? ( DynamicField_chg94ChangeRef => $Spec->{ref} ) : () ),
-                ( $Spec->{cab} ? ( CABAgents => [$AgentID], CABCustomers => [$CustomerLogin] ) : (CABAgents => [1]) ),
+                # only the CAB change gets members; the others keep the empty CAB
+                ( $Spec->{cab} ? ( CABAgents => [$AgentID], CABCustomers => [$CustomerLogin] ) : () ),
                 UserID => 1,
             ) or die "ChangeUpdate $Spec->{title} failed";
             my %WOIDs;
@@ -449,6 +450,9 @@ else {
     );
 }
 
-%Result = ( %Result, changes => _SeedChanges( \%Result ) );
+# only when the ITSMChangeManagement package is installed (its tables exist)
+if ( $Kernel::OM->Get('Kernel::System::DB')->Prepare( SQL => 'SELECT 1 FROM change_item', Limit => 1 ) ) {
+    %Result = ( %Result, changes => _SeedChanges( \%Result ) );
+}
 
 print "GOLDEN_ITSM_SEED_BEGIN\n" . $JSON->Encode( Data => \%Result ) . "\nGOLDEN_ITSM_SEED_END\n";
