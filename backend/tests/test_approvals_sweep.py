@@ -60,6 +60,7 @@ from tiqora.approvals.notify import ApprovalMailPayload, run_approval_mail
 from tiqora.approvals.settings import APPROVALS_SECTION
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraJob, TiqoraSettings
+from tiqora.domain.history_render import render_history_entry
 from tiqora.domain.settings_store import KEY_NOTIFICATION_SENDER_EMAIL, set_setting
 from tiqora.jobs.context import JobContext
 from tiqora.jobs.service import utc_now
@@ -340,6 +341,102 @@ async def test_escalation_skips_prior_voter_and_upgrades_pending_row(
             assert (rows[AG4].status, rows[AG4].decisive) == ("pending", True)
             (mail,) = await _mails(session, aid, "escalation")
             assert mail["approver_ids"] == [rows[AG4].id]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("rule", ["all", "quorum"])
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_upgraded_approver_stays_in_the_rule(
+    url_fixture: str, request: pytest.FixtureRequest, rule: str
+) -> None:
+    """Escalating to a regular approver must not let the others decide without them."""
+    extra: dict[str, Any] = {"quorum": 2} if rule == "quorum" else {}
+    definition = _defn(
+        _step(
+            "CAB",
+            AG3,
+            AG4,
+            rule=rule,
+            due_hours=1,
+            on_timeout="escalate",
+            escalation=[{"kind": "user", "ref": str(AG4)}],
+            **extra,
+        )
+    )
+    fake = _Redis()
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, definition)
+            now = _now()
+            await _overdue_by(session, aid, now)
+            assert await _tick(session, now, fake) == {**ZERO, "escalated": 1}
+            rows = {a.user_id: a for a in await _approvers(session, aid)}
+            assert len(rows) == 2 and rows[AG4].decisive and not rows[AG3].decisive
+            # F24: the upgrade changes no status but the inbox row of AG4 now reads "decisive"
+            assert fake.published == [{"type": "approval_changed", "user_ids": [AG4]}]
+
+            await session.rollback()
+            await service.decide(
+                session,
+                aid,
+                actor=Actor.agent(AG3),
+                decision="approved",
+                channel="ui",
+                settings=SETTINGS,
+            )
+            await session.commit()
+            (step,) = await _steps(session, aid)
+            assert step.status == "active"  # AG3 alone neither approves nor (quorum) rejects
+            assert (await _row(session, aid)).status == "pending"
+
+            await session.rollback()
+            result = await service.decide(
+                session,
+                aid,
+                actor=Actor.agent(AG4),
+                decision="approved",
+                channel="ui",
+                settings=SETTINGS,
+            )
+            await session.commit()
+            assert result.step_status == "approved"
+            assert (await _row(session, aid)).status == "approved"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_upgraded_approver_decides_alone(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    definition = _defn(
+        _step(
+            "CAB",
+            AG3,
+            AG4,
+            rule="all",
+            due_hours=1,
+            on_timeout="escalate",
+            escalation=[{"kind": "user", "ref": str(AG4)}],
+        )
+    )
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, definition)
+            now = _now()
+            await _overdue_by(session, aid, now)
+            await _tick(session, now)
+            await session.rollback()
+            result = await service.decide(
+                session,
+                aid,
+                actor=Actor.agent(AG4),
+                decision="approved",
+                channel="ui",
+                settings=SETTINGS,
+            )
+            await session.commit()
+            assert result.step_status == "approved"
+            assert await _by_user(session, aid) == {AG3: "not_needed", AG4: "approved"}
 
 
 @pytest.mark.db
@@ -950,3 +1047,88 @@ async def test_worker_tick_switch(
                 )
             ).scalar_one()
             assert row.value == "1"
+
+
+# --- robustness ---------------------------------------------------------------------------------
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_failing_item_does_not_starve_the_rest(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A poison item is rolled back and skipped; the item behind the id-ordered LIMIT still runs."""
+    definition = _defn(_step("Prüfung", AG3, due_hours=1, on_timeout="reject"))
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            now = _now()
+            poison = await _request(session, definition, approval_key="poison")
+            healthy = await _request(session, definition, approval_key="healthy")
+            for aid in (poison, healthy):
+                await _overdue_by(session, aid, now)
+            real = sweep._overdue  # noqa: SLF001
+
+            async def flaky(
+                db: AsyncSession, approval: TiqoraApproval, *args: Any, **kwargs: Any
+            ) -> str | None:
+                if approval.id == poison:
+                    await db.execute(text("UPDATE tiqora_approval SET title = 'half done'"))
+                    raise RuntimeError("resolver plugin exploded")
+                return await real(db, approval, *args, **kwargs)
+
+            monkeypatch.setattr(sweep, "_overdue", flaky)
+            monkeypatch.setattr(sweep, "_BATCH", 1)  # one candidate per page
+
+            assert await _tick(session, now) == {**ZERO, "timeout_decided": 1}
+
+            assert (await _row(session, poison)).status == "pending"  # rolled back, untouched
+            assert (await _row(session, poison)).title == "Freigabe appr97"
+            assert (await _row(session, healthy)).status == "rejected"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_invalid_scan_pages_through_all_requests(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            ids = [
+                await _request(session, _defn(_step("Prüfung", AG3)), approval_key=f"k{n}")
+                for n in range(3)
+            ]
+            await session.execute(text("UPDATE users SET valid_id = 2 WHERE id = :u"), {"u": AG3})
+            await session.commit()
+            monkeypatch.setattr(sweep, "_SCAN", 2)
+
+            assert await _tick(session, _now()) == {**ZERO, "removed": 3}
+
+            for aid in ids:
+                assert (await _row(session, aid)).status == "rejected"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_timeout_history_line(url_fixture: str, request: pytest.FixtureRequest) -> None:
+    """F12: the timeout decision shows up as plain text in the Znuny ticket history."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(
+                session, _defn(_step("Prüfung", AG3, due_hours=1, on_timeout="reject"))
+            )
+            now = _now()
+            await _overdue_by(session, aid, now)
+            await _tick(session, now)
+            rows = await session.execute(
+                text(
+                    "SELECT name FROM ticket_history WHERE ticket_id = :t"
+                    " AND name LIKE 'Approval #%' ORDER BY id"
+                ),
+                {"t": T1},
+            )
+            lines = [str(r[0]) for r in rows]
+            assert lines == [
+                f"Approval #{aid} (default): requested",
+                f"Approval #{aid}: decided rejected (timeout)",
+            ]
+            assert render_history_entry(history_type="Misc", name=lines[-1]) == lines[-1]

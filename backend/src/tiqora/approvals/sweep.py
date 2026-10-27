@@ -13,7 +13,7 @@ precision of a MariaDB ``DATETIME``).
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from datetime import datetime, timedelta
 from typing import Final, Literal
 
@@ -22,17 +22,16 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.approvals import audit, rules, service, tokens
+from tiqora.approvals import audit, service, tokens
 from tiqora.approvals.contract import (
     EVENT_ESCALATED,
     Actor,
     ApprovalError,
-    ResolveContext,
     StepSpec,
 )
 from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalApprover, TiqoraApprovalStep
 from tiqora.approvals.notify import enqueue_notification
-from tiqora.approvals.resolve import _customer_rows, resolve_entries  # noqa: PLC2701
+from tiqora.approvals.resolve import _customer_rows  # noqa: PLC2701
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket
@@ -46,6 +45,9 @@ logger = structlog.get_logger(__name__)
 
 _BATCH: Final = 200  # items per phase and tick
 _CHUNK: Final = 500  # IN-list size
+_MAX_PAGES: Final = 5  # keyset pages per phase and tick
+_SCAN: Final = 2000  # approver rows per scan page of the invalid-approver phase
+_SCAN_PAGES: Final = 5
 _LINK_RETENTION: Final = timedelta(days=30)
 _SYSTEM = Actor.system()
 
@@ -58,9 +60,17 @@ def _chunks[T](items: Sequence[T]) -> list[Sequence[T]]:
 
 async def _approver_state(
     session: AsyncSession, approval_id: int
-) -> dict[int, tuple[str, int | None]]:
-    rows = await service._locked_approvers(session, approval_id)  # noqa: SLF001
-    return {a.id: (a.status, a.user_id) for a in rows}
+) -> dict[int, tuple[str, bool, int | None]]:
+    """``{approver id: (status, decisive, user id)}``; a plain read (the request lock holds it)."""
+    rows = await session.execute(
+        select(
+            TiqoraApprovalApprover.id,
+            TiqoraApprovalApprover.status,
+            TiqoraApprovalApprover.decisive,
+            TiqoraApprovalApprover.user_id,
+        ).where(TiqoraApprovalApprover.approval_id == approval_id)
+    )
+    return {int(i): (str(st), bool(d), u) for i, st, d, u in rows}
 
 
 async def _item[T](
@@ -70,7 +80,6 @@ async def _item[T](
     *,
     settings: Settings,
     redis_client: redis.Redis | None,
-    pending_only: bool = True,
 ) -> T | None:
     """Runs *work* on the locked request in its own transaction; its result, or None.
 
@@ -81,7 +90,7 @@ async def _item[T](
     async with factory() as session:
         try:
             approval = await service._lock_approval(session, approval_id)  # noqa: SLF001
-            if pending_only and approval.status != "pending":
+            if approval.status != "pending":
                 await session.rollback()
                 return None
             asettings = await load_approval_settings(session, settings)
@@ -100,8 +109,8 @@ async def _item[T](
             await session.rollback()
             logger.exception("approval_sweep_item_failed", approval_id=approval_id)
             return None
-    for approver_id, (status, user_id) in after.items():
-        if user_id is not None and before.get(approver_id, (None, None))[0] != status:
+    for approver_id, (status, decisive, user_id) in after.items():
+        if user_id is not None and before.get(approver_id) != (status, decisive, user_id):
             affected.add(user_id)
     if redis_client is not None and affected:
         await publish_approval_changed(redis_client, affected)
@@ -126,32 +135,16 @@ async def _escalate(
     Never touches a principal who already voted in the step (F8), and ignores rows that are
     not pending any more. Same exclusions as at activation (requester, creator, invalid ...).
     """
-    resolution = await resolve_entries(
+    resolution = await service._resolve_step(  # noqa: SLF001
         session,
-        spec.escalation,
-        ctx=ResolveContext(
-            ticket_id=approval.ticket_id,
-            subject_type=approval.subject_type,
-            subject_ref=approval.subject_ref,
-            approval_id=approval.id,
-        ),
-        excluded_principals=await service._excluded_keys(session, approval),  # noqa: SLF001
-        allow_customers=service._allow_customers(approval, settings, registry),  # noqa: SLF001
-        source_kind_override="escalation",
+        approval,
+        spec,
+        settings=settings,
         registry=registry,
+        entries=spec.escalation,
+        source_kind_override="escalation",
     )
-    for principal, why in resolution.excluded:
-        who: dict[str, object] = (
-            {"user_id": principal.user_id} if principal.kind == "agent" else {"kind": "customer"}
-        )
-        await audit.record(
-            session,
-            approval=approval,
-            action="approver_excluded",
-            actor=_SYSTEM,
-            step_id=step.id,
-            detail={**who, "reason": why},
-        )
+    await service._audit_excluded(session, approval, step, resolution, actor=_SYSTEM)  # noqa: SLF001
     await service._audit_unresolved(session, approval, step, resolution, actor=_SYSTEM)  # noqa: SLF001
     voted = await service._voters_in_step(session, step.id)  # noqa: SLF001
     rows = {a.principal: a for a in approvers if a.step_id == step.id}
@@ -386,45 +379,33 @@ async def _drop_invalid(
             detail={"reason": "invalid"},
         )
     touched = {a.step_id for a in dropped}
-    for step in steps:
-        if step.id not in touched or approval.status != "pending" or step.status != "active":
-            continue
-        spec = StepSpec.model_validate_json(step.spec)
-        voters = await service._voters(  # noqa: SLF001
-            session,
-            step,
-            await service._locked_approvers(session, approval.id),  # noqa: SLF001
-        )
-        outcome = rules.evaluate_step(step.rule, step.quorum, voters)  # type: ignore[arg-type]
-        reason = "votes"
-        if outcome == "pending" and not voters:
-            outcome = "approved" if spec.on_no_approver == "approve" else "rejected"
-            reason = "no_approvers"
-        if outcome != "pending":
-            await service._close_step(  # noqa: SLF001
-                session,
-                approval,
-                step,
-                outcome,
-                reason,
-                settings=settings,
-                registry=registry,
-                actor=_SYSTEM,
-                now=now,
-            )
+    await service._reevaluate_steps(  # noqa: SLF001
+        session,
+        approval,
+        [s for s in steps if s.id in touched],
+        settings=settings,
+        registry=registry,
+        actor=_SYSTEM,
+        now=now,
+    )
     return len(dropped)
 
 
 # --- candidate selection --------------------------------------------------------------------
+#
+# Every selection is keyset-paged (``after`` = last key handled) and returns at most ``_BATCH``
+# ``(key, approval_id)`` pairs. A tick walks up to ``_MAX_PAGES`` pages, so items that fail and
+# stay selectable cannot starve the ones behind them.
 
 
 async def _overdue_candidates(
-    factory: async_sessionmaker[AsyncSession], now: datetime
+    factory: async_sessionmaker[AsyncSession], now: datetime, after: int
 ) -> list[tuple[int, int]]:
     async with factory() as session:
         rows = await session.execute(
             select(TiqoraApprovalStep.id, TiqoraApprovalStep.approval_id)
             .where(
+                TiqoraApprovalStep.id > after,
                 TiqoraApprovalStep.status == "active",
                 TiqoraApprovalStep.due_at.is_not(None),
                 TiqoraApprovalStep.due_at <= now,
@@ -437,7 +418,7 @@ async def _overdue_candidates(
 
 
 async def _reminder_candidates(
-    factory: async_sessionmaker[AsyncSession], settings: ApprovalSettings, now: datetime
+    factory: async_sessionmaker[AsyncSession], settings: ApprovalSettings, now: datetime, after: int
 ) -> list[tuple[int, int]]:
     if settings.reminder_interval_hours <= 0 or settings.reminder_max <= 0:
         return []
@@ -446,6 +427,7 @@ async def _reminder_candidates(
         rows = await session.execute(
             select(TiqoraApprovalStep.id, TiqoraApprovalStep.approval_id)
             .where(
+                TiqoraApprovalStep.id > after,
                 TiqoraApprovalStep.status == "active",
                 TiqoraApprovalStep.reminder_count < settings.reminder_max,
                 TiqoraApprovalStep.activated_at.is_not(None),
@@ -459,27 +441,54 @@ async def _reminder_candidates(
         return [(int(s), int(a)) for s, a in rows]
 
 
-async def _invalid_candidates(factory: async_sessionmaker[AsyncSession]) -> list[int]:
-    """Approvals with a pending approver whose agent/customer user is gone or invalid."""
+async def _invalid_candidates(
+    factory: async_sessionmaker[AsyncSession], after: int
+) -> list[tuple[int, int]]:
+    """Approvals with a pending approver whose agent/customer user is gone or invalid.
+
+    Scans the pending approver rows ``_SCAN`` at a time (ordered by request id), at most
+    ``_SCAN_PAGES`` scans per call.
+    """
+    found: set[int] = set()
+    cursor = after
     async with factory() as session:
-        rows = (
-            await session.execute(
-                select(
-                    TiqoraApprovalApprover.approval_id,
-                    TiqoraApprovalApprover.principal,
-                    TiqoraApprovalApprover.user_id,
-                    TiqoraApprovalApprover.customer_login,
-                ).where(TiqoraApprovalApprover.status == "pending")
-            )
-        ).all()
-        invalid = await _invalid_principals(session, [(p, u, c) for _, p, u, c in rows])
-    return sorted({int(a) for a, p, _, _ in rows if p in invalid})[:_BATCH]
+        for _ in range(_SCAN_PAGES):
+            rows = (
+                await session.execute(
+                    select(
+                        TiqoraApprovalApprover.approval_id,
+                        TiqoraApprovalApprover.principal,
+                        TiqoraApprovalApprover.user_id,
+                        TiqoraApprovalApprover.customer_login,
+                    )
+                    .where(
+                        TiqoraApprovalApprover.status == "pending",
+                        TiqoraApprovalApprover.approval_id > cursor,
+                    )
+                    .order_by(TiqoraApprovalApprover.approval_id)
+                    .limit(_SCAN)
+                )
+            ).all()
+            if not rows:
+                break
+            full = len(rows) == _SCAN
+            last = int(rows[-1][0])
+            if full and (cut := [r for r in rows if int(r[0]) < last]):
+                rows, cursor = cut, last - 1  # the last request's rows may go on: rescan it
+            else:
+                cursor = last
+            invalid = await _invalid_principals(session, [(p, u, c) for _, p, u, c in rows])
+            found |= {int(a) for a, p, _, _ in rows if p in invalid}
+            if not full or len(found) >= _BATCH:
+                break
+    return [(a, a) for a in sorted(found)[:_BATCH]]
 
 
-async def _orphan_candidates(factory: async_sessionmaker[AsyncSession]) -> list[int]:
+async def _orphan_candidates(
+    factory: async_sessionmaker[AsyncSession], after: int
+) -> list[tuple[int, int]]:
     """Pending requests whose ticket row no longer exists (keyset-paged, IN lists)."""
     found: list[int] = []
-    after = 0
     async with factory() as session:
         while len(found) < _BATCH:
             rows = (
@@ -500,10 +509,24 @@ async def _orphan_candidates(factory: async_sessionmaker[AsyncSession]) -> list[
                 .all()
             )
             found.extend(int(a) for a, t in rows if int(t) not in present)
-    return found[:_BATCH]
+    return [(a, a) for a in found[:_BATCH]]
 
 
 # --- tick -----------------------------------------------------------------------------------
+
+
+async def _pages(
+    fetch: Callable[[int], Awaitable[list[tuple[int, int]]]],
+) -> AsyncIterator[tuple[int, int]]:
+    """Yields ``(key, approval_id)`` over up to ``_MAX_PAGES`` keyset pages."""
+    after = 0
+    for _ in range(_MAX_PAGES):
+        page = await fetch(after)
+        for pair in page:
+            yield pair
+        if len(page) < _BATCH:
+            return
+        after = page[-1][0]
 
 
 async def run_approvals_sweep(
@@ -532,7 +555,6 @@ async def run_approvals_sweep(
     async with session_factory() as session:
         asettings = await load_approval_settings(session, settings)
 
-    # 4 first: later phases then never meet a request whose ticket is gone
     async def cancel(
         session: AsyncSession, approval: TiqoraApproval, loaded: ApprovalSettings
     ) -> bool | None:
@@ -547,13 +569,16 @@ async def run_approvals_sweep(
         )
         return True
 
-    for approval_id in await _orphan_candidates(session_factory):
+    # orphans first: later phases then never meet a request whose ticket is gone
+    async for _, approval_id in _pages(lambda after: _orphan_candidates(session_factory, after)):
         done = await _item(
             session_factory, approval_id, cancel, settings=settings, redis_client=redis_client
         )
         counts["cancelled"] += 1 if done else 0
 
-    for step_id, approval_id in await _overdue_candidates(session_factory, moment):
+    async for step_id, approval_id in _pages(
+        lambda after: _overdue_candidates(session_factory, moment, after)
+    ):
 
         async def overdue(
             session: AsyncSession,
@@ -571,7 +596,9 @@ async def run_approvals_sweep(
         if tag is not None:
             counts[tag] += 1
 
-    for step_id, approval_id in await _reminder_candidates(session_factory, asettings, moment):
+    async for step_id, approval_id in _pages(
+        lambda after: _reminder_candidates(session_factory, asettings, moment, after)
+    ):
 
         async def remind(
             session: AsyncSession,
@@ -588,13 +615,12 @@ async def run_approvals_sweep(
         )
         counts["reminded"] += 1 if sent else 0
 
-    for approval_id in await _invalid_candidates(session_factory):
+    async def drop(
+        session: AsyncSession, approval: TiqoraApproval, loaded: ApprovalSettings
+    ) -> int | None:
+        return await _drop_invalid(session, approval, loaded, registry=registry, now=moment)
 
-        async def drop(
-            session: AsyncSession, approval: TiqoraApproval, loaded: ApprovalSettings
-        ) -> int | None:
-            return await _drop_invalid(session, approval, loaded, registry=registry, now=moment)
-
+    async for _, approval_id in _pages(lambda after: _invalid_candidates(session_factory, after)):
         removed = await _item(
             session_factory, approval_id, drop, settings=settings, redis_client=redis_client
         )

@@ -27,6 +27,13 @@ MAX_STEPS_PER_STAGE = 10
 class VoterState:
     status: VoteResult  # only eligible rows (forwarded/removed/not_needed are not passed in)
     decisive: bool = False
+    #: counts in the step's rule; None = ``not decisive`` (escalation-only voters stay outside the
+    #: rule, a regular approver upgraded by an escalation is ``regular=True`` and decisive)
+    regular: bool | None = None
+
+    @property
+    def in_rule(self) -> bool:
+        return (not self.decisive) if self.regular is None else self.regular
 
 
 def evaluate_step(rule: Rule, quorum: int | None, voters: Sequence[VoterState]) -> VoteResult:
@@ -34,7 +41,8 @@ def evaluate_step(rule: Rule, quorum: int | None, voters: Sequence[VoterState]) 
 
     1. The first decisive voter who has voted decides alone (a pending decisive voter never
        blocks and never rejects).
-    2. Otherwise every rule looks at the non-decisive voters only; none of them -> ``pending``
+    2. Otherwise every rule looks at the voters that count in the rule (all non-decisive ones,
+       plus regular approvers an escalation made decisive); none of them -> ``pending``
        (no voters at all: the caller applies ``on_no_approver``).
     3. ``any``: the first non-pending voter decides ("the first decision counts"). ``all``: any
        rejection rejects, all approved approves. ``quorum`` n / ``majority`` (n = k // 2 + 1,
@@ -43,7 +51,7 @@ def evaluate_step(rule: Rule, quorum: int | None, voters: Sequence[VoterState]) 
     for voter in voters:
         if voter.decisive and voter.status != "pending":
             return voter.status
-    regular = [v for v in voters if not v.decisive]
+    regular = [v for v in voters if v.in_rule]
     if not regular:
         return "pending"
     counts = Counter(v.status for v in regular)

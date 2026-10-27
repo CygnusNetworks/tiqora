@@ -316,10 +316,13 @@ async def _resolve_step(
     *,
     settings: ApprovalSettings,
     registry: Registry,
+    entries: Sequence[ApproverEntry] | None = None,
+    source_kind_override: str | None = None,
 ) -> Resolution:
+    """Resolves the step's approvers (or *entries*, e.g. its escalation list)."""
     return await resolve_entries(
         session,
-        spec.approvers,
+        spec.approvers if entries is None else entries,
         ctx=ResolveContext(
             ticket_id=approval.ticket_id,
             subject_type=approval.subject_type,
@@ -328,8 +331,31 @@ async def _resolve_step(
         ),
         excluded_principals=await _excluded_keys(session, approval),
         allow_customers=_allow_customers(approval, settings, registry),
+        source_kind_override=source_kind_override,
         registry=registry,
     )
+
+
+async def _audit_excluded(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    step: TiqoraApprovalStep,
+    resolution: Resolution,
+    *,
+    actor: Actor,
+) -> None:
+    for principal, why in resolution.excluded:
+        who: dict[str, object] = (
+            {"user_id": principal.user_id} if principal.kind == "agent" else {"kind": "customer"}
+        )
+        await audit.record(
+            session,
+            approval=approval,
+            action="approver_excluded",
+            actor=actor,
+            step_id=step.id,
+            detail={**who, "reason": why},
+        )
 
 
 async def _audit_unresolved(
@@ -378,18 +404,7 @@ async def _activate_step(
         step_id=step.id,
         detail={"rule": step.rule, "quorum": step.quorum, "approvers": len(resolution.approvers)},
     )
-    for principal, why in resolution.excluded:
-        who: dict[str, object] = (
-            {"user_id": principal.user_id} if principal.kind == "agent" else {"kind": "customer"}
-        )
-        await audit.record(
-            session,
-            approval=approval,
-            action="approver_excluded",
-            actor=actor,
-            step_id=step.id,
-            detail={**who, "reason": why},
-        )
+    await _audit_excluded(session, approval, step, resolution, actor=actor)
     await _audit_unresolved(session, approval, step, resolution, actor=actor)
     count = len(resolution.approvers)
     if count == 0 or not rules.quorum_reachable(spec.rule, spec.quorum, count):
@@ -867,7 +882,27 @@ async def _voters(
         if a.step_id == step.id and a.status in ("pending", "approved", "rejected")
     ]
     eligible.sort(key=lambda a: (a.status == "pending", voted_at.get(a.id, (utc_now(), 0)), a.id))
-    return [rules.VoterState(a.status, a.decisive) for a in eligible]  # type: ignore[arg-type]
+    by_id = {a.id: a for a in approvers}
+    return [
+        rules.VoterState(a.status, a.decisive, _in_rule(a, by_id))  # type: ignore[arg-type]
+        for a in eligible
+    ]
+
+
+def _in_rule(row: TiqoraApprovalApprover, by_id: dict[int, TiqoraApprovalApprover]) -> bool:
+    """False for voters that exist only through an escalation (and their forward rows).
+
+    A regular approver that an escalation made decisive keeps counting in the step's rule.
+    """
+    if not row.decisive:
+        return True
+    if row.source_kind == "escalation":
+        return False
+    if row.source_kind == "forward":
+        ref = row.source_ref or ""
+        origin = by_id.get(int(ref)) if ref.isdigit() else None
+        return True if origin is None else _in_rule(origin, by_id)
+    return True
 
 
 async def _voters_in_step(session: AsyncSession, step_id: int) -> set[str]:
@@ -1182,6 +1217,44 @@ async def forward(
     return new_id
 
 
+async def _reevaluate_steps(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    steps: Sequence[TiqoraApprovalStep],
+    *,
+    settings: ApprovalSettings,
+    registry: Registry,
+    actor: Actor,
+    now: datetime,
+) -> None:
+    """Re-evaluates active steps after their voters changed, like after a vote.
+
+    No voter left: the step's ``on_no_approver``. Used by the refresh and by the sweeper.
+    """
+    for step in steps:
+        if approval.status != "pending" or step.status != "active":
+            continue
+        spec = StepSpec.model_validate_json(step.spec)
+        voters = await _voters(session, step, await _locked_approvers(session, approval.id))
+        outcome = rules.evaluate_step(step.rule, step.quorum, voters)  # type: ignore[arg-type]
+        reason = "votes"
+        if outcome == "pending" and not voters:
+            outcome = "approved" if spec.on_no_approver == "approve" else "rejected"
+            reason = "no_approvers"
+        if outcome != "pending":
+            await _close_step(
+                session,
+                approval,
+                step,
+                outcome,
+                reason,
+                settings=settings,
+                registry=registry,
+                actor=actor,
+                now=now,
+            )
+
+
 @dataclass(frozen=True, slots=True)
 class RefreshResult:
     added: int
@@ -1260,29 +1333,9 @@ async def refresh_approvers(
         detail={"added": len(added_ids), "removed": removed},
     )
 
-    for step in steps:
-        if approval.status != "pending" or step.status != "active":
-            continue
-        spec = StepSpec.model_validate_json(step.spec)
-        current = await _locked_approvers(session, approval.id)
-        voters = await _voters(session, step, current)
-        outcome = rules.evaluate_step(step.rule, step.quorum, voters)  # type: ignore[arg-type]
-        reason = "votes"
-        if outcome == "pending" and not voters:
-            outcome = "approved" if spec.on_no_approver == "approve" else "rejected"
-            reason = "no_approvers"
-        if outcome != "pending":
-            await _close_step(
-                session,
-                approval,
-                step,
-                outcome,
-                reason,
-                settings=asettings,
-                registry=reg,
-                actor=actor,
-                now=now,
-            )
+    await _reevaluate_steps(
+        session, approval, steps, settings=asettings, registry=reg, actor=actor, now=now
+    )
     if approval.status == "pending" and added_ids:
         still_pending = [
             a.id

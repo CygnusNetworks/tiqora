@@ -40,6 +40,22 @@ def test_evaluate_step(rule, quorum, voters, expected) -> None:  # type: ignore[
     assert evaluate_step(rule, quorum, voters) == expected
 
 
+def test_regular_decisive_voter_stays_in_the_rule() -> None:
+    """An approver an escalation made decisive counts in the rule AND can decide alone."""
+    up = {"decisive": True, "regular": True}
+    # rule all: the other regular voter alone does not approve while the upgraded one is pending
+    assert evaluate_step("all", None, [A, VoterState("pending", **up)]) == "pending"
+    assert evaluate_step("all", None, [VoterState("approved", **up), P]) == "approved"
+    assert evaluate_step("all", None, [VoterState("rejected", **up), A]) == "rejected"
+    # quorum 2 of 2: one approval plus the pending upgraded voter must not flip to rejected
+    assert evaluate_step("quorum", 2, [A, VoterState("pending", **up)]) == "pending"
+    # an escalation-only voter (regular=False) stays outside the rule
+    assert (
+        evaluate_step("all", None, [A, VoterState("pending", decisive=True, regular=False)])
+        == "approved"
+    )
+
+
 def test_decisive_voter_decides_alone() -> None:
     assert evaluate_step("all", None, [P, P, VoterState("approved", decisive=True)]) == "approved"
     assert evaluate_step("quorum", 3, [A, A, VoterState("rejected", decisive=True)]) == "rejected"
