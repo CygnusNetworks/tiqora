@@ -473,6 +473,7 @@ async def test_forward_creates_row_and_marks_old(
                     "kind": "forwarded",
                     "approver_ids": [new_id],
                     "include_requester": False,
+                    "include_substitutes": True,
                 }
             ]
             dead = (

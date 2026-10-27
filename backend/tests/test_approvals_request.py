@@ -222,6 +222,7 @@ async def test_request_with_definition_activates_stage_one(
                 "kind": "request",
                 "approver_ids": [approvers[0].id],
                 "include_requester": False,
+                "include_substitutes": True,
             }
             assert mails[0].created_by is None
             assert await _jobs(session, JOB_HOOK, info.approval_id) == []
@@ -503,6 +504,7 @@ async def test_no_approver_rejects_by_default(
                     "kind": "decided",
                     "approver_ids": [],
                     "include_requester": True,
+                    "include_substitutes": True,
                 }
             ]
 

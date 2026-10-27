@@ -46,6 +46,7 @@ def register_core(registry: Registry) -> None:
     registry.add(CI_PROVIDERS, tiqora_provider_factory())
 
     from tiqora.approvals.hooks import APPROVAL_HOOK_JOB
+    from tiqora.approvals.notify import APPROVAL_MAIL_JOB
     from tiqora.cmdb.archive import CMDB_ARCHIVE_JOB
     from tiqora.cmdb.propagation import CMDB_PROPAGATION_JOB
     from tiqora.cmdb.reindex import CMDB_REINDEX_JOB
@@ -90,6 +91,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, PLUGIN_REPOSITORY_REFRESH_JOB)
     registry.add(JOB_HANDLERS, PLUGIN_FETCH_JOB)
     registry.add(JOB_HANDLERS, APPROVAL_HOOK_JOB)
+    registry.add(JOB_HANDLERS, APPROVAL_MAIL_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources

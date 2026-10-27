@@ -30,7 +30,6 @@ from tiqora.approvals.contract import (
     EVENT_REQUESTED,
     EVENT_VOTED,
     JOB_HOOK,
-    JOB_MAIL,
     Actor,
     ApprovalDefinition,
     ApprovalError,
@@ -50,6 +49,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalStep,
     TiqoraApprovalVote,
 )
+from tiqora.approvals.notify import enqueue_notification
 from tiqora.approvals.resolve import (
     Resolution,
     ResolvedApprover,
@@ -160,33 +160,6 @@ def _allow_customers(
     )
 
 
-async def _enqueue_mail(
-    session: AsyncSession,
-    approval: TiqoraApproval,
-    kind: str,
-    *,
-    approver_ids: Sequence[int] = (),
-    include_requester: bool = False,
-    registry: Registry,
-) -> int | None:
-    """Queues one ``core.approval_mail`` job; None when there is nobody to mail."""
-    if not approver_ids and not include_requester:
-        return None
-    job = await enqueue_job(
-        session,
-        kind=JOB_MAIL,
-        payload={
-            "approval_id": approval.id,
-            "kind": kind,
-            "approver_ids": list(approver_ids),
-            "include_requester": include_requester,
-        },
-        created_by=None,
-        registry=registry,
-    )
-    return int(job.id)
-
-
 async def _close_open_steps(
     session: AsyncSession,
     approval: TiqoraApproval,
@@ -267,9 +240,21 @@ async def _finalize(
         registry=reg,
     )
     if status == "cancelled":
-        await _enqueue_mail(session, approval, "cancelled", approver_ids=notified, registry=reg)
+        await enqueue_notification(
+            session,
+            approval_id=approval.id,
+            kind="cancelled",
+            approver_ids=notified,
+            registry=reg,
+        )
     elif not auto and settings.mail_requester_on_decision and approval.requester != "system":
-        await _enqueue_mail(session, approval, "decided", include_requester=True, registry=reg)
+        await enqueue_notification(
+            session,
+            approval_id=approval.id,
+            kind="decided",
+            include_requester=True,
+            registry=reg,
+        )
 
 
 def _result_reason(steps: Sequence[TiqoraApprovalStep], result: ApprovalStatus) -> str:
@@ -700,7 +685,13 @@ async def request_approval(
         session, approval, settings=asettings, registry=reg, actor=actor
     )
     if approval.status == "pending":
-        await _enqueue_mail(session, approval, "request", approver_ids=new_ids, registry=reg)
+        await enqueue_notification(
+            session,
+            approval_id=approval.id,
+            kind="request",
+            approver_ids=new_ids,
+            registry=reg,
+        )
     return _info(approval)
 
 
@@ -926,7 +917,13 @@ async def _close_step(
         session, approval, settings=settings, registry=registry, actor=actor
     )
     if approval.status == "pending":
-        await _enqueue_mail(session, approval, "request", approver_ids=new_ids, registry=registry)
+        await enqueue_notification(
+            session,
+            approval_id=approval.id,
+            kind="request",
+            approver_ids=new_ids,
+            registry=registry,
+        )
 
 
 async def decide(
@@ -1175,7 +1172,13 @@ async def forward(
         approver_id=row.id,
         detail={"to_user_id": to_user_id, "new_approver_id": new_id},
     )
-    await _enqueue_mail(session, approval, "forwarded", approver_ids=[new_id], registry=reg)
+    await enqueue_notification(
+        session,
+        approval_id=approval.id,
+        kind="forwarded",
+        approver_ids=[new_id],
+        registry=reg,
+    )
     return new_id
 
 
@@ -1286,7 +1289,13 @@ async def refresh_approvers(
             for a in await _locked_approvers(session, approval.id)
             if a.id in added_ids and a.status == "pending"
         ]
-        await _enqueue_mail(session, approval, "request", approver_ids=still_pending, registry=reg)
+        await enqueue_notification(
+            session,
+            approval_id=approval.id,
+            kind="request",
+            approver_ids=still_pending,
+            registry=reg,
+        )
     return RefreshResult(added=len(added_ids), removed=removed)
 
 

@@ -6586,7 +6586,8 @@
         "itsm_linked_articles": "Note to linked tickets",
         "itsm_import": "Import Znuny ITSM data",
         "itsm_switch": "Switch ITSM to Tiqora",
-        "approval_hook": "Approval follow-up"
+        "approval_hook": "Approval follow-up",
+        "approval_mail": "Approval e-mails"
       },
       "gi_mail": "Send email from a web service request"
     },
