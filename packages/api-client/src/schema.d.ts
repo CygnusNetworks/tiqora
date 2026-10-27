@@ -9647,6 +9647,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/change-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Calendar
+         * @description Changes, tasks and freeze windows of a range of at most 92 days, with conflict flags.
+         */
+        get: operations["get_change_calendar_api_v1_itsm_change_calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-calendar/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Calendar Services
+         * @description Projected service availability: planned change and freeze windows per service.
+         */
+        get: operations["get_change_calendar_services_api_v1_itsm_change_calendar_services_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-tasks/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Change Tasks
+         * @description Change tasks the caller owns (by default only unfinished ones of live changes).
+         */
+        get: operations["get_my_change_tasks_api_v1_itsm_change_tasks_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/change-templates": {
         parameters: {
             query?: never;
@@ -9674,7 +9734,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Changes
+         * @description Changes the caller may read; ``q`` matches the number or the title. Times are UTC.
+         */
+        get: operations["get_changes_api_v1_itsm_changes_get"];
         put?: never;
         /**
          * Post Change
@@ -16984,13 +17048,20 @@ export interface components {
              */
             target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
         };
-        /** CabChangeItemOut */
+        /**
+         * CabChangeItemOut
+         * @description An agenda suggestion: the list item of the change.
+         */
         CabChangeItemOut: {
             /**
              * Change Type
              * @enum {string}
              */
             change_type: "standard" | "normal" | "emergency";
+            /** Outcome */
+            outcome: string | null;
+            /** Owner Id */
+            owner_id: number;
             /**
              * Phase
              * @enum {string}
@@ -17000,14 +17071,23 @@ export interface components {
             planned_end: string | null;
             /** Planned Start */
             planned_start: string | null;
+            /** Queue Id */
+            queue_id: number;
             /** Risk Level */
             risk_level: string | null;
+            /** Service Ids */
+            service_ids: number[];
             /** Ticket Id */
             ticket_id: number;
             /** Title */
             title: string;
             /** Tn */
             tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** CabIn */
         CabIn: {
@@ -17079,6 +17159,48 @@ export interface components {
             updated_by: number;
             /** Valid */
             valid: boolean;
+        };
+        /** CalendarChangeOut */
+        CalendarChangeOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /** Conflict Kinds */
+            conflict_kinds: string[];
+            /** Conflict Severity */
+            conflict_severity: ("info" | "warn" | "block") | null;
+            /** Outcome */
+            outcome: string | null;
+            /** Owner Id */
+            owner_id: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** CalendarOut */
         CalendarOut: {
@@ -17392,6 +17514,29 @@ export interface components {
             history_missing: boolean;
             snapshot: components["schemas"]["ApprovalSnapshotOut"] | null;
         };
+        /** ChangeCalendarOut */
+        ChangeCalendarOut: {
+            /** Changes */
+            changes: components["schemas"]["CalendarChangeOut"][];
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Freezes */
+            freezes: components["schemas"]["FreezeOccurrenceOut"][];
+            /** Freezes Truncated */
+            freezes_truncated: boolean;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /** Tasks */
+            tasks: components["schemas"]["TaskListItemOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
         /** ChangeCreateIn */
         ChangeCreateIn: {
             /**
@@ -17481,6 +17626,44 @@ export interface components {
             stale: boolean;
             /** Truncated */
             truncated: boolean;
+        };
+        /** ChangeListItemOut */
+        ChangeListItemOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /** Outcome */
+            outcome: string | null;
+            /** Owner Id */
+            owner_id: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ChangeOut */
         ChangeOut: {
@@ -17578,6 +17761,15 @@ export interface components {
             updated_at: string;
             /** Updated By */
             updated_by: number;
+        };
+        /** ChangePageOut */
+        ChangePageOut: {
+            /** Items */
+            items: components["schemas"]["ChangeListItemOut"][];
+            /** Total */
+            total: number;
+            /** Truncated */
+            truncated: boolean;
         };
         /** ChangeRiskAnswerDef */
         ChangeRiskAnswerDef: {
@@ -28632,6 +28824,19 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** ServiceAvailabilityOut */
+        ServiceAvailabilityOut: {
+            /** Change Count */
+            change_count: number;
+            /** Minutes Affected */
+            minutes_affected: number;
+            /** Service Id */
+            service_id: number;
+            /** Service Name */
+            service_name: string;
+            /** Windows */
+            windows: components["schemas"]["ServiceWindowOut"][];
+        };
         /** ServiceCreate */
         ServiceCreate: {
             /** Comments */
@@ -28744,6 +28949,38 @@ export interface components {
             sla_ids?: number[] | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** ServiceWindowOut */
+        ServiceWindowOut: {
+            /** Change Type */
+            change_type: string | null;
+            /** Direct */
+            direct: boolean | null;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Enforcement */
+            enforcement: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "change" | "freeze";
+            /** Phase */
+            phase: string | null;
+            /** Ref Id */
+            ref_id: number;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string | null;
         };
         /** SettingsSectionOut */
         SettingsSectionOut: {
@@ -29690,6 +29927,42 @@ export interface components {
             task_kind: "workorder" | "backout" | "decision" | "pir";
             /** Title */
             title: string;
+        };
+        /** TaskListItemOut */
+        TaskListItemOut: {
+            /** Change Ticket Id */
+            change_ticket_id: number;
+            /** Change Title */
+            change_title: string | null;
+            /** Change Tn */
+            change_tn: string | null;
+            /** Finished */
+            finished: boolean;
+            /** Owner Id */
+            owner_id: number;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Queue Id */
+            queue_id: number;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /**
+             * Task Kind
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /** TaskOrderIn */
         TaskOrderIn: {
@@ -57059,6 +57332,115 @@ export interface operations {
             };
         };
     };
+    get_change_calendar_api_v1_itsm_change_calendar_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                service_id?: number[] | null;
+                include_tasks?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeCalendarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_calendar_services_api_v1_itsm_change_calendar_services_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAvailabilityOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_change_tasks_api_v1_itsm_change_tasks_mine_get: {
+        parameters: {
+            query?: {
+                open_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskListItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_change_templates_api_v1_itsm_change_templates_get: {
         parameters: {
             query?: never;
@@ -57079,6 +57461,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangeTemplateSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_changes_api_v1_itsm_changes_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                phase?: ("draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled")[] | null;
+                change_type?: ("standard" | "normal" | "emergency")[] | null;
+                service_id?: number | null;
+                ci_id?: number | null;
+                window_start?: string | null;
+                window_end?: string | null;
+                mine?: "" | "owned" | "created";
+                order?: "planned_start" | "updated";
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangePageOut"];
                 };
             };
             /** @description Validation Error */

@@ -8433,6 +8433,7 @@
         "type": "object"
       },
       "CabChangeItemOut": {
+        "description": "An agenda suggestion: the list item of the change.",
         "properties": {
           "change_type": {
             "enum": [
@@ -8442,6 +8443,21 @@
             ],
             "title": "Change Type",
             "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "integer"
           },
           "phase": {
             "enum": [
@@ -8483,6 +8499,10 @@
             ],
             "title": "Planned Start"
           },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
           "risk_level": {
             "anyOf": [
               {
@@ -8493,6 +8513,13 @@
               }
             ],
             "title": "Risk Level"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Service Ids",
+            "type": "array"
           },
           "ticket_id": {
             "title": "Ticket Id",
@@ -8505,17 +8532,27 @@
           "tn": {
             "title": "Tn",
             "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
           }
         },
         "required": [
           "ticket_id",
           "tn",
           "title",
+          "queue_id",
+          "owner_id",
           "change_type",
           "phase",
+          "outcome",
           "risk_level",
           "planned_start",
-          "planned_end"
+          "planned_end",
+          "service_ids",
+          "updated_at"
         ],
         "title": "CabChangeItemOut",
         "type": "object"
@@ -8702,6 +8739,155 @@
           "updated_by"
         ],
         "title": "CabOut",
+        "type": "object"
+      },
+      "CalendarChangeOut": {
+        "properties": {
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "conflict_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflict Kinds",
+            "type": "array"
+          },
+          "conflict_severity": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "warn",
+                  "block"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Severity"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "phase": {
+            "enum": [
+              "draft",
+              "submitted",
+              "assessment",
+              "approval",
+              "scheduled",
+              "implementing",
+              "review",
+              "closed",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "queue_id",
+          "owner_id",
+          "change_type",
+          "phase",
+          "outcome",
+          "risk_level",
+          "planned_start",
+          "planned_end",
+          "service_ids",
+          "updated_at",
+          "conflict_severity",
+          "conflict_kinds"
+        ],
+        "title": "CalendarChangeOut",
         "type": "object"
       },
       "CalendarOut": {
@@ -9667,6 +9853,60 @@
         "title": "ChangeApprovalOut",
         "type": "object"
       },
+      "ChangeCalendarOut": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "freezes": {
+            "items": {
+              "$ref": "#/components/schemas/FreezeOccurrenceOut"
+            },
+            "title": "Freezes",
+            "type": "array"
+          },
+          "freezes_truncated": {
+            "title": "Freezes Truncated",
+            "type": "boolean"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskListItemOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "changes",
+          "tasks",
+          "freezes",
+          "truncated",
+          "freezes_truncated"
+        ],
+        "title": "ChangeCalendarOut",
+        "type": "object"
+      },
       "ChangeCreateIn": {
         "properties": {
           "body": {
@@ -9994,6 +10234,130 @@
           "incidents_truncated"
         ],
         "title": "ChangeImpactOut",
+        "type": "object"
+      },
+      "ChangeListItemOut": {
+        "properties": {
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "phase": {
+            "enum": [
+              "draft",
+              "submitted",
+              "assessment",
+              "approval",
+              "scheduled",
+              "implementing",
+              "review",
+              "closed",
+              "rejected",
+              "cancelled"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "service_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Service Ids",
+            "type": "array"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "queue_id",
+          "owner_id",
+          "change_type",
+          "phase",
+          "outcome",
+          "risk_level",
+          "planned_start",
+          "planned_end",
+          "service_ids",
+          "updated_at"
+        ],
+        "title": "ChangeListItemOut",
         "type": "object"
       },
       "ChangeOut": {
@@ -10393,6 +10757,32 @@
           "updated_by"
         ],
         "title": "ChangeOut",
+        "type": "object"
+      },
+      "ChangePageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeListItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "truncated"
+        ],
+        "title": "ChangePageOut",
         "type": "object"
       },
       "ChangeRiskAnswerDef": {
@@ -43209,6 +43599,42 @@
         "title": "SearchStatusOut",
         "type": "object"
       },
+      "ServiceAvailabilityOut": {
+        "properties": {
+          "change_count": {
+            "title": "Change Count",
+            "type": "integer"
+          },
+          "minutes_affected": {
+            "title": "Minutes Affected",
+            "type": "integer"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "integer"
+          },
+          "service_name": {
+            "title": "Service Name",
+            "type": "string"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceWindowOut"
+            },
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "service_id",
+          "service_name",
+          "minutes_affected",
+          "change_count",
+          "windows"
+        ],
+        "title": "ServiceAvailabilityOut",
+        "type": "object"
+      },
       "ServiceCreate": {
         "properties": {
           "comments": {
@@ -43610,6 +44036,105 @@
           }
         },
         "title": "ServiceUpdate",
+        "type": "object"
+      },
+      "ServiceWindowOut": {
+        "properties": {
+          "change_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Type"
+          },
+          "direct": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "enforcement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enforcement"
+          },
+          "kind": {
+            "enum": [
+              "change",
+              "freeze"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "ref_id": {
+            "title": "Ref Id",
+            "type": "integer"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tn"
+          }
+        },
+        "required": [
+          "kind",
+          "ref_id",
+          "tn",
+          "title",
+          "phase",
+          "change_type",
+          "enforcement",
+          "direct",
+          "start",
+          "end"
+        ],
+        "title": "ServiceWindowOut",
         "type": "object"
       },
       "SettingsSectionOut": {
@@ -46554,6 +47079,125 @@
           "title"
         ],
         "title": "TaskIn",
+        "type": "object"
+      },
+      "TaskListItemOut": {
+        "properties": {
+          "change_ticket_id": {
+            "title": "Change Ticket Id",
+            "type": "integer"
+          },
+          "change_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Title"
+          },
+          "change_tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Tn"
+          },
+          "finished": {
+            "title": "Finished",
+            "type": "boolean"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "state_type": {
+            "title": "State Type",
+            "type": "string"
+          },
+          "task_kind": {
+            "enum": [
+              "workorder",
+              "backout",
+              "decision",
+              "pir"
+            ],
+            "title": "Task Kind",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "queue_id",
+          "owner_id",
+          "state",
+          "state_type",
+          "finished",
+          "task_kind",
+          "position",
+          "planned_start",
+          "planned_end",
+          "change_ticket_id",
+          "change_tn",
+          "change_title"
+        ],
+        "title": "TaskListItemOut",
         "type": "object"
       },
       "TaskOrderIn": {
@@ -105970,6 +106614,292 @@
         ]
       }
     },
+    "/api/v1/itsm/change-calendar": {
+      "get": {
+        "description": "Changes, tasks and freeze windows of a range of at most 92 days, with conflict flags.",
+        "operationId": "get_change_calendar_api_v1_itsm_change_calendar_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "maxItems": 200,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_tasks",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Tasks",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeCalendarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Calendar",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/change-calendar/services": {
+      "get": {
+        "description": "Projected service availability: planned change and freeze windows per service.",
+        "operationId": "get_change_calendar_services_api_v1_itsm_change_calendar_services_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServiceAvailabilityOut"
+                  },
+                  "title": "Response Get Change Calendar Services Api V1 Itsm Change Calendar Services Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Calendar Services",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/change-tasks/mine": {
+      "get": {
+        "description": "Change tasks the caller owns (by default only unfinished ones of live changes).",
+        "operationId": "get_my_change_tasks_api_v1_itsm_change_tasks_mine_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaskListItemOut"
+                  },
+                  "title": "Response Get My Change Tasks Api V1 Itsm Change Tasks Mine Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Change Tasks",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
     "/api/v1/itsm/change-templates": {
       "get": {
         "description": "Valid change templates for the create dialog (Mode B).",
@@ -106041,6 +106971,261 @@
       }
     },
     "/api/v1/itsm/changes": {
+      "get": {
+        "description": "Changes the caller may read; ``q`` matches the number or the title. Times are UTC.",
+        "operationId": "get_changes_api_v1_itsm_changes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "draft",
+                      "submitted",
+                      "assessment",
+                      "approval",
+                      "scheduled",
+                      "implementing",
+                      "review",
+                      "closed",
+                      "rejected",
+                      "cancelled"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Phase"
+            }
+          },
+          {
+            "in": "query",
+            "name": "change_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "standard",
+                      "normal",
+                      "emergency"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Change Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ci_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ci Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window_start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Window Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window_end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Window End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": "",
+              "enum": [
+                "",
+                "owned",
+                "created"
+              ],
+              "title": "Mine",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "updated",
+              "enum": [
+                "planned_start",
+                "updated"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangePageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Changes",
+        "tags": [
+          "itsm-change"
+        ]
+      },
       "post": {
         "description": "Create a change ticket with its record in phase ``draft``.",
         "operationId": "post_change_api_v1_itsm_changes_post",

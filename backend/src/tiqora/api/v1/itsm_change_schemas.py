@@ -12,7 +12,6 @@ from tiqora.domain.schemas import UtcDateTime
 from tiqora.itsm.change.cab import (
     MAX_AGENDA,
     AgendaItemIn,
-    CabChangeItem,
     CabView,
     MeetingStatus,
     MeetingView,
@@ -22,6 +21,15 @@ from tiqora.itsm.change.cab import (
 from tiqora.itsm.change.freeze import Enforcement, FreezeOccurrences, Scope
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
+from tiqora.itsm.change.read import (
+    CalendarChange,
+    ChangeCalendar,
+    ChangeListItem,
+    ChangePage,
+    ServiceAvailabilityRow,
+    ServiceWindow,
+    TaskListItem,
+)
 from tiqora.itsm.change.related import RelatedTicket
 from tiqora.itsm.change.service import ChangeView
 from tiqora.itsm.change.tasks import TaskKind, TaskView
@@ -413,16 +421,145 @@ class AgendaIn(BaseModel):
     items: list[AgendaItemIn] = Field(default_factory=list, max_length=MAX_AGENDA)
 
 
-class CabChangeItemOut(BaseModel):
+class ChangeListItemOut(BaseModel):
     ticket_id: int
     tn: str
     title: str
+    queue_id: int
+    owner_id: int
     change_type: ChangeType
     phase: Phase
+    outcome: str | None
+    #: effective level (override wins over the computed one)
     risk_level: str | None
     planned_start: UtcDateTime | None
     planned_end: UtcDateTime | None
+    service_ids: list[int]
+    updated_at: UtcDateTime
 
 
-def cab_change_item_out(item: CabChangeItem) -> CabChangeItemOut:
+class CabChangeItemOut(ChangeListItemOut):
+    """An agenda suggestion: the list item of the change."""
+
+
+def change_list_item_out(item: ChangeListItem) -> ChangeListItemOut:
+    return ChangeListItemOut.model_validate(item, from_attributes=True)
+
+
+def cab_change_item_out(item: ChangeListItem) -> CabChangeItemOut:
     return CabChangeItemOut.model_validate(item, from_attributes=True)
+
+
+class ChangePageOut(BaseModel):
+    items: list[ChangeListItemOut]
+    #: matches among the scanned changes (a lower bound when ``truncated``)
+    total: int
+    #: more changes matched than one scan reads; narrow the filters
+    truncated: bool
+
+
+def change_page_out(page: ChangePage) -> ChangePageOut:
+    return ChangePageOut(
+        items=[change_list_item_out(i) for i in page.items],
+        total=page.total,
+        truncated=page.truncated,
+    )
+
+
+class TaskListItemOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    queue_id: int
+    owner_id: int
+    state: str
+    state_type: str
+    finished: bool
+    task_kind: TaskKind
+    position: int
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+    change_ticket_id: int
+    #: ``null`` when the caller may not read the change ticket
+    change_tn: str | None
+    change_title: str | None
+
+
+def task_list_item_out(item: TaskListItem) -> TaskListItemOut:
+    return TaskListItemOut.model_validate(item, from_attributes=True)
+
+
+class CalendarChangeOut(ChangeListItemOut):
+    #: highest severity among the change's conflicts; ``null`` = none
+    conflict_severity: Literal["info", "warn", "block"] | None
+    conflict_kinds: list[str]
+
+
+def calendar_change_out(c: CalendarChange) -> CalendarChangeOut:
+    return CalendarChangeOut(
+        **change_list_item_out(c.item).model_dump(),
+        conflict_severity=c.conflict_severity,
+        conflict_kinds=list(c.conflict_kinds),
+    )
+
+
+class ChangeCalendarOut(BaseModel):
+    start: UtcDateTime
+    end: UtcDateTime
+    changes: list[CalendarChangeOut]
+    tasks: list[TaskListItemOut]
+    freezes: list[FreezeOccurrenceOut]
+    #: more changes or tasks than one read covers; flags and tasks may be incomplete
+    truncated: bool
+    #: freeze occurrences were cut off; ask for a shorter range
+    freezes_truncated: bool
+
+
+def change_calendar_out(cal: ChangeCalendar) -> ChangeCalendarOut:
+    return ChangeCalendarOut(
+        start=cal.start,
+        end=cal.end,
+        changes=[calendar_change_out(c) for c in cal.changes],
+        tasks=[task_list_item_out(t) for t in cal.tasks],
+        freezes=freeze_occurrences_out(FreezeOccurrences(list(cal.freezes), False)).items,
+        truncated=cal.truncated,
+        freezes_truncated=cal.freezes_truncated,
+    )
+
+
+class ServiceWindowOut(BaseModel):
+    kind: Literal["change", "freeze"]
+    #: change ticket id or freeze id
+    ref_id: int
+    tn: str | None
+    title: str
+    phase: str | None
+    change_type: str | None
+    enforcement: str | None
+    #: the change names the service itself; ``null`` for a freeze
+    direct: bool | None
+    start: UtcDateTime
+    end: UtcDateTime
+
+
+class ServiceAvailabilityOut(BaseModel):
+    service_id: int
+    service_name: str
+    #: minutes of the range covered by planned change windows
+    minutes_affected: int
+    change_count: int
+    windows: list[ServiceWindowOut]
+
+
+def _window_out(w: ServiceWindow) -> ServiceWindowOut:
+    return ServiceWindowOut.model_validate(w, from_attributes=True)
+
+
+def service_availability_out(row: ServiceAvailabilityRow) -> ServiceAvailabilityOut:
+    return ServiceAvailabilityOut(
+        service_id=row.service_id,
+        service_name=row.service_name,
+        minutes_affected=row.minutes_affected,
+        change_count=row.change_count,
+        windows=[_window_out(w) for w in row.windows],
+    )

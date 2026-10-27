@@ -186,6 +186,11 @@ async def _impact_sets(session: AsyncSession, ticket_ids: Sequence[int]) -> dict
     }
 
 
+#: shared with the batched calendar read (``read.py``)
+impact_sets = _impact_sets
+ImpactSet = _ImpactSet
+
+
 def _ref_id(ref: str | None, prefix: str) -> int | None:
     if ref is None or not ref.startswith(prefix + ":"):
         return None

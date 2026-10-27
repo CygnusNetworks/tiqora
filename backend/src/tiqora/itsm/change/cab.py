@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Final, Literal, Self
 
@@ -59,6 +58,7 @@ from tiqora.itsm.change.models import (
     TiqoraItsmCabMember,
     TiqoraItsmChange,
 )
+from tiqora.itsm.change.read import ChangeListItem, items_for_changes
 from tiqora.itsm.change.service import MAX_TEXT
 from tiqora.itsm.change.settings import load_change_settings
 from tiqora.itsm.change.transitions import effective_cab_id
@@ -494,20 +494,6 @@ class MeetingView(BaseModel):
     updated_by: int
 
 
-@dataclass(frozen=True, slots=True)
-class CabChangeItem:
-    """A change in ``approval`` that this CAB decides, offered for the agenda."""
-
-    ticket_id: int
-    tn: str
-    title: str
-    change_type: str
-    phase: str
-    risk_level: str | None
-    planned_start: datetime | None
-    planned_end: datetime | None
-
-
 async def _require_manager(session: AsyncSession, settings: Settings, user_id: int) -> None:
     cfg = await load_change_settings(session, settings)
     if not await is_change_manager(session, user_id, cfg):
@@ -778,7 +764,7 @@ async def suggest_agenda(
     cab_id: int,
     user_id: int,
     meeting_id: int | None = None,
-) -> list[CabChangeItem]:
+) -> list[ChangeListItem]:
     """Changes in ``approval`` that this (valid) CAB decides (its own, or by the default /
     emergency CAB setting), readable by the caller, planned start first. With ``meeting_id`` the
     changes already on that agenda are left out. The cap (:data:`MAX_SUGGESTIONS`, newest changes
@@ -809,20 +795,6 @@ async def suggest_agenda(
         (await session.execute(stmt.order_by(ch.ticket_id.desc()).limit(MAX_SUGGESTIONS))).scalars()
     )
     mine = [r for r in rows if effective_cab_id(r, cfg) == cab_id]
-    readable = await readable_tickets(session, [int(r.ticket_id) for r in mine], user_id=user_id)
-    items = [
-        CabChangeItem(
-            ticket_id=int(r.ticket_id),
-            tn=readable[int(r.ticket_id)].tn,
-            title=readable[int(r.ticket_id)].title,
-            change_type=r.change_type,
-            phase=r.phase,
-            risk_level=r.risk_override_level or r.risk_level,
-            planned_start=r.planned_start,
-            planned_end=r.planned_end,
-        )
-        for r in mine
-        if int(r.ticket_id) in readable
-    ]
+    items = await items_for_changes(session, [int(r.ticket_id) for r in mine], user_id=user_id)
     far = datetime.max
     return sorted(items, key=lambda i: (i.planned_start or far, i.ticket_id))

@@ -7,8 +7,8 @@ before ``/changes/{ticket_id:int}``. Handlers commit; the services do not.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
@@ -21,25 +21,33 @@ from tiqora.api.v1.itsm_change_schemas import (
     CabChangeItemOut,
     CabOut,
     ChangeApprovalOut,
+    ChangeCalendarOut,
     ChangeCreatedOut,
     ChangeEventOut,
     ChangeOut,
+    ChangePageOut,
     ChangeStatusOut,
     ChangeTemplateSummaryOut,
     FreezeOccurrencesOut,
     MeetingOut,
     RelatedLinkIn,
     RelatedTicketOut,
+    ServiceAvailabilityOut,
+    TaskListItemOut,
     TaskOrderIn,
     TaskOut,
     approval_out,
     cab_change_item_out,
     cab_out,
+    change_calendar_out,
     change_out,
+    change_page_out,
     event_out,
     freeze_occurrences_out,
     meeting_out,
     related_out,
+    service_availability_out,
+    task_list_item_out,
     task_out,
     template_summary,
 )
@@ -66,7 +74,15 @@ from tiqora.itsm.change.impact import (
     enqueue_impact,
     read_impact,
 )
-from tiqora.itsm.change.phases import FINAL_PHASES
+from tiqora.itsm.change.phases import FINAL_PHASES, ChangeType, Phase
+from tiqora.itsm.change.read import (
+    MAX_RANGE,
+    ChangeQuery,
+    calendar,
+    list_changes,
+    my_tasks,
+    service_availability,
+)
 from tiqora.itsm.change.related import (
     create_from_ticket,
     link_related,
@@ -103,9 +119,6 @@ from tiqora.itsm.change.templates import list_templates
 from tiqora.itsm.change.transitions import TransitionIn, read_approval, transition
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.znuny.sysconfig import SysConfig
-
-#: longest range one read covers (the calendar's bound)
-MAX_RANGE = timedelta(days=92)
 
 
 class ChangeRiskAnswersIn(BaseModel):
@@ -259,6 +272,91 @@ async def get_cab_meeting_suggestions(
         session, settings, cab_id=cab_id, user_id=user.id, meeting_id=meeting_id
     )
     return [cab_change_item_out(i) for i in items]
+
+
+@router.get("/changes", response_model=ChangePageOut)
+async def get_changes(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    phase: Annotated[list[Phase] | None, Query()] = None,
+    change_type: Annotated[list[ChangeType] | None, Query()] = None,
+    service_id: Annotated[int | None, Query()] = None,
+    ci_id: Annotated[int | None, Query()] = None,
+    window_start: Annotated[datetime | None, Query()] = None,
+    window_end: Annotated[datetime | None, Query()] = None,
+    mine: Annotated[Literal["", "owned", "created"], Query()] = "",
+    order: Annotated[Literal["planned_start", "updated"], Query()] = "updated",
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+) -> ChangePageOut:
+    """Changes the caller may read; ``q`` matches the number or the title. Times are UTC."""
+    await require_change_mode(session, settings)
+    query = ChangeQuery(
+        text=q,
+        phases=tuple(phase or ()),
+        change_types=tuple(change_type or ()),
+        service_id=service_id,
+        ci_id=ci_id,
+        window_start=None if window_start is None else to_utc_naive(window_start),
+        window_end=None if window_end is None else to_utc_naive(window_end),
+        mine=mine,
+        order=order,
+        limit=limit,
+        offset=offset,
+    )
+    return change_page_out(await list_changes(session, query, user_id=user.id))
+
+
+@router.get("/change-tasks/mine", response_model=list[TaskListItemOut])
+async def get_my_change_tasks(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    open_only: Annotated[bool, Query()] = True,
+) -> list[TaskListItemOut]:
+    """Change tasks the caller owns (by default only unfinished ones of live changes)."""
+    await require_change_mode(session, settings)
+    items = await my_tasks(session, user_id=user.id, open_only=open_only)
+    return [task_list_item_out(i) for i in items]
+
+
+@router.get("/change-calendar", response_model=ChangeCalendarOut)
+async def get_change_calendar(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    start: Annotated[datetime, Query()],
+    end: Annotated[datetime, Query()],
+    service_id: Annotated[list[int] | None, Query(max_length=200)] = None,
+    include_tasks: Annotated[bool, Query()] = True,
+) -> ChangeCalendarOut:
+    """Changes, tasks and freeze windows of a range of at most 92 days, with conflict flags."""
+    await require_change_mode(session, settings)
+    cal = await calendar(
+        session,
+        user_id=user.id,
+        start=start,
+        end=end,
+        service_ids=service_id or (),
+        include_tasks=include_tasks,
+    )
+    return change_calendar_out(cal)
+
+
+@router.get("/change-calendar/services", response_model=list[ServiceAvailabilityOut])
+async def get_change_calendar_services(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    start: Annotated[datetime, Query()],
+    end: Annotated[datetime, Query()],
+) -> list[ServiceAvailabilityOut]:
+    """Projected service availability: planned change and freeze windows per service."""
+    await require_change_mode(session, settings)
+    rows = await service_availability(session, user_id=user.id, start=start, end=end)
+    return [service_availability_out(r) for r in rows]
 
 
 @router.post("/changes", response_model=ChangeCreatedOut, status_code=status.HTTP_201_CREATED)
