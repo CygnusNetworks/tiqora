@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
     DateTime,
@@ -365,7 +366,7 @@ class TiqoraApprovalToken(TiqoraBase):
     )
     ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     #: sha256 hex of the token; the token itself is never stored
-    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    token_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     #: redeemed (the decision of this link)
@@ -399,4 +400,6 @@ class TiqoraApprovalEvent(TiqoraBase):
     step_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     approver_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     channel: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    #: ``tiqora_job.id`` of the mail job (retry dedupe of ``notified`` without reading ``detail``)
+    job_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     detail: Mapped[str | None] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=True)

@@ -3,8 +3,8 @@
 The migration builds the tables; the tests compare them with the ORM metadata, exercise the
 constraints that matter (one vote per approver, one approver per step and principal, unique
 token hash, cascades, SET NULL on the template) and run a downgrade/upgrade round trip. Sync
-tests on purpose: Alembic's env.py runs its own event loop. Seed ids stay in 970000-970099.
-Leaves the schema at head.
+tests on purpose: Alembic's env.py runs its own event loop. Seed ids stay in the plan band
+970000-971999. Leaves the schema at head.
 """
 
 from __future__ import annotations
@@ -157,8 +157,8 @@ _VOTE_SQL = text(
 
 def _seed_tree(conn: object, approval_id: int) -> None:
     """One request with one step, one approver, a vote, a token and an event."""
-    step_id = approval_id + 100_000
-    approver_id = approval_id + 200_000
+    step_id = approval_id + 50
+    approver_id = approval_id + 70
     _seed_approval(conn, approval_id)
     _seed_step(conn, step_id, approval_id)
     _seed_approver(conn, approver_id, approval_id, step_id)

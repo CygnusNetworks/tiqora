@@ -249,7 +249,7 @@ def upgrade() -> None:
         sa.Column("approval_id", sa.BigInteger(), nullable=False),
         sa.Column("approver_id", sa.BigInteger(), nullable=False),
         sa.Column("ticket_id", sa.BigInteger(), nullable=False),
-        sa.Column("token_hash", sa.String(64), nullable=False),
+        sa.Column("token_hash", sa.CHAR(64), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("expires_at", sa.DateTime(), nullable=False),
         sa.Column("used_at", sa.DateTime(), nullable=True),
@@ -283,6 +283,7 @@ def upgrade() -> None:
         sa.Column("step_id", sa.BigInteger(), nullable=True),
         sa.Column("approver_id", sa.BigInteger(), nullable=True),
         sa.Column("channel", sa.String(10), nullable=True),
+        sa.Column("job_id", sa.BigInteger(), nullable=True),
         sa.Column("detail", MEDIUM_TEXT, nullable=True),
         sa.ForeignKeyConstraint(
             ["approval_id"],

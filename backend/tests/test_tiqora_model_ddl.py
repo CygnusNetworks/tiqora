@@ -418,9 +418,11 @@ def test_approvals_ddl_equals_migration() -> None:
         assert "DEFAULT 'admin'" in _column_ddl(template, "origin", dialect)
         assert "DEFAULT true" in _column_ddl(template, "valid", dialect)
         assert "DEFAULT true" in _column_ddl(TiqoraApprovalList.__table__, "valid", dialect)
-        assert "CHAR(64) NOT NULL" in _column_ddl(
-            TiqoraApprovalToken.__table__, "token_hash", dialect
+        assert (
+            _column_ddl(TiqoraApprovalToken.__table__, "token_hash", dialect)
+            == "token_hash CHAR(64) NOT NULL,"
         )
+        assert _column_ddl(TiqoraApprovalEvent.__table__, "job_id", dialect) == "job_id BIGINT,"
         for col in ("create_time", "change_time"):
             assert "DEFAULT" not in _column_ddl(template, col, dialect)
         # ids of the integer-keyed tables are generated, the member table's keys are not
