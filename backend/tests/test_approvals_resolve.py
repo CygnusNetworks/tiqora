@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests._approvals_helpers import (
@@ -89,9 +90,9 @@ async def test_user_entry(url_fixture: str, request: pytest.FixtureRequest) -> N
 @pytest.mark.parametrize("url_fixture", URLS)
 async def test_invalid_user_excluded(url_fixture: str, request: pytest.FixtureRequest) -> None:
     async with approvals_session(request, url_fixture) as session:
-        res = await _resolve(session, ("user", str(AG6)), ("user", "970199"))
+        res = await _resolve(session, ("user", str(AG6)), ("user", "970848"))
         assert res.approvers == []
-        assert _excluded(res) == [(f"agent:{AG6}", "invalid"), ("agent:970199", "unknown")]
+        assert _excluded(res) == [(f"agent:{AG6}", "invalid"), ("agent:970848", "unknown")]
 
 
 @pytest.mark.db
@@ -183,7 +184,7 @@ async def test_customer_entry_inside_company(
     async with approvals_session(request, url_fixture) as session:
         assert await ticket_customer_id(session, T1) == FIRMA
         assert await ticket_customer_id(session, T2) is None
-        assert await ticket_customer_id(session, 970899) is None
+        assert await ticket_customer_id(session, 970849) is None
         res = await _resolve(session, ("customer_user", K2))
         assert _ids(res) == [f"customer:{K2}"]
         assert res.approvers[0].source_kind == "customer_user"
@@ -265,31 +266,25 @@ async def test_resolver_entry_goes_through_filters(
 async def test_unknown_resolver_and_missing_group_do_not_raise(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
-    async def _boom(session: AsyncSession, ctx: ResolveContext) -> list[Principal]:
-        raise RuntimeError("resolver bug")
-
-    boom = ApproverResolver(key="appr97.boom", title_key="appr97.boom", resolve=_boom)
-    with installed_registry(boom) as registry:
+    with installed_registry() as registry:
         async with approvals_session(request, url_fixture) as session:
             res = await _resolve(
                 session,
                 ("resolver", "appr97.nope"),
-                ("resolver", "appr97.boom"),
-                ("group", "970998"),
+                ("group", "970845"),
                 ("group", "x"),
-                ("role", "970997"),
-                ("list", "970996"),
+                ("role", "970846"),
+                ("list", "970847"),
                 ("user", str(AG1)),
                 registry=registry,
             )
             assert _ids(res) == [f"agent:{AG1}"]
             assert [(e.kind, e.ref, reason) for e, reason in res.unresolved] == [
                 ("resolver", "appr97.nope", "unknown"),
-                ("resolver", "appr97.boom", "unknown"),
-                ("group", "970998", "unknown"),
+                ("group", "970845", "unknown"),
                 ("group", "x", "unknown"),
-                ("role", "970997", "unknown"),
-                ("list", "970996", "unknown"),
+                ("role", "970846", "unknown"),
+                ("list", "970847", "unknown"),
             ]
 
 
@@ -335,3 +330,53 @@ async def test_invalid_customer_excluded(url_fixture: str, request: pytest.Fixtu
         res = await _resolve(session, ("customer_user", K2))
         assert res.approvers == []
         assert _excluded(res) == [(f"customer:{K2}", "invalid")]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_resolver_failures_propagate(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async def _db_error(session: AsyncSession, ctx: ResolveContext) -> list[Principal]:
+        await session.execute(text("SELECT 1 FROM appr97_no_such_table"))
+        return []
+
+    async def _not_principals(session: AsyncSession, ctx: ResolveContext) -> list[Principal]:
+        return [AG1]  # type: ignore[list-item]
+
+    broken = [
+        ApproverResolver(key="appr97.dberr", title_key="appr97.dberr", resolve=_db_error),
+        ApproverResolver(key="appr97.bad", title_key="appr97.bad", resolve=_not_principals),
+    ]
+    with installed_registry(*broken) as registry:
+        async with approvals_session(request, url_fixture) as session:
+            # an infrastructure error must not turn into "no approver" (on_no_approver=approve)
+            with pytest.raises(SQLAlchemyError):
+                await _resolve(session, ("resolver", "appr97.dberr"), registry=registry)
+        async with approvals_session(request, url_fixture) as session:
+            with pytest.raises(TypeError, match="expected Principal"):
+                await _resolve(session, ("resolver", "appr97.bad"), registry=registry)
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_customer_login_case_is_canonical(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        res = await _resolve(
+            session,
+            ("customer_user", "APPR97-K2"),
+            ("customer_user", K2),
+            ("customer_user", FREMD.upper()),
+        )
+        # same customer twice (different case) collapses onto the stored login
+        assert _ids(res) == [f"customer:{K2}"]
+        assert _excluded(res) == [(f"customer:{FREMD}", "outside_company")]
+        res = await _resolve(
+            session, ("customer_user", "Appr97-K2"), excluded=frozenset({f"customer:{K2}"})
+        )
+        assert _excluded(res) == [(f"customer:{K2}", "self")]
+        assert await customer_in_ticket_company(session, "APPR97-K2", T1) is True
+        assert await customer_in_ticket_company(session, "APPR97-FREMD", T1) is False
+        assert await customer_in_ticket_company(session, "appr97-nope", T1) is False

@@ -10,11 +10,10 @@ the other is queried with an ``IN`` list (chunks <= 500).
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals.contract import (
@@ -31,8 +30,6 @@ from tiqora.db.legacy.user import PermissionGroups, Roles, RoleUser, Users
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import Registry
 from tiqora.permissions.engine import PermissionEngine
-
-logger = logging.getLogger(__name__)
 
 _CHUNK = 500
 # Znuny's root@localhost: owner/responsible fallback, never a person who can approve.
@@ -73,39 +70,60 @@ async def ticket_customer_id(session: AsyncSession, ticket_id: int) -> str | Non
     return (row[0] or None) if row is not None else None
 
 
-async def _companies_of(
-    session: AsyncSession, logins: Sequence[str], company: str
-) -> dict[str, bool]:
-    """``{login: True}`` for every login whose own company or extra mapping equals *company*."""
-    allowed = dict.fromkeys(logins, False)
-    for chunk in _chunks(list(logins)):
-        own = await session.execute(
-            select(CustomerUser.login).where(
-                CustomerUser.login.in_(chunk), CustomerUser.customer_id == company
+async def _customer_rows(
+    session: AsyncSession, logins: Sequence[str]
+) -> dict[str, tuple[str, int, str]]:
+    """``{lower(login): (login as stored, valid_id, customer_id)}`` for existing customer users.
+
+    Matched through ``lower()`` so MariaDB (case-insensitive collation) and PostgreSQL agree; an
+    exact-case match wins over a case variant.
+    """
+    wanted = sorted({login.lower() for login in logins})
+    out: dict[str, tuple[str, int, str]] = {}
+    for chunk in _chunks(wanted):
+        rows = await session.execute(
+            select(CustomerUser.login, CustomerUser.valid_id, CustomerUser.customer_id).where(
+                func.lower(CustomerUser.login).in_(chunk)
             )
         )
-        for (login,) in own:
-            allowed[login] = True
+        for login, valid_id, customer_id in rows:
+            key = str(login).lower()
+            if key not in out or str(login) in logins:
+                out[key] = (str(login), int(valid_id), str(customer_id))
+    return out
+
+
+async def _companies_of(
+    session: AsyncSession, rows: dict[str, tuple[str, int, str]], company: str
+) -> dict[str, bool]:
+    """``{stored login: True}`` for every customer whose own company or mapping is *company*."""
+    allowed = {login: cid == company for login, _, cid in rows.values()}
+    canonical = {key: login for key, (login, _, _) in rows.items()}
+    for chunk in _chunks(sorted(canonical)):
         extra = await session.execute(
             select(CustomerUserCustomer.user_id).where(
-                CustomerUserCustomer.user_id.in_(chunk), CustomerUserCustomer.customer_id == company
+                func.lower(CustomerUserCustomer.user_id).in_(chunk),
+                CustomerUserCustomer.customer_id == company,
             )
         )
-        for (login,) in extra:
-            allowed[login] = True
+        for (user_id,) in extra:
+            allowed[canonical[str(user_id).lower()]] = True
     return allowed
 
 
 async def customer_in_ticket_company(session: AsyncSession, login: str, ticket_id: int) -> bool:
-    """Whether customer user *login* belongs to the ticket's company.
+    """Whether customer user *login* (any letter case) belongs to the ticket's company.
 
     True when the login's own company or a ``customer_user_customer`` mapping equals
-    ``ticket.customer_id``; a ticket without a company admits nobody.
+    ``ticket.customer_id``; a ticket without a company or an unknown login admits nobody.
     """
     company = await ticket_customer_id(session, ticket_id)
     if company is None:
         return False
-    return (await _companies_of(session, [login], company))[login]
+    rows = await _customer_rows(session, [login])
+    if login.lower() not in rows:
+        return False
+    return (await _companies_of(session, rows, company))[rows[login.lower()][0]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,13 +238,15 @@ async def _collect(
             if resolver is None:
                 unresolved.append((entry, "unknown"))
                 continue
-            try:
-                principals = await resolver.resolve(session, ctx)
-            except Exception:
-                logger.exception("approver resolver %s failed", entry.ref)
-                unresolved.append((entry, "unknown"))
-                continue
+            # No catch: a failing resolver (DB error, plugin bug) must fail the request instead of
+            # emptying the step, which on_no_approver="approve" would turn into an approval.
+            principals = await resolver.resolve(session, ctx)
             for principal in principals:
+                if not isinstance(principal, Principal):
+                    raise TypeError(
+                        f"approver resolver {entry.ref} returned {type(principal).__name__},"
+                        " expected Principal"
+                    )
                 add(principal, "resolver", entry, None)
     return candidates, unresolved
 
@@ -254,20 +274,16 @@ async def resolve_entries(
     for chunk in _chunks(agent_ids):
         rows = await session.execute(select(Users.id, Users.valid_id).where(Users.id.in_(chunk)))
         agent_valid.update({int(i): int(v) for i, v in rows})
-    logins = sorted({c.principal.login for c in candidates if c.principal.login is not None})
     customer_valid: dict[str, int] = {}
+    in_company: dict[str, bool] = {}
     if allow_customers:
-        for login_chunk in _chunks(logins):
-            rows = await session.execute(
-                select(CustomerUser.login, CustomerUser.valid_id).where(
-                    CustomerUser.login.in_(login_chunk)
-                )
-            )
-            customer_valid.update({str(lg): int(v) for lg, v in rows})
-    company = (
-        await ticket_customer_id(session, ctx.ticket_id) if logins and allow_customers else None
-    )
-    in_company = await _companies_of(session, logins, company) if company is not None else {}
+        logins = [c.principal.login for c in candidates if c.principal.login is not None]
+        crows = await _customer_rows(session, logins)
+        # canonical keys: the login as stored, whatever case the entry / resolver spelled
+        candidates = [_canonical(c, crows) for c in candidates]
+        customer_valid = {login: valid for login, valid, _ in crows.values()}
+        company = await ticket_customer_id(session, ctx.ticket_id) if crows else None
+        in_company = await _companies_of(session, crows, company) if company is not None else {}
 
     approvers: list[ResolvedApprover] = []
     excluded: list[tuple[Principal, str]] = []
@@ -294,6 +310,16 @@ async def resolve_entries(
     return Resolution(approvers=approvers, excluded=excluded, unresolved=unresolved)
 
 
+def _canonical(cand: _Candidate, rows: dict[str, tuple[str, int, str]]) -> _Candidate:
+    login = cand.principal.login
+    if login is None or login.lower() not in rows:
+        return cand
+    stored = rows[login.lower()][0]
+    return _Candidate(
+        Principal.customer(stored), cand.source_kind, cand.source_ref, cand.source_label
+    )
+
+
 def _exclusion(
     principal: Principal,
     *,
@@ -305,7 +331,8 @@ def _exclusion(
 ) -> str | None:
     if principal.kind == "agent":
         uid = principal.user_id
-        assert uid is not None
+        if uid is None:
+            raise ValueError("agent principal without user_id")
         if uid == _SYSTEM_USER_ID:
             return "system_user"
         if uid not in agent_valid:
@@ -314,7 +341,8 @@ def _exclusion(
             return "invalid"
     else:
         login = principal.login
-        assert login is not None
+        if login is None:
+            raise ValueError("customer principal without login")
         if not allow_customers:
             return "customers_not_allowed"
         if login not in customer_valid:
