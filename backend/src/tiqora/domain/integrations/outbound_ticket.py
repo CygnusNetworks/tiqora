@@ -23,7 +23,6 @@ from tiqora.znuny.sysconfig import SysConfig
 
 STATE_NEW = "new"
 STATE_CLOSED = "closed successful"
-PRIORITY_NORMAL = "3 normal"
 
 
 class QueueNotFound(LookupError):
@@ -54,9 +53,9 @@ async def create_outbound_ticket(
 
     Raises :class:`QueueNotFound`, :class:`OutboundMailDisabled`, the write
     service's access errors and ``OutboundMailError`` (nothing stored then).
-    ``sysconfig`` is the one the write service was built with.
+    ``sysconfig`` is the one the write service was built with; the priority is
+    its ``PostmasterDefaultPriority`` (installations rename "3 normal").
     """
-    _ = sysconfig
     queue_id = (
         await session.execute(select(Queue.id).where(Queue.name == req.queue, Queue.valid_id == 1))
     ).scalar_one_or_none()
@@ -68,7 +67,9 @@ async def create_outbound_ticket(
         raise OutboundMailDisabled
     new_id = await _named_id(session, TicketState, STATE_NEW)
     closed_id = await _named_id(session, TicketState, STATE_CLOSED)
-    priority_id = await _named_id(session, TicketPriority, PRIORITY_NORMAL)
+    priority_id = await _named_id(
+        session, TicketPriority, await sysconfig.postmaster_default_priority()
+    )
 
     # The caller's session starts a transaction implicitly on the selects above.
     if session.in_transaction():

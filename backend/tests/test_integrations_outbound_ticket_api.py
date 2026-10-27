@@ -345,6 +345,26 @@ async def test_close_false_leaves_ticket_open(seeded: str, monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
+async def test_priority_from_postmaster_default(
+    seeded: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Production renamed "3 normal"; the configured default must win over the Znuny name.
+    async def _high(self: SysConfig) -> str:
+        return "4 high"
+
+    monkeypatch.setattr(SysConfig, "postmaster_default_priority", _high)
+    resp = await _post(seeded, monkeypatch, _payload())
+    assert resp.status_code == 201, resp.text
+    rows = _rows(
+        seeded,
+        "SELECT p.name FROM ticket t JOIN ticket_priority p ON p.id = t.ticket_priority_id"
+        " WHERE t.id = :id",
+        id=resp.json()["ticket_id"],
+    )
+    assert rows[0][0] == "4 high"
+
+
+@pytest.mark.asyncio
 async def test_unknown_queue_404(seeded: str, monkeypatch: pytest.MonkeyPatch) -> None:
     resp = await _post(seeded, monkeypatch, _payload(queue="Gibt-es-nicht-94300"))
     assert resp.status_code == 404, resp.text
