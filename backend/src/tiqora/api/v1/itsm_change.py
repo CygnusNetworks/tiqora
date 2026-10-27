@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession, get_session_factory_dep
@@ -42,6 +43,13 @@ from tiqora.itsm.change.impact import (
     read_impact,
 )
 from tiqora.itsm.change.phases import FINAL_PHASES
+from tiqora.itsm.change.risk import (
+    ChangeRiskOut,
+    evaluate_risk,
+    override_level,
+    read_risk,
+    set_answers,
+)
 from tiqora.itsm.change.service import (
     ChangeCreateIn,
     ChangeUpdateIn,
@@ -67,6 +75,18 @@ from tiqora.znuny.sysconfig import SysConfig
 
 #: longest range one read covers (the calendar's bound)
 MAX_RANGE = timedelta(days=92)
+
+
+class ChangeRiskAnswersIn(BaseModel):
+    #: ``question_key -> answer_key``; replaces all answers (a missing question is unanswered)
+    answers: dict[str, str] = Field(default_factory=dict, max_length=200)
+
+
+class ChangeRiskOverrideIn(BaseModel):
+    #: ``low|medium|high|very_high``; ``null`` removes the override
+    level: str | None = None
+    reason: str = Field(..., max_length=1000)
+
 
 router = APIRouter(prefix="/itsm", tags=["itsm-change"])
 #: ticket sub-resources (``/tickets/{id}/change``, …)
@@ -202,6 +222,65 @@ async def get_change_conflicts(
     return await read_conflicts(
         session, settings, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
     )
+
+
+@router.get("/changes/{ticket_id:int}/risk", response_model=ChangeRiskOut)
+async def get_change_risk(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ChangeRiskOut:
+    """Questionnaire, answers and the stored risk evaluation; references the caller cannot read
+    are left out of the findings and only counted."""
+    return await read_risk(session, settings, ticket_id=ticket_id, user_id=user.id)
+
+
+@router.put("/changes/{ticket_id:int}/risk/answers", response_model=ChangeRiskOut)
+async def put_change_risk_answers(
+    ticket_id: int,
+    body: ChangeRiskAnswersIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ChangeRiskOut:
+    """Replace the questionnaire answers (needs ``rw``) and evaluate the risk again."""
+    await set_answers(session, settings, ticket_id=ticket_id, answers=body.answers, user_id=user.id)
+    out = await read_risk(session, settings, ticket_id=ticket_id, user_id=user.id)
+    await session.commit()
+    return out
+
+
+@router.post("/changes/{ticket_id:int}/risk/evaluate", response_model=ChangeRiskOut)
+async def post_change_risk_evaluate(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ChangeRiskOut:
+    """Evaluate the risk again from stored data only (needs ``rw``)."""
+    await require_change_mode(session, settings)
+    await _ticket(session, ticket_id, user_id=user.id, write=True)
+    await evaluate_risk(session, settings, ticket_id=ticket_id, user_id=user.id)
+    out = await read_risk(session, settings, ticket_id=ticket_id, user_id=user.id)
+    await session.commit()
+    return out
+
+
+@router.put("/changes/{ticket_id:int}/risk/override", response_model=ChangeRiskOut)
+async def put_change_risk_override(
+    ticket_id: int,
+    body: ChangeRiskOverrideIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ChangeRiskOut:
+    """A change manager sets or removes the risk level by hand; the reason is required."""
+    await override_level(
+        session,
+        settings,
+        ticket_id=ticket_id,
+        level=body.level,
+        reason=body.reason,
+        user_id=user.id,
+    )
+    out = await read_risk(session, settings, ticket_id=ticket_id, user_id=user.id)
+    await session.commit()
+    return out
 
 
 @router.post(

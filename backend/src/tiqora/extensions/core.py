@@ -93,6 +93,11 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, PLUGIN_REPOSITORY_REFRESH_JOB)
     registry.add(JOB_HANDLERS, PLUGIN_FETCH_JOB)
 
+    from tiqora.itsm.change.risk import CHANGE_RISK_CHECKS, core_risk_checks
+
+    for check in core_risk_checks():
+        registry.add(CHANGE_RISK_CHECKS, check)
+
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
 

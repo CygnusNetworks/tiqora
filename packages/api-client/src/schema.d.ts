@@ -4189,6 +4189,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/change/risk-questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Questions
+         * @description The risk questionnaire in order, valid or not.
+         */
+        get: operations["get_risk_questions_api_v1_admin_itsm_change_risk_questions_get"];
+        put?: never;
+        /** Post Risk Question */
+        post: operations["post_risk_question_api_v1_admin_itsm_change_risk_questions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions/examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Risk Question Examples
+         * @description Insert the four example questions whose keys do not exist yet.
+         */
+        post: operations["post_risk_question_examples_api_v1_admin_itsm_change_risk_questions_examples_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Risk Question Order
+         * @description Put the questions in the given order (every question exactly once).
+         */
+        put: operations["put_risk_question_order_api_v1_admin_itsm_change_risk_questions_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Risk Question
+         * @description Replace the question; its key stays.
+         */
+        put: operations["put_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__put"];
+        post?: never;
+        /**
+         * Delete Risk Question
+         * @description Delete the question and the answers given to it (mark it invalid to keep them).
+         */
+        delete: operations["delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/itsm/change/templates": {
         parameters: {
             query?: never;
@@ -9548,6 +9633,87 @@ export interface paths {
          * @description Compute the impact set again in the background; poll ``GET /api/v1/jobs/{job_id}``.
          */
         post: operations["post_change_impact_recompute_api_v1_itsm_changes__ticket_id__impact_recompute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Risk
+         * @description Questionnaire, answers and the stored risk evaluation; references the caller cannot read
+         *     are left out of the findings and only counted.
+         */
+        get: operations["get_change_risk_api_v1_itsm_changes__ticket_id__risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Change Risk Answers
+         * @description Replace the questionnaire answers (needs ``rw``) and evaluate the risk again.
+         */
+        put: operations["put_change_risk_answers_api_v1_itsm_changes__ticket_id__risk_answers_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Change Risk Evaluate
+         * @description Evaluate the risk again from stored data only (needs ``rw``).
+         */
+        post: operations["post_change_risk_evaluate_api_v1_itsm_changes__ticket_id__risk_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Change Risk Override
+         * @description A change manager sets or removes the risk level by hand; the reason is required.
+         */
+        put: operations["put_change_risk_override_api_v1_itsm_changes__ticket_id__risk_override_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -16939,6 +17105,140 @@ export interface components {
             updated_at: string;
             /** Updated By */
             updated_by: number;
+        };
+        /** ChangeRiskAnswerDef */
+        ChangeRiskAnswerDef: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Points
+             * @default 0
+             */
+            points: number;
+        };
+        /** ChangeRiskAnswersIn */
+        ChangeRiskAnswersIn: {
+            /** Answers */
+            answers?: {
+                [key: string]: string;
+            };
+        };
+        /** ChangeRiskExamplesOut */
+        ChangeRiskExamplesOut: {
+            /** Created */
+            created: string[];
+        };
+        /** ChangeRiskFindingOut */
+        ChangeRiskFindingOut: {
+            /** Check Key */
+            check_key: string;
+            /** Hidden Ref Count */
+            hidden_ref_count: number;
+            /** Message Key */
+            message_key: string;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Points */
+            points: number;
+            /** Refs */
+            refs: string[];
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warn" | "block";
+        };
+        /** ChangeRiskOut */
+        ChangeRiskOut: {
+            /** Answer Points */
+            answer_points: number;
+            /** Answers */
+            answers: {
+                [key: string]: string;
+            };
+            /** Blocked */
+            blocked: boolean;
+            /** Can Answer */
+            can_answer: boolean;
+            /** Can Override */
+            can_override: boolean;
+            /** Effective Level */
+            effective_level: string | null;
+            /** Evaluated At */
+            evaluated_at: string | null;
+            /** Findings */
+            findings: components["schemas"]["ChangeRiskFindingOut"][];
+            /** Level */
+            level: string | null;
+            /** Override Level */
+            override_level: string | null;
+            /** Override Reason */
+            override_reason: string | null;
+            /** Questionnaire Complete */
+            questionnaire_complete: boolean;
+            /** Questions */
+            questions: components["schemas"]["ChangeRiskQuestionOut"][];
+            /** Score */
+            score: number | null;
+            thresholds: components["schemas"]["ChangeRiskThresholdsOut"];
+        };
+        /** ChangeRiskOverrideIn */
+        ChangeRiskOverrideIn: {
+            /** Level */
+            level?: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /** ChangeRiskQuestionIn */
+        ChangeRiskQuestionIn: {
+            /** Answers */
+            answers: components["schemas"]["ChangeRiskAnswerDef"][];
+            /** Help */
+            help?: string | null;
+            /** Question */
+            question: string;
+            /** Question Key */
+            question_key: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** ChangeRiskQuestionOrderIn */
+        ChangeRiskQuestionOrderIn: {
+            /** Order */
+            order: number[];
+        };
+        /** ChangeRiskQuestionOut */
+        ChangeRiskQuestionOut: {
+            /** Answers */
+            answers: components["schemas"]["ChangeRiskAnswerDef"][];
+            /** Help */
+            help: string | null;
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
+            /** Question */
+            question: string;
+            /** Question Key */
+            question_key: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /** ChangeRiskThresholdsOut */
+        ChangeRiskThresholdsOut: {
+            /** High From */
+            high_from: number;
+            /** Medium From */
+            medium_from: number;
+            /** Very High From */
+            very_high_from: number;
         };
         /** ChangeStatusOut */
         ChangeStatusOut: {
@@ -41715,6 +42015,218 @@ export interface operations {
             };
         };
     };
+    get_risk_questions_api_v1_admin_itsm_change_risk_questions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_risk_question_api_v1_admin_itsm_change_risk_questions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskQuestionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_risk_question_examples_api_v1_admin_itsm_change_risk_questions_examples_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskExamplesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_risk_question_order_api_v1_admin_itsm_change_risk_questions_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskQuestionOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                question_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskQuestionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                question_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_templates_api_v1_admin_itsm_change_templates_get: {
         parameters: {
             query?: never;
@@ -55795,6 +56307,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_risk_api_v1_itsm_changes__ticket_id__risk_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_change_risk_answers_api_v1_itsm_changes__ticket_id__risk_answers_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskAnswersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_risk_evaluate_api_v1_itsm_changes__ticket_id__risk_evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_change_risk_override_api_v1_itsm_changes__ticket_id__risk_override_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskOverrideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
                 };
             };
             /** @description Validation Error */

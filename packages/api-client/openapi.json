@@ -9740,6 +9740,416 @@
         "title": "ChangeOut",
         "type": "object"
       },
+      "ChangeRiskAnswerDef": {
+        "properties": {
+          "key": {
+            "pattern": "^[a-z][a-z0-9_]{0,49}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "points": {
+            "default": 0,
+            "maximum": 50.0,
+            "minimum": -50.0,
+            "title": "Points",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "ChangeRiskAnswerDef",
+        "type": "object"
+      },
+      "ChangeRiskAnswersIn": {
+        "properties": {
+          "answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 200,
+            "title": "Answers",
+            "type": "object"
+          }
+        },
+        "title": "ChangeRiskAnswersIn",
+        "type": "object"
+      },
+      "ChangeRiskExamplesOut": {
+        "properties": {
+          "created": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Created",
+            "type": "array"
+          }
+        },
+        "required": [
+          "created"
+        ],
+        "title": "ChangeRiskExamplesOut",
+        "type": "object"
+      },
+      "ChangeRiskFindingOut": {
+        "properties": {
+          "check_key": {
+            "title": "Check Key",
+            "type": "string"
+          },
+          "hidden_ref_count": {
+            "title": "Hidden Ref Count",
+            "type": "integer"
+          },
+          "message_key": {
+            "title": "Message Key",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Refs",
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warn",
+              "block"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_key",
+          "severity",
+          "points",
+          "message_key",
+          "params",
+          "refs",
+          "hidden_ref_count"
+        ],
+        "title": "ChangeRiskFindingOut",
+        "type": "object"
+      },
+      "ChangeRiskOut": {
+        "properties": {
+          "answer_points": {
+            "title": "Answer Points",
+            "type": "integer"
+          },
+          "answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Answers",
+            "type": "object"
+          },
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "can_answer": {
+            "title": "Can Answer",
+            "type": "boolean"
+          },
+          "can_override": {
+            "title": "Can Override",
+            "type": "boolean"
+          },
+          "effective_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Level"
+          },
+          "evaluated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluated At"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeRiskFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "override_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Level"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Reason"
+          },
+          "questionnaire_complete": {
+            "title": "Questionnaire Complete",
+            "type": "boolean"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeRiskQuestionOut"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/ChangeRiskThresholdsOut"
+          }
+        },
+        "required": [
+          "questions",
+          "answers",
+          "answer_points",
+          "questionnaire_complete",
+          "score",
+          "level",
+          "override_level",
+          "override_reason",
+          "effective_level",
+          "evaluated_at",
+          "findings",
+          "blocked",
+          "thresholds",
+          "can_answer",
+          "can_override"
+        ],
+        "title": "ChangeRiskOut",
+        "type": "object"
+      },
+      "ChangeRiskOverrideIn": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ChangeRiskOverrideIn",
+        "type": "object"
+      },
+      "ChangeRiskQuestionIn": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeRiskAnswerDef"
+            },
+            "maxItems": 10,
+            "minItems": 2,
+            "title": "Answers",
+            "type": "array"
+          },
+          "help": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help"
+          },
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "question_key": {
+            "pattern": "^[a-z][a-z0-9_]{0,49}$",
+            "title": "Question Key",
+            "type": "string"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "question_key",
+          "question",
+          "answers"
+        ],
+        "title": "ChangeRiskQuestionIn",
+        "type": "object"
+      },
+      "ChangeRiskQuestionOrderIn": {
+        "properties": {
+          "order": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "title": "Order",
+            "type": "array"
+          }
+        },
+        "required": [
+          "order"
+        ],
+        "title": "ChangeRiskQuestionOrderIn",
+        "type": "object"
+      },
+      "ChangeRiskQuestionOut": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeRiskAnswerDef"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "help": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "question_key": {
+            "title": "Question Key",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "question_key",
+          "question",
+          "help",
+          "answers",
+          "position",
+          "valid"
+        ],
+        "title": "ChangeRiskQuestionOut",
+        "type": "object"
+      },
+      "ChangeRiskThresholdsOut": {
+        "properties": {
+          "high_from": {
+            "title": "High From",
+            "type": "integer"
+          },
+          "medium_from": {
+            "title": "Medium From",
+            "type": "integer"
+          },
+          "very_high_from": {
+            "title": "Very High From",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "medium_from",
+          "high_from",
+          "very_high_from"
+        ],
+        "title": "ChangeRiskThresholdsOut",
+        "type": "object"
+      },
       "ChangeStatusOut": {
         "properties": {
           "available": {
@@ -73112,6 +73522,446 @@
         ]
       }
     },
+    "/api/v1/admin/itsm/change/risk-questions": {
+      "get": {
+        "description": "The risk questionnaire in order, valid or not.",
+        "operationId": "get_risk_questions_api_v1_admin_itsm_change_risk_questions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeRiskQuestionOut"
+                  },
+                  "title": "Response Get Risk Questions Api V1 Admin Itsm Change Risk Questions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Risk Questions",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "post": {
+        "operationId": "post_risk_question_api_v1_admin_itsm_change_risk_questions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRiskQuestionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskQuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Risk Question",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/risk-questions/examples": {
+      "post": {
+        "description": "Insert the four example questions whose keys do not exist yet.",
+        "operationId": "post_risk_question_examples_api_v1_admin_itsm_change_risk_questions_examples_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskExamplesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Risk Question Examples",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/risk-questions/order": {
+      "put": {
+        "description": "Put the questions in the given order (every question exactly once).",
+        "operationId": "put_risk_question_order_api_v1_admin_itsm_change_risk_questions_order_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRiskQuestionOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeRiskQuestionOut"
+                  },
+                  "title": "Response Put Risk Question Order Api V1 Admin Itsm Change Risk Questions Order Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Risk Question Order",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/risk-questions/{question_id}": {
+      "delete": {
+        "description": "Delete the question and the answers given to it (mark it invalid to keep them).",
+        "operationId": "delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "title": "Question Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Risk Question",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "put": {
+        "description": "Replace the question; its key stays.",
+        "operationId": "put_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "title": "Question Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRiskQuestionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskQuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Risk Question",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
     "/api/v1/admin/itsm/change/templates": {
       "get": {
         "description": "All templates, valid or not.",
@@ -103781,6 +104631,326 @@
           }
         },
         "summary": "Post Change Impact Recompute",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/risk": {
+      "get": {
+        "description": "Questionnaire, answers and the stored risk evaluation; references the caller cannot read\nare left out of the findings and only counted.",
+        "operationId": "get_change_risk_api_v1_itsm_changes__ticket_id__risk_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Risk",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/risk/answers": {
+      "put": {
+        "description": "Replace the questionnaire answers (needs ``rw``) and evaluate the risk again.",
+        "operationId": "put_change_risk_answers_api_v1_itsm_changes__ticket_id__risk_answers_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRiskAnswersIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Change Risk Answers",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/risk/evaluate": {
+      "post": {
+        "description": "Evaluate the risk again from stored data only (needs ``rw``).",
+        "operationId": "post_change_risk_evaluate_api_v1_itsm_changes__ticket_id__risk_evaluate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Change Risk Evaluate",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/{ticket_id}/risk/override": {
+      "put": {
+        "description": "A change manager sets or removes the risk level by hand; the reason is required.",
+        "operationId": "put_change_risk_override_api_v1_itsm_changes__ticket_id__risk_override_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRiskOverrideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeRiskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Change Risk Override",
         "tags": [
           "itsm-change"
         ]

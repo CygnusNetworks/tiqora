@@ -24,6 +24,7 @@ Nothing here commits except the job; no JOIN between ``tiqora_*`` and Znuny tabl
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Final
@@ -436,19 +437,24 @@ async def _service_names(session: AsyncSession, ids: list[int]) -> dict[int, str
     return out
 
 
-async def _open_incident_ids(
-    session: AsyncSession, settings: Settings, service_ids: list[int]
+async def open_incident_ids(
+    session: AsyncSession,
+    type_names: Sequence[str],
+    service_ids: Sequence[int],
+    *,
+    since: datetime | None = None,
+    cap: int = INCIDENT_SCAN_CAP,
 ) -> list[int]:
-    """Newest open incident tickets (ids only, unfiltered) on the services, at most the scan cap."""
-    if not service_ids:
+    """Newest open tickets of the given types on the services (ids only, unfiltered), at most
+    ``cap``. ``since`` keeps tickets created at or after it. Callers filter by the viewer."""
+    if not service_ids or not type_names:
         return []
-    itsm_cfg = await load_itsm_settings(session, settings)
     types = (
         await session.execute(
             text("SELECT id FROM ticket_type WHERE name IN :n").bindparams(
                 bindparam("n", expanding=True)
             ),
-            {"n": [itsm_cfg.incident_type, itsm_cfg.major_incident_type]},
+            {"n": list(type_names)},
         )
     ).all()
     states = (
@@ -462,27 +468,42 @@ async def _open_incident_ids(
     ).all()
     if not types or not states:
         return []
-    stmt = text(
-        "SELECT id FROM ticket WHERE service_id IN :s AND type_id IN :ty"
-        " AND ticket_state_id IN :st ORDER BY id DESC LIMIT :cap"
-    ).bindparams(
+    sql = (
+        "SELECT id FROM ticket WHERE service_id IN :s AND type_id IN :ty AND ticket_state_id IN :st"
+    )
+    if since is not None:
+        sql += " AND create_time >= :since"
+    stmt = text(sql + " ORDER BY id DESC LIMIT :cap").bindparams(
         bindparam("s", expanding=True),
         bindparam("ty", expanding=True),
         bindparam("st", expanding=True),
     )
     found: list[int] = []
-    for start in range(0, len(service_ids), CHUNK):
-        rows = await session.execute(
-            stmt,
-            {
-                "s": service_ids[start : start + CHUNK],
-                "ty": [int(r[0]) for r in types],
-                "st": [int(r[0]) for r in states],
-                "cap": INCIDENT_SCAN_CAP,
-            },
-        )
+    ids = list(service_ids)
+    for start in range(0, len(ids), CHUNK):
+        params: dict[str, Any] = {
+            "s": ids[start : start + CHUNK],
+            "ty": [int(r[0]) for r in types],
+            "st": [int(r[0]) for r in states],
+            "cap": cap,
+        }
+        if since is not None:
+            params["since"] = since
+        rows = await session.execute(stmt, params)
         found.extend(int(r[0]) for r in rows)
-    return sorted(set(found), reverse=True)[:INCIDENT_SCAN_CAP]
+    return sorted(set(found), reverse=True)[:cap]
+
+
+async def _open_incident_ids(
+    session: AsyncSession, settings: Settings, service_ids: list[int]
+) -> list[int]:
+    """Newest open incident tickets (ids only, unfiltered) on the services, at most the scan cap."""
+    if not service_ids:
+        return []
+    itsm_cfg = await load_itsm_settings(session, settings)
+    return await open_incident_ids(
+        session, [itsm_cfg.incident_type, itsm_cfg.major_incident_type], service_ids
+    )
 
 
 async def read_impact(
@@ -598,6 +619,7 @@ __all__ = [
     "enqueue_impact",
     "enqueue_impact_if_change",
     "impact_is_current",
+    "open_incident_ids",
     "read_impact",
     "recompute_impact",
     "refresh_stale_impacts",

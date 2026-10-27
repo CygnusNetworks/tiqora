@@ -25,6 +25,18 @@ from tiqora.itsm.change.freeze import (
     list_freezes,
     update_freeze,
 )
+from tiqora.itsm.change.risk import (
+    ChangeRiskExamplesOut,
+    ChangeRiskQuestionIn,
+    ChangeRiskQuestionOrderIn,
+    ChangeRiskQuestionOut,
+    create_question,
+    delete_question,
+    insert_examples,
+    list_questions,
+    reorder_questions,
+    update_question,
+)
 from tiqora.itsm.change.templates import (
     TemplateIn,
     create_template,
@@ -126,5 +138,67 @@ async def put_freeze_window(
 async def delete_freeze_window(freeze_id: int, admin: AdminUser, session: DbSession) -> Response:
     _ = admin
     await delete_freeze(session, freeze_id=freeze_id)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/risk-questions", response_model=list[ChangeRiskQuestionOut])
+async def get_risk_questions(admin: AdminUser, session: DbSession) -> list[ChangeRiskQuestionOut]:
+    """The risk questionnaire in order, valid or not."""
+    _ = admin
+    return await list_questions(session, include_invalid=True)
+
+
+@router.post(
+    "/risk-questions", response_model=ChangeRiskQuestionOut, status_code=status.HTTP_201_CREATED
+)
+async def post_risk_question(
+    body: ChangeRiskQuestionIn, admin: AdminUser, session: DbSession
+) -> ChangeRiskQuestionOut:
+    out = await create_question(session, data=body, user_id=admin.id)
+    await session.commit()
+    return out
+
+
+@router.put("/risk-questions/order", response_model=list[ChangeRiskQuestionOut])
+async def put_risk_question_order(
+    body: ChangeRiskQuestionOrderIn, admin: AdminUser, session: DbSession
+) -> list[ChangeRiskQuestionOut]:
+    """Put the questions in the given order (every question exactly once)."""
+    _ = admin
+    out = await reorder_questions(session, order=body.order)
+    await session.commit()
+    return out
+
+
+@router.post(
+    "/risk-questions/examples",
+    response_model=ChangeRiskExamplesOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_risk_question_examples(
+    admin: AdminUser, session: DbSession
+) -> ChangeRiskExamplesOut:
+    """Insert the four example questions whose keys do not exist yet."""
+    created = await insert_examples(session, user_id=admin.id)
+    await session.commit()
+    return ChangeRiskExamplesOut(created=created)
+
+
+@router.put("/risk-questions/{question_id:int}", response_model=ChangeRiskQuestionOut)
+async def put_risk_question(
+    question_id: int, body: ChangeRiskQuestionIn, admin: AdminUser, session: DbSession
+) -> ChangeRiskQuestionOut:
+    """Replace the question; its key stays."""
+    out = await update_question(session, question_id=question_id, data=body, user_id=admin.id)
+    await session.commit()
+    return out
+
+
+@router.delete("/risk-questions/{question_id:int}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_risk_question(question_id: int, admin: AdminUser, session: DbSession) -> Response:
+    """Delete the question and the answers given to it (mark it invalid to keep them)."""
+    _ = admin
+    await delete_question(session, question_id=question_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
