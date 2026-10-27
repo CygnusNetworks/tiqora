@@ -2,24 +2,36 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tests._itsm_mode_helpers import make_factory, plain_url, store
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.approvals.contract import (
     Actor,
     ApprovalDefinition,
     ApprovalStatus,
     Principal,
 )
+from tiqora.config import Settings
 from tiqora.itsm.change.approval_port import (
     APPROVAL_KEY,
     ApprovalSnapshot,
     set_approval_port_for_tests,
 )
+from tiqora.itsm.change.models import TiqoraItsmChange
+from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
+from tiqora.itsm.settings import ItsmSettings
+from tiqora.itsm.setup import apply_setup
+from tiqora.itsm.znuny_adapter.detect import clear_detect_cache
+from tiqora.settings_sections.store import save_section_values
 
 _EPOCH = datetime(2026, 1, 1, 8, 0, 0)
 
@@ -144,3 +156,160 @@ def use_fake_approval_port() -> Iterator[FakeApprovalPort]:
         yield port
     finally:
         set_approval_port_for_tests(None)
+
+
+# --- Tiqora-side change helpers --------------------------------------------------------------
+
+
+async def make_change(
+    session: AsyncSession,
+    ticket_id: int,
+    *,
+    change_type: str = "normal",
+    phase: str = "draft",
+    user_id: int = 1,
+    **fields: Any,
+) -> TiqoraItsmChange:
+    """A ``tiqora_itsm_change`` row for an existing ticket (flushed, not committed).
+
+    Bypasses the service on purpose: tests of later phases start from a given phase without
+    walking the phase machine.
+    """
+    now = datetime(2026, 10, 1, 8, 0, 0)
+    values: dict[str, Any] = {
+        "approval_round": 0,
+        "created_at": now,
+        "created_by": user_id,
+        "updated_at": now,
+        "updated_by": user_id,
+        **fields,
+    }
+    row = TiqoraItsmChange(ticket_id=ticket_id, change_type=change_type, phase=phase, **values)
+    session.add(row)
+    await session.flush()
+    return row
+
+
+# --- the service/API world -------------------------------------------------------------------
+
+URL_FIXTURES = ["mariadb_znuny_url", "postgres_znuny_url"]
+APP_SETTINGS = Settings(environment="test")
+_T = datetime(2026, 10, 1)
+#: seed band of Task 5 (946300-946399)
+U_FULL, U_CREATE, U_RO, U_NONE, U_MANAGER = 946301, 946302, 946303, 946304, 946305
+G_A, G_B, G_MANAGER = 946310, 946311, 946312
+Q_A, Q_B = 946320, 946321
+SERVICE, SERVICE_B = 946330, 946331
+MANAGER_GROUP = "chg94-managers"
+_COUNTER_TABLES = ("ticket_number_counter",)
+
+
+@dataclass
+class ChangeWorld:
+    """One rolled-back session on a plain Znuny database in Mode B with the change setup applied.
+
+    Users: ``U_FULL`` rw on queue ``Q_A``; ``U_CREATE`` create+ro only; ``U_RO`` ro only;
+    ``U_NONE`` nothing; ``U_MANAGER`` rw in the change manager group. Queue ``Q_B`` is out of reach
+    for everybody but admin (user 1). Nothing is committed, so the strict leak check finds nothing
+    except the ticket-number counter, which commits in its own session and is removed afterwards.
+    """
+
+    session: AsyncSession
+    url: str
+    factory: async_sessionmaker[AsyncSession]
+
+
+async def _seed_access(session: AsyncSession) -> None:
+    for uid, login in (
+        (U_FULL, "chg94-full"),
+        (U_CREATE, "chg94-create"),
+        (U_RO, "chg94-ro"),
+        (U_NONE, "chg94-none"),
+        (U_MANAGER, "chg94-manager"),
+    ):
+        await session.execute(
+            text(
+                "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:i, :l, 'x', 'Erika', 'Beispiel', 1, :t, 1, :t, 1)"
+            ),
+            {"i": uid, "l": login, "t": _T},
+        )
+    for gid, name in ((G_A, "chg94-a"), (G_B, "chg94-b"), (G_MANAGER, MANAGER_GROUP)):
+        await session.execute(
+            text(
+                "INSERT INTO permission_groups (id, name, valid_id, create_time, create_by,"
+                " change_time, change_by) VALUES (:id, :n, 1, :t, 1, :t, 1)"
+            ),
+            {"id": gid, "n": name, "t": _T},
+        )
+    grants = (
+        (U_FULL, G_A, ("ro", "rw")),
+        (U_CREATE, G_A, ("ro", "create")),
+        (U_RO, G_A, ("ro",)),
+        (U_MANAGER, G_A, ("ro", "rw")),
+        (U_MANAGER, G_MANAGER, ("rw",)),
+    )
+    for uid, gid, keys in grants:
+        for key in keys:
+            await session.execute(
+                text(
+                    "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+                    " create_by, change_time, change_by) VALUES (:u, :g, :k, :t, 1, :t, 1)"
+                ),
+                {"u": uid, "g": gid, "k": key, "t": _T},
+            )
+    for qid, gid in ((Q_A, G_A), (Q_B, G_B)):
+        await session.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
+                " change_time, change_by) VALUES (:id, :n, :g, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+            ),
+            {"id": qid, "n": f"chg94-q{qid}", "g": gid, "t": _T},
+        )
+    for sid in (SERVICE, SERVICE_B):
+        await session.execute(
+            text(
+                "INSERT INTO service (id, name, valid_id, create_time, create_by, change_time,"
+                " change_by) VALUES (:id, :n, 1, :t, 1, :t, 1)"
+            ),
+            {"id": sid, "n": f"chg94-service-{sid}", "t": _T},
+        )
+
+
+@asynccontextmanager
+async def change_world(
+    request: pytest.FixtureRequest,
+    url_fixture: str,
+    *,
+    mode: str | None = "tiqora",
+    setup: bool = True,
+    manager_group: bool = True,
+) -> AsyncIterator[ChangeWorld]:
+    url = plain_url(request, url_fixture)
+    marks = snapshot_marks(url, _COUNTER_TABLES)
+    store(url, "itsm.mode", mode)
+    clear_detect_cache()
+    engine, factory = make_factory(url)
+    try:
+        async with factory() as session:
+            try:
+                await _seed_access(session)
+                if setup:
+                    await apply_setup(session, ItsmSettings(), groups={"change"}, user_id=1)
+                if manager_group:
+                    await save_section_values(
+                        session,
+                        ITSM_CHANGE_SECTION,
+                        {"manager_group": MANAGER_GROUP},
+                        secret_key=APP_SETTINGS.secret_key,
+                    )
+                session.commit = session.flush  # type: ignore[method-assign]
+                yield ChangeWorld(session, url, factory)
+            finally:
+                await session.rollback()
+    finally:
+        await engine.dispose()
+        delete_above_marks(url, marks)
+        clear_detect_cache()
