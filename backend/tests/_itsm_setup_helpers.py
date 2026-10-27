@@ -22,6 +22,8 @@ FIELDS = (
     "ITSMDecisionDate",
     "ITSMDueDate",
 )
+#: Tiqora's own change fields (created by the setup group ``change``)
+CHANGE_FIELDS = ("ITSMChangeType", "ITSMChangePhase")
 
 
 def _in(names: tuple[str, ...] | list[str]) -> str:
@@ -88,7 +90,7 @@ def cleaned_plain_url(
     *,
     types: tuple[str, ...] | list[str] = TYPES,
     states: tuple[str, ...] | list[str] = (STATE,),
-    fields: tuple[str, ...] | list[str] = FIELDS,
+    fields: tuple[str, ...] | list[str] = (*FIELDS, *CHANGE_FIELDS),
 ) -> str:
     """A plain (no ITSM) Znuny database that is back to its snapshot after the test."""
     url = plain_url(request, URL_FIXTURE[dialect])

@@ -4478,6 +4478,151 @@
             "help": "Adresse der Znuny-Agentenoberfläche für „In Znuny bearbeiten“. Leer: aus der Znuny-Konfiguration ableiten. Muss mit http:// oder https:// beginnen."
           }
         }
+      },
+      "itsmChange": {
+        "title": "ITSM-Changes",
+        "fields": {
+          "change_queue_id": {
+            "label": "Queue für neue Changes",
+            "help": "Queue-ID neuer Changes. 0 lässt die Agentin oder den Agenten die Queue beim Anlegen wählen."
+          },
+          "task_queue_id": {
+            "label": "Queue für Change-Aufgaben",
+            "help": "Queue-ID der Change-Aufgaben. 0 verwendet die Queue des Changes."
+          },
+          "manager_group": {
+            "label": "Gruppe der Change-Manager",
+            "help": "Znuny-Gruppe, deren rw-Mitglieder Changes verwalten. Leer: nur Administratoren."
+          },
+          "default_cab_id": {
+            "label": "Standard-CAB",
+            "help": "CAB für die Freigabe. 0 bedeutet, dass das CAB am Change gewählt werden muss."
+          },
+          "emergency_cab_id": {
+            "label": "Notfall-CAB",
+            "help": "CAB für Notfall-Changes. 0 verwendet das Standard-CAB."
+          },
+          "emergency_post_approval": {
+            "label": "Notfall-Changes: nachträgliche Freigabe",
+            "help": "Notfall-Changes dürfen mit der Umsetzung beginnen, bevor die Freigabe entschieden ist."
+          },
+          "auto_approve_low_risk": {
+            "label": "Risikoarme Changes automatisch freigeben",
+            "help": "Normale Changes mit niedrigem Risiko überspringen das CAB, wenn alle Prüfungen bestanden sind."
+          },
+          "standard_requires_review": {
+            "label": "Standard-Changes brauchen eine Nachbetrachtung",
+            "help": "Standard-Changes durchlaufen vor dem Abschluss ebenfalls die Nachbetrachtung."
+          },
+          "approval_due_hours": {
+            "label": "Freigabe fällig nach (Stunden)",
+            "help": "Zeit, die das CAB für die Entscheidung hat, bevor die Regel für Zeitüberschreitung greift."
+          },
+          "approval_timeout": {
+            "label": "Wenn die Freigabe überfällig ist",
+            "help": "Nur erinnern benachrichtigt die Mitglieder; Ablehnen lehnt den Change ab."
+          },
+          "cab_allow_self_approval": {
+            "label": "Eigene Changes selbst freigeben",
+            "help": "Erlaubt Besitzer und Antragsteller eines Changes, im CAB mitzustimmen."
+          },
+          "state_open": {
+            "label": "Ticket-Status solange offen",
+            "help": "Ticket-Status eines offenen Changes."
+          },
+          "state_closed_successful": {
+            "label": "Ticket-Status: erfolgreich abgeschlossen",
+            "help": "Ticket-Status eines erfolgreich abgeschlossenen Changes."
+          },
+          "state_closed_failed": {
+            "label": "Ticket-Status: erfolglos abgeschlossen",
+            "help": "Ticket-Status eines gescheiterten oder zurückgerollten Changes."
+          },
+          "state_closed_cancelled": {
+            "label": "Ticket-Status: abgebrochen",
+            "help": "Ticket-Status eines abgebrochenen Changes."
+          },
+          "related_link_type": {
+            "label": "Verknüpfungstyp für Störungen und Probleme",
+            "help": "Verknüpfungstyp zwischen einem Change und zugehörigen Störungen oder Problemen."
+          },
+          "task_link_type": {
+            "label": "Verknüpfungstyp für Change-Aufgaben",
+            "help": "Verknüpfungstyp zwischen einem Change (übergeordnet) und seinen Aufgaben."
+          },
+          "risk_medium_from": {
+            "label": "Risiko mittel ab (Punkte)",
+            "help": "Punktzahl, ab der das Risiko als mittel gilt."
+          },
+          "risk_high_from": {
+            "label": "Risiko hoch ab (Punkte)",
+            "help": "Punktzahl, ab der das Risiko als hoch gilt. Muss über mittel liegen."
+          },
+          "risk_very_high_from": {
+            "label": "Risiko sehr hoch ab (Punkte)",
+            "help": "Punktzahl, ab der das Risiko als sehr hoch gilt. Muss über hoch liegen."
+          },
+          "weight_service_criticality": {
+            "label": "Gewicht: Service-Kritikalität",
+            "help": "Punkte je Kritikalitätsstufe eines betroffenen Services."
+          },
+          "weight_ci_incident": {
+            "label": "Gewicht: betroffenes CI mit Störung",
+            "help": "Punkte für ein betroffenes CI, das aktuell eine Störung hat."
+          },
+          "weight_open_incidents": {
+            "label": "Gewicht: offene Störungen",
+            "help": "Punkte für offene Störungen an den betroffenen Services."
+          },
+          "weight_overlap": {
+            "label": "Gewicht: überlappende Changes",
+            "help": "Punkte für andere Changes im selben Zeitfenster."
+          },
+          "weight_freeze": {
+            "label": "Gewicht: Sperrzeitraum",
+            "help": "Punkte, wenn das Zeitfenster einen Sperrzeitraum berührt."
+          },
+          "weight_failed_history": {
+            "label": "Gewicht: frühere gescheiterte Changes",
+            "help": "Punkte für gescheiterte Changes an denselben Services."
+          },
+          "weight_emergency": {
+            "label": "Gewicht: Notfall-Change",
+            "help": "Punkte, die jeder Notfall-Change zusätzlich erhält."
+          },
+          "weight_missing_backout": {
+            "label": "Gewicht: fehlender Rückfallplan",
+            "help": "Punkte, wenn der Rückfallplan leer ist."
+          },
+          "incident_lookback_days": {
+            "label": "Rückblick Störungen (Tage)",
+            "help": "Störungen der letzten Tage gelten als aktuell."
+          },
+          "failed_change_lookback_days": {
+            "label": "Rückblick gescheiterte Changes (Tage)",
+            "help": "Gescheiterte Changes der letzten Tage fließen in das Risiko ein."
+          },
+          "impact_refresh_hours": {
+            "label": "Auswirkung aktualisieren nach (Stunden)",
+            "help": "Die Auswirkung geplanter Changes wird nach dieser Zeit neu berechnet."
+          },
+          "max_tasks": {
+            "label": "Höchstzahl Aufgaben je Change",
+            "help": "Obergrenze für Change-Aufgaben, auch bei Vorlagen."
+          },
+          "calendar_id": {
+            "label": "Kalender für geplante Changes",
+            "help": "Znuny-Kalender, der pro geplantem Change einen Termin erhält. 0 schaltet ihn ab."
+          },
+          "portal_schedule_enabled": {
+            "label": "Geplante Changes im Portal zeigen",
+            "help": "Kundinnen und Kunden sehen geplante Changes ihrer Services im Portal."
+          },
+          "legacy_change_group": {
+            "label": "Gruppe für frühere Znuny-Changes",
+            "help": "Mitglieder (ro) dürfen die Changes des Znuny-ITSM-Change-Moduls lesen. Existiert die Gruppe nicht, dürfen es Change-Manager und Administratoren."
+          }
+        }
       }
     },
     "identity": {

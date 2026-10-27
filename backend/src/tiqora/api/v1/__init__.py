@@ -21,6 +21,7 @@ from tiqora.api.v1 import (
     events,
     integrations,
     itsm,
+    itsm_change,
     jobs,
     kb,
     kiosk,
@@ -95,6 +96,8 @@ api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(itsm.router)
 api_v1_router.include_router(itsm.ticket_router)
+api_v1_router.include_router(itsm_change.router)
+api_v1_router.include_router(itsm_change.ticket_router)
 api_v1_router.include_router(plugins.router)
 api_v1_router.include_router(cmdb_router)
 api_v1_router.include_router(plugin_channels.router)

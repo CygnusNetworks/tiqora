@@ -9012,6 +9012,65 @@
         "title": "CategoryUpdateIn",
         "type": "object"
       },
+      "ChangeStatusOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "can_manage": {
+            "title": "Can Manage",
+            "type": "boolean"
+          },
+          "can_see_legacy": {
+            "title": "Can See Legacy",
+            "type": "boolean"
+          },
+          "legacy": {
+            "enum": [
+              "none",
+              "live",
+              "archive"
+            ],
+            "title": "Legacy",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "off",
+              "znuny_readthrough",
+              "tiqora"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "ok",
+              "itsm_off",
+              "mode_a",
+              "setup_missing"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "setup_complete_change": {
+            "title": "Setup Complete Change",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "available",
+          "reason",
+          "legacy",
+          "can_manage",
+          "can_see_legacy",
+          "setup_complete_change"
+        ],
+        "title": "ChangeStatusOut",
+        "type": "object"
+      },
       "ChannelConfigOut": {
         "properties": {
           "channel": {
@@ -100070,6 +100129,72 @@
         "summary": "Get Catalog",
         "tags": [
           "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/changes/status": {
+      "get": {
+        "description": "Whether changes are available and what the caller may do. Answers in every mode.",
+        "operationId": "get_change_status_api_v1_itsm_changes_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Status",
+        "tags": [
+          "itsm-change"
         ]
       }
     },

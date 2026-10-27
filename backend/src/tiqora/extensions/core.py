@@ -20,6 +20,7 @@ def register_core(registry: Registry) -> None:
     from tiqora.avatars.settings import AVATARS_SECTION
     from tiqora.cmdb.settings import CMDB_SECTION
     from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION
+    from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
     from tiqora.itsm.settings import ITSM_SECTION
     from tiqora.jobs.settings import JOBS_SECTION
     from tiqora.reporting.settings import REPORTING_SECTION
@@ -31,6 +32,7 @@ def register_core(registry: Registry) -> None:
         PROCESS_DEPLOY_SECTION,
         REPORTING_SECTION,
         ITSM_SECTION,
+        ITSM_CHANGE_SECTION,
         CMDB_SECTION,
     ):
         validate_section_schema(section)

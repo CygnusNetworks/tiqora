@@ -9296,6 +9296,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/changes/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Status
+         * @description Whether changes are available and what the caller may do. Answers in every mode.
+         */
+        get: operations["get_change_status_api_v1_itsm_changes_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/cis": {
         parameters: {
             query?: never;
@@ -16386,6 +16406,32 @@ export interface components {
             sort?: number | null;
             /** Valid */
             valid?: boolean | null;
+        };
+        /** ChangeStatusOut */
+        ChangeStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Can Manage */
+            can_manage: boolean;
+            /** Can See Legacy */
+            can_see_legacy: boolean;
+            /**
+             * Legacy
+             * @enum {string}
+             */
+            legacy: "none" | "live" | "archive";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "znuny_readthrough" | "tiqora";
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "ok" | "itsm_off" | "mode_a" | "setup_missing";
+            /** Setup Complete Change */
+            setup_complete_change: boolean;
         };
         /** ChannelConfigOut */
         ChannelConfigOut: {
@@ -54043,6 +54089,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_status_api_v1_itsm_changes_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeStatusOut"];
                 };
             };
             /** @description Validation Error */

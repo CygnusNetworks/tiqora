@@ -4478,6 +4478,151 @@
             "help": "Address of the Znuny agent interface for “Edit in Znuny”. Empty derives it from the Znuny configuration. Must start with http:// or https://."
           }
         }
+      },
+      "itsmChange": {
+        "title": "ITSM changes",
+        "fields": {
+          "change_queue_id": {
+            "label": "Queue for new changes",
+            "help": "Queue id of new changes. 0 lets the agent pick the queue when creating."
+          },
+          "task_queue_id": {
+            "label": "Queue for change tasks",
+            "help": "Queue id of change tasks. 0 uses the queue of the change."
+          },
+          "manager_group": {
+            "label": "Change manager group",
+            "help": "Znuny group whose rw members manage changes. Empty: administrators only."
+          },
+          "default_cab_id": {
+            "label": "Default CAB",
+            "help": "CAB used for approvals. 0 means the CAB must be chosen on the change."
+          },
+          "emergency_cab_id": {
+            "label": "Emergency CAB",
+            "help": "CAB for emergency changes. 0 uses the default CAB."
+          },
+          "emergency_post_approval": {
+            "label": "Emergency changes: approve afterwards",
+            "help": "Emergency changes may start the implementation before the approval is decided."
+          },
+          "auto_approve_low_risk": {
+            "label": "Approve low-risk changes automatically",
+            "help": "Normal changes with a low risk skip the CAB when all checks pass."
+          },
+          "standard_requires_review": {
+            "label": "Standard changes need a review",
+            "help": "Standard changes also go through the review phase before they close."
+          },
+          "approval_due_hours": {
+            "label": "Approval due after (hours)",
+            "help": "Time the CAB has to decide before the timeout rule applies."
+          },
+          "approval_timeout": {
+            "label": "When the approval is overdue",
+            "help": "Notify only reminds the members; reject rejects the change."
+          },
+          "cab_allow_self_approval": {
+            "label": "Owner may vote on own change",
+            "help": "Allow the owner and the submitter of a change to vote in the CAB."
+          },
+          "state_open": {
+            "label": "Ticket state while open",
+            "help": "Ticket state of an open change."
+          },
+          "state_closed_successful": {
+            "label": "Ticket state: closed successfully",
+            "help": "Ticket state of a successfully closed change."
+          },
+          "state_closed_failed": {
+            "label": "Ticket state: closed unsuccessfully",
+            "help": "Ticket state of a failed or backed-out change."
+          },
+          "state_closed_cancelled": {
+            "label": "Ticket state: cancelled",
+            "help": "Ticket state of a cancelled change."
+          },
+          "related_link_type": {
+            "label": "Link type for incidents and problems",
+            "help": "Link type between a change and related incidents or problems."
+          },
+          "task_link_type": {
+            "label": "Link type for change tasks",
+            "help": "Link type between a change (parent) and its tasks."
+          },
+          "risk_medium_from": {
+            "label": "Risk medium from (points)",
+            "help": "Score from which the risk counts as medium."
+          },
+          "risk_high_from": {
+            "label": "Risk high from (points)",
+            "help": "Score from which the risk counts as high. Must be above medium."
+          },
+          "risk_very_high_from": {
+            "label": "Risk very high from (points)",
+            "help": "Score from which the risk counts as very high. Must be above high."
+          },
+          "weight_service_criticality": {
+            "label": "Weight: service criticality",
+            "help": "Points per level of criticality of an affected service."
+          },
+          "weight_ci_incident": {
+            "label": "Weight: affected CI with incident",
+            "help": "Points for an affected CI that currently has an incident."
+          },
+          "weight_open_incidents": {
+            "label": "Weight: open incidents",
+            "help": "Points for open incidents on the affected services."
+          },
+          "weight_overlap": {
+            "label": "Weight: overlapping changes",
+            "help": "Points for other changes in the same time window."
+          },
+          "weight_freeze": {
+            "label": "Weight: freeze window",
+            "help": "Points when the window touches a freeze window."
+          },
+          "weight_failed_history": {
+            "label": "Weight: failed changes before",
+            "help": "Points for failed changes on the same services."
+          },
+          "weight_emergency": {
+            "label": "Weight: emergency change",
+            "help": "Points added to every emergency change."
+          },
+          "weight_missing_backout": {
+            "label": "Weight: missing rollback plan",
+            "help": "Points when the rollback plan is empty."
+          },
+          "incident_lookback_days": {
+            "label": "Incident look-back (days)",
+            "help": "Incidents of the last days count as recent."
+          },
+          "failed_change_lookback_days": {
+            "label": "Failed-change look-back (days)",
+            "help": "Failed changes of the last days count in the risk."
+          },
+          "impact_refresh_hours": {
+            "label": "Refresh impact after (hours)",
+            "help": "Impact of planned changes is recomputed after this time."
+          },
+          "max_tasks": {
+            "label": "Maximum tasks per change",
+            "help": "Upper limit of change tasks, also for templates."
+          },
+          "calendar_id": {
+            "label": "Calendar for scheduled changes",
+            "help": "Znuny calendar that receives an appointment per scheduled change. 0 turns it off."
+          },
+          "portal_schedule_enabled": {
+            "label": "Show planned changes in the portal",
+            "help": "Customers see planned changes of their services in the portal."
+          },
+          "legacy_change_group": {
+            "label": "Group for former Znuny changes",
+            "help": "Members (ro) may read the changes of the Znuny ITSM change module. If the group does not exist, change managers and administrators may."
+          }
+        }
       }
     },
     "identity": {
