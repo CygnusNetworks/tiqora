@@ -274,6 +274,11 @@ ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
         "link_invalid": 410,
         "link_expired": 410,
         "link_used": 410,
+        "invalid_member": 422,
+        "list_name_taken": 409,
+        "list_in_use": 409,
+        "template_key_taken": 409,
+        "delegation_overlap": 409,
     }
 )
 
