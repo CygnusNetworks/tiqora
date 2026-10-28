@@ -9220,7 +9220,13 @@
       "cannotVote": "You cannot vote on this request (any more)."
     },
     "portal": {
-      "title": "Approvals"
+      "title": "Approvals",
+      "unavailable": "Not available",
+      "loadError": "The approvals could not be loaded. Please try again.",
+      "empty": "No open approvals. You will be notified by email when an approval is waiting for you.",
+      "emptyDone": "No decided approvals yet.",
+      "back": "Back to approvals",
+      "decidedAt": "decided {{date}}"
     },
     "link": {
       "title": "Approval",

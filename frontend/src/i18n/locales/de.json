@@ -9228,7 +9228,13 @@
       "cannotVote": "Sie können hier nicht (mehr) abstimmen."
     },
     "portal": {
-      "title": "Freigaben"
+      "title": "Freigaben",
+      "unavailable": "Nicht verfügbar",
+      "loadError": "Die Freigaben konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "empty": "Keine offenen Freigaben. Sie werden per E-Mail benachrichtigt, sobald eine Freigabe auf Sie wartet.",
+      "emptyDone": "Noch keine erledigten Freigaben.",
+      "back": "Zurück zu den Freigaben",
+      "decidedAt": "entschieden {{date}}"
     },
     "link": {
       "title": "Freigabe",

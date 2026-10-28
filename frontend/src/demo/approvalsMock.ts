@@ -477,7 +477,10 @@ export function resolveApprovalsData(path: string, method: string, search = ""):
     return { items, total: items.length, limit: 25, offset: 0 };
   }
   const portalOne = path.match(/\/api\/portal\/approvals\/(\d+)(\/decision)?$/);
-  if (portalOne && portalOne[1] === "601" && (get || (method === "POST" && portalOne[2]))) return PORTAL_DETAIL;
+  if (portalOne && portalOne[1] === "601" && get) return PORTAL_DETAIL;
+  if (portalOne && portalOne[1] === "601" && method === "POST" && portalOne[2]) {
+    return { ...PORTAL_DETAIL, status: "approved", my_status: "approved", my_decision: "approved", can_decide: false };
+  }
 
   // Admin plane
   if (path.endsWith("/api/v1/admin/approvals") && get) {
