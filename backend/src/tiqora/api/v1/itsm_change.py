@@ -29,6 +29,8 @@ from tiqora.api.v1.itsm_change_schemas import (
     ChangeStatusOut,
     ChangeTemplateSummaryOut,
     FreezeOccurrencesOut,
+    LegacyChangeOut,
+    LegacyChangePageOut,
     MeetingOut,
     RelatedLinkIn,
     RelatedTicketOut,
@@ -44,6 +46,8 @@ from tiqora.api.v1.itsm_change_schemas import (
     change_page_out,
     event_out,
     freeze_occurrences_out,
+    legacy_change_out,
+    legacy_page_out,
     meeting_out,
     related_out,
     service_availability_out,
@@ -53,6 +57,7 @@ from tiqora.api.v1.itsm_change_schemas import (
 )
 from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.db.tiqora.models import TiqoraJob
+from tiqora.domain.ticket_access import readable_tickets
 from tiqora.itsm.change.cab import (
     MeetingIn,
     MeetingUpdateIn,
@@ -68,11 +73,16 @@ from tiqora.itsm.change.cab import (
 from tiqora.itsm.change.conflicts import ConflictOut, read_conflicts
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import occurrences
-from tiqora.itsm.change.gate import change_availability, require_change_mode
+from tiqora.itsm.change.gate import can_see_legacy, change_availability, require_change_mode
 from tiqora.itsm.change.impact import (
     ChangeImpactOut,
     enqueue_impact,
     read_impact,
+)
+from tiqora.itsm.change.legacy.sources import (
+    LegacyChangeSource,
+    get_legacy_source,
+    visible_links,
 )
 from tiqora.itsm.change.phases import FINAL_PHASES, ChangeType, Phase
 from tiqora.itsm.change.read import (
@@ -107,6 +117,7 @@ from tiqora.itsm.change.service import (
     list_events,
     update_change,
 )
+from tiqora.itsm.change.settings import load_change_settings
 from tiqora.itsm.change.tasks import (
     TaskIn,
     TaskUpdateIn,
@@ -117,6 +128,11 @@ from tiqora.itsm.change.tasks import (
 )
 from tiqora.itsm.change.templates import list_templates
 from tiqora.itsm.change.transitions import TransitionIn, read_approval, transition
+from tiqora.itsm.ci_provider import CiRef
+from tiqora.itsm.deeplink import CHANGE_ZOOM, znuny_agent_url
+from tiqora.itsm.mode import get_itsm_mode
+from tiqora.itsm.providers import get_ci_provider
+from tiqora.itsm.settings import load_itsm_settings
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -739,3 +755,80 @@ async def delete_change_related(
     out = [related_out(i) for i in items]
     await session.commit()
     return out
+
+
+# --- legacy (Znuny) changes: read-only ----------------------------------------------------------
+
+
+async def _legacy_source(
+    session: AsyncSession, settings: AppSettings, *, user_id: int
+) -> LegacyChangeSource:
+    """The source first (404 without one), then the legacy change group (403)."""
+    source = await get_legacy_source(session, settings)
+    if source is None:
+        raise ChangeError("legacy_unavailable", 404)
+    if not await can_see_legacy(session, user_id, await load_change_settings(session, settings)):
+        raise ChangeError("legacy_forbidden", 403)
+    return source
+
+
+@router.get("/legacy-changes", response_model=LegacyChangePageOut)
+async def get_legacy_changes(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    ticket_id: Annotated[int | None, Query()] = None,
+    ci: Annotated[str | None, Query(max_length=40)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+) -> LegacyChangePageOut:
+    """Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy
+    change group. ``q`` matches number, title, description and justification; ``ticket_id`` /
+    ``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page
+    when the caller cannot read it. Times are UTC."""
+    source = await _legacy_source(session, settings, user_id=user.id)
+    ci_ref: CiRef | None = None
+    if ci:
+        try:
+            ci_ref = CiRef.parse(ci)
+        except ValueError as exc:
+            raise ChangeError("ci_ref_invalid", 422) from exc
+    if ticket_id is not None and not await readable_tickets(session, [ticket_id], user_id=user.id):
+        return legacy_page_out(source.kind, [], 0)
+    if ci_ref is not None:
+        mode = (await get_itsm_mode(session)).mode
+        provider = get_ci_provider(mode, SysConfig(session))
+        if provider is None or (
+            ci_ref.source == provider.source
+            and ci_ref not in await provider.get_many(session, [ci_ref], user_id=user.id)
+        ):
+            return legacy_page_out(source.kind, [], 0)
+    items, total = await source.search(
+        session, text=q, ticket_id=ticket_id, ci_ref=ci_ref, limit=limit, offset=offset
+    )
+    return legacy_page_out(source.kind, items, total)
+
+
+@router.get("/legacy-changes/{znuny_change_id:int}", response_model=LegacyChangeOut)
+async def get_legacy_change(
+    znuny_change_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> LegacyChangeOut:
+    """One Znuny change with work orders, CAB, history and links; linked tickets and CIs the
+    caller cannot read are left out (``hidden_links`` counts them)."""
+    source = await _legacy_source(session, settings, user_id=user.id)
+    change = await source.get(session, znuny_change_id)
+    if change is None:
+        raise ChangeError("legacy_change_not_found", 404)
+    sysconfig = SysConfig(session)
+    provider = get_ci_provider((await get_itsm_mode(session)).mode, sysconfig)
+    links = await visible_links(session, change, user_id=user.id, provider=provider)
+    url = None
+    if source.kind == "live":
+        url = await znuny_agent_url(
+            sysconfig,
+            await load_itsm_settings(session, settings),
+            CHANGE_ZOOM,
+            ChangeID=change.znuny_change_id,
+        )
+    return legacy_change_out(source.kind, change, links, znuny_url=url)

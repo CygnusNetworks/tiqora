@@ -27013,6 +27013,565 @@
         "title": "KnowledgeBundle",
         "type": "object"
       },
+      "LegacyCabMemberOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "user",
+              "customer_user"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "login"
+        ],
+        "title": "LegacyCabMemberOut",
+        "type": "object"
+      },
+      "LegacyChangeOut": {
+        "properties": {
+          "actual_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual End"
+          },
+          "actual_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Start"
+          },
+          "builder_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Builder Login"
+          },
+          "cab": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyCabMemberOut"
+            },
+            "title": "Cab",
+            "type": "array"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "cis": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyCiLinkOut"
+            },
+            "title": "Cis",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "dynamic_fields": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Dynamic Fields",
+            "type": "object"
+          },
+          "hidden_links": {
+            "title": "Hidden Links",
+            "type": "integer"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyHistoryOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "justification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Justification"
+          },
+          "manager_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager Login"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "requested_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Time"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyServiceLinkOut"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "live",
+              "archive"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "tickets": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyTicketLinkOut"
+            },
+            "title": "Tickets",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "workorders": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyWorkOrderOut"
+            },
+            "title": "Workorders",
+            "type": "array"
+          },
+          "znuny_change_id": {
+            "title": "Znuny Change Id",
+            "type": "integer"
+          },
+          "znuny_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Znuny Url"
+          }
+        },
+        "required": [
+          "source",
+          "znuny_change_id",
+          "number",
+          "title",
+          "state",
+          "category",
+          "impact",
+          "priority",
+          "manager_login",
+          "builder_login",
+          "requested_time",
+          "planned_start",
+          "planned_end",
+          "actual_start",
+          "actual_end",
+          "created_at",
+          "changed_at",
+          "description",
+          "justification",
+          "cab",
+          "workorders",
+          "history",
+          "dynamic_fields",
+          "tickets",
+          "cis",
+          "services",
+          "hidden_links",
+          "znuny_url"
+        ],
+        "title": "LegacyChangeOut",
+        "type": "object"
+      },
+      "LegacyChangePageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LegacyChangeSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "live",
+              "archive"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "items",
+          "total"
+        ],
+        "title": "LegacyChangePageOut",
+        "type": "object"
+      },
+      "LegacyChangeSummaryOut": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "workorder_count": {
+            "title": "Workorder Count",
+            "type": "integer"
+          },
+          "znuny_change_id": {
+            "title": "Znuny Change Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "znuny_change_id",
+          "number",
+          "title",
+          "state",
+          "planned_start",
+          "planned_end",
+          "workorder_count",
+          "changed_at"
+        ],
+        "title": "LegacyChangeSummaryOut",
+        "type": "object"
+      },
+      "LegacyCiLinkOut": {
+        "properties": {
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "direction": {
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "workorder_number": {
+            "title": "Workorder Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ref",
+          "number",
+          "name",
+          "class_name",
+          "link_type",
+          "direction",
+          "workorder_number"
+        ],
+        "title": "LegacyCiLinkOut",
+        "type": "object"
+      },
+      "LegacyHistoryOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "history_type": {
+            "title": "History Type",
+            "type": "string"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "user_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Login"
+          },
+          "workorder_number": {
+            "title": "Workorder Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created_at",
+          "user_login",
+          "history_type",
+          "field",
+          "old",
+          "new",
+          "workorder_number"
+        ],
+        "title": "LegacyHistoryOut",
+        "type": "object"
+      },
       "LegacySchemaOut": {
         "description": "Detected OTRS/Znuny schema profile for the connected database.\n\nSee ``tiqora.db.legacy.profile`` / multi-version support matrix\n(version ids such as ``znuny-6.5``, OTRS/Znuny 6.0\u20137.3). Surfaced on the\nadmin System-Info page so operators can see which peer schema Tiqora\nadapted to.",
         "properties": {
@@ -27070,6 +27629,255 @@
           "source"
         ],
         "title": "LegacySchemaOut",
+        "type": "object"
+      },
+      "LegacyServiceLinkOut": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "integer"
+          },
+          "workorder_number": {
+            "title": "Workorder Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "service_id",
+          "name",
+          "link_type",
+          "direction",
+          "workorder_number"
+        ],
+        "title": "LegacyServiceLinkOut",
+        "type": "object"
+      },
+      "LegacyTicketLinkOut": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "workorder_number": {
+            "title": "Workorder Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "state",
+          "link_type",
+          "direction",
+          "workorder_number"
+        ],
+        "title": "LegacyTicketLinkOut",
+        "type": "object"
+      },
+      "LegacyWorkOrderOut": {
+        "properties": {
+          "accounted_time": {
+            "title": "Accounted Time",
+            "type": "number"
+          },
+          "actual_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual End"
+          },
+          "actual_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Start"
+          },
+          "agent_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Login"
+          },
+          "dynamic_fields": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Dynamic Fields",
+            "type": "object"
+          },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruction"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "planned_effort": {
+            "title": "Planned Effort",
+            "type": "number"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "work_order_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Order Type"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "work_order_type",
+          "state",
+          "agent_login",
+          "planned_start",
+          "planned_end",
+          "actual_start",
+          "actual_end",
+          "planned_effort",
+          "accounted_time",
+          "instruction",
+          "report",
+          "dynamic_fields"
+        ],
+        "title": "LegacyWorkOrderOut",
         "type": "object"
       },
       "LinkGraphEdgeOut": {
@@ -109504,6 +110312,221 @@
           }
         },
         "summary": "Get Freeze Windows",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/legacy-changes": {
+      "get": {
+        "description": "Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy\nchange group. ``q`` matches number, title, description and justification; ``ticket_id`` /\n``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page\nwhen the caller cannot read it. Times are UTC.",
+        "operationId": "get_legacy_changes_api_v1_itsm_legacy_changes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ci",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ci"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyChangePageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Legacy Changes",
+        "tags": [
+          "itsm-change"
+        ]
+      }
+    },
+    "/api/v1/itsm/legacy-changes/{znuny_change_id}": {
+      "get": {
+        "description": "One Znuny change with work orders, CAB, history and links; linked tickets and CIs the\ncaller cannot read are left out (``hidden_links`` counts them).",
+        "operationId": "get_legacy_change_api_v1_itsm_legacy_changes__znuny_change_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "znuny_change_id",
+            "required": true,
+            "schema": {
+              "title": "Znuny Change Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Legacy Change",
         "tags": [
           "itsm-change"
         ]

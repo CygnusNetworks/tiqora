@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -19,6 +20,8 @@ from tiqora.itsm.change.cab import (
     Rule,
 )
 from tiqora.itsm.change.freeze import Enforcement, FreezeOccurrences, Scope
+from tiqora.itsm.change.legacy.model import LegacyChange, LegacyChangeSummary, LegacyWorkOrder
+from tiqora.itsm.change.legacy.sources import VisibleLinks
 from tiqora.itsm.change.models import TiqoraItsmChangeEvent
 from tiqora.itsm.change.phases import ChangeType, Phase
 from tiqora.itsm.change.read import (
@@ -565,4 +568,211 @@ def service_availability_out(row: ServiceAvailabilityRow) -> ServiceAvailability
         minutes_affected=row.minutes_affected,
         change_count=row.change_count,
         windows=[_window_out(w) for w in row.windows],
+    )
+
+
+# --- legacy (Znuny) changes -------------------------------------------------------------------
+
+
+class LegacyChangeSummaryOut(BaseModel):
+    znuny_change_id: int
+    number: str
+    title: str | None
+    state: str | None
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+    workorder_count: int
+    changed_at: UtcDateTime
+
+
+class LegacyChangePageOut(BaseModel):
+    #: ``live`` = read from Znuny now (Mode A), ``archive`` = stored by the import (Mode B)
+    source: Literal["live", "archive"]
+    items: list[LegacyChangeSummaryOut]
+    total: int
+
+
+class LegacyWorkOrderOut(BaseModel):
+    number: int
+    title: str | None
+    work_order_type: str | None
+    state: str | None
+    agent_login: str | None
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+    actual_start: UtcDateTime | None
+    actual_end: UtcDateTime | None
+    planned_effort: float
+    accounted_time: float
+    #: plain text (never HTML)
+    instruction: str | None
+    report: str | None
+    dynamic_fields: dict[str, list[str]]
+
+
+class LegacyCabMemberOut(BaseModel):
+    kind: Literal["user", "customer_user"]
+    login: str
+
+
+class LegacyHistoryOut(BaseModel):
+    created_at: UtcDateTime
+    user_login: str | None
+    history_type: str
+    field: str | None
+    #: raw Znuny values (ids for ``*ID`` fields, ``%%``-joined lists)
+    old: str | None
+    new: str | None
+    #: 0 = the change itself
+    workorder_number: int
+
+
+class LegacyTicketLinkOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    state: str
+    link_type: str
+    #: the change's (or work order's) side of the link
+    direction: Literal["source", "target"]
+    workorder_number: int
+
+
+class LegacyCiLinkOut(BaseModel):
+    #: ``znuny:<id>`` / ``tiqora:<id>``
+    ref: str
+    #: ``null`` for a CI known only by its Znuny id
+    number: str | None
+    name: str | None
+    class_name: str | None
+    link_type: str
+    direction: Literal["source", "target"]
+    workorder_number: int
+
+
+class LegacyServiceLinkOut(BaseModel):
+    service_id: int
+    name: str | None
+    link_type: str
+    direction: Literal["source", "target"]
+    workorder_number: int
+
+
+class LegacyChangeOut(BaseModel):
+    source: Literal["live", "archive"]
+    znuny_change_id: int
+    number: str
+    title: str | None
+    state: str | None
+    category: str | None
+    impact: str | None
+    priority: str | None
+    manager_login: str | None
+    builder_login: str | None
+    requested_time: UtcDateTime | None
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+    actual_start: UtcDateTime | None
+    actual_end: UtcDateTime | None
+    created_at: UtcDateTime
+    changed_at: UtcDateTime
+    #: plain text (never HTML)
+    description: str | None
+    justification: str | None
+    cab: list[LegacyCabMemberOut]
+    workorders: list[LegacyWorkOrderOut]
+    history: list[LegacyHistoryOut]
+    dynamic_fields: dict[str, list[str]]
+    tickets: list[LegacyTicketLinkOut]
+    cis: list[LegacyCiLinkOut]
+    services: list[LegacyServiceLinkOut]
+    #: linked tickets/CIs the caller cannot read ("n weitere ohne Leserecht")
+    hidden_links: int
+    #: "In Znuny bearbeiten" (live source only; ``null`` when the Znuny URL is unknown)
+    znuny_url: str | None
+
+
+def legacy_summary_out(item: LegacyChangeSummary) -> LegacyChangeSummaryOut:
+    return LegacyChangeSummaryOut.model_validate(item, from_attributes=True)
+
+
+def legacy_page_out(
+    source: Literal["live", "archive"], items: list[LegacyChangeSummary], total: int
+) -> LegacyChangePageOut:
+    return LegacyChangePageOut(
+        source=source, items=[legacy_summary_out(i) for i in items], total=total
+    )
+
+
+def _dynamic_fields_out(fields: Mapping[str, tuple[str, ...]]) -> dict[str, list[str]]:
+    return {name: list(values) for name, values in fields.items()}
+
+
+def _workorder_out(w: LegacyWorkOrder) -> LegacyWorkOrderOut:
+    return LegacyWorkOrderOut(
+        number=w.number,
+        title=w.title,
+        work_order_type=w.work_order_type,
+        state=w.state,
+        agent_login=w.agent_login,
+        planned_start=w.planned_start,
+        planned_end=w.planned_end,
+        actual_start=w.actual_start,
+        actual_end=w.actual_end,
+        planned_effort=w.planned_effort,
+        accounted_time=w.accounted_time,
+        instruction=w.instruction,
+        report=w.report,
+        dynamic_fields=_dynamic_fields_out(w.dynamic_fields),
+    )
+
+
+#: internal rows of Znuny's work order renumbering; its history screen does not show them
+_HIDDEN_HISTORY_FIELDS = frozenset({"NoNumberCalc"})
+
+
+def legacy_change_out(
+    source: Literal["live", "archive"],
+    change: LegacyChange,
+    links: VisibleLinks,
+    *,
+    znuny_url: str | None,
+) -> LegacyChangeOut:
+    return LegacyChangeOut(
+        source=source,
+        znuny_change_id=change.znuny_change_id,
+        number=change.number,
+        title=change.title,
+        state=change.state,
+        category=change.category,
+        impact=change.impact,
+        priority=change.priority,
+        manager_login=change.manager_login,
+        builder_login=change.builder_login,
+        requested_time=change.requested_time,
+        planned_start=change.planned_start,
+        planned_end=change.planned_end,
+        actual_start=change.actual_start,
+        actual_end=change.actual_end,
+        created_at=change.created_at,
+        changed_at=change.changed_at,
+        description=change.description,
+        justification=change.justification,
+        cab=[LegacyCabMemberOut(kind=kind, login=login) for kind, login in change.cab],
+        workorders=[_workorder_out(w) for w in change.workorders],
+        history=[
+            LegacyHistoryOut.model_validate(h, from_attributes=True)
+            for h in change.history
+            if h.field not in _HIDDEN_HISTORY_FIELDS
+        ],
+        dynamic_fields=_dynamic_fields_out(change.dynamic_fields),
+        tickets=[
+            LegacyTicketLinkOut.model_validate(t, from_attributes=True) for t in links.tickets
+        ],
+        cis=[LegacyCiLinkOut.model_validate(c, from_attributes=True) for c in links.cis],
+        services=[
+            LegacyServiceLinkOut.model_validate(s, from_attributes=True) for s in links.services
+        ],
+        hidden_links=links.hidden,
+        znuny_url=znuny_url,
     )

@@ -23,6 +23,8 @@ CI_ZOOM: Final = "AgentITSMConfigItemZoom"
 CI_EDIT: Final = "AgentITSMConfigItemEdit"
 CI_HISTORY: Final = "AgentITSMConfigItemHistory"
 SERVICE_ZOOM: Final = "AgentITSMServiceZoom"
+#: ITSMChangeManagement's change zoom (parameter ``ChangeID``)
+CHANGE_ZOOM: Final = "AgentITSMChangeZoom"
 
 
 async def agent_base_url(sysconfig: SysConfig, settings: ItsmSettings) -> str | None:
@@ -60,6 +62,7 @@ async def znuny_agent_url(
 
 
 __all__ = [
+    "CHANGE_ZOOM",
     "CI_EDIT",
     "CI_HISTORY",
     "CI_ZOOM",

@@ -10215,6 +10215,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/legacy-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Legacy Changes
+         * @description Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy
+         *     change group. ``q`` matches number, title, description and justification; ``ticket_id`` /
+         *     ``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page
+         *     when the caller cannot read it. Times are UTC.
+         */
+        get: operations["get_legacy_changes_api_v1_itsm_legacy_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/legacy-changes/{znuny_change_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Legacy Change
+         * @description One Znuny change with work orders, CAB, history and links; linked tickets and CIs the
+         *     caller cannot read are left out (``hidden_links`` counts them).
+         */
+        get: operations["get_legacy_change_api_v1_itsm_legacy_changes__znuny_change_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/link-types": {
         parameters: {
             query?: never;
@@ -23348,6 +23392,160 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** LegacyCabMemberOut */
+        LegacyCabMemberOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "customer_user";
+            /** Login */
+            login: string;
+        };
+        /** LegacyChangeOut */
+        LegacyChangeOut: {
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Builder Login */
+            builder_login: string | null;
+            /** Cab */
+            cab: components["schemas"]["LegacyCabMemberOut"][];
+            /** Category */
+            category: string | null;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Cis */
+            cis: components["schemas"]["LegacyCiLinkOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string | null;
+            /** Dynamic Fields */
+            dynamic_fields: {
+                [key: string]: string[];
+            };
+            /** Hidden Links */
+            hidden_links: number;
+            /** History */
+            history: components["schemas"]["LegacyHistoryOut"][];
+            /** Impact */
+            impact: string | null;
+            /** Justification */
+            justification: string | null;
+            /** Manager Login */
+            manager_login: string | null;
+            /** Number */
+            number: string;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Priority */
+            priority: string | null;
+            /** Requested Time */
+            requested_time: string | null;
+            /** Services */
+            services: components["schemas"]["LegacyServiceLinkOut"][];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "live" | "archive";
+            /** State */
+            state: string | null;
+            /** Tickets */
+            tickets: components["schemas"]["LegacyTicketLinkOut"][];
+            /** Title */
+            title: string | null;
+            /** Workorders */
+            workorders: components["schemas"]["LegacyWorkOrderOut"][];
+            /** Znuny Change Id */
+            znuny_change_id: number;
+            /** Znuny Url */
+            znuny_url: string | null;
+        };
+        /** LegacyChangePageOut */
+        LegacyChangePageOut: {
+            /** Items */
+            items: components["schemas"]["LegacyChangeSummaryOut"][];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "live" | "archive";
+            /** Total */
+            total: number;
+        };
+        /** LegacyChangeSummaryOut */
+        LegacyChangeSummaryOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Number */
+            number: string;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** State */
+            state: string | null;
+            /** Title */
+            title: string | null;
+            /** Workorder Count */
+            workorder_count: number;
+            /** Znuny Change Id */
+            znuny_change_id: number;
+        };
+        /** LegacyCiLinkOut */
+        LegacyCiLinkOut: {
+            /** Class Name */
+            class_name: string | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** Name */
+            name: string | null;
+            /** Number */
+            number: string | null;
+            /** Ref */
+            ref: string;
+            /** Workorder Number */
+            workorder_number: number;
+        };
+        /** LegacyHistoryOut */
+        LegacyHistoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Field */
+            field: string | null;
+            /** History Type */
+            history_type: string;
+            /** New */
+            new: string | null;
+            /** Old */
+            old: string | null;
+            /** User Login */
+            user_login: string | null;
+            /** Workorder Number */
+            workorder_number: number;
+        };
         /**
          * LegacySchemaOut
          * @description Detected OTRS/Znuny schema profile for the connected database.
@@ -23378,6 +23576,75 @@ export interface components {
             state_priority_has_color: boolean;
             /** Supported */
             supported: boolean;
+        };
+        /** LegacyServiceLinkOut */
+        LegacyServiceLinkOut: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** Name */
+            name: string | null;
+            /** Service Id */
+            service_id: number;
+            /** Workorder Number */
+            workorder_number: number;
+        };
+        /** LegacyTicketLinkOut */
+        LegacyTicketLinkOut: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** State */
+            state: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /** Workorder Number */
+            workorder_number: number;
+        };
+        /** LegacyWorkOrderOut */
+        LegacyWorkOrderOut: {
+            /** Accounted Time */
+            accounted_time: number;
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Agent Login */
+            agent_login: string | null;
+            /** Dynamic Fields */
+            dynamic_fields: {
+                [key: string]: string[];
+            };
+            /** Instruction */
+            instruction: string | null;
+            /** Number */
+            number: number;
+            /** Planned Effort */
+            planned_effort: number;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Report */
+            report: string | null;
+            /** State */
+            state: string | null;
+            /** Title */
+            title: string | null;
+            /** Work Order Type */
+            work_order_type: string | null;
         };
         /** LinkGraphEdgeOut */
         LinkGraphEdgeOut: {
@@ -58470,6 +58737,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FreezeOccurrencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_legacy_changes_api_v1_itsm_legacy_changes_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                ticket_id?: number | null;
+                ci?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyChangePageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_legacy_change_api_v1_itsm_legacy_changes__znuny_change_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                znuny_change_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyChangeOut"];
                 };
             };
             /** @description Validation Error */
