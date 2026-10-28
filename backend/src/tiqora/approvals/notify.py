@@ -353,7 +353,8 @@ async def _already_notified(
     return False
 
 
-async def _describe_lines(session: AsyncSession, approval: TiqoraApproval) -> list[str]:
+async def describe_lines(session: AsyncSession, approval: TiqoraApproval) -> list[str]:
+    """The subject type's "what is this about" lines for *approval* (empty when it has none)."""
     subject_type = get_registry().get(APPROVAL_SUBJECT_TYPES, approval.subject_type)
     if subject_type is None or subject_type.describe is None:
         return []
@@ -365,11 +366,6 @@ async def _describe_lines(session: AsyncSession, approval: TiqoraApproval) -> li
             "approval_mail_describe_failed", approval_id=approval.id, error=type(exc).__name__
         )
         return []
-
-
-async def describe_lines(session: AsyncSession, approval: TiqoraApproval) -> list[str]:
-    """The subject type's "what is this about" lines for *approval* (empty when it has none)."""
-    return await _describe_lines(session, approval)
 
 
 async def _decision_link(
@@ -535,7 +531,7 @@ async def _deliver(
         if action and step and step.due_at
         else None,
         description=approval.description if action else None,
-        lines=await _describe_lines(session, approval) if action else (),
+        lines=await describe_lines(session, approval) if action else (),
         link=link[0] if link else None,
         expires=texts.moment_text(link[1], locale) if link else None,
         inbox_url=_inbox_url(ctx, settings, recipient.principal) if action else None,

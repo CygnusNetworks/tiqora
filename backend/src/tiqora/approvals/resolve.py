@@ -70,7 +70,7 @@ async def ticket_customer_id(session: AsyncSession, ticket_id: int) -> str | Non
     return (row[0] or None) if row is not None else None
 
 
-async def _customer_rows(
+async def customer_rows(
     session: AsyncSession, logins: Sequence[str]
 ) -> dict[str, tuple[str, int, str]]:
     """``{lower(login): (login as stored, valid_id, customer_id)}`` for existing customer users.
@@ -120,7 +120,7 @@ async def customer_in_ticket_company(session: AsyncSession, login: str, ticket_i
     company = await ticket_customer_id(session, ticket_id)
     if company is None:
         return False
-    rows = await _customer_rows(session, [login])
+    rows = await customer_rows(session, [login])
     if login.lower() not in rows:
         return False
     return (await _companies_of(session, rows, company))[rows[login.lower()][0]]
@@ -135,7 +135,7 @@ async def customer_tickets_in_company(
     ``ticket.customer_id`` for the tickets in IN-list chunks. Same rule as
     :func:`customer_in_ticket_company`; tickets without a company are never included.
     """
-    rows = await _customer_rows(session, [login])
+    rows = await customer_rows(session, [login])
     found = rows.get(login.lower())
     if found is None or not ticket_ids:
         return set()
@@ -163,7 +163,7 @@ async def canonical_principal(session: AsyncSession, principal: Principal) -> Pr
     """
     if principal.login is None:
         return principal
-    rows = await _customer_rows(session, [principal.login])
+    rows = await customer_rows(session, [principal.login])
     found = rows.get(principal.login.lower())
     return Principal.customer(found[0]) if found is not None else principal
 
@@ -320,7 +320,7 @@ async def resolve_entries(
     in_company: dict[str, bool] = {}
     if allow_customers:
         logins = [c.principal.login for c in candidates if c.principal.login is not None]
-        crows = await _customer_rows(session, logins)
+        crows = await customer_rows(session, logins)
         # canonical keys: the login as stored, whatever case the entry / resolver spelled
         candidates = [_canonical(c, crows) for c in candidates]
         customer_valid = {login: valid for login, valid, _ in crows.values()}

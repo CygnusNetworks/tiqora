@@ -19,6 +19,7 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import delegation, rules
+from tiqora.approvals._engine import excluded_keys, in_rule
 from tiqora.approvals.contract import Actor, StepSpec
 from tiqora.approvals.models import (
     TiqoraApproval,
@@ -27,7 +28,6 @@ from tiqora.approvals.models import (
     TiqoraApprovalVote,
 )
 from tiqora.approvals.resolve import canonical_principal, customer_tickets_in_company
-from tiqora.approvals.service import _excluded_keys, _in_rule
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.jobs.service import utc_now
 
@@ -80,13 +80,13 @@ class _Row:
     vote: TiqoraApprovalVote | None
 
 
-async def _actor_key(session: AsyncSession, actor: Actor) -> str | None:
+async def actor_key(session: AsyncSession, actor: Actor) -> str | None:
     if actor.principal is None:
         return None
     return (await canonical_principal(session, actor.principal)).key
 
 
-async def _pending_rows(
+async def pending_rows(
     session: AsyncSession,
     actor: Actor,
     *,
@@ -97,7 +97,7 @@ async def _pending_rows(
 
     *approval_ids* limits the scan to those requests (detail and ticket views).
     """
-    key = await _actor_key(session, actor)
+    key = await actor_key(session, actor)
     if key is None:
         return []
     user_id = actor.principal.user_id if actor.principal is not None else None
@@ -172,11 +172,13 @@ async def _decided_rows(
     return [_Row(a, s, p, v) for a, s, p, v in result], int(total)
 
 
-async def _progress(session: AsyncSession, step_ids: Sequence[int]) -> dict[int, tuple[int, int]]:
+async def step_progress(
+    session: AsyncSession, step_ids: Sequence[int]
+) -> dict[int, tuple[int, int]]:
     """``{step_id: (voters in the rule, approved)}`` over the eligible rows.
 
     Escalation-only approvers are outside the rule; a regular approver an escalation made
-    decisive still counts (same notion as ``service._voters``).
+    decisive still counts (same notion as ``_engine.step_voters``).
     """
     voters: Counter[int] = Counter()
     approved: Counter[int] = Counter()
@@ -192,7 +194,7 @@ async def _progress(session: AsyncSession, step_ids: Sequence[int]) -> dict[int,
         all_rows = list(rows)
         by_id = {a.id: a for a in all_rows}
         for row in all_rows:
-            if row.status in ("pending", "approved", "rejected") and _in_rule(row, by_id):
+            if row.status in ("pending", "approved", "rejected") and in_rule(row, by_id):
                 voters[row.step_id] += 1
                 if row.status == "approved":
                     approved[row.step_id] += 1
@@ -215,7 +217,9 @@ async def _tickets(
     return out
 
 
-async def _blocked(session: AsyncSession, key: str, rows: Sequence[_Row]) -> dict[int, str | None]:
+async def blocked_reasons(
+    session: AsyncSession, key: str, rows: Sequence[_Row]
+) -> dict[int, str | None]:
     """``{approver_id: reason}`` for pending rows the actor cannot vote on (None = can vote)."""
     step_ids = sorted({r.step.id for r in rows})
     voted: set[int] = set()
@@ -233,7 +237,7 @@ async def _blocked(session: AsyncSession, key: str, rows: Sequence[_Row]) -> dic
             out[row.approver.id] = "already_voted"
         elif row.approver.principal != key:  # delegated: requester/creator never vote
             if row.approval.id not in excluded:
-                excluded[row.approval.id] = await _excluded_keys(session, row.approval)
+                excluded[row.approval.id] = await excluded_keys(session, row.approval)
             keys = excluded[row.approval.id]
             out[row.approver.id] = (
                 "own_request" if key in keys or row.approver.principal in keys else None
@@ -246,8 +250,8 @@ async def _blocked(session: AsyncSession, key: str, rows: Sequence[_Row]) -> dic
 async def _items(
     session: AsyncSession, key: str, rows: Sequence[_Row], *, pending: bool = False
 ) -> list[InboxItem]:
-    blocked = await _blocked(session, key, rows) if pending else {}
-    progress = await _progress(session, [r.step.id for r in rows])
+    blocked = await blocked_reasons(session, key, rows) if pending else {}
+    progress = await step_progress(session, [r.step.id for r in rows])
     tickets = await _tickets(session, [r.approval.ticket_id for r in rows])
     now = utc_now()
     items: list[InboxItem] = []
@@ -295,11 +299,11 @@ async def inbox(
     offset: int,
 ) -> InboxPage:
     """One page of the inbox: by deadline (NULL last) then id; the decided tab newest first."""
-    key = await _actor_key(session, actor)
+    key = await actor_key(session, actor)
     if key is None:
         return InboxPage([], 0)
     if state == "pending":
-        rows = await _pending_rows(session, actor)
+        rows = await pending_rows(session, actor)
         items = await _items(session, key, rows[offset : offset + limit], pending=True)
         return InboxPage(items, len(rows))
     page, total = await _decided_rows(session, key, limit=limit, offset=offset)
@@ -308,11 +312,13 @@ async def inbox(
 
 async def pending_count(session: AsyncSession, actor: Actor) -> int:
     """Open rows the actor can still vote on (own and delegated) - the sidebar badge."""
-    key = await _actor_key(session, actor)
+    key = await actor_key(session, actor)
     if key is None:
         return 0
-    rows = await _pending_rows(session, actor)
-    return sum(1 for reason in (await _blocked(session, key, rows)).values() if reason is None)
+    rows = await pending_rows(session, actor)
+    return sum(
+        1 for reason in (await blocked_reasons(session, key, rows)).values() if reason is None
+    )
 
 
 async def customer_page(
@@ -329,7 +335,7 @@ async def customer_page(
     tickets, one IN-list lookup on ``ticket`` keeps those whose company the customer belongs
     to); the decided tab is then paged in SQL like the agent inbox.
     """
-    key = await _actor_key(session, actor)
+    key = await actor_key(session, actor)
     if key is None:
         return InboxPage([], 0)
     candidates = (
@@ -342,7 +348,7 @@ async def customer_page(
     if not allowed:
         return InboxPage([], 0)
     if state == "pending":
-        rows = await _pending_rows(session, actor, ticket_ids=allowed)
+        rows = await pending_rows(session, actor, ticket_ids=allowed)
         return InboxPage(
             await _items(session, key, rows[offset : offset + limit], pending=True), len(rows)
         )

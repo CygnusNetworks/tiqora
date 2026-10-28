@@ -22,7 +22,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.approvals import audit, service, tokens
+from tiqora.approvals import _engine, audit, service, tokens
 from tiqora.approvals.contract import (
     EVENT_ESCALATED,
     Actor,
@@ -31,7 +31,7 @@ from tiqora.approvals.contract import (
 )
 from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalApprover, TiqoraApprovalStep
 from tiqora.approvals.notify import enqueue_notification
-from tiqora.approvals.resolve import _customer_rows  # noqa: PLC2701
+from tiqora.approvals.resolve import customer_rows
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket
@@ -92,7 +92,7 @@ async def _item[T](
     affected: set[int] = set()
     async with factory() as session:
         try:
-            approval = await service._lock_approval(session, approval_id)  # noqa: SLF001
+            approval = await _engine.lock_approval(session, approval_id)
             if approval.status != "pending":
                 await session.rollback()
                 return None
@@ -138,7 +138,7 @@ async def _escalate(
     Never touches a principal who already voted in the step (F8), and ignores rows that are
     not pending any more. Same exclusions as at activation (requester, creator, invalid ...).
     """
-    resolution = await service._resolve_step(  # noqa: SLF001
+    resolution = await _engine.resolve_step(
         session,
         approval,
         spec,
@@ -147,9 +147,9 @@ async def _escalate(
         entries=spec.escalation,
         source_kind_override="escalation",
     )
-    await service._audit_excluded(session, approval, step, resolution, actor=_SYSTEM)  # noqa: SLF001
-    await service._audit_unresolved(session, approval, step, resolution, actor=_SYSTEM)  # noqa: SLF001
-    voted = await service._voters_in_step(session, step.id)  # noqa: SLF001
+    await _engine.audit_excluded(session, approval, step, resolution, actor=_SYSTEM)
+    await _engine.audit_unresolved(session, approval, step, resolution, actor=_SYSTEM)
+    voted = await _engine.voters_in_step(session, step.id)
     rows = {a.principal: a for a in approvers if a.step_id == step.id}
     decisive: list[int] = []
     for resolved in resolution.approvers:
@@ -158,7 +158,7 @@ async def _escalate(
             continue
         row = rows.get(key)
         if row is None:
-            new_id = await service._add_approver(  # noqa: SLF001
+            new_id = await _engine.add_approver(
                 session, approval, step, resolved, actor=_SYSTEM, now=now
             )
             row = await session.get(TiqoraApprovalApprover, new_id)
@@ -183,7 +183,7 @@ async def _overdue(
 ) -> str | None:
     """One step past its deadline: notify, escalate or decide it by ``on_timeout``."""
     step = next(
-        (s for s in await service._locked_steps(session, approval.id) if s.id == step_id),  # noqa: SLF001
+        (s for s in await _engine.locked_steps(session, approval.id) if s.id == step_id),
         None,
     )
     if (
@@ -195,7 +195,7 @@ async def _overdue(
     ):
         return None
     spec = StepSpec.model_validate_json(step.spec)
-    approvers = await service._locked_approvers(session, approval.id, step_ids=[step.id])  # noqa: SLF001
+    approvers = await _engine.locked_approvers(session, approval.id, step_ids=[step.id])
     pending = [a for a in approvers if a.status == "pending"]
     step.overdue_at = now
 
@@ -234,7 +234,7 @@ async def _overdue(
             step_id=step.id,
             detail={"decision": outcome},
         )
-        await service._close_step(  # noqa: SLF001
+        await _engine.close_step(
             session,
             approval,
             step,
@@ -281,7 +281,7 @@ async def _remind(
     if settings.reminder_interval_hours <= 0:
         return None
     step = next(
-        (s for s in await service._locked_steps(session, approval.id) if s.id == step_id),  # noqa: SLF001
+        (s for s in await _engine.locked_steps(session, approval.id) if s.id == step_id),
         None,
     )
     if step is None or step.status != "active" or step.reminder_count >= settings.reminder_max:
@@ -292,7 +292,7 @@ async def _remind(
         return None
     pending = [
         a.id
-        for a in await service._locked_approvers(session, approval.id, step_ids=[step.id])  # noqa: SLF001
+        for a in await _engine.locked_approvers(session, approval.id, step_ids=[step.id])
         if a.status == "pending"
     ]
     if not pending:
@@ -332,7 +332,7 @@ async def _invalid_principals(
         )
         valid_agents.update(int(i) for i in found.scalars())
     logins = [login for _, _, login in rows if login is not None]
-    customers = await _customer_rows(session, logins) if logins else {}
+    customers = await customer_rows(session, logins) if logins else {}
     invalid: set[str] = set()
     for key, uid, login in rows:
         if uid is not None and uid not in valid_agents:
@@ -353,12 +353,8 @@ async def _drop_invalid(
     now: datetime,
 ) -> int | None:
     """Removes pending approvers that became invalid and re-evaluates their steps."""
-    steps = [
-        s
-        for s in await service._locked_steps(session, approval.id)  # noqa: SLF001
-        if s.status == "active"
-    ]
-    approvers = await service._locked_approvers(session, approval.id)  # noqa: SLF001
+    steps = [s for s in await _engine.locked_steps(session, approval.id) if s.status == "active"]
+    approvers = await _engine.locked_approvers(session, approval.id)
     active = {s.id for s in steps}
     candidates = [a for a in approvers if a.status == "pending" and a.step_id in active]
     gone = await _invalid_principals(
@@ -382,7 +378,7 @@ async def _drop_invalid(
             detail={"reason": "invalid"},
         )
     touched = {a.step_id for a in dropped}
-    await service._reevaluate_steps(  # noqa: SLF001
+    await _engine.reevaluate_steps(
         session,
         approval,
         [s for s in steps if s.id in touched],

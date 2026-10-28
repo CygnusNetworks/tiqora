@@ -77,7 +77,7 @@ async def issue_link(session: AsyncSession, approver_id: int, *, settings: Appro
     ``not_an_approver`` for an unknown row, a row that is not ``pending``, a step that is not
     active or a closed request (no row is inserted).
     """
-    from tiqora.approvals import service  # service imports this module for the revocations
+    from tiqora.approvals import _engine  # the engine imports this module for the revocations
 
     approval_id = (
         await session.execute(
@@ -89,7 +89,7 @@ async def issue_link(session: AsyncSession, approver_id: int, *, settings: Appro
     if approval_id is None:
         raise ApprovalError("not_an_approver", 403)
     try:
-        approval = await service._lock_approval(session, approval_id)  # noqa: SLF001
+        approval = await _engine.lock_approval(session, approval_id)
     except ApprovalError as exc:  # deleted in between
         raise ApprovalError("not_an_approver", 403) from exc
     row = await _one(
@@ -239,7 +239,7 @@ async def redeem_link(
     caller commits. Raises ``link_*`` (HTTP 410) or whatever
     ``decide`` refuses with.
     """
-    from tiqora.approvals import service
+    from tiqora.approvals import _engine, service
 
     approval_id = (
         await session.execute(
@@ -252,10 +252,10 @@ async def redeem_link(
         raise ApprovalError("link_invalid", 410)
     await session.rollback()
     try:
-        await service._lock_approval(session, approval_id)  # noqa: SLF001
+        await _engine.lock_approval(session, approval_id)
     except ApprovalError as exc:
         raise ApprovalError("link_invalid", 410) from exc
-    if not (await service._settings(session, settings)).email_links_enabled:  # noqa: SLF001
+    if not (await _engine.load_settings(session, settings)).email_links_enabled:
         raise ApprovalError("link_invalid", 410)
     target = await resolve_link(session, token, for_update=True)
     consumed = await session.execute(

@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import access, inbox, notify, rules
+from tiqora.approvals._engine import in_rule
 from tiqora.approvals.contract import Actor, Principal, StepSpec
 from tiqora.approvals.models import (
     TiqoraApproval,
@@ -35,7 +36,6 @@ from tiqora.approvals.schemas import (
     MyApproverRowOut,
     VoteOut,
 )
-from tiqora.approvals.service import _in_rule
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
@@ -117,7 +117,7 @@ def _detail_json(raw: str | None) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-async def _load_ticket(session: AsyncSession, ticket_id: int) -> tuple[str | None, str | None]:
+async def load_ticket(session: AsyncSession, ticket_id: int) -> tuple[str | None, str | None]:
     row = (
         await session.execute(select(Ticket.tn, Ticket.title).where(Ticket.id == ticket_id))
     ).first()
@@ -136,13 +136,13 @@ async def _my_rows(
     """Open rows of this request the caller can vote on right now (own and delegated)."""
     if actor.principal is None or actor.principal.kind != "agent":
         return []
-    key = await inbox._actor_key(session, actor)
+    key = await inbox.actor_key(session, actor)
     if key is None:
         return []
-    rows = await inbox._pending_rows(session, actor, approval_ids=[approval.id])
+    rows = await inbox.pending_rows(session, actor, approval_ids=[approval.id])
     if not rows:
         return []
-    blocked = await inbox._blocked(session, key, rows)
+    blocked = await inbox.blocked_reasons(session, key, rows)
     mine = [r for r in rows if blocked[r.approver.id] is None]
     labels = await user_labels(session, [r.approver.user_id for r in mine if r.approver.user_id])
     out: list[MyApproverRowOut] = []
@@ -223,8 +223,8 @@ async def build_detail(
     step_out: list[ApprovalStepOut] = []
     for step in steps:
         rows = by_step[step.id]
-        in_rule = [a for a in rows if a.status in ("pending", "approved", "rejected")]
-        voters = [a for a in in_rule if _in_rule(a, by_id)]
+        eligible = [a for a in rows if a.status in ("pending", "approved", "rejected")]
+        voters = [a for a in eligible if in_rule(a, by_id)]
         step_out.append(
             ApprovalStepOut(
                 id=step.id,
@@ -270,7 +270,7 @@ async def build_detail(
             )
         )
 
-    tn, title = await _load_ticket(session, approval.ticket_id)
+    tn, title = await load_ticket(session, approval.ticket_id)
     pending = approval.status == "pending"
     return ApprovalDetailOut(
         id=approval.id,
@@ -283,7 +283,7 @@ async def build_detail(
         approval_key=approval.approval_key,
         title=approval.title,
         description=approval.description,
-        describe_lines=await notify._describe_lines(session, approval),
+        describe_lines=await notify.describe_lines(session, approval),
         status=approval.status,
         reason=approval.reason,
         current_stage=approval.current_stage,
@@ -314,10 +314,10 @@ async def build_summaries(
     labels = await principal_labels(session, [a.requester for a in approvals])
     mine: set[int] = set()
     if actor.principal is not None and actor.principal.kind == "agent":
-        key = await inbox._actor_key(session, actor)
-        rows = await inbox._pending_rows(session, actor, approval_ids=[a.id for a in approvals])
+        key = await inbox.actor_key(session, actor)
+        rows = await inbox.pending_rows(session, actor, approval_ids=[a.id for a in approvals])
         if key is not None and rows:
-            blocked = await inbox._blocked(session, key, rows)
+            blocked = await inbox.blocked_reasons(session, key, rows)
             mine = {r.approval.id for r in rows if blocked[r.approver.id] is None}
     out: list[ApprovalSummaryOut] = []
     for approval in approvals:

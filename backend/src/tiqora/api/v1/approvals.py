@@ -574,10 +574,10 @@ async def _link_view(session: AsyncSession, target: tokens.LinkTarget) -> LinkIn
         )
     ).scalar_one()
     labels = await detail.principal_labels(session, [approver.principal])
-    number, ticket_title = await detail._load_ticket(session, approval.ticket_id)  # noqa: SLF001
+    number, ticket_title = await detail.load_ticket(session, approval.ticket_id)
     required = None
     if step.rule in ("quorum", "majority"):
-        voters, _ = (await inbox._progress(session, [step.id]))[step.id]  # noqa: SLF001
+        voters, _ = (await inbox.step_progress(session, [step.id]))[step.id]
         required = rules.required_votes(step.rule, step.quorum, voters)  # type: ignore[arg-type]
     return LinkInspectOut(
         valid=True,
@@ -590,7 +590,7 @@ async def _link_view(session: AsyncSession, target: tokens.LinkTarget) -> LinkIn
         rule=step.rule,
         required=required,
         due_at=step.due_at,
-        describe_lines=await notify._describe_lines(session, approval),  # noqa: SLF001
+        describe_lines=await notify.describe_lines(session, approval),
     )
 
 

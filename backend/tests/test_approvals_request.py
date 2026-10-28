@@ -38,7 +38,7 @@ from tests._approvals_helpers import (
     to_async_url,
 )
 from tests._row_cleanup import delete_above_marks, snapshot_marks
-from tiqora.approvals import access, audit, service
+from tiqora.approvals import _engine, access, audit, service
 from tiqora.approvals.contract import (
     EVENT_CANCELLED,
     EVENT_DECIDED,
@@ -372,7 +372,7 @@ async def test_customer_setting_off_excludes_at_activation(
             first.status = "approved"
             await session.flush()
             approval = await _row(session, info.approval_id)
-            new_ids = await service._activate_next_stage(
+            new_ids = await _engine.activate_next_stage(
                 session, approval, settings=ApprovalSettings(), registry=reg
             )
             assert new_ids == []
@@ -1142,13 +1142,13 @@ async def test_system_and_portal_creators_do_not_make_agent_1_a_creator(
                 row = await _row(session, info.approval_id)
                 assert row.created_by == 1
                 assert await audit.creator_key(session, row) in (None, "customer:appr97-k1")
-                excluded = await service._excluded_keys(session, row)
+                excluded = await _engine.excluded_keys(session, row)
                 assert "agent:1" not in excluded
                 assert not await access.can_cancel(session, row, Actor(Principal.agent(1), 1))
             row = await _row(session, by_agent.approval_id)
             assert await audit.creator_key(session, row) == f"agent:{AG3}"
-            assert await service._excluded_keys(session, row) == {f"agent:{AG3}"}
+            assert await _engine.excluded_keys(session, row) == {f"agent:{AG3}"}
             assert await access.can_cancel(session, row, Actor.agent(AG3))
             # the portal creator is excluded as a creator in later stages (not only as requester)
             row = await _row(session, by_portal.approval_id)
-            assert await service._excluded_keys(session, row) == {"customer:appr97-k1"}
+            assert await _engine.excluded_keys(session, row) == {"customer:appr97-k1"}
