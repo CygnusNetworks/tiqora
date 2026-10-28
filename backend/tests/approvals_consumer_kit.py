@@ -17,15 +17,25 @@ Everything here talks to the public service API only. The helpers never commit: 
 and ``reject_first`` flush on the caller's session, :func:`run_hook_now` opens sessions through
 the factory it is given and commits the way the job does. ``shared_session_factory`` adapts a
 rolled-back test session (``approvals_session``) to the factory shape the job expects.
+
+Lock order (contract): a consumer calls the approval service (``request_approval``,
+``cancel_approval``, ``record_auto_decision``) **before** it writes the Znuny ``ticket`` row
+(state, owner, lock, articles, history) in the same transaction. The engine itself locks
+``tiqora_approval`` first and touches ``ticket`` afterwards (history lines insert child rows,
+which InnoDB guards with a shared lock on the ticket), so a consumer that updates the ticket
+first deadlocks (MariaDB 1213) with a concurrent vote. :func:`race_consumer_and_vote` checks a
+consumer's transaction against a vote that arrives in between its two halves.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+import asyncio
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.approvals import service
@@ -43,6 +53,7 @@ from tiqora.approvals.models import TiqoraApprovalApprover, TiqoraApprovalStep
 from tiqora.config import Settings
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.context import JobContext
+from tiqora.jobs.service import utc_now
 
 _SETTINGS = Settings(environment="test")
 _MAX_ROUNDS = 100  # more votes than any definition has approvers: guards a stuck loop
@@ -172,3 +183,111 @@ async def reject_first(session: AsyncSession, approval_id: int) -> ApprovalInfo:
     others) the request may still be pending afterwards.
     """
     return await _vote_all(session, approval_id, "rejected", stop_after_first=True)
+
+
+# --- lock order -------------------------------------------------------------------------------
+
+_MARIADB_DEADLOCK = 1213
+#: how long the vote is given to reach its lock wait (no PROCESS privilege to ask InnoDB)
+_BLOCK_WAIT_SECONDS = 1.0
+
+
+async def touch_ticket(session: AsyncSession, ticket_id: int) -> None:
+    """A consumer's write of the Znuny ``ticket`` row (an X lock), e.g. its state change."""
+    await session.execute(
+        text("UPDATE ticket SET change_time = :now WHERE id = :t"),
+        {"now": utc_now().replace(microsecond=0), "t": ticket_id},
+    )
+
+
+def _db_outcome(exc: DBAPIError) -> str:
+    code = exc.orig.args[0] if exc.orig is not None and exc.orig.args else None
+    return "deadlock" if code == _MARIADB_DEADLOCK else f"db_error:{type(exc.orig).__name__}"
+
+
+async def _vote_and_commit(
+    factory: async_sessionmaker[AsyncSession],
+    approval_id: int,
+    voter: Actor,
+    approver_id: int | None,
+) -> str:
+    async with factory() as session:
+        await session.rollback()  # deciding callers roll back first (F1(a))
+        try:
+            await service.decide(
+                session,
+                approval_id,
+                actor=voter,
+                decision="approved",
+                channel="api",
+                approver_id=approver_id,
+                settings=_SETTINGS,
+            )
+            await session.commit()
+        except ApprovalError as exc:
+            await session.rollback()
+            return exc.code
+        except DBAPIError as exc:
+            await session.rollback()
+            return _db_outcome(exc)
+        return "ok"
+
+
+async def _wait_until_blocked(task: asyncio.Task[str]) -> None:
+    """Gives *task* time to run into a lock wait; returns early once it finished."""
+    for _ in range(10):
+        if task.done():
+            return
+        await asyncio.sleep(_BLOCK_WAIT_SECONDS / 10)
+
+
+async def race_consumer_and_vote(
+    factory: async_sessionmaker[AsyncSession],
+    approval_id: int,
+    *,
+    first: Callable[[AsyncSession], Awaitable[object]],
+    then: Callable[[AsyncSession], Awaitable[object]],
+    voter: Actor,
+    approver_id: int | None = None,
+    within_seconds: float = 45,
+) -> tuple[str, str]:
+    """``(consumer outcome, vote outcome)`` of a consumer transaction raced by one vote.
+
+    Session A (the consumer) runs *first* - with the contract's order, the approval service
+    call - then a vote by *voter* starts in session B and is given time to block on A's locks,
+    then A runs *then* (its ``ticket`` write, e.g. :func:`touch_ticket`) and commits. Outcomes
+    are ``ok``, an ``ApprovalError`` code, ``deadlock`` (MariaDB 1213) or ``db_error:<class>``.
+    Needs a factory on committed data (two real connections), never ``approvals_session``.
+    """
+
+    votes: list[asyncio.Task[str]] = []
+
+    async def consumer() -> tuple[str, str]:
+        async with factory() as a:
+            await first(a)
+            votes.append(
+                asyncio.create_task(_vote_and_commit(factory, approval_id, voter, approver_id))
+            )
+            await _wait_until_blocked(votes[0])
+            try:
+                await then(a)
+                await a.commit()
+                outcome = "ok"
+            except ApprovalError as exc:
+                await a.rollback()
+                outcome = exc.code
+            except DBAPIError as exc:
+                await a.rollback()
+                outcome = _db_outcome(exc)
+        return outcome, await votes[0]
+
+    try:
+        return await asyncio.wait_for(consumer(), timeout=within_seconds)
+    except TimeoutError as exc:
+        raise AssertionError(
+            f"consumer and vote did not finish within {within_seconds} s (lock wait?)"
+        ) from exc
+    finally:
+        for vote in votes:
+            if not vote.done():
+                vote.cancel()

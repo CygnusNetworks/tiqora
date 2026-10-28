@@ -1,13 +1,15 @@
 """The approval engine's service API (A7), stable for consumers.
 
-Request, activation, auto decision, cancel and the read functions live here; voting, forwarding
-and refreshing are added by the decision tasks. Every function takes an ``AsyncSession``,
-flushes and never commits: the caller owns the transaction. Every state-changing function locks
-``tiqora_approval`` first (``FOR UPDATE``, ``populate_existing``) and reads the step/approver rows
-it is about to change with locking reads, so InnoDB hands out the latest committed versions
-instead of the REPEATABLE-READ snapshot - a consumer calling from inside its own transaction
-cannot roll back to please the engine. Lock order: consumer row, ``tiqora_approval``,
-step/approver/token rows. Timestamps are naive UTC (``utc_now``).
+Request, auto decision, cancel, voting, forwarding, refreshing and the read functions (C1); the
+shared internals live in :mod:`tiqora.approvals._engine`. Every function takes an
+``AsyncSession``, flushes and never commits: the caller owns the transaction. Every
+state-changing function locks ``tiqora_approval`` first (``FOR UPDATE``, ``populate_existing``)
+and reads the step/approver rows it is about to change with locking reads, so InnoDB hands out
+the latest committed versions instead of the REPEATABLE-READ snapshot - a consumer calling from
+inside its own transaction cannot roll back to please the engine. Lock order: consumer row,
+``tiqora_approval``, step/approver/token rows, then the Znuny ``ticket`` row (history lines): a
+consumer calls these functions before it writes the ticket in the same transaction (see
+:mod:`tiqora.approvals.contract`). Timestamps are naive UTC (``utc_now``).
 """
 
 from __future__ import annotations

@@ -4,6 +4,15 @@ Consumers (ITSM change, catalogue, process) import names from here and from ``se
 Changes after the first consumer forked are additive only (new keyword arguments / fields with
 defaults, new ``ERROR_STATUS`` codes).
 
+Lock order (consumers lock in the order approval -> ticket): a consumer locks its own row first,
+then calls the approval service (``request_approval``, ``cancel_approval``,
+``record_auto_decision``) **before** it writes the Znuny ticket row (state, owner, lock, queue,
+articles, history) in the same transaction. The engine locks ``tiqora_approval`` and then touches
+the ticket (its history lines are child rows of ``ticket``; InnoDB guards them with a shared lock
+on the ticket row), so a consumer that writes the ticket first deadlocks with a concurrent vote
+on MariaDB (1213). Full order: consumer row -> ``tiqora_approval`` -> approver/token rows ->
+``ticket``. ``tests/approvals_consumer_kit.race_consumer_and_vote`` checks a consumer against it.
+
 Pure module: no database, network, file system or settings access. It imports only the standard
 library, pydantic, ``sqlalchemy.ext.asyncio`` (type checking only) and
 ``tiqora.extensions.registry``.

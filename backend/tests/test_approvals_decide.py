@@ -38,6 +38,7 @@ from tests._approvals_helpers import (
     to_async_url,
 )
 from tests._row_cleanup import delete_above_marks, snapshot_marks
+from tests.approvals_consumer_kit import race_consumer_and_vote, touch_ticket
 from tiqora.approvals import delegation, rules, service
 from tiqora.approvals.contract import (
     EVENT_DECIDED,
@@ -1064,3 +1065,47 @@ async def test_cancel_inside_consumer_transaction_sees_late_vote(
                         AG5: "not_needed",
                     }
                     assert [v.decision for v in await _votes(a, aid)] == ["approved"]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("call", ["cancel", "supersede"])
+async def test_consumer_order_approval_then_ticket_never_deadlocks(
+    request: pytest.FixtureRequest, call: str
+) -> None:
+    """MariaDB: the contract's lock order (approval service first, then the ticket row).
+
+    A consumer cancels (or supersedes) inside its transaction, a vote arrives and waits for the
+    request lock, then the consumer writes the ticket row and commits. No 1213: the vote sees
+    the closed request. (The engine's own history line S-locks the ticket after the request,
+    so a consumer that wrote the ticket first would deadlock here.)
+    """
+    async with _committed_world(request.getfixturevalue("mariadb_znuny_url")) as factory:
+        with installed_registry(make_fake_subject_type()):
+            async with factory() as setup:
+                aid = await _request(setup, ALL_THREE)
+                await setup.commit()
+
+            async def consumer_call(a: AsyncSession) -> None:
+                if call == "cancel":
+                    await service.cancel_approval(
+                        a, aid, actor=REQUESTER, check_permission=False, settings=SETTINGS
+                    )
+                else:
+                    await _request(a, ALL_THREE)
+
+            outcome = await race_consumer_and_vote(
+                factory,
+                aid,
+                first=consumer_call,
+                then=lambda a: touch_ticket(a, T1),
+                voter=Actor.agent(AG3),
+            )
+            assert outcome == ("ok", "approval_closed")
+            async with factory() as check:
+                assert (await _row(check, aid)).status == "cancelled"
+                assert await _votes(check, aid) == []
+                history = await check.execute(
+                    text("SELECT name FROM ticket_history WHERE ticket_id = :t AND name = :n"),
+                    {"t": T1, "n": f"Approval #{aid}: cancelled"},
+                )
+                assert len(history.all()) == 1

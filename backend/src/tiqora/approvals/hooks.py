@@ -3,10 +3,12 @@
 The deciding transaction only enqueues the job (dedupe key ``approval:<id>:<status>``); the
 consumer hook runs here, after that commit, so a consumer bug can never roll back a vote. The job
 does not lock ``tiqora_approval`` before it calls ``on_decided`` (the consumer takes its own locks
-first, then the engine's - lock order of the service). One attempt is one transaction: the
-optional note, the hook and the ``hook_done`` audit row commit together, so a retry never leaves a
-second note behind. Retried up to ``max_attempts`` times (60 s * attempt); the last failure is
-audited as ``hook_failed`` with the exception class name.
+first, then the engine's - lock order of the service), and it writes the optional decision note
+(a ticket article) only after ``on_decided``: consumer rows before the Znuny ``ticket`` row, as
+the contract asks of consumers. One attempt is one transaction: the hook, the optional note and
+the ``hook_done`` audit row commit together, so a retry never leaves a second note behind.
+Retried up to ``max_attempts`` times (60 s * attempt); the last failure is audited as
+``hook_failed`` with the exception class name.
 """
 
 from __future__ import annotations
@@ -198,17 +200,17 @@ async def _run_once(
 
     actor = Actor.system()
     settings = await load_approval_settings(session, ctx.settings)
-    note = "off"
-    if settings.decision_note:
-        note = await _write_note(session, approval, actor)
-
     subject_type = get_registry().get(APPROVAL_SUBJECT_TYPES, approval.subject_type)
     if subject_type is None:
         raise LookupError(f"subject type not registered: {approval.subject_type}")
+    # the consumer's rows first, the ticket (decision note) after: the lock order of the contract
     hook = "none"
     if subject_type.on_decided is not None:
         await subject_type.on_decided(session, await _outcome(session, approval))
         hook = "called"
+    note = "off"
+    if settings.decision_note:
+        note = await _write_note(session, approval, actor)
     await audit.record(
         session,
         approval=approval,

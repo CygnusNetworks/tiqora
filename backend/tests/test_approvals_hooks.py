@@ -294,6 +294,31 @@ async def test_decision_note_written_when_enabled(
 
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_hook_runs_on_decided_before_the_note(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Lock order: the consumer's rows (``on_decided``) before the ticket row (the note)."""
+    fake = make_fake_subject_type()
+    seen: list[int] = []
+
+    async def count_notes(session: AsyncSession, outcome: Any) -> None:
+        seen.append(len(await _notes(session)))
+
+    probing = replace(fake.item, on_decided=count_notes)
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(probing):
+            await _set(session, decision_note=True)
+            await session.commit()
+            approval_id, _ = await _decided(session)
+            before = await _notes(session)
+            result = await run_hook_now(shared_session_factory(session), approval_id, "approved")
+            assert (result["hook"], result["note"]) == ("called", "written")
+            assert seen == [len(before)]  # no note yet while the consumer ran
+            assert len(await _notes(session)) == len(before) + 1
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_decision_note_veto_skipped(
     url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:

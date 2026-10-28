@@ -513,11 +513,18 @@ Principal-Schlüssel haben die Form `agent:<id>` und `customer:<login>`.
 **Sperrreihenfolge.** Jede Funktion, die den Zustand ändert, sperrt zuerst `tiqora_approval`
 (`SELECT … FOR UPDATE`) und liest danach Schritte, Freigeber und Token mit Sperre. Die Reihenfolge
 ist überall: eigene Zeile des Verbrauchers (zum Beispiel die Änderung) → `tiqora_approval` →
-Freigeber und Token. Routen (Agent, Portal, Link, MCP) rufen vor `decide` und `redeem_link`
-`await session.rollback()` auf, damit die Sperre die erste Anweisung der Transaktion ist.
-Verbraucher dagegen rufen `request_approval`, `cancel_approval` und `record_auto_decision` innerhalb
-ihrer **eigenen** Transaktion auf, nachdem sie ihre eigene Zeile gesperrt haben (kein `rollback`). Tests dafür: `tests/approvals_consumer_kit.py`
-(`approve_all`, `reject_first`, `run_hook_now`, `assert_subject_registered`).
+Freigeber und Token → Znuny-Zeile `ticket`. Routen (Agent, Portal, Link, MCP) rufen vor `decide`
+und `redeem_link` `await session.rollback()` auf, damit die Sperre die erste Anweisung der
+Transaktion ist. Verbraucher dagegen rufen `request_approval`, `cancel_approval` und
+`record_auto_decision` innerhalb ihrer **eigenen** Transaktion auf, nachdem sie ihre eigene Zeile
+gesperrt haben (kein `rollback`), und zwar **bevor** sie in derselben Transaktion die Ticketzeile
+schreiben (Status, Besitzer, Sperre, Queue, Artikel, Historie). Die Engine schreibt nach der
+Sperre auf `tiqora_approval` Historienzeilen zum Ticket; InnoDB sperrt dabei die Ticketzeile
+geteilt. Wer das Ticket zuerst ändert und danach die Engine aufruft, läuft unter MariaDB mit
+einer gleichzeitigen Stimme in einen Deadlock (Fehler 1213). Auch der Job `core.approval_hook`
+ruft erst `on_decided` auf und schreibt die Entscheidungsnotiz danach. Tests dafür:
+`tests/approvals_consumer_kit.py` (`approve_all`, `reject_first`, `run_hook_now`,
+`assert_subject_registered`, `race_consumer_and_vote` mit `touch_ticket` für die Sperrreihenfolge).
 
 **Gleichzeitige Anfragen.** Legen zwei Transaktionen zugleich eine Anfrage für dasselbe neue
 `(Ticket, Schlüssel)` an, verhalten sich die Datenbanken verschieden: Unter PostgreSQL können beide
