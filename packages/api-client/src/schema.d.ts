@@ -706,6 +706,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/change-schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Change Schedule */
+        get: operations["get_change_schedule_api_portal_change_schedule_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/config-items": {
         parameters: {
             query?: never;
@@ -26479,6 +26496,29 @@ export interface components {
              */
             webauthn: boolean;
         };
+        /** PortalChangeOut */
+        PortalChangeOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "scheduled" | "implementing" | "closed";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Services */
+            services: string[];
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
         /** PortalCiDetailOut */
         PortalCiDetailOut: {
             /** Class Name */
@@ -33931,6 +33971,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_schedule_api_portal_change_schedule_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalChangeOut"][];
                 };
             };
             /** @description Validation Error */

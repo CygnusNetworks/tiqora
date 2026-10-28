@@ -6,6 +6,7 @@ from tiqora.api.portal import (
     attachments,
     auth,
     auth_sso,
+    changes,
     cmdb,
     kb,
     preferences,
@@ -22,6 +23,7 @@ portal_router.include_router(security.router)
 portal_router.include_router(tickets.router)
 portal_router.include_router(attachments.router)
 portal_router.include_router(cmdb.router)
+portal_router.include_router(changes.router)
 portal_router.include_router(kb.router)
 portal_router.include_router(process.router)
 portal_router.include_router(preferences.router)

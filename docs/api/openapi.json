@@ -36210,6 +36210,78 @@
         "title": "PortalAuthMethodsOut",
         "type": "object"
       },
+      "PortalChangeOut": {
+        "properties": {
+          "change_type": {
+            "enum": [
+              "standard",
+              "normal",
+              "emergency"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "scheduled",
+              "implementing",
+              "closed"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tn",
+          "title",
+          "change_type",
+          "phase",
+          "planned_start",
+          "planned_end",
+          "services"
+        ],
+        "title": "PortalChangeOut",
+        "type": "object"
+      },
       "PortalCiDetailOut": {
         "properties": {
           "class_name": {
@@ -55903,6 +55975,79 @@
         "summary": "Totp Verify",
         "tags": [
           "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/change-schedule": {
+      "get": {
+        "operationId": "get_change_schedule_api_portal_change_schedule_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PortalChangeOut"
+                  },
+                  "title": "Response Get Change Schedule Api Portal Change Schedule Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Change Schedule",
+        "tags": [
+          "portal-changes"
         ]
       }
     },
