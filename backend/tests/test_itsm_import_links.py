@@ -220,6 +220,25 @@ async def test_non_valid_state_is_skipped(world: _World) -> None:
     assert [i.code for i in ctx.report.issues] == ["unsupported_object"]
 
 
+async def test_change_and_work_order_links_are_left_to_the_change_archive(world: _World) -> None:
+    """Work order -> CI links (and any change end) are carried by the change archive (step
+    ``changes``): neither imported nor ``unsupported_object`` nor counted as skipped."""
+    src = sample_source()
+    src.links += [
+        _link("ITSMWorkOrder", "11", "ITSMConfigItem", "1"),
+        _link("ITSMConfigItem", "2", "ITSMWorkOrder", "12", type_name="Normal"),
+        _link("ITSMChange", "13", "ITSMConfigItem", "3", type_name="Normal", state="Removed"),
+    ]
+    maps = await _import_cis(world, src)
+    ctx = await _run_links(world, src, maps)
+    assert len(await _links(world)) == 4  # the links of the sample only
+    steps = ctx.report.steps["links"]
+    assert (steps.created, steps.skipped, steps.unchanged) == (4, 1, 0)  # skipped: the FAQ link
+    assert [i.code for i in ctx.report.issues] == ["unsupported_object"]
+    assert "FAQ" in ctx.report.issues[0].message
+    assert await _link_map_count(world) == 4
+
+
 async def test_link_to_unmapped_ci_is_reported(world: _World) -> None:
     src = sample_source()
     src.links.append(_link("ITSMConfigItem", "8", "ITSMConfigItem", "999"))

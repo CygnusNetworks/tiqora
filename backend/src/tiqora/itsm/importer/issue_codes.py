@@ -8,7 +8,7 @@ from __future__ import annotations
 
 ISSUE_CODES: dict[str, str] = {
     "unsupported_object": (
-        "Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ, Change)"
+        "Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ)"
     ),
     "unknown_link_type": (
         "Der Verknüpfungstyp ist in Znuny nicht konfiguriert; die Verknüpfung wurde nicht "

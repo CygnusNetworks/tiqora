@@ -681,7 +681,8 @@ der Wechsel in den Mode B selbst (Schreibsperre in Znuny, Umstellung, Rückweg) 
 | Versionen mit `xml_storage`-Attributen | CI-Versionen mit Attributen als Schlüssel-Wert-Struktur | Datums- und Verweiswerte werden umgerechnet; Verweise auf andere CIs und Katalogeinträge werden aufgelöst |
 | Verknüpfungen CI mit CI | CI-Verknüpfungen | Verknüpfungstypen kommen aus der Znuny-Konfiguration |
 | Verknüpfungen CI mit Ticket oder Service | CI-Verknüpfungen mit Ticket oder Service | Die Ticket- und Service-Schlüssel sind in beiden Systemen dieselben |
-| Verknüpfungen CI mit anderen Objekten (FAQ, Change, Arbeitsauftrag) | nicht übernommen | Bericht: `unsupported_object` |
+| Verknüpfungen Arbeitsauftrag oder Change mit CI | im Change-Archiv beim Change | Kein eigener Eintrag im Schritt Verknüpfungen; der Schritt Changes übernimmt sie mit dem Change |
+| Verknüpfungen CI mit anderen Objekten (z. B. FAQ) | nicht übernommen | Bericht: `unsupported_object` |
 | Anhänge der Versionen | Anhänge der CI-Versionen | Nur aus der Datenbank, höchstens 50 MB je Datei |
 | Prioritätsmatrix (`cip_allocate`) | Prioritätsmatrix | Ersetzt die vorhandene Matrix als Ganzes |
 | ITSM-Angaben der Services (Typ, Kritikalität) | ITSM-Angaben des Services | Nur für Services, die es in Tiqora gibt |
@@ -730,7 +731,7 @@ einen Text. Die Codes bedeuten:
 
 | Code | Bedeutung |
 |---|---|
-| `unsupported_object` | Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ, Change); die Verknüpfung wurde nicht übernommen |
+| `unsupported_object` | Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ); die Verknüpfung wurde nicht übernommen |
 | `unknown_link_type` | Der Verknüpfungstyp ist in Znuny nicht konfiguriert; die Verknüpfung wurde nicht übernommen |
 | `attachment_in_filesystem` | Der Anhang liegt im Dateisystem von Znuny und konnte nicht aus der Datenbank gelesen werden; kopieren Sie ihn bei Bedarf von Hand |
 | `attachment_too_large` | Der Anhang überschreitet die zulässige Größe (50 MB) und wurde nicht übernommen |
