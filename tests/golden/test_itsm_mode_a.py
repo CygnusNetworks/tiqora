@@ -243,6 +243,27 @@ def _fresh_detect_cache() -> None:
     clear_detect_cache()
 
 
+_DELETE_TICKETS = r"""
+my @IDs = $TicketObject->TicketSearch(
+    Result => 'ARRAY', Title => 'itsm28 *', UserID => 1, Limit => 1000,
+    StateType => [ 'new', 'open', 'closed', 'removed', 'pending reminder', 'pending auto' ],
+);
+$TicketObject->TicketDelete( TicketID => $_, UserID => 1 ) or die "TicketDelete $_ failed" for @IDs;
+Emit({ deleted => scalar @IDs });
+"""
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _module_tickets() -> Generator[None, None, None]:
+    """The tickets the cases create (``NewTicket('itsm28 ...')``) are removed with
+    ``TicketDelete`` (links, history and articles with them), also leftovers of an aborted run."""
+    znuny_json(_DELETE_TICKETS)
+    try:
+        yield
+    finally:
+        znuny_json(_DELETE_TICKETS)
+
+
 async def _commit(
     factory: SessionFactory,
     action: Callable[[AsyncSession, ZnunyCiProvider], Awaitable[Any]],
