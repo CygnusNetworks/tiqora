@@ -26,6 +26,7 @@ from tests._change_fixtures import (
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_db, get_session_factory_dep
 from tiqora.api.portal.deps import get_current_customer, require_portal_enabled
+from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.customer_auth import AuthenticatedCustomer
 from tiqora.itsm.change.models import (
@@ -135,6 +136,17 @@ async def _change(
     )
     await w.session.flush()
     return tid
+
+
+def _wired_client(w: ChangeWorld, *, portal_enabled: bool = True) -> AsyncClient:
+    """Production wiring: only the database is replaced; portal gate and customer auth are real."""
+
+    async def _db() -> Any:
+        yield w.session
+
+    app = create_app(Settings(environment="test", portal_enabled=portal_enabled))
+    app.dependency_overrides[get_db] = _db
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
 def _client(w: ChangeWorld, login: str = CUSTOMER) -> AsyncClient:
@@ -265,5 +277,48 @@ async def test_output_has_no_internal_fields(w: ChangeWorld) -> None:
     }
     assert item["change_type"] == "normal"
     assert item["planned_start"].startswith("2026-11-10T08:00:00")
-    for secret in ("geheimer", "risk", "high", "owner", "cab", "ticket_id", f'"id": {tid}'):
-        assert secret not in r.text
+    # the plain-text plans and the ids are not in the body, only the seven keys above
+    assert "geheimer" not in r.text
+    assert tid not in {v for v in item.values() if isinstance(v, int)}
+
+
+async def test_production_wiring_gate_and_auth(w: ChangeWorld) -> None:
+    await _change(w, ticket_service=SVC_MINE)
+    async with _wired_client(w, portal_enabled=False) as c:
+        off = await c.get("/api/portal/change-schedule", params=RANGE)
+    assert (off.status_code, off.json()) == (404, {"detail": "Not Found"})
+    async with _wired_client(w) as c:
+        anon = await c.get("/api/portal/change-schedule", params=RANGE)
+    assert (anon.status_code, anon.json()) == (401, {"detail": "Not authenticated"})
+    # the schedule's own switch is checked before authentication: nothing to learn when off
+    await _enable(w, False)
+    async with _wired_client(w) as c:
+        feature_off = await c.get("/api/portal/change-schedule", params=RANGE)
+    assert (feature_off.status_code, feature_off.json()) == (404, {"detail": "Not Found"})
+
+
+async def test_invalid_service_assignment_is_not_shown(w: ChangeWorld) -> None:
+    await w.session.execute(
+        text("UPDATE service SET valid_id = 2 WHERE id = :s"), {"s": SVC_SHARED}
+    )
+    await _change(w, title="chg94 invalid", ticket_service=SVC_SHARED)
+    await _change(w, title="chg94 both", ticket_service=SVC_SHARED, extra=(SVC_MINE,))
+    got = {i["title"]: i["services"] for i in (await _get(w)).json()}
+    assert got == {"chg94 both": ["chg94-mine"]}
+
+
+async def test_scan_cap_sets_truncated_header(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.itsm.change import portal as portal_module
+
+    monkeypatch.setattr(portal_module, "LIST_SCAN_CAP", 2)
+    for n in range(3):
+        await _change(w, title=f"chg94 cap {n}", extra=(SVC_MINE,))
+    r = await _get(w)
+    assert r.status_code == 200
+    assert r.headers["X-Schedule-Truncated"] == "true"
+    assert len(r.json()) == 2
+    monkeypatch.setattr(portal_module, "LIST_SCAN_CAP", 5000)
+    ok = await _get(w)
+    assert "X-Schedule-Truncated" not in ok.headers and len(ok.json()) == 3

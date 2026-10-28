@@ -55980,6 +55980,7 @@
     },
     "/api/portal/change-schedule": {
       "get": {
+        "description": "The body stays a list; ``X-Schedule-Truncated: true`` says the scan cap bit.",
         "operationId": "get_change_schedule_api_portal_change_schedule_get",
         "parameters": [
           {

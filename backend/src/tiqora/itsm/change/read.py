@@ -265,6 +265,12 @@ def _service_cond(service_ids: Sequence[int]) -> ColumnElement[bool]:
     )
 
 
+#: public names for the portal schedule (same module family, one definition)
+chunked = _chunked
+window_cond = _window_cond
+service_cond = _service_cond
+
+
 @dataclass(frozen=True, slots=True)
 class _Rec:
     ticket_id: int

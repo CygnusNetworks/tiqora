@@ -713,7 +713,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Change Schedule */
+        /**
+         * Get Change Schedule
+         * @description The body stays a list; ``X-Schedule-Truncated: true`` says the scan cap bit.
+         */
         get: operations["get_change_schedule_api_portal_change_schedule_get"];
         put?: never;
         post?: never;

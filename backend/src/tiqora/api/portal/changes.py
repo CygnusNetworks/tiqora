@@ -3,25 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.portal.deps import CurrentCustomer
-from tiqora.itsm.change.portal import schedule_enabled, schedule_for_customer
-
-
-class PortalChangeOut(BaseModel):
-    tn: str
-    title: str
-    change_type: Literal["standard", "normal", "emergency"]
-    phase: Literal["scheduled", "implementing", "closed"]
-    planned_start: datetime | None
-    planned_end: datetime | None
-    #: only the customer's own services among the affected ones
-    services: list[str]
+from tiqora.itsm.change.portal import PortalChangeOut, schedule_enabled, schedule_for_customer
 
 
 async def require_schedule_enabled(session: DbSession, settings: AppSettings) -> None:
@@ -41,19 +29,12 @@ router = APIRouter(
 async def get_change_schedule(
     customer: CurrentCustomer,
     session: DbSession,
+    response: Response,
     start: Annotated[datetime, Query()],
     end: Annotated[datetime, Query()],
 ) -> list[PortalChangeOut]:
-    items = await schedule_for_customer(session, login=customer.login, start=start, end=end)
-    return [
-        PortalChangeOut(
-            tn=i.tn,
-            title=i.title,
-            change_type=i.change_type,  # type: ignore[arg-type]
-            phase=i.phase,  # type: ignore[arg-type]
-            planned_start=i.planned_start,
-            planned_end=i.planned_end,
-            services=list(i.services),
-        )
-        for i in items
-    ]
+    """The body stays a list; ``X-Schedule-Truncated: true`` says the scan cap bit."""
+    schedule = await schedule_for_customer(session, login=customer.login, start=start, end=end)
+    if schedule.truncated:
+        response.headers["X-Schedule-Truncated"] = "true"
+    return schedule.items
