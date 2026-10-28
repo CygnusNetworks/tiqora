@@ -3,7 +3,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { approvalErrorMessage } from "@/lib/approvalsApi";
 
 /**
- * "Anfrage zurückziehen?" for the inbox, the ticket panel and the admin overview. A withdrawal is final
+ * "Anforderung zurückziehen?" for the inbox, the ticket panel and the admin overview. A withdrawal is final
  * (the approvers' links die and nobody can decide any more), so every page asks first.
  */
 export function WithdrawConfirm({
