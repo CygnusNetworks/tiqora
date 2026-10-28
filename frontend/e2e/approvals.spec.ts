@@ -173,7 +173,7 @@ test.describe("agent inbox on a phone", () => {
 
     await sheet.getByTestId("approval-approve").click();
     await page.getByTestId("decision-submit").click();
-    await expect(sheet.getByTestId("approval-detail").getByTestId("approval-status-badge").first().first()).toContainText("Freigegeben");
+    await expect(sheet.getByTestId("approval-detail").getByTestId("approval-status-badge").first()).toContainText("Freigegeben");
 
     await sheet.getByTestId("approval-sheet-close").click();
     await expect(sheet).toHaveCount(0);

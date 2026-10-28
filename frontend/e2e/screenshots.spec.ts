@@ -411,6 +411,16 @@ test("cmdb screenshots", async ({ page }) => {
 test("approvals screenshots", async ({ page }) => {
   await prep(page);
   await mockAdminApi(page);
+  // The default fixture has system queues only (hidden in the sidebar): show a few real ones.
+  const q = (id: number, name: string, open: number, children: unknown[] = []) => ({
+    id, name, group_id: 1, valid: true, counts: { open, locked: 0, unlocked: open, total: open }, children,
+  });
+  await page.route("**/api/v1/queues", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([q(10, "Support", 7, [{ ...q(11, "Support::Netzwerk", 3), parent_name: "Support" }]), q(12, "Vertrieb", 2)]),
+    }),
+  );
   await loginAsAgent(page);
   await shot(page, "/agent/approvals?id=501", "agent-approvals");
   try {
@@ -427,6 +437,8 @@ test("approvals screenshots", async ({ page }) => {
   }
   await shot(page, "/approve#t=demo", "approval-confirm-page");
   try {
+    // Tall enough for the whole first step, so the dialog is not cut off at the top.
+    await page.setViewportSize({ width: 1440, height: 1500 });
     await page.goto("/admin/approvals/templates", { waitUntil: "domcontentloaded" });
     await page.locator('[data-testid="template-row"][data-template-key="cab_normal"]').getByTestId("template-edit").click({ timeout: 5000 });
     await page.getByTestId("template-check-ok").waitFor({ state: "visible", timeout: 5000 });

@@ -2548,7 +2548,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
       { id: 1, name: "Standard (8x5)" },
       { id: 2, name: "Premium (24x7)" },
     ];
-  if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, name: o.owner_name }));
+  if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, full_name: o.owner_name, name: o.owner_name }));
   if (p.endsWith("/api/v1/tickets/dashboard-summary")) return { my_open: 9, my_new: 3, unowned_new: 5, escalated: 6 };
   if (p.endsWith("/api/v1/tickets") && method === "GET") return ticketListPage();
   if (p.endsWith("/api/v1/tickets/facets")) return ticketFacets();
