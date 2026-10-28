@@ -241,6 +241,8 @@ class LinkInspectOut(BaseModel):
     ticket_title: str | None = None
     step_name: str | None = None
     rule: str | None = None
+    #: Approvals needed; only for ``quorum`` / ``majority`` (``any`` / ``all`` say it themselves).
+    required: int | None = None
     due_at: UtcDateTime | None = None
     describe_lines: list[str] = Field(default_factory=list)
 

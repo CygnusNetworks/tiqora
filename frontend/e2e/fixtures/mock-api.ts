@@ -15,7 +15,7 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
-import { resolveApprovalsData } from "../../src/demo/approvalsMock";
+import { resolveApprovalLink, resolveApprovalsData } from "../../src/demo/approvalsMock";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
@@ -684,6 +684,15 @@ export async function mockApi(page: Page) {
     // default link setting (details off), so the derived-preset titles are what the e2e sees.
     if (path.includes("/api/v1/kiosk/")) {
       const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
+      if (out) {
+        await json(route, out.status, out.body);
+        return;
+      }
+    }
+
+    // Public approval link: answers from the request body (token `demo`).
+    if (path.includes("/api/v1/approval-links/")) {
+      const out = resolveApprovalLink(path, method, method === "POST" ? req.postDataJSON() : undefined);
       if (out) {
         await json(route, out.status, out.body);
         return;

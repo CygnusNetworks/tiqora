@@ -2,15 +2,24 @@ import { ApiClient } from "@tiqora/api-client";
 
 let redirecting = false;
 
+/** Pages that authenticate by their own secret and must never bounce to the login page. */
+export function isSessionlessPath(path: string): boolean {
+  return (
+    path.startsWith("/login") ||
+    // The public wallboard has no login: an error there must never leave the page.
+    path.startsWith("/wallboard") ||
+    // The approval link authenticates by its token, never by a session.
+    path === "/approve" ||
+    path.startsWith("/approve?") ||
+    path.startsWith("/approve/")
+  );
+}
+
 function goLogin() {
   if (redirecting) return;
   if (typeof window === "undefined") return;
   const path = window.location.pathname + window.location.search;
-  if (path.startsWith("/login")) return;
-  // The public wallboard has no login: an error there must never leave the page.
-  if (path.startsWith("/wallboard")) return;
-  // The public approval link authenticates by its token, never by a session.
-  if (path.startsWith("/approve")) return;
+  if (isSessionlessPath(path)) return;
   redirecting = true;
   const next = encodeURIComponent(path || "/agent");
   window.location.assign(`/login?next=${next}`);

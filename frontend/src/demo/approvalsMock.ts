@@ -420,11 +420,36 @@ const LINK_INSPECT: ApprovalLinkInspect = {
   ticket_title: cabChange.ticket_title,
   step_name: "CAB",
   rule: "majority",
+  required: 2,
   approver_name: "Erika Muster",
   due_at: DUE_FUTURE,
   description: cabChange.description,
   describe_lines: cabChange.describe_lines,
 };
+
+/** Only the token `demo` is a live link; everything else is a dead one (`link_invalid`). */
+export const DEMO_APPROVAL_LINK_TOKEN = "demo";
+
+/**
+ * Public link endpoints with the request body (the plain resolver never sees it): inspect and
+ * decide answer for the demo token, decide echoes the chosen decision as the request status.
+ */
+export function resolveApprovalLink(
+  path: string,
+  method: string,
+  body: unknown,
+): { status: number; body: unknown } | undefined {
+  if (method !== "POST") return undefined;
+  const isInspect = path.endsWith("/api/v1/approval-links/inspect");
+  const isDecide = path.endsWith("/api/v1/approval-links/decide");
+  if (!isInspect && !isDecide) return undefined;
+  const sent = (body ?? {}) as { token?: unknown; decision?: unknown };
+  const live = sent.token === DEMO_APPROVAL_LINK_TOKEN;
+  if (isInspect) return { status: 200, body: live ? LINK_INSPECT : { valid: false, code: "link_invalid" } };
+  if (!live) return { status: 410, body: { detail: { code: "link_invalid", detail: null } } };
+  const decision = sent.decision === "rejected" ? "rejected" : "approved";
+  return { status: 200, body: { status: decision, decision } };
+}
 
 const idOf = (m: RegExpMatchArray | null) => (m ? Number(m[1]) : null);
 

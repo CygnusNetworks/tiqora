@@ -11,7 +11,7 @@ import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
 import { demoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolveItsmData } from "./itsmMock";
-import { resolveApprovalsData } from "./approvalsMock";
+import { resolveApprovalLink, resolveApprovalsData } from "./approvalsMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
@@ -133,6 +133,12 @@ function kioskResponse(request: Request): Response | undefined {
 }
 
 export const handlers = [
+  // Public approval link: the body decides (token `demo`, approve vs. reject).
+  http.post("*/api/v1/approval-links/*", async ({ request }) => {
+    const body = await request.json().catch(() => ({}));
+    const out = resolveApprovalLink(new URL(request.url).pathname, "POST", body);
+    return out ? HttpResponse.json(out.body as never, { status: out.status }) : HttpResponse.json({}, { status: 404 });
+  }),
   // Approvals: the inbox and the portal list filter on `?state=`, which resolveData never sees.
   http.get("*/api/v1/approvals/inbox", ({ request }) => {
     const url = new URL(request.url);

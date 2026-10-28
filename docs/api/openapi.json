@@ -25825,6 +25825,17 @@
             ],
             "title": "Due At"
           },
+          "required": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required"
+          },
           "rule": {
             "anyOf": [
               {

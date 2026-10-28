@@ -31,6 +31,7 @@ from tiqora.approvals import (
     inbox,
     lists,
     notify,
+    rules,
     service,
     templates,
     tokens,
@@ -574,6 +575,10 @@ async def _link_view(session: AsyncSession, target: tokens.LinkTarget) -> LinkIn
     ).scalar_one()
     labels = await detail.principal_labels(session, [approver.principal])
     number, ticket_title = await detail._load_ticket(session, approval.ticket_id)  # noqa: SLF001
+    required = None
+    if step.rule in ("quorum", "majority"):
+        voters, _ = (await inbox._progress(session, [step.id]))[step.id]  # noqa: SLF001
+        required = rules.required_votes(step.rule, step.quorum, voters)  # type: ignore[arg-type]
     return LinkInspectOut(
         valid=True,
         approver_name=labels[approver.principal],
@@ -583,6 +588,7 @@ async def _link_view(session: AsyncSession, target: tokens.LinkTarget) -> LinkIn
         ticket_title=ticket_title,
         step_name=step.name,
         rule=step.rule,
+        required=required,
         due_at=step.due_at,
         describe_lines=await notify._describe_lines(session, approval),  # noqa: SLF001
     )

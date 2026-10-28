@@ -22714,6 +22714,8 @@ export interface components {
             description?: string | null;
             /** Due At */
             due_at?: string | null;
+            /** Required */
+            required?: number | null;
             /** Rule */
             rule?: string | null;
             /** Step Name */

@@ -9244,8 +9244,8 @@
       "requestStatus": "Status der Anfrage: {{status}}",
       "closeHint": "Sie können dieses Fenster jetzt schließen.",
       "retryIn": "Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
-      "ruleQuorum": "Eine Mindestanzahl an Freigaben ist nötig",
-      "ruleMajority": "Mehrheit der Freigaben nötig"
+      "reopen": "Öffnen Sie den Link aus der E-Mail erneut.",
+      "retry": "Erneut versuchen"
     },
     "subject": {
       "ticket": "Ticket"

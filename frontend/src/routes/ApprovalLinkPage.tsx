@@ -14,7 +14,7 @@ type Phase =
   | { kind: "loading" }
   | { kind: "missing" }
   | { kind: "ready"; info: ApprovalLinkInspect }
-  | { kind: "error"; message: string; retryAfter?: number }
+  | { kind: "error"; message: string; retryable: boolean }
   | { kind: "done"; result: ApprovalLinkDecision };
 
 const LINK_CODES = new Set(["link_invalid", "link_expired", "link_used"]);
@@ -37,40 +37,54 @@ export function ApprovalLinkPage() {
   const started = useRef(false);
 
   const [comment, setComment] = useState("");
-  const [touched, setTouched] = useState(false);
+  const [reasonAsked, setReasonAsked] = useState(false);
   const [pending, setPending] = useState<"approved" | "rejected" | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   // Rate limit on decide: the buttons stay off until this moment (epoch ms).
   const [blockedUntil, setBlockedUntil] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
-  const failure = (err: unknown): Phase => ({
-    kind: "error",
-    message: approvalErrorMessage(err, t),
-    retryAfter: err instanceof ApiError && err.status === 429 ? err.retryAfterSeconds : undefined,
-  });
-
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const found = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("t");
-    window.history.replaceState(null, "", "/approve");
-    if (!found) {
-      setPhase({ kind: "missing" });
-      return;
+  // Seconds the server asked us to wait (429); the buttons and the retry stay off until then.
+  const holdOff = (err: unknown) => {
+    if (err instanceof ApiError && err.status === 429 && err.retryAfterSeconds) {
+      setBlockedUntil(Date.now() + err.retryAfterSeconds * 1000);
+      setNow(Date.now());
     }
-    token.current = found;
-    approvalLinkApi.inspect(found).then(
+  };
+
+  // A dead link will not get better by asking again; a throttle, 5xx or network error might.
+  const failure = (err: unknown): Phase => {
+    const code = approvalErrorCode(err);
+    holdOff(err);
+    return { kind: "error", message: approvalErrorMessage(err, t), retryable: !(code && LINK_CODES.has(code)) };
+  };
+
+  const runInspect = (tok: string) => {
+    setPhase({ kind: "loading" });
+    approvalLinkApi.inspect(tok).then(
       (info) => {
         if (info.valid) {
           setPhase({ kind: "ready", info });
         } else {
           const code = info.code && LINK_CODES.has(info.code) ? info.code : "link_invalid";
-          setPhase({ kind: "error", message: t(`approvals.errors.${code}`) });
+          setPhase({ kind: "error", message: t(`approvals.errors.${code}`), retryable: false });
         }
       },
       (err: unknown) => setPhase(failure(err)),
     );
+  };
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    const found = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("t");
+    window.history.replaceState(window.history.state, "", "/approve");
+    if (!found) {
+      setPhase({ kind: "missing" });
+      return;
+    }
+    token.current = found;
+    runInspect(found);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once; t/failure only build messages
   }, []);
 
@@ -85,7 +99,7 @@ export function ApprovalLinkPage() {
 
   const submit = async (decision: "approved" | "rejected") => {
     if (!token.current || pending || Date.now() < blockedUntil) return;
-    setTouched(true);
+    setReasonAsked(decision === "rejected");
     if (decision === "rejected" && comment.trim() === "") return;
     setPending(decision);
     setFormError(null);
@@ -98,10 +112,7 @@ export function ApprovalLinkPage() {
         setPhase(failure(err));
       } else {
         setFormError(approvalErrorMessage(err, t));
-        if (err instanceof ApiError && err.status === 429 && err.retryAfterSeconds) {
-          setBlockedUntil(Date.now() + err.retryAfterSeconds * 1000);
-          setNow(Date.now());
-        }
+        holdOff(err);
       }
     } finally {
       setPending(null);
@@ -130,17 +141,32 @@ export function ApprovalLinkPage() {
   }
   if (phase.kind === "missing") {
     return shell(
-      <p className="text-sm text-danger" role="alert" data-testid="approval-link-error">
-        {t("approvals.link.incomplete")}
-      </p>,
+      <div className="space-y-1" role="alert" data-testid="approval-link-error">
+        <p className="text-sm text-danger">{t("approvals.link.incomplete")}</p>
+        <p className="text-xs text-muted">{t("approvals.link.reopen")}</p>
+      </div>,
     );
   }
+  const waitSeconds = Math.max(0, Math.ceil((blockedUntil - now) / 1000));
   if (phase.kind === "error") {
     return shell(
-      <div className="space-y-1" role="alert" data-testid="approval-link-error">
-        <p className="text-sm text-danger">{phase.message}</p>
-        {phase.retryAfter && (
-          <p className="text-xs text-muted">{t("approvals.link.retryIn", { seconds: phase.retryAfter })}</p>
+      <div className="space-y-2" data-testid="approval-link-error">
+        <div className="space-y-1" role="alert">
+          <p className="text-sm text-danger">{phase.message}</p>
+          {phase.retryable && <p className="text-xs text-muted">{t("approvals.link.reopen")}</p>}
+          {waitSeconds > 0 && (
+            <p className="text-xs text-muted">{t("approvals.link.retryIn", { seconds: waitSeconds })}</p>
+          )}
+        </div>
+        {phase.retryable && token.current && (
+          <Button
+            variant="secondary"
+            disabled={waitSeconds > 0}
+            onClick={() => token.current && runInspect(token.current)}
+            data-testid="approval-link-retry"
+          >
+            {t("approvals.link.retry")}
+          </Button>
         )}
       </div>,
     );
@@ -161,18 +187,11 @@ export function ApprovalLinkPage() {
   }
 
   const { info } = phase;
-  const missing = touched && comment.trim() === "";
-  const waitSeconds = Math.max(0, Math.ceil((blockedUntil - now) / 1000));
+  const missing = reasonAsked && comment.trim() === "";
   const locked = pending !== null || waitSeconds > 0;
-  // The link API sends the plain rule without the required count: name the number-free variants.
-  const ruleText =
-    info.rule === "quorum"
-      ? t("approvals.link.ruleQuorum")
-      : info.rule === "majority"
-        ? t("approvals.link.ruleMajority")
-        : info.rule
-          ? t(approvalRuleKey(info.rule))
-          : null;
+  const ruleText = info.rule
+    ? t(approvalRuleKey(info.rule), { required: info.required ?? undefined })
+    : null;
   return shell(
     <div className="space-y-4">
       <div className="space-y-1">

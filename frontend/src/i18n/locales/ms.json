@@ -9236,8 +9236,8 @@
       "requestStatus": "Status of the request: {{status}}",
       "closeHint": "You can close this window now.",
       "retryIn": "Please try again in {{seconds}} seconds.",
-      "ruleQuorum": "A minimum number of approvals is required",
-      "ruleMajority": "A majority of approvals is required"
+      "reopen": "Please open the link from the e-mail again.",
+      "retry": "Try again"
     },
     "subject": {
       "ticket": "Ticket"

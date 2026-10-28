@@ -23,6 +23,7 @@ from tests._approvals_helpers import (
     AG1,
     AG3,
     AG4,
+    AG5,
     T1,
     approvals_session,
     installed_registry,
@@ -186,7 +187,7 @@ async def test_inspect_valid(url_fixture: str, request: pytest.FixtureRequest) -
             body = response.json()
             assert set(body) == {
                 "valid", "code", "approver_name", "title", "description", "ticket_number",
-                "ticket_title", "step_name", "rule", "due_at", "describe_lines",
+                "ticket_title", "step_name", "rule", "required", "due_at", "describe_lines",
             }  # fmt: skip
             assert (body["valid"], body["code"]) == (True, None)
             assert body["approver_name"] == "Appr appr97-agent3"
@@ -198,10 +199,47 @@ async def test_inspect_valid(url_fixture: str, request: pytest.FixtureRequest) -
             assert body["ticket_title"]
             assert (body["step_name"], body["rule"], body["due_at"]) == ("Prüfung", "any", None)
             assert body["describe_lines"] == []
+            assert body["required"] is None
             # nothing was written: no vote, the link is not used, the request is pending
             assert await _votes(session, aid) == []
             assert (await _token_row(session, aid)).used_at is None
             assert await _status(session, aid) == "pending"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_inspect_required_for_quorum_and_majority(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            seen = {}
+            for key, rule, extra in (
+                ("k-all", "all", {}),
+                ("k-quorum", "quorum", {"quorum": 2}),
+                ("k-majority", "majority", {}),
+            ):
+                info = await service.request_approval(
+                    session,
+                    ticket_id=T1,
+                    subject_type=SUBJECT,
+                    title="Freigabe appr97",
+                    description=None,
+                    actor=Actor.agent(AG1),
+                    definition=_defn(_step("Prüfung", AG3, AG4, AG5, rule=rule, **extra)),
+                    approval_key=key,
+                    settings=SETTINGS,
+                )
+                token = await _link_for(session, info.approval_id, AG3)
+                async with _client(session) as client:
+                    response = await client.post(f"{BASE}/inspect", json={"token": token})
+                assert response.status_code == 200, response.text
+                seen[rule] = (response.json()["rule"], response.json()["required"])
+            assert seen == {
+                "all": ("all", None),
+                "quorum": ("quorum", 2),
+                "majority": ("majority", 2),
+            }
 
 
 @pytest.mark.db
@@ -252,7 +290,8 @@ async def test_inspect_invalid_codes(url_fixture: str, request: pytest.FixtureRe
             invalid = {
                 "valid": False, "code": "link_invalid", "approver_name": None, "title": None,
                 "description": None, "ticket_number": None, "ticket_title": None,
-                "step_name": None, "rule": None, "due_at": None, "describe_lines": [],
+                "step_name": None, "rule": None, "required": None, "due_at": None,
+                    "describe_lines": [],
             }  # fmt: skip
             assert unknown.json() == invalid
             assert late.json() == {**invalid, "code": "link_expired"}

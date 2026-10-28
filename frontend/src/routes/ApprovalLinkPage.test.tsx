@@ -17,7 +17,8 @@ const INFO: ApprovalLinkInspect = {
   ticket_number: "2026101012345",
   ticket_title: "Switch tauschen",
   step_name: "CAB",
-  rule: "all",
+  rule: "quorum",
+  required: 2,
   approver_name: "Erika Muster",
   due_at: "2030-01-15T12:00:00Z",
   description: "Bitte prüfen.",
@@ -43,7 +44,7 @@ beforeEach(async () => {
   await i18n.changeLanguage("de");
   inspect.mockReset();
   decide.mockReset();
-  window.history.replaceState(null, "", "/approve#t=tok-123");
+  window.history.replaceState({ key: "router-1" }, "", "/approve#t=tok-123");
   replaceState = vi.spyOn(window.history, "replaceState");
 });
 afterEach(() => {
@@ -58,7 +59,8 @@ describe("ApprovalLinkPage", () => {
     await screen.findByTestId("approval-link-approver");
     expect(inspect).toHaveBeenCalledTimes(1);
     expect(inspect).toHaveBeenCalledWith("tok-123");
-    expect(replaceState).toHaveBeenCalledWith(null, "", "/approve");
+    expect(replaceState).toHaveBeenCalledWith({ key: "router-1" }, "", "/approve");
+    expect(window.history.state).toEqual({ key: "router-1" });
     expect(window.location.hash).toBe("");
     expect(window.location.search).toBe("");
     expect(window.location.pathname).toBe("/approve");
@@ -70,7 +72,7 @@ describe("ApprovalLinkPage", () => {
     expect(await screen.findByTestId("approval-link-request-title")).toHaveTextContent("Change freigeben");
     expect(screen.getByTestId("approval-link-ticket")).toHaveTextContent("Ticket 2026101012345 · Switch tauschen");
     expect(screen.getByTestId("approval-link-step")).toHaveTextContent("Schritt: CAB");
-    expect(screen.getByTestId("approval-link-rule")).toHaveTextContent("Alle Freigeber müssen zustimmen");
+    expect(screen.getByTestId("approval-link-rule")).toHaveTextContent("2 Freigaben nötig");
     expect(screen.getByTestId("approval-link-due")).toHaveTextContent(/^Frist: .*2030/);
     expect(screen.getByTestId("approval-link-lines").querySelectorAll("li")).toHaveLength(2);
     expect(screen.getByTestId("approval-link-approver")).toHaveTextContent("Sie entscheiden als Erika Muster");
@@ -82,6 +84,7 @@ describe("ApprovalLinkPage", () => {
     window.history.replaceState(null, "", "/approve");
     show();
     expect(await screen.findByText("Der Link ist unvollständig.")).toBeInTheDocument();
+    expect(screen.getByText("Öffnen Sie den Link aus der E-Mail erneut.")).toBeInTheDocument();
     expect(inspect).not.toHaveBeenCalled();
   });
 
@@ -142,12 +145,65 @@ describe("ApprovalLinkPage", () => {
     expect(await screen.findByTestId("approval-link-error")).toHaveTextContent(text);
   });
 
+  it.each([null, "something_else"])("inspect valid:false with code %s falls back to link_invalid", async (code) => {
+    inspect.mockResolvedValue({ valid: false, code });
+    show();
+    expect(await screen.findByTestId("approval-link-error")).toHaveTextContent(
+      "Dieser Link ist nicht mehr gültig. Möglicherweise wurde bereits entschieden oder die Freigabe zurückgezogen.",
+    );
+    expect(screen.queryByTestId("approval-link-retry")).toBeNull();
+  });
+
+  it("decide failing with link_invalid replaces the card with the error", async () => {
+    inspect.mockResolvedValue(INFO);
+    decide.mockRejectedValue(apiError(410, "link_invalid"));
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Freigeben" }));
+    expect(await screen.findByTestId("approval-link-error")).toHaveTextContent(
+      "Dieser Link ist nicht mehr gültig.",
+    );
+    expect(screen.queryByRole("button", { name: "Freigeben" })).toBeNull();
+  });
+
+  it("an inspect server error says so, asks to reopen the link and retries with the held token", async () => {
+    inspect.mockRejectedValueOnce(new ApiError(500, "boom", "/api/v1/approval-links/inspect"));
+    inspect.mockResolvedValueOnce(INFO);
+    show();
+    const box = await screen.findByTestId("approval-link-error");
+    expect(box).toHaveTextContent("Die Freigabe konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.");
+    expect(box).toHaveTextContent("Öffnen Sie den Link aus der E-Mail erneut.");
+    fireEvent.click(screen.getByTestId("approval-link-retry"));
+    expect(await screen.findByTestId("approval-link-approver")).toBeInTheDocument();
+    expect(inspect).toHaveBeenCalledTimes(2);
+    expect(inspect).toHaveBeenLastCalledWith("tok-123");
+  });
+
   it("inspect rate limit shows the text and the Retry-After wait", async () => {
     inspect.mockRejectedValue(apiError(429, "rate_limited", 120));
     show();
     const box = await screen.findByTestId("approval-link-error");
     expect(box).toHaveTextContent("Zu viele Versuche. Bitte warten Sie einige Minuten.");
     expect(box).toHaveTextContent("Bitte versuchen Sie es in 120 Sekunden erneut.");
+    expect(screen.getByTestId("approval-link-retry")).toBeDisabled();
+  });
+
+  it("the retry after a 429 unlocks after Retry-After and reuses the token", async () => {
+    inspect.mockRejectedValueOnce(apiError(429, "rate_limited", 2));
+    inspect.mockResolvedValueOnce(INFO);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    show();
+    await screen.findByTestId("approval-link-retry");
+    expect(screen.getByTestId("approval-link-retry")).toBeDisabled();
+    await act(async () => {
+      vi.advanceTimersByTime(10); // flush the effect that arms the countdown
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.getByTestId("approval-link-retry")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("approval-link-retry"));
+    expect(await screen.findByTestId("approval-link-approver")).toBeInTheDocument();
+    expect(inspect).toHaveBeenLastCalledWith("tok-123");
   });
 
   it("decide rate limit disables both buttons until Retry-After has passed", async () => {
@@ -162,8 +218,12 @@ describe("ApprovalLinkPage", () => {
     expect(screen.getByRole("button", { name: "Freigeben" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Ablehnen" })).toBeDisabled();
     await act(async () => {
+      vi.advanceTimersByTime(10); // flush the effect that arms the countdown
+    });
+    await act(async () => {
       vi.advanceTimersByTime(4000);
     });
+    expect(screen.queryByTestId("approval-link-comment-error")).toHaveTextContent("");
     expect(screen.getByRole("button", { name: "Freigeben" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Ablehnen" })).toBeEnabled();
   });
