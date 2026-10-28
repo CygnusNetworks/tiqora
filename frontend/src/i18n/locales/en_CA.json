@@ -9183,7 +9183,48 @@
   },
   "approvals": {
     "agent": {
-      "title": "My approvals"
+      "title": "My approvals",
+      "empty": "No open approvals. You will be notified by email when an approval is waiting for you.",
+      "emptyDone": "No decided approvals yet.",
+      "loadFailed": "The approvals could not be loaded. Please try again.",
+      "detail": "Approval details",
+      "back": "Back to list",
+      "cancel": "Withdraw request",
+      "requestedBy": "Requested by {{name}}",
+      "ticket": "Ticket #{{number}}",
+      "onBehalfOf": "on behalf of {{name}}",
+      "myDecision": "Your decision: {{decision}}",
+      "prev": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{pages}}",
+      "tabs": {
+        "open": "Open",
+        "done": "Decided",
+        "delegation": "Substitute"
+      },
+      "blocked": {
+        "already_voted": "not possible (already voted)",
+        "own_request": "not possible (your own request)"
+      },
+      "delegation": {
+        "title": "Substitute",
+        "hint": "While a substitute is active, that person can decide approvals in your place. One person casts only one vote per step.",
+        "empty": "You have not named a substitute.",
+        "new": "Name a substitute",
+        "substitute": "Substitute",
+        "from": "From (optional, default: now)",
+        "until": "Until (optional)",
+        "periodHint": "Without an end date the substitute stays active until you end it.",
+        "substituteMissing": "Please choose a substitute.",
+        "untilPast": "The end must be in the future.",
+        "untilBeforeFrom": "The end must be after the start.",
+        "create": "Save substitute",
+        "revoke": "End now",
+        "running": "active",
+        "planned": "planned",
+        "noEnd": "no end",
+        "alreadyEnded": "Already ended."
+      }
     },
     "portal": {
       "title": "Approvals"

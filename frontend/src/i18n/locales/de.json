@@ -9183,7 +9183,48 @@
   },
   "approvals": {
     "agent": {
-      "title": "Meine Freigaben"
+      "title": "Meine Freigaben",
+      "empty": "Keine offenen Freigaben. Sie werden per E-Mail benachrichtigt, wenn eine Freigabe auf Sie wartet.",
+      "emptyDone": "Noch keine entschiedenen Freigaben.",
+      "loadFailed": "Die Freigaben konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "detail": "Details der Freigabe",
+      "back": "Zurück zur Liste",
+      "cancel": "Anfrage zurückziehen",
+      "requestedBy": "Angefordert von {{name}}",
+      "ticket": "Ticket #{{number}}",
+      "onBehalfOf": "in Vertretung für {{name}}",
+      "myDecision": "Ihre Entscheidung: {{decision}}",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "pageOf": "Seite {{page}} von {{pages}}",
+      "tabs": {
+        "open": "Offen",
+        "done": "Erledigt",
+        "delegation": "Vertretung"
+      },
+      "blocked": {
+        "already_voted": "nicht möglich (bereits abgestimmt)",
+        "own_request": "nicht möglich (eigene Anfrage)"
+      },
+      "delegation": {
+        "title": "Vertretung",
+        "hint": "Solange eine Vertretung gilt, kann diese Person an Ihrer Stelle über Freigaben entscheiden. Pro Schritt zählt nur eine Stimme je Person.",
+        "empty": "Sie haben keine Vertretung benannt.",
+        "new": "Vertretung benennen",
+        "substitute": "Vertretung",
+        "from": "Von (optional, sonst ab jetzt)",
+        "until": "Bis (optional)",
+        "periodHint": "Ohne Enddatum bleibt die Vertretung aktiv, bis Sie sie beenden.",
+        "substituteMissing": "Bitte wählen Sie eine Vertretung.",
+        "untilPast": "Das Ende muss in der Zukunft liegen.",
+        "untilBeforeFrom": "Das Ende muss nach dem Beginn liegen.",
+        "create": "Vertretung speichern",
+        "revoke": "Jetzt beenden",
+        "running": "aktiv",
+        "planned": "geplant",
+        "noEnd": "ohne Ende",
+        "alreadyEnded": "Bereits beendet."
+      }
     },
     "portal": {
       "title": "Freigaben"

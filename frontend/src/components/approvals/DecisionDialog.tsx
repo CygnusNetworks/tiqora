@@ -21,17 +21,20 @@ export function DecisionDialog({
   onClose,
   approvalId,
   approverId,
+  initialDecision = "approved",
   onDone,
 }: {
   open: boolean;
   onClose: () => void;
   approvalId: number;
   approverId?: number;
+  /** Choice the dialog opens with (the inbox has one button per choice). */
+  initialDecision?: ApprovalDecision;
   onDone: (detail: ApprovalDetail) => void;
 }) {
   const { t } = useTranslation();
   const fieldId = useId();
-  const [decision, setDecision] = useState<ApprovalDecision>("approved");
+  const [decision, setDecision] = useState<ApprovalDecision>(initialDecision);
   const [comment, setComment] = useState("");
   const [touched, setTouched] = useState(false);
 
@@ -47,11 +50,11 @@ export function DecisionDialog({
   const reset = mutation.reset;
   useEffect(() => {
     if (!open) return;
-    setDecision("approved");
+    setDecision(initialDecision);
     setComment("");
     setTouched(false);
     reset();
-  }, [open, reset]);
+  }, [open, reset, initialDecision]);
 
   const missing = decision === "rejected" && comment.trim() === "";
   const submit = () => {
