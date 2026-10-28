@@ -33,7 +33,8 @@ from tests.test_gdpr_erasure import (
     _seed_tiqora_tables,
     _tiqora_tables,  # noqa: F401  (autouse: creates the tiqora_* tables)
 )
-from tiqora.approvals.contract import ApprovalDefinition
+from tiqora.approvals import templates
+from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
 from tiqora.approvals.models import APPROVAL_TICKET_TABLES
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
@@ -643,6 +644,35 @@ async def test_preview_counts_approvals(url_fixture: str, request: pytest.Fixtur
 
         _, counts = await _erase(factory, seed, "anonymize")
         assert {k: counts[k] for k in expected} == expected
+
+
+@pytest.mark.parametrize("url_fixture", _URLS)
+async def test_stale_template_save_after_erasure_is_refused(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """An editor opened before the erasure saves the old definition with the change_time it
+    loaded: 409 ``template_changed``, the erased login does not come back (B-M8)."""
+    async with _world(url_fixture, request, "anonymize") as (factory, seed):
+        async with factory() as session:
+            loaded = (await templates.get_template(session, TPL)).change_time
+        assert loaded == NOW
+        await _erase(factory, seed, "anonymize")
+
+        async with factory() as session:
+            with pytest.raises(ApprovalError) as err:
+                await templates.update_template(
+                    session,
+                    TPL,
+                    actor_id=1,
+                    definition=json.loads(_template_definition(seed.login)),
+                    expected_change_time=loaded,
+                )
+            await session.rollback()
+        assert (err.value.code, err.value.http_status) == ("template_changed", 409)
+
+        (template,) = (await _rows(factory, seed.tickets))["tiqora_approval_template"]
+        assert seed.login.lower() not in str(template["definition"]).lower()
+        assert template["change_time"] != NOW
 
 
 @pytest.mark.parametrize("url_fixture", _URLS)
