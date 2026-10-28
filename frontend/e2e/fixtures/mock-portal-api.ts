@@ -1,3 +1,4 @@
+import { resolveApprovalsData } from "../../src/demo/approvalsMock";
 import type { Page, Route } from "@playwright/test";
 
 const customer = {
@@ -272,6 +273,14 @@ export async function mockPortalApi(page: Page) {
         ],
       });
       return;
+    }
+
+    if (path.includes("/api/portal/approvals")) {
+      const out = resolveApprovalsData(path, method, new URL(req.url()).search);
+      if (out !== undefined) {
+        await json(route, 200, out);
+        return;
+      }
     }
 
     await json(route, 404, { detail: `No mock for ${method} ${path}` });

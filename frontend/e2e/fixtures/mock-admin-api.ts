@@ -1,5 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 import { mockApi, loginAsAgent } from "./mock-api";
+import { resolveApprovalsData } from "../../src/demo/approvalsMock";
 import type { AdminProcess, DeployStatus } from "../../src/lib/deployStatusApi";
 
 async function json(route: Route, status: number, body: unknown) {
@@ -426,6 +427,19 @@ export async function mockAdminApi(page: Page) {
     const method = req.method();
 
     if (await handleProcessDesigner(route, path, method)) return;
+
+    // Approvals admin (overview, templates, Freigabegruppen, delegations): the demo resolver's records.
+    if (path.includes("/api/v1/admin/approvals")) {
+      if (method === "DELETE") {
+        await route.fulfill({ status: 204 });
+        return;
+      }
+      const out = resolveApprovalsData(path, method, url.search);
+      if (out !== undefined) {
+        await json(route, method === "POST" && !path.endsWith("/validate") ? 201 : 200, out);
+        return;
+      }
+    }
 
     // ProcessManagement overview (read-only)
     if (path.endsWith("/api/v1/admin/processes") && method === "GET") {

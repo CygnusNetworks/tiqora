@@ -17,6 +17,7 @@ import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
 import { resolveGiData } from "./giMock";
 import { resolveItsmData } from "./itsmMock";
+import { resolveApprovalsData } from "./approvalsMock";
 import { resolveItsmImport } from "./itsmImportMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
@@ -2434,6 +2435,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   const giData = resolveGiData(p, method); if (giData !== undefined) return giData;
   const importData = resolveItsmImport(p, method); if (importData !== undefined) return importData;
   const itsmData = resolveItsmData(p, method); if (itsmData !== undefined) return itsmData;
+  const approvalsData = resolveApprovalsData(p, method); if (approvalsData !== undefined) return approvalsData;
   // Auth
   if (p.endsWith("/auth/methods")) return {
     password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,

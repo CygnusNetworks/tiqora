@@ -80,7 +80,8 @@
     "templates": "Templates",
     "escalatedCount": "{{count}} eskaliert",
     "customers": "Kunden",
-    "searches": "Gespeicherte Suchen"
+    "searches": "Gespeicherte Suchen",
+    "approvals": "Meine Freigaben"
   },
   "views": {
     "mine": "Meine Tickets",
@@ -1376,7 +1377,8 @@
       "newTicket": "Neues Ticket",
       "kb": "Hilfeartikel",
       "preferences": "Einstellungen",
-      "cmdb": "Meine Geräte und Systeme"
+      "cmdb": "Meine Geräte und Systeme",
+      "approvals": "Freigaben"
     },
     "login": {
       "stepUp": {
@@ -2244,7 +2246,11 @@
       "cmdbCatalog": "CMDB-Auswahllisten",
       "itsm": "ITSM",
       "itsmLinkTypes": "Verknüpfungstypen",
-      "itsmImport": "ITSM-Import"
+      "itsmImport": "ITSM-Import",
+      "approvals": "Freigaben",
+      "approvalsTemplates": "Freigabevorlagen",
+      "approvalsLists": "Freigabegruppen",
+      "approvalsDelegations": "Vertretungen"
     },
     "table": {
       "id": "ID",
@@ -3910,7 +3916,12 @@
       "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
       "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
       "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM",
-      "itsmImport": "ITSM-Daten aus Znuny in die CMDB von Tiqora übernehmen und auf Tiqora umstellen."
+      "itsmImport": "ITSM-Daten aus Znuny in die CMDB von Tiqora übernehmen und auf Tiqora umstellen.",
+      "approvals": "Alle Freigaben mit Status und Frist; Freigaben zurückziehen",
+      "approvalsTemplates": "Wiederverwendbare Freigabe-Abläufe mit Schritten, Regeln und Fristen",
+      "approvalsLists": "Gruppen von Freigebern, zum Beispiel ein CAB, für den Einsatz in Vorlagen",
+      "approvalsDelegations": "Wer wen bei Abwesenheit vertritt",
+      "settingsApprovals": "Fristen, Erinnerungen, Entscheidungslinks, Kunden als Freigeber und Abstimmen über MCP"
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4480,6 +4491,59 @@
           "znuny_agent_url": {
             "label": "Znuny-Agentenadresse",
             "help": "Adresse der Znuny-Agentenoberfläche für „In Znuny bearbeiten“. Leer: aus der Znuny-Konfiguration ableiten. Muss mit http:// oder https:// beginnen."
+          }
+        }
+      },
+      "approvals": {
+        "title": "Freigaben",
+        "fields": {
+          "default_due_hours": {
+            "label": "Standardfrist (Stunden)",
+            "help": "Frist für Schritte ohne eigene Frist. 0 bedeutet keine Frist."
+          },
+          "reminder_interval_hours": {
+            "label": "Erinnerung alle (Stunden)",
+            "help": "Wie oft offene Freigeber erinnert werden. 0 schaltet Erinnerungen aus."
+          },
+          "reminder_max": {
+            "label": "Höchstzahl der Erinnerungen",
+            "help": "Wie viele Erinnerungen ein Schritt höchstens verschickt."
+          },
+          "email_links_enabled": {
+            "label": "Entscheidungslinks in E-Mails",
+            "help": "Freigeber können direkt aus der E-Mail entscheiden. Ohne Links verweist die E-Mail nur auf den Eingang."
+          },
+          "link_ttl_hours": {
+            "label": "Gültigkeit der Links (Stunden)",
+            "help": "Wie lange ein Entscheidungslink funktioniert."
+          },
+          "max_links_per_approver": {
+            "label": "Aktive Links je Freigeber",
+            "help": "Ältere Links desselben Freigebers werden ungültig, wenn diese Zahl überschritten wird."
+          },
+          "customer_approvers_enabled": {
+            "label": "Kunden als Freigeber",
+            "help": "Erlaubt Kunden als Freigeber. Sie entscheiden im Portal oder über den Link."
+          },
+          "portal_approvals_enabled": {
+            "label": "Freigaben im Portal",
+            "help": "Zeigt Kunden ihre offenen Freigaben im Portal. Wirkt nur, wenn Kunden Freigeber sein dürfen und das Portal aktiv ist."
+          },
+          "history_entries": {
+            "label": "Einträge im Ticketverlauf",
+            "help": "Schreibt für jede Anforderung, Stimme und Entscheidung eine kurze Zeile in den Ticketverlauf."
+          },
+          "decision_note": {
+            "label": "Interne Notiz bei Entscheidung",
+            "help": "Fügt dem Ticket eine interne Notiz hinzu, wenn endgültig entschieden ist."
+          },
+          "mail_requester_on_decision": {
+            "label": "Antragsteller informieren",
+            "help": "Schickt dem Antragsteller eine E-Mail, wenn endgültig entschieden ist."
+          },
+          "mcp_decide_enabled": {
+            "label": "Abstimmen über MCP erlauben",
+            "help": "Achtung: Erlaubt einem MCP-Client mit der ausdrücklichen Tool-Berechtigung „approval_decide“, verbindliche Stimmen im Namen seines Benutzers abzugeben. Lassen Sie das ausgeschaltet, solange Sie dem Client und seinen Eingaben nicht vertrauen."
           }
         }
       }
@@ -9115,6 +9179,63 @@
     "newTicket": {
       "recentIncident": "Für diesen Service gab es bereits vor {{minutes}} Minuten einen Vorfall: #{{tn}} {{title}}. Handelt es sich um dasselbe Problem?",
       "openTicket": "Ticket öffnen"
+    }
+  },
+  "approvals": {
+    "agent": {
+      "title": "Meine Freigaben"
+    },
+    "portal": {
+      "title": "Freigaben"
+    },
+    "link": {
+      "title": "Freigabe"
+    },
+    "subject": {
+      "ticket": "Ticket"
+    },
+    "resolver": {
+      "ticket_customer_user": "Kunde des Tickets",
+      "ticket_owner": "Besitzer des Tickets",
+      "ticket_responsible": "Verantwortlicher des Tickets"
+    },
+    "rule": {
+      "any": "Eine Freigabe genügt",
+      "all": "Alle Freigeber müssen zustimmen",
+      "quorum": "{{required}} Freigaben nötig",
+      "majority": "Mehrheit nötig ({{required}} Freigaben)"
+    },
+    "errors": {
+      "approval_not_found": "Diese Freigabe gibt es nicht, oder Sie dürfen sie nicht sehen.",
+      "ticket_not_found": "Dieses Ticket gibt es nicht, oder Sie dürfen es nicht sehen.",
+      "template_not_found": "Diese Freigabevorlage gibt es nicht.",
+      "list_not_found": "Diese Freigabegruppe gibt es nicht.",
+      "forbidden": "Dazu haben Sie keine Berechtigung.",
+      "not_an_approver": "Sie sind für diese Freigabe nicht als Freigeber vorgesehen.",
+      "self_approval_forbidden": "Eine selbst beantragte Freigabe können Sie nicht selbst erteilen.",
+      "customer_approver_outside_company": "Dieser Kunde gehört zu einer anderen Firma als das Ticket und kann nicht freigeben.",
+      "delegation_not_active": "Die Vertretung ist nicht (mehr) aktiv. Sie können deshalb nicht für diese Person abstimmen.",
+      "comment_too_long": "Der Kommentar ist zu lang.",
+      "already_decided": "Hier wurde bereits entschieden.",
+      "approval_closed": "Diese Freigabe ist bereits abgeschlossen.",
+      "step_not_active": "Dieser Schritt wartet gerade nicht auf eine Entscheidung.",
+      "forward_not_allowed": "Diese Freigabe kann nicht weitergeleitet werden.",
+      "forward_target_invalid": "Die gewählte Person kann diese Freigabe nicht übernehmen.",
+      "invalid_definition": "Die Freigabe-Definition ist nicht gültig. Bitte prüfen Sie Schritte, Freigeber und Fristen.",
+      "unknown_subject_type": "Diese Art von Freigabe ist nicht bekannt.",
+      "subject_not_requestable": "Diese Art von Freigabe kann nicht von Hand angefordert werden.",
+      "customer_approvers_not_allowed": "Kunden können diese Art von Freigabe nicht erteilen.",
+      "unknown_resolver": "Eine Freigeber-Regel in der Definition gibt es nicht.",
+      "link_invalid": "Dieser Link ist nicht mehr gültig. Möglicherweise wurde bereits entschieden oder die Freigabe zurückgezogen.",
+      "link_expired": "Dieser Link ist abgelaufen. Bitte melden Sie sich an und entscheiden Sie unter „Meine Freigaben“.",
+      "link_used": "Über diese Freigabe wurde mit diesem Link bereits entschieden.",
+      "invalid_member": "Ein gewähltes Mitglied der Gruppe gibt es nicht oder ist nicht gültig.",
+      "list_name_taken": "Eine Freigabegruppe mit diesem Namen gibt es schon.",
+      "list_in_use": "Diese Freigabegruppe wird noch von einer Vorlage oder einer laufenden Freigabe verwendet.",
+      "template_key_taken": "Eine Freigabevorlage mit diesem Schlüssel gibt es schon.",
+      "delegation_overlap": "Für diesen Zeitraum gibt es schon eine Vertretung.",
+      "rate_limited": "Zu viele Versuche. Bitte warten Sie einige Minuten.",
+      "unknown": "Die Freigabe konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut."
     }
   }
 }

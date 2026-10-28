@@ -11,6 +11,7 @@ import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
 import { demoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolveItsmData } from "./itsmMock";
+import { resolveApprovalsData } from "./approvalsMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
@@ -75,6 +76,10 @@ function respond(pathname: string, method: string): unknown {
     const data = demoPortalProcess(pathname, method);
     if (data !== undefined) return data;
   }
+  if (pathname.startsWith("/api/portal/approvals")) {
+    const data = resolveApprovalsData(pathname, method);
+    if (data !== undefined) return data;
+  }
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};
 
   if (pathname.includes("/api/v1/report")) syncDemoFacts();
@@ -128,6 +133,15 @@ function kioskResponse(request: Request): Response | undefined {
 }
 
 export const handlers = [
+  // Approvals: the inbox and the portal list filter on `?state=`, which resolveData never sees.
+  http.get("*/api/v1/approvals/inbox", ({ request }) => {
+    const url = new URL(request.url);
+    return HttpResponse.json(resolveApprovalsData(url.pathname, "GET", url.search) as never);
+  }),
+  http.get("*/api/portal/approvals", ({ request }) => {
+    const url = new URL(request.url);
+    return HttpResponse.json(resolveApprovalsData(url.pathname, "GET", url.search) as never);
+  }),
   // ITSM: the CI list and service lookups filter on the query string, which resolveData never sees.
   http.get("*/api/v1/itsm/*", ({ request }) => {
     const url = new URL(request.url);

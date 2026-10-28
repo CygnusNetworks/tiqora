@@ -127,6 +127,15 @@ import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { WebservicesPage } from "@/routes/admin/WebservicesPage";
 import { ItsmPage } from "@/routes/admin/ItsmPage";
+import { ApprovalsOverviewPage } from "@/routes/admin/approvals/ApprovalsOverviewPage";
+import { ApprovalTemplatesPage } from "@/routes/admin/approvals/ApprovalTemplatesPage";
+import { ApprovalListsPage } from "@/routes/admin/approvals/ApprovalListsPage";
+import { ApprovalDelegationsPage } from "@/routes/admin/approvals/ApprovalDelegationsPage";
+import { ApprovalsPage } from "@/routes/agent/ApprovalsPage";
+import { parseApprovalsSearch } from "@/routes/agent/approvalsSearch";
+import { ApprovalLinkPage } from "@/routes/ApprovalLinkPage";
+import { PortalApprovalsPage } from "@/routes/portal/ApprovalsPage";
+import { PortalApprovalPage } from "@/routes/portal/ApprovalPage";
 import { LinkTypesPage } from "@/routes/admin/LinkTypesPage";
 import { ItsmImportPage } from "@/routes/admin/ItsmImportPage";
 import { CiListPage } from "@/routes/agent/CiListPage";
@@ -235,6 +244,14 @@ const setPasswordRoute = createRoute({
     token: typeof s.token === "string" ? s.token : undefined,
   }),
   component: SetPasswordPage,
+});
+
+// Public: the decision link of an approval e-mail. The token travels in the URL fragment
+// (never in the query), the page strips it from the address bar.
+const approvalLinkRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/approve",
+  component: ApprovalLinkPage,
 });
 
 const agentLayoutRoute = createRoute({
@@ -1439,10 +1456,54 @@ const portalCmdbDetailRoute = createRoute({
   component: PortalCiPage,
 });
 
+const agentApprovalsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/approvals",
+  validateSearch: parseApprovalsSearch,
+  component: ApprovalsPage,
+});
+
+const portalApprovalsRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/approvals",
+  component: PortalApprovalsPage,
+});
+
+const portalApprovalRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/approvals/$approvalId",
+  component: PortalApprovalPage,
+});
+
+const adminApprovalsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/approvals",
+  component: ApprovalsOverviewPage,
+});
+
+const adminApprovalTemplatesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/approvals/templates",
+  component: ApprovalTemplatesPage,
+});
+
+const adminApprovalListsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/approvals/lists",
+  component: ApprovalListsPage,
+});
+
+const adminApprovalDelegationsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/approvals/delegations",
+  component: ApprovalDelegationsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   setPasswordRoute,
+  approvalLinkRoute,
   kioskWallboardRoute,
   agentLayoutRoute.addChildren([
     agentIndexRoute,
@@ -1486,6 +1547,7 @@ const routeTree = rootRoute.addChildren([
     agentCmdbImportRoute,
     agentCmdbCiRoute,
     agentCmdbCiEditRoute,
+    agentApprovalsRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([
@@ -1499,6 +1561,8 @@ const routeTree = rootRoute.addChildren([
     portalSecurityRoute,
     portalCmdbListRoute,
     portalCmdbDetailRoute,
+    portalApprovalsRoute,
+    portalApprovalRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,
@@ -1537,6 +1601,10 @@ const routeTree = rootRoute.addChildren([
     adminItsmRoute,
     adminItsmLinkTypesRoute,
     adminItsmImportRoute,
+    adminApprovalsRoute,
+    adminApprovalTemplatesRoute,
+    adminApprovalListsRoute,
+    adminApprovalDelegationsRoute,
     adminWebserviceDetailRoute,
     adminApiKeysRoute,
     adminMailOutboundRoute,

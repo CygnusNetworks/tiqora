@@ -80,7 +80,8 @@
     "templates": "Mallit",
     "escalatedCount": "{{count}} eskaloitunutta",
     "customers": "Customers",
-    "searches": "Saved searches"
+    "searches": "Saved searches",
+    "approvals": "My approvals"
   },
   "views": {
     "mine": "Omat tiketit",
@@ -1376,7 +1377,8 @@
       "newTicket": "Uusi lippu",
       "kb": "Ohjeartikkelit",
       "preferences": "Asetukset",
-      "cmdb": "Devices and systems"
+      "cmdb": "Devices and systems",
+      "approvals": "Approvals"
     },
     "login": {
       "stepUp": {
@@ -2244,7 +2246,11 @@
       "cmdbCatalog": "CMDB catalog",
       "itsm": "ITSM",
       "itsmLinkTypes": "Link types",
-      "itsmImport": "ITSM import"
+      "itsmImport": "ITSM import",
+      "approvals": "Approvals",
+      "approvalsTemplates": "Approval templates",
+      "approvalsLists": "Approval groups",
+      "approvalsDelegations": "Delegations"
     },
     "table": {
       "id": "ID",
@@ -3902,7 +3908,12 @@
       "itsm": "ITSM mode, setup, priority matrix and services",
       "itsmLinkTypes": "Link types between tickets, configuration items and services",
       "settingsItsm": "Ticket types, workaround state, limits and the Znuny address for ITSM",
-      "itsmImport": "Import ITSM data from Znuny into the Tiqora CMDB and switch over."
+      "itsmImport": "Import ITSM data from Znuny into the Tiqora CMDB and switch over.",
+      "approvals": "All approval requests with status and deadline; withdraw requests",
+      "approvalsTemplates": "Reusable approval flows with steps, rules and deadlines",
+      "approvalsLists": "Groups of approvers such as a CAB, used in templates",
+      "approvalsDelegations": "Who stands in for whom during absence",
+      "settingsApprovals": "Deadlines, reminders, decision links, customers as approvers and MCP voting"
     },
     "types": {
       "title_plural": "Tikettityypit",
@@ -4472,6 +4483,59 @@
           "znuny_agent_url": {
             "label": "Znuny agent address",
             "help": "Address of the Znuny agent interface for “Edit in Znuny”. Empty derives it from the Znuny configuration. Must start with http:// or https://."
+          }
+        }
+      },
+      "approvals": {
+        "title": "Approvals",
+        "fields": {
+          "default_due_hours": {
+            "label": "Default deadline (hours)",
+            "help": "Deadline of a step that sets none. 0 means no deadline."
+          },
+          "reminder_interval_hours": {
+            "label": "Reminder interval (hours)",
+            "help": "How often pending approvers are reminded. 0 switches reminders off."
+          },
+          "reminder_max": {
+            "label": "Maximum reminders",
+            "help": "How many reminders one step sends at most."
+          },
+          "email_links_enabled": {
+            "label": "Decision links in e-mails",
+            "help": "Approvers can decide with one click from the e-mail. Without it the e-mail only points to the inbox."
+          },
+          "link_ttl_hours": {
+            "label": "Link validity (hours)",
+            "help": "How long a decision link works."
+          },
+          "max_links_per_approver": {
+            "label": "Active links per approver",
+            "help": "Older links of the same approver stop working when this number is exceeded."
+          },
+          "customer_approvers_enabled": {
+            "label": "Customers as approvers",
+            "help": "Allows customer users as approvers. They decide in the portal or by link."
+          },
+          "portal_approvals_enabled": {
+            "label": "Approvals in the portal",
+            "help": "Shows customers their open approvals in the portal. Only effective with customers as approvers and the portal switched on."
+          },
+          "history_entries": {
+            "label": "Entries in the ticket history",
+            "help": "Writes a short line to the ticket history for every request, vote and decision."
+          },
+          "decision_note": {
+            "label": "Internal note on decision",
+            "help": "Adds an internal note to the ticket when a request is finally decided."
+          },
+          "mail_requester_on_decision": {
+            "label": "Tell the requester",
+            "help": "Sends the requester an e-mail when a request is finally decided."
+          },
+          "mcp_decide_enabled": {
+            "label": "Allow voting via MCP",
+            "help": "Warning: lets an MCP client with the explicit tool permission “approval_decide” cast binding votes in the name of its user. Leave this off unless you trust the client and its prompts."
           }
         }
       }
@@ -9107,6 +9171,63 @@
     "newTicket": {
       "recentIncident": "This service already had an incident {{minutes}} minutes ago: #{{tn}} {{title}}. Is it the same problem?",
       "openTicket": "Open ticket"
+    }
+  },
+  "approvals": {
+    "agent": {
+      "title": "My approvals"
+    },
+    "portal": {
+      "title": "Approvals"
+    },
+    "link": {
+      "title": "Approval"
+    },
+    "subject": {
+      "ticket": "Ticket"
+    },
+    "resolver": {
+      "ticket_customer_user": "Customer of the ticket",
+      "ticket_owner": "Owner of the ticket",
+      "ticket_responsible": "Responsible agent of the ticket"
+    },
+    "rule": {
+      "any": "One approval is enough",
+      "all": "All approvers must approve",
+      "quorum": "{{required}} approvals needed",
+      "majority": "Majority needed ({{required}} approvals)"
+    },
+    "errors": {
+      "approval_not_found": "This approval does not exist or you may not see it.",
+      "ticket_not_found": "This ticket does not exist or you may not see it.",
+      "template_not_found": "This approval template does not exist.",
+      "list_not_found": "This approval group does not exist.",
+      "forbidden": "You are not allowed to do this.",
+      "not_an_approver": "You are not an approver of this request.",
+      "self_approval_forbidden": "You cannot approve a request you made yourself.",
+      "customer_approver_outside_company": "This customer belongs to a different company than the ticket and cannot be an approver.",
+      "delegation_not_active": "The delegation is not active (any more), so you cannot vote on behalf of this person.",
+      "comment_too_long": "The comment is too long.",
+      "already_decided": "A decision has already been made here.",
+      "approval_closed": "This request is already closed.",
+      "step_not_active": "This step is not waiting for a decision at the moment.",
+      "forward_not_allowed": "This request cannot be forwarded.",
+      "forward_target_invalid": "The chosen person cannot take over this approval.",
+      "invalid_definition": "The approval definition is not valid. Please check steps, approvers and deadlines.",
+      "unknown_subject_type": "This kind of request is not known.",
+      "subject_not_requestable": "This kind of request cannot be started by hand.",
+      "customer_approvers_not_allowed": "Customers cannot approve this kind of request.",
+      "unknown_resolver": "An approver rule in the definition does not exist.",
+      "link_invalid": "This link is no longer valid. A decision may already have been made, or the request was withdrawn.",
+      "link_expired": "This link has expired. Please sign in and decide under “My approvals”.",
+      "link_used": "A decision was already made with this link.",
+      "invalid_member": "A chosen member of the group does not exist or is not valid.",
+      "list_name_taken": "An approval group with this name already exists.",
+      "list_in_use": "This approval group is still used by a template or a running request.",
+      "template_key_taken": "An approval template with this key already exists.",
+      "delegation_overlap": "There is already a delegation for this period.",
+      "rate_limited": "Too many attempts. Please wait a few minutes.",
+      "unknown": "The approval could not be processed. Please try again."
     }
   }
 }

@@ -15,6 +15,7 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
+import { resolveApprovalsData } from "../../src/demo/approvalsMock";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
@@ -685,6 +686,15 @@ export async function mockApi(page: Page) {
       const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
       if (out) {
         await json(route, out.status, out.body);
+        return;
+      }
+    }
+
+    // Approvals (inbox, detail, ticket panel, public link): the demo resolver's records, with `?state=`.
+    if (/\/api\/v1\/(approvals|approval-links)(\/|$)|\/api\/v1\/tickets\/\d+\/approvals$/.test(path)) {
+      const out = resolveApprovalsData(path, method, url.search);
+      if (out !== undefined) {
+        await json(route, method === "POST" && path.endsWith("/approvals") ? 201 : 200, out);
         return;
       }
     }
