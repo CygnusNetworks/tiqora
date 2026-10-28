@@ -38,7 +38,7 @@ from tests._approvals_helpers import (
     to_async_url,
 )
 from tests._row_cleanup import delete_above_marks, snapshot_marks
-from tests.approvals_consumer_kit import shared_session_factory
+from tests.approvals_consumer_kit import run_hook_now, shared_session_factory
 from tiqora.approvals import service, sweep
 from tiqora.approvals.contract import (
     EVENT_DECIDED,
@@ -534,6 +534,62 @@ async def test_overdue_reject_and_approve(
                     "timeout"
                 ]
             assert await _tick(session, now + timedelta(minutes=1)) == ZERO
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_timeout_approval_behind_a_voted_stage_reads_timeout(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A-I2: stage 1 voted ("passt"), stage 2 approved by its deadline: reason ``timeout``.
+
+    The hook hands the consumer no comment (stage 1's vote comment is not the decision).
+    """
+    fake = make_fake_subject_type()
+    definition = _defn(
+        _step("Fachbereich", AG3),
+        _step("CAB", AG4, stage=2, due_hours=1, on_timeout="approve"),
+    )
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(fake):
+            aid = await _request(session, definition)
+            await service.decide(
+                session,
+                aid,
+                actor=Actor.agent(AG3),
+                decision="approved",
+                channel="ui",
+                comment="passt",
+                settings=SETTINGS,
+            )
+            await session.commit()
+            now = _now()
+            await session.execute(
+                text(
+                    "UPDATE tiqora_approval_step SET due_at = :d"
+                    " WHERE approval_id = :a AND position = 2"
+                ),
+                {"d": now - timedelta(minutes=5), "a": aid},
+            )
+
+            assert await _tick(session, now) == {**ZERO, "timeout_decided": 1}
+
+            assert [(s.status, s.reason) for s in await _steps(session, aid)] == [
+                ("approved", "votes"),
+                ("approved", "timeout"),
+            ]
+            row = await _row(session, aid)
+            assert (row.status, row.reason) == ("approved", "timeout")
+            assert [p["reason"] for n, p in await _outbox(session) if n == EVENT_DECIDED] == [
+                "timeout"
+            ]
+            await run_hook_now(shared_session_factory(session), aid, "approved")
+            (outcome,) = fake.decided
+            assert (outcome.status, outcome.reason, outcome.comment) == (
+                "approved",
+                "timeout",
+                None,
+            )
 
 
 # --- race: sweeper vs. vote ---------------------------------------------------------------------

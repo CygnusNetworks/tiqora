@@ -21,6 +21,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import audit
+from tiqora.approvals._engine import last_closed_step
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     JOB_HOOK,
@@ -79,12 +80,28 @@ async def _already_done(session: AsyncSession, approval_id: int) -> bool:
 
 
 async def _final_comment(session: AsyncSession, approval: TiqoraApproval) -> str | None:
-    """Comment of the vote that decided the request; None for timeout, auto decision, cancel."""
+    """Comment of the vote that decided the request; None unless it was decided by votes.
+
+    Only the newest vote of the step that closed last counts (never an earlier stage's comment);
+    a request whose reason is ``timeout``, ``no_approvers``, ``auto`` or a cancel has none.
+    """
     if approval.reason != "votes" or approval.status == "cancelled":
+        return None
+    steps = (
+        (
+            await session.execute(
+                select(TiqoraApprovalStep).where(TiqoraApprovalStep.approval_id == approval.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    step = last_closed_step(steps)
+    if step is None:
         return None
     row = await session.execute(
         select(TiqoraApprovalVote.comment)
-        .where(TiqoraApprovalVote.approval_id == approval.id)
+        .where(TiqoraApprovalVote.step_id == step.id)
         .order_by(TiqoraApprovalVote.id.desc())
         .limit(1)
     )

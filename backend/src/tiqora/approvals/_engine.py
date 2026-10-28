@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Final, Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -224,19 +224,38 @@ async def finalize(
         )
 
 
+#: step reasons of an approved request, weakest first: the weakest one closed is the request's
+#: reason, so a silent approval (deadline passed, nobody could decide, automatic) behind voted
+#: stages stays visible to consumers (CX4) instead of reading ``votes``
+APPROVED_REASON_PRECEDENCE: Final = ("timeout", "no_approvers", "auto", "votes")
+
+
 def result_reason(steps: Sequence[TiqoraApprovalStep], result: ApprovalStatus) -> str:
-    """The request's reason: that of the step that decided it (``votes`` when it has none)."""
+    """The request's reason, from its closed steps.
+
+    Rejected: the reason of the step that rejected it. Approved: the weakest reason of the
+    closed steps (:data:`APPROVED_REASON_PRECEDENCE`); ``votes`` when no step has another one.
+    """
     if result == "rejected":
         for step in steps:
             if step.status == "rejected":
                 return step.reason or "votes"
         return "votes"
-    reasons = {s.reason or "votes" for s in steps}
-    if reasons == {"no_approvers"}:
-        return "no_approvers"
-    if reasons == {"timeout"}:
-        return "timeout"
+    closed = {s.reason or "votes" for s in steps if s.status in ("approved", "rejected")}
+    for reason in APPROVED_REASON_PRECEDENCE:
+        if reason in closed:
+            return reason
     return "votes"
+
+
+def last_closed_step(steps: Sequence[TiqoraApprovalStep]) -> TiqoraApprovalStep | None:
+    """The step whose result closed the request: the rejecting step, else the approved step of
+    the highest stage (latest decision, then position, within that stage)."""
+    rejected = [s for s in steps if s.status == "rejected"]
+    closed = rejected or [s for s in steps if s.status == "approved"]
+    if not closed:
+        return None
+    return max(closed, key=lambda s: (s.stage, s.decided_at or datetime.min, s.position))
 
 
 async def add_approver(
