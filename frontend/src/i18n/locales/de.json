@@ -9231,7 +9231,21 @@
       "title": "Freigaben"
     },
     "link": {
-      "title": "Freigabe"
+      "title": "Freigabe",
+      "incomplete": "Der Link ist unvollständig.",
+      "loading": "Freigabe wird geladen",
+      "ticket": "Ticket {{number}}",
+      "step": "Schritt: {{name}}",
+      "due": "Frist: {{date}}",
+      "decidingAs": "Sie entscheiden als {{name}}",
+      "counter": "{{count}} / {{max}}",
+      "doneApproved": "Danke, Ihre Freigabe wurde gespeichert.",
+      "doneRejected": "Ihre Ablehnung wurde gespeichert.",
+      "requestStatus": "Status der Anfrage: {{status}}",
+      "closeHint": "Sie können dieses Fenster jetzt schließen.",
+      "retryIn": "Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
+      "ruleQuorum": "Eine Mindestanzahl an Freigaben ist nötig",
+      "ruleMajority": "Mehrheit der Freigaben nötig"
     },
     "subject": {
       "ticket": "Ticket"

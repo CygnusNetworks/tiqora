@@ -877,8 +877,10 @@ export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
   readonly path: string;
+  /** Seconds from a `Retry-After` header (429/503), when the server sent one. */
+  readonly retryAfterSeconds?: number;
 
-  constructor(status: number, detail: unknown, path: string) {
+  constructor(status: number, detail: unknown, path: string, retryAfterSeconds?: number) {
     const message =
       typeof detail === "string"
         ? detail
@@ -890,6 +892,7 @@ export class ApiError extends Error {
     this.status = status;
     this.detail = detail;
     this.path = path;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   get isUnauthorized(): boolean {
@@ -1023,7 +1026,13 @@ export class ApiClient {
       ) {
         this.onUnauthorized();
       }
-      throw new ApiError(res.status, payload ?? res.statusText, path);
+      const retryAfter = Number(res.headers.get("retry-after"));
+      throw new ApiError(
+        res.status,
+        payload ?? res.statusText,
+        path,
+        Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : undefined,
+      );
     }
 
     return payload as T;

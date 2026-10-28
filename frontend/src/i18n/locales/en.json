@@ -9231,7 +9231,21 @@
       "title": "Approvals"
     },
     "link": {
-      "title": "Approval"
+      "title": "Approval",
+      "incomplete": "The link is incomplete.",
+      "loading": "Loading approval",
+      "ticket": "Ticket {{number}}",
+      "step": "Step: {{name}}",
+      "due": "Due: {{date}}",
+      "decidingAs": "You are deciding as {{name}}",
+      "counter": "{{count}} / {{max}}",
+      "doneApproved": "Thank you, your approval has been saved.",
+      "doneRejected": "Your rejection has been saved.",
+      "requestStatus": "Status of the request: {{status}}",
+      "closeHint": "You can close this window now.",
+      "retryIn": "Please try again in {{seconds}} seconds.",
+      "ruleQuorum": "A minimum number of approvals is required",
+      "ruleMajority": "A majority of approvals is required"
     },
     "subject": {
       "ticket": "Ticket"

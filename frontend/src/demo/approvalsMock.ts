@@ -433,7 +433,7 @@ export function resolveApprovalsData(path: string, method: string, search = ""):
   const get = method === "GET";
   // Public link (no auth)
   if (path.endsWith("/api/v1/approval-links/inspect") && method === "POST") return LINK_INSPECT;
-  if (path.endsWith("/api/v1/approval-links/decide") && method === "POST") return { status: "recorded", decision: "approved" };
+  if (path.endsWith("/api/v1/approval-links/decide") && method === "POST") return { status: "approved", decision: "approved" };
 
   // Ticket panel
   const onTicket = path.match(/\/api\/v1\/tickets\/(\d+)\/approvals$/);

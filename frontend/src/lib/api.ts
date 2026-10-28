@@ -9,6 +9,8 @@ function goLogin() {
   if (path.startsWith("/login")) return;
   // The public wallboard has no login: an error there must never leave the page.
   if (path.startsWith("/wallboard")) return;
+  // The public approval link authenticates by its token, never by a session.
+  if (path.startsWith("/approve")) return;
   redirecting = true;
   const next = encodeURIComponent(path || "/agent");
   window.location.assign(`/login?next=${next}`);
