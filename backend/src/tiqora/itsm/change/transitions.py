@@ -41,6 +41,7 @@ from tiqora.domain.ticket_access import TicketFacts
 from tiqora.domain.ticket_write_service import InvalidInput, TicketWriteService
 from tiqora.domain.ticket_write_service import TicketAccessDenied as WriteAccessDenied
 from tiqora.itsm.change.approval_port import ApprovalSnapshot, get_approval_port
+from tiqora.itsm.change.calendar_mirror import sync_appointment
 from tiqora.itsm.change.conflicts import load_conflicts
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.gate import is_change_manager, require_change_mode
@@ -441,6 +442,9 @@ async def transition(
         await mirror_dynamic_fields(
             session, ticket_id=ticket_id, change_type=change_type, phase=to, user_id=user_id
         )
+        await sync_appointment(
+            session, cfg, ticket_id=ticket_id, user_id=user_id, base_url=settings.public_base_url
+        )
         actor = Actor.agent(user_id)
         if requests_cab:
             assert cab is not None  # noqa: S101 - guarded above (cab_missing)
@@ -660,7 +664,7 @@ async def on_approval_outcome(
     round or approval set, a phase that moved on (e.g. the change cancelled it itself), an
     outcome already handled.
     """
-    _ = settings, sysconfig
+    _ = sysconfig
     row = await _lock(session, ticket_id)
     if row is None or row.approval_id != approval_id or row.approval_round != round:
         return False
@@ -724,6 +728,13 @@ async def on_approval_outcome(
             change_type=row.change_type,
             phase=to,
             user_id=SYSTEM_USER_ID,
+        )
+        await sync_appointment(
+            session,
+            await load_change_settings(session, settings),
+            ticket_id=ticket_id,
+            user_id=SYSTEM_USER_ID,
+            base_url=settings.public_base_url,
         )
         await notify_listeners(
             session, ChangeEvent(ticket_id, "phase", from_phase, to, SYSTEM_USER_ID, now)

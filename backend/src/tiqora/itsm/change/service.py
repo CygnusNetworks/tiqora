@@ -49,6 +49,7 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.domain.ticket_write_service import TicketAccessDenied as WriteAccessDenied
 from tiqora.extensions import ExtensionPoint, get_registry
+from tiqora.itsm.change.calendar_mirror import sync_appointment
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.gate import is_change_manager, require_change_mode
 from tiqora.itsm.change.models import (
@@ -948,6 +949,14 @@ async def update_change(
         row.updated_at = now
         row.updated_by = user_id
         await session.flush()
+        if "window" in changed:
+            await sync_appointment(
+                session,
+                cfg,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                base_url=settings.public_base_url,
+            )
         if "change_type" in changed:
             await mirror_dynamic_fields(
                 session,
