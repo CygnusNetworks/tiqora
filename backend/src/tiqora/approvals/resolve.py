@@ -93,24 +93,6 @@ async def customer_rows(
     return out
 
 
-async def _companies_of(
-    session: AsyncSession, rows: dict[str, tuple[str, int, str]], company: str
-) -> dict[str, bool]:
-    """``{stored login: True}`` for every customer whose own company or mapping is *company*."""
-    allowed = {login: cid == company for login, _, cid in rows.values()}
-    canonical = {key: login for key, (login, _, _) in rows.items()}
-    for chunk in _chunks(sorted(canonical)):
-        extra = await session.execute(
-            select(CustomerUserCustomer.user_id).where(
-                func.lower(CustomerUserCustomer.user_id).in_(chunk),
-                CustomerUserCustomer.customer_id == company,
-            )
-        )
-        for (user_id,) in extra:
-            allowed[canonical[str(user_id).lower()]] = True
-    return allowed
-
-
 async def customers_in_ticket_company(
     session: AsyncSession, pairs: Iterable[tuple[str, int]]
 ) -> set[tuple[str, int]]:
@@ -125,6 +107,14 @@ async def customers_in_ticket_company(
     if not wanted:
         return set()
     rows = await customer_rows(session, [login for login, _ in wanted])
+    return await _admitted(session, rows, wanted)
+
+
+async def _admitted(
+    session: AsyncSession, rows: dict[str, tuple[str, int, str]], wanted: set[tuple[str, int]]
+) -> set[tuple[str, int]]:
+    """:func:`customers_in_ticket_company` on already loaded :func:`customer_rows`. Companies
+    compare exactly (in Python), on MariaDB too, whose collation would ignore letter case."""
     companies: dict[str, set[str]] = {key: {cid} for key, (_, _, cid) in rows.items()}
     for chunk in _chunks(sorted(rows)):
         mapped = await session.execute(
@@ -350,8 +340,10 @@ async def resolve_entries(
         # canonical keys: the login as stored, whatever case the entry / resolver spelled
         candidates = [_canonical(c, crows) for c in candidates]
         customer_valid = {login: valid for login, valid, _ in crows.values()}
-        company = await ticket_customer_id(session, ctx.ticket_id) if crows else None
-        in_company = await _companies_of(session, crows, company) if company is not None else {}
+        # the sweeper's rule (customers_in_ticket_company), so resolve and sweep never disagree
+        stored = {login for login, _, _ in crows.values()}
+        admitted = await _admitted(session, crows, {(login, ctx.ticket_id) for login in stored})
+        in_company = {login: (login, ctx.ticket_id) in admitted for login in stored}
 
     approvers: list[ResolvedApprover] = []
     excluded: list[tuple[Principal, str]] = []

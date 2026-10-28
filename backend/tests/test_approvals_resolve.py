@@ -228,6 +228,27 @@ async def test_customer_via_customer_user_customer(
 
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_company_differing_in_case_only_is_outside_everywhere(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A mapping to ``APPR97-FIRMA`` is not the ticket's ``appr97-firma``: resolve excludes the
+    customer like the sweeper's predicate does (MariaDB's collation would match it in SQL)."""
+    async with approvals_session(request, url_fixture) as session:
+        await session.execute(
+            text(
+                "INSERT INTO customer_user_customer (user_id, customer_id, create_time, create_by,"
+                " change_time, change_by) VALUES (:u, :c, '2026-10-15 08:00:00', 1,"
+                " '2026-10-15 08:00:00', 1)"
+            ),
+            {"u": FREMD, "c": FIRMA.upper()},
+        )
+        res = await _resolve(session, ("customer_user", FREMD))
+        assert _excluded(res) == [(f"customer:{FREMD}", "outside_company")]
+        assert await customer_in_ticket_company(session, FREMD, T1) is False
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_customers_not_allowed(url_fixture: str, request: pytest.FixtureRequest) -> None:
     async with approvals_session(request, url_fixture) as session:
         res = await _resolve(
