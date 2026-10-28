@@ -454,6 +454,12 @@ def module_state(
             state.had_types = {str(r[0]) for r in cur.fetchall()}
             cur.execute("SELECT name FROM dynamic_field WHERE name IN %s", (CHANGE_FIELDS,))
             state.had_fields = {str(r[0]) for r in cur.fetchall()}
+    # The ITSM packages create none of these rows: present means an aborted run of this module,
+    # which would also turn test_itsm_mode_a::test_setup_on_itsm_peer_is_noop red.
+    assert not state.had_types and not state.had_fields, (
+        f"change setup rows left by an aborted run: {sorted(state.had_types | state.had_fields)};"
+        " remove them (DynamicFieldDelete, DELETE FROM ticket_type) before running the module"
+    )
     znuny_copy_in(TIQORASYNC_MODULE, TIQORASYNC_PEER_PATH)
     # TiqoraSync starts at the current end of the signal table (older signals are not ours)
     with state.connect() as conn, conn.cursor() as cur:
@@ -465,14 +471,19 @@ def module_state(
     try:
         yield state
     finally:
+        # each step runs even when an earlier one fails
         try:
             state.restore_tiqora()  # tiqora rows first: they name the tickets by id
-            _delete_tickets(state.tickets)
-            _remove_setup_rows(state)
         finally:
-            znuny_perl_eval(f"unlink '{TIQORASYNC_PEER_PATH}'; print 'ok';")
-            znuny_console("Maint::Cache::Delete")
-            clear_detect_cache()
+            try:
+                _delete_tickets(state.tickets)
+            finally:
+                try:
+                    _remove_setup_rows(state)
+                finally:
+                    znuny_perl_eval(f"unlink '{TIQORASYNC_PEER_PATH}'; print 'ok';")
+                    znuny_console("Maint::Cache::Delete")
+                    clear_detect_cache()
 
 
 @pytest.fixture()

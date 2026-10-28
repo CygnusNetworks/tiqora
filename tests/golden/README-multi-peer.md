@@ -333,7 +333,10 @@ Tiqora's writes reach Znuny's caches (dynamic field list, types) through TiqoraS
 production: the module copies `TiqoraSync.pm` in and calls `Run()` after the setup and after the
 change is created. It restores every `tiqora_*` table it changed from a snapshot, removes its
 tickets (`TicketDelete`, titles `chg94 golden*`), the two dynamic fields (`DynamicFieldDelete`)
-and the two ticket types when they were not there before, and the mode setting.
+and the two ticket types, and the mode setting. The ITSM packages create none of the change setup
+rows, so the module refuses to start when they exist (left by an aborted run; they would also turn
+`test_setup_on_itsm_peer_is_noop` red): delete them with `DynamicFieldDelete` and
+`DELETE FROM ticket_type WHERE name IN ('Change', 'Change::Task')` first.
 
 Results (2026-10-28, cached images `tiqora-golden-peer-znuny-6.5` / `-7.3`, DB volumes migrated to
 `20261010_0084` by `golden-seed`): 5 passed on `znuny-6.5-itsm` and 5 passed on `znuny-7.3-itsm`,
