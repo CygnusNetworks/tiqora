@@ -24,7 +24,7 @@ from tests._change_fixtures import (
     FakeApprovalPort,
     change_world,
 )
-from tests._itsm_mode_helpers import store  # noqa: F401  (fixture helpers share the module)
+from tiqora.calendar.service import CalendarService
 from tiqora.db.legacy.calendar import CalendarAppointment
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.itsm.change.approval_port import set_approval_port_for_tests
@@ -32,7 +32,7 @@ from tiqora.itsm.change.calendar_mirror import sync_appointment
 from tiqora.itsm.change.models import TiqoraItsmChange
 from tiqora.itsm.change.service import ChangeCreateIn, ChangeUpdateIn, create_change, update_change
 from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION, load_change_settings
-from tiqora.itsm.change.transitions import TransitionIn, transition
+from tiqora.itsm.change.transitions import TransitionIn, on_approval_outcome, transition
 from tiqora.settings_sections.store import save_section_values
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -233,3 +233,90 @@ async def test_no_session_begin_used(w: ChangeWorld, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(w.session, "begin", _forbidden)
     await _sync(w, cfg, tid)
     assert len(await _appointments(w)) == 1
+
+
+async def _go(w: ChangeWorld, tid: int, to: str) -> None:
+    await transition(
+        w.session,
+        APP_SETTINGS,
+        SysConfig(w.session),
+        ticket_id=tid,
+        data=TransitionIn.model_validate({"to": to}),
+        user_id=U_FULL,
+        session_factory=w.factory,
+    )
+
+
+async def test_approval_outcome_creates(w: ChangeWorld, port: FakeApprovalPort) -> None:
+    """The system path mirrors: approved -> scheduled creates the appointment."""
+    _ = port
+    await _cfg(w, CAL)
+    tid = await _change(w, "approval")
+    row = await _row(w, tid)
+    row.approval_id, row.approval_round = 1, 1
+    await w.session.flush()
+    changed = await on_approval_outcome(
+        w.session,
+        APP_SETTINGS,
+        SysConfig(w.session),
+        ticket_id=tid,
+        approval_id=1,
+        round=1,
+        status="approved",
+    )
+    assert changed is True
+    row = await _row(w, tid)
+    assert row.phase == "scheduled"
+    (appt,) = await _appointments(w)
+    assert row.calendar_appointment_id == appt.id
+
+
+async def test_leaving_implementing_deletes(w: ChangeWorld, port: FakeApprovalPort) -> None:
+    """I15: any phase but scheduled / implementing holds no appointment."""
+    _ = port
+    await _cfg(w, CAL)
+    tid = await _change(w, "scheduled")
+    await _go(w, tid, "implementing")
+    assert len(await _appointments(w)) == 1
+    await _go(w, tid, "review")
+    assert await _appointments(w) == []
+    assert (await _row(w, tid)).calendar_appointment_id is None
+
+
+async def test_window_cleared_deletes(w: ChangeWorld) -> None:
+    cfg = await _cfg(w, CAL)
+    tid = await _change(w, "scheduled")
+    await _sync(w, cfg, tid)
+    assert len(await _appointments(w)) == 1
+    await update_change(
+        w.session,
+        APP_SETTINGS,
+        SysConfig(w.session),
+        ticket_id=tid,
+        data=ChangeUpdateIn.model_validate({"clear_window": True}),
+        user_id=U_FULL,
+    )
+    assert await _appointments(w) == []
+    assert (await _row(w, tid)).calendar_appointment_id is None
+
+
+async def test_unexpected_failure_never_fails_transition(
+    w: ChangeWorld,
+    port: FakeApprovalPort,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _ = port
+    await _cfg(w, CAL)
+    tid = await _change(w, "scheduled")
+
+    async def _boom(*_: Any, **__: Any) -> Any:
+        raise ValueError("boom")
+
+    monkeypatch.setattr(CalendarService, "create_appointment_unchecked", _boom)
+    with caplog.at_level(logging.WARNING):
+        await _go(w, tid, "implementing")
+    assert any(r.message == "change_calendar_mirror_failed" for r in caplog.records)
+    row = await _row(w, tid)
+    assert row.phase == "implementing" and row.calendar_appointment_id is None
+    assert await _appointments(w) == []

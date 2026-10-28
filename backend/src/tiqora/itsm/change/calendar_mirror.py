@@ -17,7 +17,6 @@ import contextlib
 import logging
 from typing import Final
 
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.calendar.schemas import AppointmentIn
@@ -65,6 +64,8 @@ async def _sync(
     assert row.planned_start is not None and row.planned_end is not None  # noqa: S101
     ticket = await session.get(Ticket, row.ticket_id)
     if ticket is None:
+        await _remove(service, row, user_id)
+        await session.flush()
         return
     title = f"Change {ticket.tn}: {ticket.title or ''}"[:_MAX_TITLE]
     link = f"{base_url.rstrip('/')}/tickets/{row.ticket_id}" if base_url.strip() else None
@@ -78,7 +79,6 @@ async def _sync(
         current is not None
         and current.calendar_id == cfg.calendar_id
         and current.title == title
-        and current.description == description
         and current.start_time == row.planned_start
         and current.end_time == row.planned_end
     ):
@@ -104,7 +104,7 @@ async def sync_appointment(
     *,
     ticket_id: int,
     user_id: int,
-    base_url: str = "",
+    base_url: str,
 ) -> None:
     """Bring the change's appointment in line with its phase and window (no-op when off)."""
     if cfg.calendar_id == 0:
@@ -120,14 +120,17 @@ async def sync_appointment(
             raise CalendarNotFound(f"calendar {cfg.calendar_id} not found")
         async with session.begin_nested():
             await _sync(session, cfg, row, user_id=user_id, base_url=base_url)
-    except (CalendarNotFound, AppointmentNotFound):
-        logger.warning(
-            "change_calendar_missing",
-            extra={"ticket_id": ticket_id, "calendar_id": cfg.calendar_id},
-        )
-    except SQLAlchemyError:
-        logger.exception("change_calendar_sync_failed", extra={"ticket_id": ticket_id})
-        await session.refresh(row)
+    except Exception as exc:  # noqa: BLE001 - a mirror error never fails the caller
+        if isinstance(exc, CalendarNotFound | AppointmentNotFound):
+            logger.warning(
+                "change_calendar_missing",
+                extra={"ticket_id": ticket_id, "calendar_id": cfg.calendar_id},
+            )
+        else:
+            logger.exception("change_calendar_mirror_failed", extra={"ticket_id": ticket_id})
+        # the savepoint rollback expired the row (and undid the id change): reload it
+        with contextlib.suppress(Exception):
+            await session.refresh(row)
 
 
 __all__ = ["MIRRORED_PHASES", "sync_appointment"]
