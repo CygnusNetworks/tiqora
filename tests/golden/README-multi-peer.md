@@ -280,3 +280,69 @@ Things worth knowing for the survey (Tasks 2 and 3): with ITSMCore installed the
 `Kernel::System::Service` / `SLA` modules switch on `IsITSMInstalled` and require `TypeID` (and
 `Criticality` for services); in 6.5+ criticality and impact of a *ticket* are dynamic fields
 (`ITSMCriticality`, `ITSMImpact`), the general catalog class `ITSM::Core::Criticality` is empty.
+
+## Change-Verwaltung
+
+`test_itsm_change_legacy.py` (wave-5 itsm-change Task 28) proves on `znuny-6.5-itsm`
+(ITSMChangeManagement 6.5.2) and `znuny-7.3-itsm` (7.3.4) that Tiqora reads Znuny's change
+management without changing it. It needs the `chg94` changes of `itsm_seed.pl` (three changes,
+work orders of the types workorder/backout/pir, one without times, CAB agent + customer user
+`chg94-cust@example.org`, change and work-order dynamic fields, change->ticket and work
+order->CI/service/ticket links, one change template); the module runs the seed itself (idempotent).
+
+```sh
+cd backend && GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm uv run python -m pytest -q -m golden \
+    ../tests/golden/test_itsm_change_legacy.py
+```
+
+- `test_legacy_reader_equals_znuny_changeget`: every change of the peer through `ZnunyLiveSource`
+  equals `ChangeGet` / `WorkOrderGet` / `ChangeCABGet` / `ChangeHistoryGet` / `LinkList`: header,
+  catalog names, manager/builder/agent logins, the times derived from the work orders (ruling S2,
+  the seed's mail change has a work order without planned times and unfinished ones), texts, CAB,
+  dynamic fields, links (work-order links carry the work-order number, ruling S1) and every
+  history row incl. the names `AgentITSMChangeHistory` resolves for `*ID` / CAB fields. The list,
+  the ticket / CI filters (against `LinkList`, directly or through a work order) and the number /
+  title search of `reader.search` as well.
+- `test_mode_a_change_view_writes_nothing`: `/api/v1/itsm/legacy-changes` (list, text, CI and ticket
+  filters, detail; as `root@localhost` and as `chg94.agent`, who sees no linked ticket or CI)
+  leaves the 15 `change_*` + 5 `condition_*` tables and `link_relation` as they were (ordered
+  `SELECT *` hashed in Python, ruling F33).
+- `test_archive_equals_reader`: `run_import` (step `changes`), then `ArchiveSource.get` equals
+  `ZnunyLiveSource.get` for every change, except that CI links are stored as `tiqora:<id>` (the
+  import took every CI); the standalone archive afterwards reports all changes `unchanged`; the
+  change tables are untouched. Runs without erasures (the module refuses a peer with tombstones).
+- `test_setup_change_dfs_like_znuny_admin`: the setup group `change` on the ITSM peer; Znuny's
+  `DynamicFieldGet`, `YAML->Load`, `AdminDynamicFieldDropdown` (`Subaction=Change`, rendered with a
+  real Layout), `PossibleValuesGet`, `FieldValueValidate` (every value accepted, another one
+  refused) and `ValueLookup` agree with `TIQORA_CHANGE_DYNAMIC_FIELDS`; the types `Change` /
+  `Change::Task` resolve.
+- `test_change_ticket_visible_in_znuny`: in Mode B a change (`create_change`) and a task
+  (`add_task`) created by Tiqora: `TicketGet` shows the types, `ITSMChangeType=normal` /
+  `ITSMChangePhase=draft` with their labels and `TicketDynamicFieldUpdate` history, and `LinkList`
+  the `ParentChild` link from both tickets.
+
+Representation differences the comparison normalises (no value differs): Znuny's API answers `""`
+where the reader has `None`, numbers as text (`"4.00"`), `*Plain` texts with the line's newlines
+(ruling S3: stripped on both sides); the history screen shows `name (ID=x)` and joins CAB lists
+with `,`, the reader keeps the raw value plus the name and joins with `, `; `LinkList` reports
+both ends of an unpointed type (`Normal`) as `Source`, so the stored direction is compared for
+pointed types (`DependsOn`) only. `*NotificationSent` content holds recipient addresses (ruling
+S5): it is compared as SHA-256 on both sides, so no address reaches the test output.
+
+Tiqora's writes reach Znuny's caches (dynamic field list, types) through TiqoraSync, as in
+production: the module copies `TiqoraSync.pm` in and calls `Run()` after the setup and after the
+change is created. It restores every `tiqora_*` table it changed from a snapshot, removes its
+tickets (`TicketDelete`, titles `chg94 golden*`), the two dynamic fields (`DynamicFieldDelete`)
+and the two ticket types when they were not there before, and the mode setting.
+
+Results (2026-10-28, cached images `tiqora-golden-peer-znuny-6.5` / `-7.3`, DB volumes migrated to
+`20261010_0084` by `golden-seed`): 5 passed on `znuny-6.5-itsm` and 5 passed on `znuny-7.3-itsm`,
+no difference between the lines. The reader and the archive showed no parity difference. Together
+with `test_itsm_peer_smoke.py`, `test_itsm_mode_a.py`, `test_itsm_import.py` and
+`test_gi_config_items.py` on `znuny-7.3-itsm`: 54 passed, 3 skipped, 1 failed. The failure is
+`test_itsm_import.py::test_second_run_reports_only_unchanged`: the CI importer's `links` step
+reports the two work order->CI links of the change seed as `unsupported_object` and counts them
+`skipped` (open, see the Task 28 report). The same session found and fixed two follow-ups of the
+change work in the older modules: `_itsm_import_support.run_importer_with_id` passes `settings`
+(new argument of `run_import`) and snapshots the legacy change tables the import now writes, and
+`test_setup_on_itsm_peer_is_noop` expects the change group's dynamic fields as `missing`.
