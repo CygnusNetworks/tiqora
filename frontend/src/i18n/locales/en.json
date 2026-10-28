@@ -9266,7 +9266,7 @@
       "all": "All approvers must approve",
       "quorum": "{{required}} approvals needed",
       "majority": "Majority needed ({{required}} approvals)",
-      "majorityOpen": "Majority required"
+      "majorityOpen": "Majority needed"
     },
     "errors": {
       "approval_not_found": "This approval does not exist or you may not see it.",
@@ -9287,7 +9287,7 @@
       "invalid_definition": "The details are not valid. Please check steps, approvers and deadlines.",
       "unknown_subject_type": "This approval type is not known.",
       "subject_not_requestable": "This approval type cannot be requested by hand.",
-      "customer_approvers_not_allowed": "Customers cannot approve this kind of request.",
+      "customer_approvers_not_allowed": "Customers cannot approve this approval type.",
       "unknown_resolver": "An approver rule in the template does not exist.",
       "link_invalid": "This link is no longer valid. A decision may already have been made, or the request was withdrawn.",
       "link_expired": "This link has expired. Please sign in and decide under “My approvals”.",

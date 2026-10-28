@@ -97,7 +97,7 @@ test.describe("agent inbox and ticket panel", () => {
   test("withdrawing from the inbox asks first", async ({ page }) => {
     await page.goto("/agent/approvals?id=503");
     await page.getByTestId("approval-cancel").click();
-    await expect(page.getByText("Anfrage zurückziehen?")).toBeVisible();
+    await expect(page.getByText("Anforderung zurückziehen?")).toBeVisible();
     await page.getByTestId("confirm-dialog-cancel").click();
     await expect(page.getByTestId("approval-detail").getByTestId("approval-status-badge").first()).toContainText("Offen");
     await page.getByTestId("approval-cancel").click();
@@ -126,7 +126,7 @@ test.describe("agent inbox and ticket panel", () => {
 
     // Withdrawing moves it under "Ältere Freigaben".
     await created.getByTestId("ticket-approval-cancel").click();
-    await expect(page.getByText("Anfrage zurückziehen?")).toBeVisible();
+    await expect(page.getByText("Anforderung zurückziehen?")).toBeVisible();
     await page.getByTestId("confirm-dialog-confirm").click();
     await expect(panel.getByTestId("ticket-approvals-older-toggle")).toBeVisible();
     await expect(panel.getByTestId("ticket-approval")).toHaveCount(1);

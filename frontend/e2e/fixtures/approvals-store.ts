@@ -169,14 +169,15 @@ class ApprovalsStore {
   private request(ticketId: number, body: { title?: string; description?: string | null; template_key?: string | null; definition?: { steps?: StepIn[] } | null }) {
     const id = this.nextApprovalId++;
     let seq = 8000 + id * 10;
-    const specs: StepIn[] =
-      body.definition?.steps ??
-      (body.template_key === "cab_normal"
-        ? [
-            { name: "CAB", stage: 1, rule: "majority", approvers: [{}, {}, {}] },
-            { name: "Betriebsleitung", stage: 2, rule: "any", approvers: [{}] },
-          ]
-        : [{ name: "Freigabe", stage: 1, rule: "any", approvers: [{}] }]);
+    // Steps come from the template the store holds; a list resolves to its three demo members, any other entry to one person.
+    const fromTemplate = this.templates.find((t) => t.template_key === body.template_key)?.definition.steps.map((st) => ({
+      name: st.name,
+      stage: st.stage,
+      rule: st.rule,
+      quorum: st.quorum,
+      approvers: st.approvers.flatMap((e) => (e.kind === "list" ? [{}, {}, {}] : [{}])),
+    }));
+    const specs: StepIn[] = body.definition?.steps ?? fromTemplate ?? [{ name: "Freigabe", stage: 1, rule: "any", approvers: [{}] }];
     const first = Math.min(...specs.map((s) => s.stage ?? 1));
     const steps = specs.map((s, i) => {
       const active = (s.stage ?? 1) === first;

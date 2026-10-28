@@ -84,7 +84,7 @@ describe("TicketApprovalsPanel", () => {
     renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
     fireEvent.click(await screen.findByTestId("ticket-approval-cancel"));
     expect(cancel).not.toHaveBeenCalled();
-    expect(screen.getByText("Anfrage zurückziehen?")).toBeInTheDocument();
+    expect(screen.getByText("Anforderung zurückziehen?")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
     expect((cancel.mock.calls[0] as unknown as [{ body?: unknown } | undefined])[0]?.body).toBeUndefined();

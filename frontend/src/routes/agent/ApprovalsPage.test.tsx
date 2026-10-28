@@ -223,7 +223,7 @@ describe("ApprovalsPage", () => {
     renderApproval(<ApprovalsPage />);
     fireEvent.click(await screen.findByTestId("approval-cancel"));
     expect(cancel).not.toHaveBeenCalled();
-    expect(screen.getByText("Anfrage zurückziehen?")).toBeInTheDocument();
+    expect(screen.getByText("Anforderung zurückziehen?")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
     expect(cancel).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("approval-cancel"));

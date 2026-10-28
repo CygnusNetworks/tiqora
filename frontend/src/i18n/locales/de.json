@@ -9287,7 +9287,7 @@
       "invalid_definition": "Die Angaben sind nicht gültig. Bitte prüfen Sie Schritte, Freigeber und Fristen.",
       "unknown_subject_type": "Diese Art der Freigabe ist nicht bekannt.",
       "subject_not_requestable": "Diese Art der Freigabe kann nicht von Hand angefordert werden.",
-      "customer_approvers_not_allowed": "Kunden können diese Art von Freigabe nicht erteilen.",
+      "customer_approvers_not_allowed": "Kunden können diese Art der Freigabe nicht erteilen.",
       "unknown_resolver": "Eine Regel für Freigeber in der Vorlage gibt es nicht.",
       "link_invalid": "Dieser Link ist nicht mehr gültig. Möglicherweise wurde bereits entschieden oder die Freigabe zurückgezogen.",
       "link_expired": "Dieser Link ist abgelaufen. Bitte melden Sie sich an und entscheiden Sie unter „Meine Freigaben“.",
@@ -9566,9 +9566,9 @@
       "discard": "Änderungen verwerfen"
     },
     "withdraw": {
-      "action": "Anfrage zurückziehen",
-      "title": "Anfrage zurückziehen?",
-      "message": "Die Anfrage „{{title}}“ wird ohne Entscheidung geschlossen. Niemand kann sie mehr entscheiden."
+      "action": "Anforderung zurückziehen",
+      "title": "Anforderung zurückziehen?",
+      "message": "Die Anforderung „{{title}}“ wird ohne Entscheidung geschlossen. Niemand kann sie mehr entscheiden."
     }
   }
 }
