@@ -473,17 +473,22 @@ class TiqoraItsmLegacyChangeRef(TiqoraBase):
 class TiqoraItsmLegacyErased(TiqoraBase):
     """GDPR tombstone: an erased customer login or address that never re-enters the archive.
 
-    Only a keyed hash (HMAC-SHA256 of the lowercased identifier, ``legacy.archive.erased_hash``)
-    is stored, never the identifier itself.
+    Only a keyed hash (HMAC-SHA256 of the lowercased identifier,
+    ``tiqora.itsm.change.legacy.redact.erased_hash``) is stored, never the identifier itself.
+    One row per erasure job and identifier: rolling one job back removes its rows only, so an
+    identifier another erasure still holds stays erased.
     """
 
     __tablename__ = "tiqora_itsm_legacy_erased"
     __table_args__ = (
-        UniqueConstraint("identifier_hash", name="uq_tiqora_itsm_legacy_erased_hash"),
+        UniqueConstraint("identifier_hash", "job_id", name="uq_tiqora_itsm_legacy_erased_hash_job"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     identifier_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
     #: ``login`` | ``email``
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: ``tiqora_gdpr_job.id`` (by value); ``NULL`` for the CLI anonymisation, which has no job
+    #: and no rollback
+    job_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created: Mapped[datetime] = mapped_column(DateTime, nullable=False)

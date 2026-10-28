@@ -30,6 +30,7 @@ from tests._itsm_import_fixtures import (
 )
 from tests._itsm_mode_helpers import profile_packages
 from tests._sysconfig_rows import set_sysconfig_rows
+from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import (
     TiqoraCmdbCatalog,
@@ -170,6 +171,7 @@ async def _run(
         page_size=4,
         progress=_noop,
         check_cancelled=check_cancelled,
+        settings=get_settings(),
     )
 
 
@@ -520,6 +522,7 @@ async def test_real_adapter_on_znuny_6x_tables(itsm_world, monkeypatch) -> None:
         page_size=2,
         progress=_noop,
         check_cancelled=_noop,
+        settings=get_settings(),
     )
 
     assert _order(report) == list(STEP_ORDER)

@@ -125,6 +125,7 @@ async def run_changes(ctx: StepContext) -> None:
         progress=ctx.progress,
         check_cancelled=ctx.check_cancelled,
         report=ArchiveReport(),
+        settings=ctx.settings,
     )
     for name in ("created", "updated", "unchanged", "skipped"):
         ctx.report.count(STEP_CHANGES, name, getattr(archived, name))

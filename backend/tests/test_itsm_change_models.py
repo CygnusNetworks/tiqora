@@ -272,8 +272,8 @@ def test_migration_creates_change_tables(migrated: str) -> None:
                 ["meeting_id", "change_ticket_id"],
             ),
             "tiqora_itsm_legacy_erased": (
-                "uq_tiqora_itsm_legacy_erased_hash",
-                ["identifier_hash"],
+                "uq_tiqora_itsm_legacy_erased_hash_job",
+                ["identifier_hash", "job_id"],
             ),
             "tiqora_itsm_legacy_change": (
                 "uq_tiqora_itsm_legacy_change_znuny",

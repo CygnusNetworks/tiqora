@@ -546,6 +546,7 @@ def test_itsm_change_ddl_equals_migration() -> None:
         erased = TiqoraItsmLegacyErased.__table__
         assert "CHAR(64) NOT NULL" in _column_ddl(erased, "identifier_hash", dialect)
         assert "VARCHAR(16) NOT NULL" in _column_ddl(erased, "kind", dialect)
+        assert _column_ddl(erased, "job_id", dialect) == "job_id BIGINT,"
         assert "AUTO_INCREMENT" not in _column_ddl(
             TiqoraItsmLegacyChangeRef.__table__, "legacy_change_id", dialect
         )

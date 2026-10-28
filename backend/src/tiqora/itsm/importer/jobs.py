@@ -190,6 +190,7 @@ async def run_itsm_import_job(ctx: JobContext, payload: Any) -> dict[str, Any]:
             page_size=payload.page_size,
             progress=ctx.progress,
             check_cancelled=ctx.check_cancelled,
+            settings=ctx.settings,
         )
         await ctx.add_file(CSV_NAME, "text/csv; charset=utf-8", report.to_csv())
     except JobCancelled:
@@ -287,6 +288,7 @@ async def run_itsm_switch_job(ctx: JobContext, payload: Any) -> dict[str, Any] |
                 page_size=500,
                 progress=ctx.progress,
                 check_cancelled=ctx.check_cancelled,
+                settings=ctx.settings,
             )
             await ctx.add_file(CSV_NAME, "text/csv; charset=utf-8", report.to_csv())
         await ctx.check_cancelled()

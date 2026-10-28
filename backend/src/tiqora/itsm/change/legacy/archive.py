@@ -44,7 +44,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, insert, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.config import get_settings
+from tiqora.config import Settings
 from tiqora.itsm.change.legacy import reader
 from tiqora.itsm.change.legacy.model import (
     CabKind,
@@ -59,6 +59,7 @@ from tiqora.itsm.change.legacy.redact import (
     MappingRedactor,
     TombstoneRedactor,
     erased_hash,
+    erased_key,
     redact_data,
     redacted_hashes,
 )
@@ -312,19 +313,19 @@ def _stored_hashes(raw: str) -> set[str]:
 
 
 async def load_tombstones(session: AsyncSession) -> set[str]:
-    """Every tombstone hash (one per erased login or address)."""
-    rows = await session.execute(select(TiqoraItsmLegacyErased.identifier_hash))
+    """Every erased identifier's hash (distinct; one row per erasure job and identifier)."""
+    rows = await session.execute(select(TiqoraItsmLegacyErased.identifier_hash).distinct())
     return {str(r[0]).strip() for r in rows}
 
 
 def redact_for_storage(
-    change: LegacyChange, secret_key: str, tombstones: Collection[str]
+    change: LegacyChange, key: bytes, tombstones: Collection[str]
 ) -> tuple[dict[str, Any], set[str]]:
     """``data`` of a change to store, redacted against the tombstones, and the hashes it hit."""
     data = change_to_data(change)
     if not tombstones:
         return data, set()
-    redactor = TombstoneRedactor(secret_key, tombstones)
+    redactor = TombstoneRedactor(key, tombstones)
     out = redact_data(data, redactor)
     if redactor.hits:
         out[REDACTED_KEY] = sorted(redactor.hits)
@@ -365,7 +366,7 @@ async def _archive_batch(
     run_id: int | None,
     dry_run: bool,
     report: ArchiveReport,
-    secret_key: str,
+    key: bytes,
     tombstones: Collection[str],
 ) -> None:
     """At most :data:`reader.MAX_READ` changes (flush only)."""
@@ -389,7 +390,7 @@ async def _archive_batch(
         source_id = str(change.znuny_change_id)
         stored = with_ci_refs(change, targets)
         fp = fingerprint(stored)  # of the unredacted form: Znuny unchanged -> unchanged
-        data, hits = redact_for_storage(stored, secret_key, tombstones)
+        data, hits = redact_for_storage(stored, key, tombstones)
         row = rows.get(change.znuny_change_id)
         if row is not None and row.fingerprint == fp and _stored_hashes(row.data) == hits:
             report.unchanged += 1
@@ -415,8 +416,8 @@ async def _archive_batch(
             row = TiqoraItsmLegacyChange(znuny_change_id=change.znuny_change_id, **values)
             session.add(row)
         else:
-            for key, value in values.items():
-                setattr(row, key, value)
+            for column, value in values.items():
+                setattr(row, column, value)
         await session.flush()
         await _replace_refs(session, int(row.id), change_refs(shown))
         await store.put(KIND_LEGACY_CHANGE, source_id, int(row.id), fp)
@@ -431,12 +432,12 @@ async def archive_changes(
     progress: Callable[[int, int | None, str], Awaitable[None]],
     check_cancelled: Callable[[], Awaitable[None]],
     report: ArchiveReport,
-    secret_key: str | None = None,
+    settings: Settings,
 ) -> ArchiveReport:
     """Archive every Znuny change into ``report`` (one session and commit per page of
     ``page_size`` ids; cancellation is checked before each page). Without the change tables
-    nothing happens. ``secret_key`` keys the tombstone hashes (default: the site secret)."""
-    secret = get_settings().secret_key if secret_key is None else secret_key
+    nothing happens. ``settings`` give the tombstone key (:func:`redact.erased_key`)."""
+    key = erased_key(settings)
     async with session_factory() as session:
         if not await reader.change_tables_present(session):
             return report
@@ -467,7 +468,7 @@ async def archive_changes(
                     run_id=run_id,
                     dry_run=dry_run,
                     report=report,
-                    secret_key=secret,
+                    key=key,
                     tombstones=tombstones,
                 )
             if dry_run:
@@ -538,7 +539,7 @@ async def run_legacy_archive_job(ctx: JobContext, payload: Any) -> dict[str, Any
         progress=ctx.progress,
         check_cancelled=ctx.check_cancelled,
         report=ArchiveReport(),
-        secret_key=ctx.settings.secret_key,
+        settings=ctx.settings,
     )
     return {"dry_run": payload.dry_run, **report.as_dict()}
 
@@ -629,23 +630,32 @@ async def _candidate_ids(
 
 async def _add_tombstones(
     session: AsyncSession,
-    secret_key: str,
+    key: bytes,
     identifiers: Sequence[tuple[str, str]],
     add_backup: BackupFn,
+    job_id: int | None,
 ) -> int:
-    """One tombstone per ``(kind, identifier)`` that has none yet; each new one is backed up as
-    created (a rollback deletes it, an existing one stays for the earlier erasure)."""
+    """One tombstone of this job per ``(kind, identifier)``; each new one is backed up as
+    created, so a rollback of the job deletes its own rows only and an identifier another
+    erasure also holds stays erased."""
     wanted: dict[str, str] = {}
     for kind, identifier in identifiers:
         if identifier and identifier.strip():
-            wanted.setdefault(erased_hash(secret_key, identifier), kind)
-    known = await load_tombstones(session)
+            wanted.setdefault(erased_hash(key, identifier), kind)
+    table = TiqoraItsmLegacyErased
+    mine = table.job_id.is_(None) if job_id is None else table.job_id == job_id
+    known: set[str] = set()
+    for part in chunks(sorted(wanted)):
+        rows = await session.execute(
+            select(table.identifier_hash).where(table.identifier_hash.in_(list(part)), mine)
+        )
+        known.update(str(r[0]).strip() for r in rows)
     created = 0
     now = utc_now()
     for digest, kind in sorted(wanted.items()):
         if digest in known:
             continue
-        row = TiqoraItsmLegacyErased(identifier_hash=digest, kind=kind, created=now)
+        row = TiqoraItsmLegacyErased(identifier_hash=digest, kind=kind, job_id=job_id, created=now)
         session.add(row)
         await session.flush()
         await add_backup(TOMBSTONE_CREATED, {"id": int(row.id)}, {})
@@ -659,17 +669,19 @@ async def erase_legacy_change_customers(
     replacements: Mapping[str, str],
     emails: Collection[str],
     add_backup: BackupFn,
-    secret_key: str,
+    settings: Settings,
+    job_id: int | None,
 ) -> dict[str, int]:
     """Remove erased customer users from the archive for good (flush only; no commit).
 
     ``replacements`` maps each erased login to the token its tickets got; ``emails`` are the
-    customers' addresses. A tombstone is left per login and address (the archive redacts
-    against it on every later write). In the archived rows the person-bearing values
-    (:func:`~tiqora.itsm.change.legacy.redact.redact_data`) are pseudonymised: each login becomes
-    its token, each address :data:`REDACTED`; their ``customer_user`` lookup rows are deleted.
-    Every changed, deleted or created row is backed up first, so ``rollback_job`` restores the
-    rows (incl. the fingerprint) and deletes the new tombstones.
+    customers' addresses; ``job_id`` is the erasure job (``None`` for the CLI anonymisation,
+    which has no rollback). A tombstone of the job is left per login and address (the archive
+    redacts against all of them on every later write). In the archived rows the person-bearing
+    values (:func:`~tiqora.itsm.change.legacy.redact.redact_data`) are pseudonymised: each login
+    becomes its token, each address :data:`REDACTED`; their ``customer_user`` lookup rows are
+    deleted. Every changed, deleted or created row is backed up first, so ``rollback_job``
+    restores the rows (incl. the fingerprint) and deletes the job's own tombstones.
     """
     logins = [lg for lg in replacements if lg and lg.strip()]
     addresses = [e for e in emails if e and e.strip()]
@@ -680,11 +692,13 @@ async def erase_legacy_change_customers(
     }
     if not logins and not addresses:
         return counts
+    key = erased_key(settings)
     counts["tiqora_itsm_legacy_erased"] = await _add_tombstones(
         session,
-        secret_key,
+        key,
         [*(("login", lg) for lg in logins), *(("email", e) for e in addresses)],
         add_backup,
+        job_id,
     )
     table = TiqoraItsmLegacyChange
     for part in chunks(sorted(await _candidate_ids(session, logins, addresses))):
@@ -696,7 +710,7 @@ async def erase_legacy_change_customers(
             )
         ).all()
         for row_id, raw, title, fp in rows:
-            redactor = MappingRedactor(secret_key, replacements, addresses)
+            redactor = MappingRedactor(key, replacements, addresses)
             old = json.loads(raw)
             data = redact_data(old, redactor)
             if not redactor.hits:

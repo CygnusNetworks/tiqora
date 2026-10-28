@@ -17,7 +17,13 @@ not in a change archived for the first time after the erasure.
   title, instruction and report, dynamic field values.
 
 Links, ids, numbers, catalog names, history types and field names and agent logins are never
-touched. A word matches only as a whole (``erika`` does not match ``erika.beispiel``).
+touched. In free text an identifier matches as a whole run of identifier characters (letters,
+digits, ``_ . @ + -``; leading/trailing dots and dashes are tried off): ``erika`` does not match
+``erika.beispiel``, but ``&lt;erika@example.org&gt;`` and ``chg94.kunde&nbsp;`` (raw RichText
+history values) do. A value with HTML entities is also matched after decoding them (an
+identifier written as ``erika&#64;example.org``); such a value is then stored decoded.
+Identifiers with other characters are matched only in the exact-entry fields (CAB, lists,
+recipients).
 ``data["redacted"]`` lists the hashes a row was redacted for, so the archive can tell a row that
 must be written again (a tombstone added or rolled back) from an unchanged one.
 """
@@ -27,9 +33,12 @@ from __future__ import annotations
 import copy
 import hashlib
 import hmac
+import html
 import re
 from collections.abc import Collection, Mapping
 from typing import Any, Final
+
+from tiqora.config import Settings
 
 #: what an erased customer becomes where no pseudonym is known
 REDACTED: Final = "[gelöscht]"
@@ -44,15 +53,24 @@ _NOTIFICATION_SUFFIX: Final = "NotificationSent"
 _HISTORY_VALUES: Final = ("old", "new", "old_display", "new_display")
 _WORKORDER_TEXTS: Final = ("title", "instruction", "report")
 _CHANGE_TEXTS: Final = ("title", "description", "justification")
-#: a word: everything up to white space or a separator (an address or a dotted login is one)
-_WORD: Final = re.compile(r"[^\s,;:<>()\[\]{}\"'|/\\%]+")
-_TRAILING: Final = ".!?"
+#: a run of identifier characters (an address or a dotted login is one run; ``&``, ``;``,
+#: ``<``, white space ... end it)
+_WORD: Final = re.compile(r"[\w.@+-]+")
+_EDGES: Final = ".-"
 _KEY_LABEL: Final = b"itsm-legacy-erased-v1"
 
 
-def erased_hash(secret_key: str, identifier: str) -> str:
-    """HMAC-SHA256 (hex) of the lowercased identifier under a key derived from the site secret."""
-    key = hmac.new(secret_key.encode("utf-8"), _KEY_LABEL, hashlib.sha256).digest()
+def erased_key(settings: Settings) -> bytes:
+    """The tombstone HMAC key, derived from the site secret (``TIQORA_SECRET_KEY``).
+
+    The one source of the key: the erasure, the archive job and the importer step all pass
+    their settings here, so their hashes agree. Derive it once per run, not per word.
+    """
+    return hmac.new(settings.secret_key.encode("utf-8"), _KEY_LABEL, hashlib.sha256).digest()
+
+
+def erased_hash(key: bytes, identifier: str) -> str:
+    """HMAC-SHA256 (hex) of the stripped, lowercased identifier under :func:`erased_key`."""
     return hmac.new(key, identifier.strip().lower().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -70,32 +88,32 @@ class MappingRedactor(Redactor):
     """The erasure: each login -> its token, each address -> :data:`REDACTED`."""
 
     def __init__(
-        self, secret_key: str, replacements: Mapping[str, str], emails: Collection[str]
+        self, key: bytes, replacements: Mapping[str, str], emails: Collection[str]
     ) -> None:
         super().__init__()
-        self._secret = secret_key
+        self._key = key
         self._map = {e.strip().lower(): REDACTED for e in emails if e and e.strip()}
         self._map.update({k.strip().lower(): v for k, v in replacements.items() if k.strip()})
 
     def lookup(self, identifier: str) -> str | None:
         found = self._map.get(identifier.strip().lower())
         if found is not None:
-            self.hits.add(erased_hash(self._secret, identifier))
+            self.hits.add(erased_hash(self._key, identifier))
         return found
 
 
 class TombstoneRedactor(Redactor):
     """Every archive write: an identifier with a tombstone -> :data:`REDACTED`."""
 
-    def __init__(self, secret_key: str, hashes: Collection[str]) -> None:
+    def __init__(self, key: bytes, hashes: Collection[str]) -> None:
         super().__init__()
-        self._secret = secret_key
+        self._key = key
         self._hashes = frozenset(hashes)
 
     def lookup(self, identifier: str) -> str | None:
         if not identifier.strip():
             return None
-        digest = erased_hash(self._secret, identifier)
+        digest = erased_hash(self._key, identifier)
         if digest not in self._hashes:
             return None
         self.hits.add(digest)
@@ -106,18 +124,30 @@ def _word(word: str, redactor: Redactor) -> str:
     found = redactor.lookup(word)
     if found is not None:
         return found
-    core = word.rstrip(_TRAILING)
+    core = word.strip(_EDGES)
     if core and core != word:
         found = redactor.lookup(core)
         if found is not None:
-            return found + word[len(core) :]
+            start = word.index(core)
+            return word[:start] + found + word[start + len(core) :]
     return word
+
+
+def _words(value: str, redactor: Redactor) -> str:
+    return _WORD.sub(lambda m: _word(m.group(0), redactor), value)
 
 
 def _text(value: Any, redactor: Redactor) -> Any:
     if not isinstance(value, str) or not value:
         return value
-    return _WORD.sub(lambda m: _word(m.group(0), redactor), value)
+    out = _words(value, redactor)
+    if "&" in out:
+        decoded = html.unescape(out)
+        if decoded != out:
+            redacted = _words(decoded, redactor)
+            if redacted != decoded:  # only visible with the entities decoded
+                return redacted
+    return out
 
 
 def _entries(value: Any, separator: str, redactor: Redactor) -> Any:

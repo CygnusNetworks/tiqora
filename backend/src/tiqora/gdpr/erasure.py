@@ -2221,7 +2221,8 @@ async def run_erasure(
                     replacements=login_to_new,
                     emails=erased_emails,
                     add_backup=_backup_saved,
-                    secret_key=settings.secret_key,
+                    settings=settings,
+                    job_id=job_id,
                 )
             )
         # GenericInterface debugger lines hold payloads of these tickets (customer names,

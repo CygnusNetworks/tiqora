@@ -58,6 +58,7 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraItsmImportMap, TiqoraJob, TiqoraSettings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import get_registry, set_registry_for_tests
+from tiqora.gdpr.anonymize import anonymize_customer
 from tiqora.gdpr.erasure import rollback_job, run_erasure
 from tiqora.itsm.change.legacy import reader
 from tiqora.itsm.change.legacy.archive import (
@@ -73,7 +74,14 @@ from tiqora.itsm.change.legacy.archive import (
     run_legacy_archive_job,
     with_ci_refs,
 )
-from tiqora.itsm.change.legacy.redact import REDACTED, erased_hash
+from tiqora.itsm.change.legacy.redact import (
+    REDACTED,
+    MappingRedactor,
+    TombstoneRedactor,
+    erased_hash,
+    erased_key,
+    redact_data,
+)
 from tiqora.itsm.change.legacy.sources import ArchiveSource, get_legacy_source, visible_links
 from tiqora.itsm.change.models import (
     TiqoraItsmChange,
@@ -108,6 +116,10 @@ CUSTOMER2, CUSTOMER2_MAIL = "chg94.kunde", "chg94-kunde@example.org"
 CAB2, CAB2_HISTORY, CAB2_NOTIFY = 947632, 947633, 947634
 #: a change first seen after the erasure: id, CAB row, history row
 LATE_CHANGE, LATE_CAB, LATE_NOTIFY = 947650, 947651, 947652
+#: a second customer sharing CUSTOMER2's address; RichText history rows
+CUSTOMER3 = "chg94.kundin"
+CAB3, SHARED_NOTIFY = 947635, 947636
+RICH_HISTORY, RICH_HISTORY_2 = 947637, 947638
 #: a customer whose login equals a ticket id
 NUMERIC_LOGIN, NUMERIC_MAIL = str(TICKET_A), "chg94-num@example.org"
 ARCHIVED = {MAIL, FIRMWARE, UPTIME}
@@ -178,7 +190,7 @@ async def _archive(w: World, *, dry_run: bool = False, page_size: int = 2) -> Ar
         progress=_noop,
         check_cancelled=_noop,
         report=ArchiveReport(),
-        secret_key=SETTINGS.secret_key,
+        settings=SETTINGS,
     )
 
 
@@ -415,6 +427,7 @@ def _step_ctx(w: World, *, run_id: int, dry_run: bool = False) -> StepContext:
         user_id=ADMIN,
         writer_for=lambda _s: pytest.fail("the change step writes no CI"),
         mapstore_for=lambda s: MapStore(s, run_id=run_id, read_only=dry_run),
+        settings=SETTINGS,
     )
 
 
@@ -841,8 +854,8 @@ async def test_erasure_tombstone_keeps_customer_out(
         # tombstones: keyed hashes of the lowercased login and address, never the plain value
         assert await _tombstones(w) == sorted(
             [
-                (erased_hash(SETTINGS.secret_key, CUSTOMER2), "login"),
-                (erased_hash(SETTINGS.secret_key, CUSTOMER2_MAIL), "email"),
+                (erased_hash(erased_key(SETTINGS), CUSTOMER2), "login"),
+                (erased_hash(erased_key(SETTINGS), CUSTOMER2_MAIL), "email"),
             ]
         )
         assert result.counts["tiqora_itsm_legacy_erased"] == 2
@@ -948,3 +961,189 @@ async def test_erasure_of_numeric_login_leaves_links_intact(
         mail = change_from_data(json.loads((await _rows(w))[MAIL].data))
         assert any(li.key == NUMERIC_LOGIN and li.object == "Ticket" for li in mail.links)
         assert await _refs(w, MAIL) == refs_before[MAIL]
+
+
+async def _tombstone_jobs(w: World) -> list[tuple[str, int | None]]:
+    async with w.factory() as s:
+        rows = await s.execute(
+            select(TiqoraItsmLegacyErased.identifier_hash, TiqoraItsmLegacyErased.job_id)
+        )
+        return sorted(
+            ((str(h).strip(), None if j is None else int(j)) for h, j in rows.all()),
+            key=lambda t: (t[0], t[1] or 0),
+        )
+
+
+async def _edit_mail(w: World, day: int) -> None:
+    async with w.factory() as s:
+        await s.execute(
+            text("UPDATE change_item SET change_time = :c WHERE id = :i"),
+            {"c": at(day, 8), "i": MAIL},
+        )
+        await s.commit()
+
+
+def test_redact_matches_identifiers_next_to_html_entities() -> None:
+    """Raw RichText history values: entities and tags around an identifier, an encoded one."""
+    key = erased_key(SETTINGS)
+    values = {
+        "field": "Description",
+        "history_type": "ChangeUpdate",
+        "old": "<p>Bitte an Erika &lt;chg94-kunde@example.org&gt; senden</p>",
+        "new": "Kontakt: chg94.kunde&nbsp;(Tel), nicht chg94.kunde.extra",
+        "old_display": "Mail: chg94-kunde&#64;example.org.",
+        "new_display": "-chg94.kunde-",
+    }
+    data = {"history": [values], "cab": [], "workorders": []}
+    erased = redact_data(data, MappingRedactor(key, {CUSTOMER2: "tok94"}, [CUSTOMER2_MAIL]))[
+        "history"
+    ][0]
+    assert erased["old"] == f"<p>Bitte an Erika &lt;{REDACTED}&gt; senden</p>"
+    assert erased["new"] == "Kontakt: tok94&nbsp;(Tel), nicht chg94.kunde.extra"
+    assert erased["old_display"] == f"Mail: {REDACTED}."  # matched decoded, stored decoded
+    assert erased["new_display"] == "-tok94-"
+    tombstones = TombstoneRedactor(
+        key, {erased_hash(key, CUSTOMER2), erased_hash(key, CUSTOMER2_MAIL)}
+    )
+    archived = redact_data(data, tombstones)["history"][0]
+    assert archived["old"] == f"<p>Bitte an Erika &lt;{REDACTED}&gt; senden</p>"
+    assert archived["new"] == f"Kontakt: {REDACTED}&nbsp;(Tel), nicht chg94.kunde.extra"
+    assert archived["old_display"] == f"Mail: {REDACTED}."
+    assert tombstones.hits == {erased_hash(key, CUSTOMER2), erased_hash(key, CUSTOMER2_MAIL)}
+    # other fields of the same row are no person-bearing text: left alone
+    ids = {"field": "ChangeStateID", "history_type": "ChangeUpdate", "old": CUSTOMER2}
+    assert redact_data({"history": [ids]}, tombstones)["history"][0]["old"] == CUSTOMER2
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_rich_text_history_redacted_on_erasure_and_rearchive(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            customer_id = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            for hid, field, old, new in (
+                (
+                    RICH_HISTORY,
+                    "Description",
+                    "<p>Kontakt: chg94.kunde&nbsp;(Tel)</p>",
+                    f"<p>Bitte an Erika &lt;{CUSTOMER2_MAIL}&gt; senden</p>",
+                ),
+                (RICH_HISTORY_2, "Justification", "", "Mail: chg94-kunde&#64;example.org"),
+            ):
+                await seed_change_history(
+                    s,
+                    history_id=hid,
+                    change_id=MAIL,
+                    history_type="ChangeUpdate",
+                    created_at=at(1, 15),
+                    fieldname=field,
+                    content_old=old,
+                    content_new=new,
+                    user_id=MANAGER,
+                )
+            await s.commit()
+        await _archive(w)
+        await _erase(w, customer_id)
+
+        def rich(raw: str) -> list[tuple[str | None, str | None]]:
+            change = change_from_data(json.loads(raw))
+            return [
+                (h.old, h.new)
+                for h in change.history
+                if h.field in ("Description", "Justification")
+            ]
+
+        erased = (await _rows(w))[MAIL].data
+        assert _absent(erased, CUSTOMER2, CUSTOMER2_MAIL, "chg94-kunde&#64;example.org")
+        assert rich(erased)[1] == ("", f"Mail: {REDACTED}")
+        assert rich(erased)[0][1] == f"<p>Bitte an Erika &lt;{REDACTED}&gt; senden</p>"
+        assert _counts(await _archive(w)) == (0, 0, 3, 0)
+
+        await _edit_mail(w, 7)  # re-archive from Znuny against the tombstones
+        assert _counts(await _archive(w)) == (0, 1, 2, 0)
+        archived = (await _rows(w))[MAIL].data
+        assert _absent(archived, CUSTOMER2, CUSTOMER2_MAIL, "chg94-kunde&#64;example.org")
+        assert rich(archived)[0] == (
+            f"<p>Kontakt: {REDACTED}&nbsp;(Tel)</p>",
+            f"<p>Bitte an Erika &lt;{REDACTED}&gt; senden</p>",
+        )
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_rollback_keeps_a_shared_address_another_erasure_holds(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """Two customers share an address: rolling the first erasure back removes only its own
+    tombstones; the address stays erased for the second one."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            first = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            second = await _customer(s, CUSTOMER3, CUSTOMER2_MAIL)
+            for cab_id, login in ((CAB2, CUSTOMER2), (CAB3, CUSTOMER3)):
+                await seed_change_cab(s, change_id=MAIL, cab_id=cab_id, customer_user_id=login)
+            await seed_change_history(
+                s,
+                history_id=SHARED_NOTIFY,
+                change_id=MAIL,
+                history_type="ChangeNotificationSent",
+                created_at=at(1, 14),
+                content_new=f"{CUSTOMER2_MAIL}%%ChangeUpdate",
+                user_id=MANAGER,
+            )
+            await s.commit()
+        await _archive(w)
+        key = erased_key(SETTINGS)
+        shared = erased_hash(key, CUSTOMER2_MAIL)
+
+        job_a = (await _erase(w, first)).job_id
+        job_b = (await _erase(w, second)).job_id
+
+        assert [j for h, j in await _tombstone_jobs(w) if h == shared] == sorted([job_a, job_b])
+        assert len(await _tombstone_jobs(w)) == 4  # login + address per job
+
+        await rollback_job(w.factory, SETTINGS, job_a, force_parallel=True, actor="test")
+
+        assert await _tombstone_jobs(w) == sorted(
+            [(erased_hash(key, CUSTOMER3), job_b), (shared, job_b)],
+            key=lambda t: (t[0], t[1] or 0),
+        )
+        # the rollback restored the row as it was before job A; the next run redacts it again
+        # against what is still erased: CUSTOMER2 is back, CUSTOMER3 and the address are not
+        assert _counts(await _archive(w)) == (0, 1, 2, 0)
+        data = (await _rows(w))[MAIL].data
+        assert CUSTOMER2 in data
+        assert _absent(data, CUSTOMER3, CUSTOMER2_MAIL)
+        refs = await _refs(w, MAIL)
+        assert ("customer_user", CUSTOMER2, 0) in refs
+        assert ("customer_user", CUSTOMER3, 0) not in refs
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_cli_anonymisation_also_leaves_tombstones(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+            await s.commit()
+        await _archive(w)
+        assert CUSTOMER2 in (await _rows(w))[MAIL].data
+
+        result = await anonymize_customer(
+            w.factory, SETTINGS, login=CUSTOMER2, seed=7, force_parallel=True, actor="test"
+        )
+
+        assert result.legacy_changes == 1
+        key = erased_key(SETTINGS)
+        # no job, no rollback: permanent tombstones (job_id NULL)
+        assert await _tombstone_jobs(w) == sorted(
+            [(erased_hash(key, CUSTOMER2), None), (erased_hash(key, CUSTOMER2_MAIL), None)],
+            key=lambda t: (t[0], t[1] or 0),
+        )
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+        assert ("customer_user", CUSTOMER2, 0) not in await _refs(w, MAIL)
+        await _edit_mail(w, 8)
+        assert _counts(await _archive(w)) == (0, 1, 2, 0)
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)

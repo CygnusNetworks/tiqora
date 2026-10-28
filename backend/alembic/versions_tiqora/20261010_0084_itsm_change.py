@@ -420,9 +420,12 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column("identifier_hash", sa.CHAR(64), nullable=False),
         sa.Column("kind", sa.String(16), nullable=False),
+        sa.Column("job_id", sa.BigInteger(), nullable=True),
         sa.Column("created", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("identifier_hash", name="uq_tiqora_itsm_legacy_erased_hash"),
+        sa.UniqueConstraint(
+            "identifier_hash", "job_id", name="uq_tiqora_itsm_legacy_erased_hash_job"
+        ),
     )
 
 
