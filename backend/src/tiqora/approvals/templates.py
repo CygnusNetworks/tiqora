@@ -10,8 +10,10 @@ import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
+import structlog
 from pydantic import ValidationError
-from sqlalchemy import bindparam, delete, select, text
+from sqlalchemy import bindparam, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals.contract import (
@@ -24,6 +26,8 @@ from tiqora.approvals.contract import (
 from tiqora.approvals.models import TiqoraApprovalList, TiqoraApprovalTemplate
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
+
+logger = structlog.get_logger(__name__)
 
 _CHUNK = 500
 _ORIGIN_MAX = 16
@@ -220,16 +224,36 @@ async def get_template_by_key(session: AsyncSession, key: str) -> TemplateRow:
 async def list_templates(
     session: AsyncSession, *, subject_type: str | None = None, include_invalid: bool = False
 ) -> list[TemplateRow]:
-    """Templates by name; ``subject_type`` keeps those listing it plus the all-types ones."""
+    """Templates by name; ``subject_type`` keeps those listing it plus the all-types ones.
+
+    A stored row that no longer parses (hand-edited, older format) is left out and logged.
+    """
     stmt = select(TiqoraApprovalTemplate).order_by(
         TiqoraApprovalTemplate.name, TiqoraApprovalTemplate.id
     )
     if not include_invalid:
         stmt = stmt.where(TiqoraApprovalTemplate.valid.is_(True))
-    rows = [_row(e) for e in (await session.execute(stmt)).scalars()]
+    rows: list[TemplateRow] = []
+    for entity in (await session.execute(stmt)).scalars():
+        try:
+            rows.append(_row(entity))
+        except ValueError as exc:  # json / pydantic: one unreadable stored row must not hide all
+            logger.warning(
+                "approval_template_unreadable", template_id=entity.id, error=type(exc).__name__
+            )
     if subject_type is None:
         return rows
     return [r for r in rows if not r.subject_types or subject_type in r.subject_types]
+
+
+async def _insert(session: AsyncSession, entity: TiqoraApprovalTemplate) -> bool:
+    """Inserts *entity* in a savepoint; False when the unique key was taken meanwhile."""
+    try:
+        async with session.begin_nested():
+            session.add(entity)
+    except IntegrityError:
+        return False
+    return True
 
 
 async def create_template(
@@ -265,8 +289,8 @@ async def create_template(
         change_time=now,
         change_by=actor_id,
     )
-    session.add(entity)
-    await session.flush()
+    if not await _insert(session, entity):  # a concurrent insert took the key after the check
+        raise ApprovalError("template_key_taken", 409)
     return _row(entity)
 
 
@@ -318,13 +342,15 @@ async def update_template(
 
 
 async def delete_template(session: AsyncSession, template_id: int) -> None:
-    """Running requests keep their snapshot; their ``template_id`` becomes NULL (FK SET NULL)."""
-    if await session.get(TiqoraApprovalTemplate, template_id) is None:
+    """Running requests keep their snapshot; their ``template_id`` becomes NULL (FK SET NULL).
+
+    An ORM delete: only this entity leaves the session (no ``expire_all`` on the caller's
+    session, whose other loaded objects stay usable).
+    """
+    entity = await session.get(TiqoraApprovalTemplate, template_id)
+    if entity is None:
         raise ApprovalError("template_not_found", 404)
-    await session.execute(
-        delete(TiqoraApprovalTemplate).where(TiqoraApprovalTemplate.id == template_id)
-    )
-    session.expire_all()
+    await session.delete(entity)
     await session.flush()
 
 
@@ -338,7 +364,11 @@ async def ensure_template(
     subject_types: Iterable[str] = (),
     description: str | None = None,
 ) -> TemplateRow:
-    """Inserts the template if its key is free; an existing row is returned untouched."""
+    """Inserts the template if its key is free; an existing row is returned untouched.
+
+    Two workers seeding at once are fine: the loser's insert fails in a savepoint and it reads
+    the winner's row instead (the caller's transaction goes on).
+    """
     key = _clean_key(key)
     if not origin or len(origin) > _ORIGIN_MAX:
         raise ApprovalError("invalid_definition", 422, f"origin must be 1-{_ORIGIN_MAX} characters")
@@ -359,6 +389,9 @@ async def ensure_template(
         change_time=now,
         change_by=1,
     )
-    session.add(entity)
-    await session.flush()
+    if not await _insert(session, entity):
+        winner = await _template_by_key(session, key)
+        if winner is None:  # the other insert was rolled back again: nothing to share
+            raise ApprovalError("template_key_taken", 409)
+        return _row(winner)
     return _row(entity)

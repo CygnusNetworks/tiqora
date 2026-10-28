@@ -12,6 +12,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import bindparam, delete, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
@@ -139,8 +140,11 @@ async def create_list(
         change_time=now,
         change_by=actor_id,
     )
-    session.add(entity)
-    await session.flush()
+    try:
+        async with session.begin_nested():  # a concurrent insert may take the name after the check
+            session.add(entity)
+    except IntegrityError as exc:
+        raise ApprovalError("list_name_taken", 409) from exc
     session.add_all(TiqoraApprovalListMember(list_id=entity.id, user_id=u) for u in members)
     await session.flush()
     return _row(entity, tuple(members))
@@ -220,9 +224,10 @@ async def delete_list(session: AsyncSession, list_id: int) -> None:
     users = await templates_using_list(session, list_id)
     if users:
         raise ApprovalError("list_in_use", 409, ",".join(users))
+    # bulk deletes keep the session's identity map in sync by themselves: no expire_all on the
+    # caller's session (its other loaded objects stay usable)
     await session.execute(
         delete(TiqoraApprovalListMember).where(TiqoraApprovalListMember.list_id == list_id)
     )
     await session.execute(delete(TiqoraApprovalList).where(TiqoraApprovalList.id == list_id))
-    session.expire_all()
     await session.flush()

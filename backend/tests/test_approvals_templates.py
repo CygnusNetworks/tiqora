@@ -16,6 +16,7 @@ from tests._approvals_helpers import (
 )
 from tiqora.approvals import lists, templates
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
+from tiqora.approvals.models import TiqoraApprovalTemplate
 from tiqora.jobs.service import utc_now
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
@@ -294,3 +295,82 @@ async def test_delete_template_keeps_running_requests(
             )
         ).one()
         assert tuple(row) == (None, "pending", "appr97 laufend")
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_unreadable_stored_template_is_skipped(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """One hand-broken definition must not take the whole template list down."""
+    async with approvals_session(request, url_fixture) as session:
+        good = await templates.create_template(
+            session, key="appr97.good", name="appr97 Gut", definition=USER, actor_id=AG1
+        )
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_approval_template (template_key, name, subject_types,"
+                " definition, origin, valid, create_time, create_by, change_time, change_by)"
+                " VALUES ('appr97.bad', 'appr97 Kaputt', '[]', '{\"steps\": []}', 'admin', :v,"
+                " :now, 1, :now, 1)"
+            ),
+            {"v": True, "now": utc_now().replace(microsecond=0)},
+        )
+        keys = [t.key for t in await templates.list_templates(session, include_invalid=True)]
+        assert "appr97.good" in keys and "appr97.bad" not in keys
+        assert good.key in [t.key for t in await templates.list_templates(session)]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_key_race_answers_taken_or_shares_the_winner(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A concurrent insert won between the key check and the insert: ``create_template`` says
+    ``template_key_taken`` (409), ``ensure_template`` returns the winner; the transaction lives."""
+    async with approvals_session(request, url_fixture) as session:
+        winner = await templates.ensure_template(
+            session, key="appr97.race", name="appr97 Sieger", definition=USER, origin="test"
+        )
+        real = templates._template_by_key  # noqa: SLF001
+        calls: list[str] = []
+
+        async def first_misses(s: object, key: str) -> object:
+            calls.append(key)
+            return None if len(calls) == 1 else await real(session, key)
+
+        monkeypatch.setattr(templates, "_template_by_key", first_misses)
+        again = await templates.ensure_template(
+            session, key="appr97.race", name="appr97 Verlierer", definition=USER, origin="test"
+        )
+        assert (again.id, again.name) == (winner.id, "appr97 Sieger")
+
+        calls.clear()
+        with pytest.raises(ApprovalError) as err:
+            await templates.create_template(
+                session, key="appr97.race", name="appr97 Doppelt", definition=USER, actor_id=AG1
+            )
+        assert (err.value.code, err.value.http_status) == ("template_key_taken", 409)
+        assert (await templates.get_template(session, winner.id)).name == "appr97 Sieger"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_delete_template_keeps_the_callers_objects_usable(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """No ``expire_all``: an object the caller loaded before stays readable (no lazy load)."""
+    async with approvals_session(request, url_fixture) as session:
+        keep = await templates.create_template(
+            session, key="appr97.keep", name="appr97 Bleibt", definition=USER, actor_id=AG1
+        )
+        gone = await templates.create_template(
+            session, key="appr97.gone", name="appr97 Weg", definition=USER, actor_id=AG1
+        )
+        loaded = await session.get(TiqoraApprovalTemplate, keep.id)
+        assert loaded is not None
+        await templates.delete_template(session, gone.id)
+        assert loaded.name == "appr97 Bleibt"  # expired objects would raise MissingGreenlet here
+        with pytest.raises(ApprovalError) as err:
+            await templates.get_template(session, gone.id)
+        assert err.value.code == "template_not_found"

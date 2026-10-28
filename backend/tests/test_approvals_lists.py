@@ -7,6 +7,7 @@ import pytest
 from tests._approvals_helpers import AG1, AG2, AG3, AG4, AG6, approvals_session
 from tiqora.approvals import lists, templates
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
+from tiqora.approvals.models import TiqoraApprovalList
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 
@@ -109,3 +110,39 @@ async def test_list_member_ids_bulk(url_fixture: str, request: pytest.FixtureReq
         got = await lists.list_member_ids(session, [a.id, b.id, c.id, 970199])
         assert got == {a.id: (AG3, AG4), b.id: (), c.id: (AG2,), 970199: ()}
         assert await lists.list_member_ids(session, []) == {}
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_list_name_race_is_409(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The unique index decides when a concurrent insert won after the name check."""
+    async with approvals_session(request, url_fixture) as session:
+        first = await lists.create_list(session, name="appr97 race", actor_id=AG1)
+
+        async def never_taken(*args: object, **kwargs: object) -> bool:
+            return False
+
+        monkeypatch.setattr(lists, "_name_taken", never_taken)
+        with pytest.raises(ApprovalError) as err:
+            await lists.create_list(session, name="appr97 race", member_ids=[AG3], actor_id=AG1)
+        assert (err.value.code, err.value.http_status) == ("list_name_taken", 409)
+        assert (await lists.get_list(session, first.id)).name == "appr97 race"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_delete_list_keeps_the_callers_objects_usable(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        keep = await lists.create_list(session, name="appr97 bleibt", actor_id=AG1)
+        gone = await lists.create_list(session, name="appr97 weg", member_ids=[AG3], actor_id=AG1)
+        loaded = await session.get(TiqoraApprovalList, keep.id)
+        assert loaded is not None
+        await lists.delete_list(session, gone.id)
+        assert loaded.name == "appr97 bleibt"  # expired objects would raise MissingGreenlet here
+        with pytest.raises(ApprovalError) as err:
+            await lists.get_list(session, gone.id)
+        assert err.value.code == "list_not_found"
