@@ -1,10 +1,12 @@
 """GDPR erasure of approval records (Task 18) on MariaDB and PostgreSQL.
 
 The erased customer ``appr97-kunde2-<tag>@example.org`` owns ticket ``T_E`` (erased) and is a
-customer approver on ticket ``T1`` (971981, another customer's ticket, no ticket row needed: the
-approval tables have no FK to ``ticket``). The approval set of ``T_E`` is removed in every mode;
-on ``T1`` every column naming the customer is rewritten, the vote comment blanked, the customer's
-link token deleted; a template naming the customer loses the entry. Rollback restores all of it.
+customer approver and requester on ticket ``T1`` (971981, another customer's ticket; no ticket
+row needed, the approval tables have no FK to ``ticket``; one test makes it a real ticket of a
+second customer who is erased later). The approval set of ``T_E`` is removed in every mode; on
+``T1`` every column naming the customer is rewritten, the vote comment and the customer's own
+request texts blanked, the customer's link token deleted; a template naming the customer loses
+the entry. Rollback restores all of it, and skips rows that were deleted since.
 Seed band 971980-971999.
 """
 
@@ -72,6 +74,12 @@ class _Seed:
     login: str
     customer_user_id: int
     erased_ticket: int
+    other_ticket: int = T1
+    owner_customer_user_id: int | None = None  # the other ticket's customer, if seeded
+
+    @property
+    def tickets(self) -> list[int]:
+        return [self.erased_ticket, self.other_ticket]
 
 
 def _tag(url_fixture: str, variant: str) -> str:
@@ -93,6 +101,9 @@ async def _insert_set(
     requester: str,
     customer: str | None,
     spec_ref: str,
+    title: str = "appr97 Zugang",
+    description: str = "appr97 Beschreibung",
+    template_id: int | None = None,
 ) -> None:
     """One request with one step, one approver, its vote, its link token and one audit row.
 
@@ -118,11 +129,18 @@ async def _insert_set(
     await session.execute(
         text(
             "INSERT INTO tiqora_approval (id, ticket_id, subject_type, approval_key, title,"
-            " description, status, current_stage, requester, created_by, created_at)"
-            " VALUES (:id, :t, 'ticket', 'default', 'appr97 Zugang', 'appr97 Beschreibung',"
-            " 'pending', 1, :r, 1, :n)"
+            " description, template_id, status, current_stage, requester, created_by,"
+            " created_at)"
+            " VALUES (:id, :t, 'ticket', 'default', :ti, :de, :tpl, 'pending', 1, :r, 1, :n)"
         ),
-        {**params, "id": approval_id, "r": requester},
+        {
+            **params,
+            "id": approval_id,
+            "r": requester,
+            "ti": title,
+            "de": description,
+            "tpl": template_id,
+        },
     )
     await session.execute(
         text(
@@ -229,6 +247,9 @@ def _template_definition(login: str) -> str:
                         {"kind": "customer_user", "ref": login.upper()},
                         {"kind": "user", "ref": "1"},
                     ],
+                    "due_hours": 24,
+                    "on_timeout": "escalate",
+                    "escalation": [{"kind": "customer_user", "ref": login}],
                 },
                 {
                     **step,
@@ -241,7 +262,9 @@ def _template_definition(login: str) -> str:
     )
 
 
-async def _seed(factory: async_sessionmaker[AsyncSession], url: str, tag: str) -> _Seed:
+async def _seed(
+    factory: async_sessionmaker[AsyncSession], url: str, tag: str, *, owned_other: bool = False
+) -> _Seed:
     login = f"appr97-kunde2-{tag}@example.org"
     company = f"APPR97-GDPR-{tag.upper()}"
     async with factory() as session:
@@ -251,7 +274,20 @@ async def _seed(factory: async_sessionmaker[AsyncSession], url: str, tag: str) -
         erased = await _insert_ticket(
             session, customer_user_id=login, customer_id=company, tn=f"2026AP{tag}{cuid}"
         )
-        # the erased customer's own ticket: an agent-only request (deleted whole)
+        other, owner_id = T1, None
+        if owned_other:
+            owner = f"appr97-owner-{tag}@example.org"
+            owner_company = f"APPR97-GDPR-O{tag.upper()}"
+            await _insert_company(session, customer_id=owner_company, name=f"appr97 O {tag}")
+            owner_id = await _insert_customer(session, login=owner, customer_id=owner_company)
+            other = await _insert_ticket(
+                session,
+                customer_user_id=owner,
+                customer_id=owner_company,
+                tn=f"2026AO{tag}{owner_id}",
+            )
+        await _insert_template(session, tag, login)
+        # the erased customer's own ticket: an agent-only request from a template (deleted whole)
         await _insert_set(
             session,
             ids=(A_E, S_E, AP_E, V_E, TK_E, EV_E),
@@ -259,16 +295,19 @@ async def _seed(factory: async_sessionmaker[AsyncSession], url: str, tag: str) -
             requester="agent:1",
             customer=None,
             spec_ref="1",
+            template_id=TPL,
         )
-        # another ticket: the customer requested and approved, spelled in another case in the
-        # entry (the stored principal is the canonical login)
+        # another ticket: the customer requested (title and description name them) and approved,
+        # spelled in another case in the entry (the stored principal is the canonical login)
         await _insert_set(
             session,
             ids=(A_O, S_O, AP_O, V_O, TK_O, EV_O),
-            ticket_id=T1,
+            ticket_id=other,
             requester=f"customer:{login}",
             customer=login,
             spec_ref=login.upper(),
+            title=f"Zugang fuer {login}",
+            description=f"Bitte {login.upper()} freischalten",
         )
         await session.execute(
             text(
@@ -276,25 +315,34 @@ async def _seed(factory: async_sessionmaker[AsyncSession], url: str, tag: str) -
                 " principal, user_id, source_kind, source_ref, status, added_at)"
                 " VALUES (:id, :a, :s, :t, 'agent:1', 1, 'user', '1', 'pending', :n)"
             ),
-            {"id": AP_AGENT, "a": A_O, "s": S_O, "t": T1, "n": NOW},
+            {"id": AP_AGENT, "a": A_O, "s": S_O, "t": other, "n": NOW},
         )
-        await _insert_token(session, TK_AGENT, A_O, AP_AGENT, T1)
-        await session.execute(
-            text(
-                "INSERT INTO tiqora_approval_template (id, template_key, name, subject_types,"
-                " definition, origin, valid, create_time, create_by, change_time, change_by)"
-                " VALUES (:id, :k, 'appr97 Vorlage', '[]', :d, 'admin', :v, :n, 1, :n, 1)"
-            ),
-            {
-                "id": TPL,
-                "k": f"appr97-gdpr-{tag}",
-                "d": _template_definition(login),
-                "v": True,
-                "n": NOW,
-            },
-        )
+        await _insert_token(session, TK_AGENT, A_O, AP_AGENT, other)
         await session.commit()
-    return _Seed(login=login, customer_user_id=cuid, erased_ticket=erased)
+    return _Seed(
+        login=login,
+        customer_user_id=cuid,
+        erased_ticket=erased,
+        other_ticket=other,
+        owner_customer_user_id=owner_id,
+    )
+
+
+async def _insert_template(session: AsyncSession, tag: str, login: str) -> None:
+    await session.execute(
+        text(
+            "INSERT INTO tiqora_approval_template (id, template_key, name, subject_types,"
+            " definition, origin, valid, create_time, create_by, change_time, change_by)"
+            " VALUES (:id, :k, 'appr97 Vorlage', '[]', :d, 'admin', :v, :n, 1, :n, 1)"
+        ),
+        {
+            "id": TPL,
+            "k": f"appr97-gdpr-{tag}",
+            "d": _template_definition(login),
+            "v": True,
+            "n": NOW,
+        },
+    )
 
 
 async def _rows(
@@ -344,7 +392,7 @@ async def _cleanup(factory: async_sessionmaker[AsyncSession], ticket_ids: list[i
 
 @asynccontextmanager
 async def _world(
-    url_fixture: str, request: pytest.FixtureRequest, variant: str
+    url_fixture: str, request: pytest.FixtureRequest, variant: str, *, owned_other: bool = False
 ) -> AsyncIterator[tuple[async_sessionmaker[AsyncSession], _Seed]]:
     url = str(request.getfixturevalue(url_fixture))
     marks = snapshot_marks(url, _MARK_TABLES)
@@ -352,10 +400,10 @@ async def _world(
     tag = _tag(url_fixture, variant)
     seed: _Seed | None = None
     try:
-        seed = await _seed(factory, url, tag)
+        seed = await _seed(factory, url, tag, owned_other=owned_other)
         yield factory, seed
     finally:
-        tickets = [T1] + ([seed.erased_ticket] if seed is not None else [])
+        tickets = seed.tickets if seed is not None else [T1]
         await _cleanup(factory, tickets)
         await engine.dispose()
         delete_above_marks(
@@ -370,10 +418,11 @@ async def _world(
         )
         sync_engine = create_engine(url)
         with sync_engine.begin() as conn:
-            conn.execute(
-                text("DELETE FROM customer_user_customer WHERE user_id LIKE :p"),
-                {"p": "appr97-kunde2-%"},
-            )
+            for pattern in ("appr97-kunde2-%", "appr97-owner-%"):
+                conn.execute(
+                    text("DELETE FROM customer_user_customer WHERE user_id LIKE :p"),
+                    {"p": pattern},
+                )
             conn.execute(
                 text("DELETE FROM customer_company WHERE customer_id LIKE :p"),
                 {"p": "APPR97-GDPR-%"},
@@ -412,7 +461,7 @@ async def test_ticket_erasure_removes_approvals(
             "tiqora_approval_step": 1,
             "tiqora_approval": 1,
         }
-        rows = await _rows(factory, [seed.erased_ticket, T1])
+        rows = await _rows(factory, seed.tickets)
         assert _ids(rows, "tiqora_approval") == {A_O}
         assert _ids(rows, "tiqora_approval_step") == {S_O}
         assert _ids(rows, "tiqora_approval_approver") == {AP_O, AP_AGENT}
@@ -438,7 +487,7 @@ async def test_ticket_hard_delete_removes_approvals(
             "tiqora_approval_step": 1,
             "tiqora_approval": 1,
         }
-        rows = await _rows(factory, [seed.erased_ticket, T1])
+        rows = await _rows(factory, seed.tickets)
         erased_rows = {
             table: [r for r in rows[table] if int(r["ticket_id"]) == seed.erased_ticket]
             for table in APPROVAL_TICKET_TABLES
@@ -456,14 +505,14 @@ async def test_rollback_restores_approvals(
     """Every approval row (deleted set, rewritten rows, deleted tokens, template) comes back
     byte-identical, in all three erasure variants."""
     async with _world(url_fixture, request, variant) as (factory, seed):
-        before = await _rows(factory, [seed.erased_ticket, T1])
+        before = await _rows(factory, seed.tickets)
         assert len(before["tiqora_approval"]) == 2
         job_id, _ = await _erase(factory, seed, variant)
-        assert await _rows(factory, [seed.erased_ticket, T1]) != before
+        assert await _rows(factory, seed.tickets) != before
 
         await rollback_job(factory, Settings(), job_id, force_parallel=True, actor="test")
 
-        assert await _rows(factory, [seed.erased_ticket, T1]) == before
+        assert await _rows(factory, seed.tickets) == before
 
 
 @pytest.mark.parametrize("url_fixture", _URLS)
@@ -479,7 +528,7 @@ async def test_customer_erasure_rewrites_other_tickets(
         # requester, step spec, approver, vote, event on T1 + the template
         assert counts["tiqora_approval_customer_refs"] == 6
 
-        rows = await _rows(factory, [seed.erased_ticket, T1])
+        rows = await _rows(factory, seed.tickets)
         leaks = [
             (table, column, value)
             for table, table_rows in rows.items()
@@ -518,8 +567,11 @@ async def test_customer_erasure_rewrites_other_tickets(
         (vote,) = rows["tiqora_approval_vote"]
         assert (vote["decided_by"], vote["comment"]) == (new_principal, "[anonymisiert]")
         (request_row,) = rows["tiqora_approval"]
-        assert request_row["requester"] == new_principal
-        assert request_row["title"] == "appr97 Zugang"
+        assert (request_row["requester"], request_row["title"], request_row["description"]) == (
+            new_principal,
+            "[anonymisiert]",
+            "[anonymisiert]",
+        )
         (event,) = rows["tiqora_approval_event"]
         assert event["actor"] == new_principal
         (step,) = rows["tiqora_approval_step"]
@@ -534,10 +586,16 @@ async def test_customer_erasure_rewrites_other_tickets(
             [("user", "1")],  # entry dropped
             [("customer_user", "[anonymisiert]")],  # last entry: placeholder keeps it valid
         ]
+        # the emptied escalation is not padded; the step stops escalating
+        assert [(s.escalation, s.on_timeout) for s in definition.steps] == [
+            ([], "notify"),
+            ([], "notify"),
+        ]
+        assert template["change_time"] != NOW
 
         await rollback_job(factory, Settings(), job_id, force_parallel=True, actor="test")
 
-        rows = await _rows(factory, [seed.erased_ticket, T1])
+        rows = await _rows(factory, seed.tickets)
         approver = next(r for r in rows["tiqora_approval_approver"] if r["id"] == AP_O)
         assert (approver["customer_login"], approver["principal"], approver["source_ref"]) == (
             seed.login,
@@ -546,9 +604,17 @@ async def test_customer_erasure_rewrites_other_tickets(
         )
         vote = next(r for r in rows["tiqora_approval_vote"] if r["id"] == V_O)
         assert (vote["decided_by"], vote["comment"]) == (f"customer:{seed.login}", _COMMENT)
+        request_row = next(r for r in rows["tiqora_approval"] if r["id"] == A_O)
+        assert (request_row["title"], request_row["description"]) == (
+            f"Zugang fuer {seed.login}",
+            f"Bitte {seed.login.upper()} freischalten",
+        )
         assert _ids(rows, "tiqora_approval_token") == {TK_E, TK_O, TK_AGENT}
         (template,) = rows["tiqora_approval_template"]
-        assert template["definition"] == _template_definition(seed.login)
+        assert (template["definition"], template["change_time"]) == (
+            _template_definition(seed.login),
+            NOW,
+        )
 
 
 @pytest.mark.parametrize("url_fixture", _URLS)
@@ -577,3 +643,64 @@ async def test_preview_counts_approvals(url_fixture: str, request: pytest.Fixtur
 
         _, counts = await _erase(factory, seed, "anonymize")
         assert {k: counts[k] for k in expected} == expected
+
+
+@pytest.mark.parametrize("url_fixture", _URLS)
+async def test_rollback_after_template_deleted(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The admin deletes the template the erasure warned about; the rollback still restores
+    everything else (the template's own backup is skipped, the request comes back without it)."""
+    async with _world(url_fixture, request, "tpldel") as (factory, seed):
+        before = await _rows(factory, seed.tickets)
+        job_id, _ = await _erase(factory, seed, "anonymize")
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM tiqora_approval_template WHERE id = :i"), {"i": TPL}
+            )
+            await session.commit()
+
+        await rollback_job(factory, Settings(), job_id, force_parallel=True, actor="test")
+
+        after = await _rows(factory, seed.tickets)
+        assert after["tiqora_approval_template"] == []
+        expected_requests = [
+            {**r, "template_id": None} if r["id"] == A_E else r for r in before["tiqora_approval"]
+        ]
+        assert sorted(after["tiqora_approval"], key=lambda r: r["id"]) == sorted(
+            expected_requests, key=lambda r: r["id"]
+        )
+        for table in APPROVAL_TICKET_TABLES:
+            if table != "tiqora_approval":
+                assert after[table] == before[table], table
+
+
+@pytest.mark.parametrize("url_fixture", _URLS)
+async def test_rollback_after_later_erasure_of_other_ticket(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A later erasure of the other ticket's customer deletes that approval set; rolling back the
+    first job skips the rows that are gone and restores the rest."""
+    async with _world(url_fixture, request, "later", owned_other=True) as (factory, seed):
+        assert seed.owner_customer_user_id is not None
+        before = await _rows(factory, seed.tickets)
+        first_job, _ = await _erase(factory, seed, "anonymize")
+        second = await run_erasure(
+            factory,
+            Settings(),
+            customer_user_ids=[seed.owner_customer_user_id],
+            mode="anonymize",
+            seed=19,
+            force_parallel=True,
+            actor="test",
+        )
+        assert second.counts["tiqora_approval"] == 1  # the other ticket's set
+
+        await rollback_job(factory, Settings(), first_job, force_parallel=True, actor="test")
+
+        after = await _rows(factory, seed.tickets)
+        for table in APPROVAL_TICKET_TABLES:
+            assert after[table] == [
+                r for r in before[table] if int(r["ticket_id"]) == seed.erased_ticket
+            ], table
+        assert after["tiqora_approval_template"] == before["tiqora_approval_template"]

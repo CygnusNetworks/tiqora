@@ -1153,9 +1153,16 @@ async def _count_in(session: AsyncSession, table: str, column: str, ids: list[in
 async def _select_in(
     session: AsyncSession, sql: str, params: dict[str, list[Any]]
 ) -> list[dict[str, Any]]:
-    """Runs *sql* once per chunk of the (equally long) expanding list *params*; rows by id."""
+    """Runs *sql* once per chunk of the expanding lists *params*; rows by id.
+
+    The lists are sliced in lockstep, so they must be equally long (callers pass the same logins
+    in different spellings).
+    """
+    sizes = {len(values) for values in params.values()}
+    if len(sizes) != 1:
+        raise ValueError(f"_select_in needs equally long lists, got sizes {sorted(sizes)}")
     stmt = text(sql).bindparams(*(bindparam(name, expanding=True) for name in params))
-    size = len(next(iter(params.values())))
+    size = sizes.pop()
     out: dict[int, dict[str, Any]] = {}
     for start in range(0, size, _IN_CHUNK):
         chunk = {name: values[start : start + _IN_CHUNK] for name, values in params.items()}
@@ -1202,9 +1209,11 @@ def _rewrite_step_spec(raw: str, repl: dict[str, str]) -> str | None:
 def _rewrite_template_definition(raw: str, repl: dict[str, str]) -> str | None:
     """Template definition without the erased logins' entries (None: unchanged).
 
-    A list the drop would empty keeps one ``customer_user`` entry ``[anonymisiert]``: steps need
-    an approver (and an escalating step its escalation), and the template editor then warns
-    ``missing_customer:[anonymisiert]`` instead of failing to load the definition.
+    An ``approvers`` list the drop would empty keeps one ``customer_user`` entry
+    ``[anonymisiert]``: a step needs an approver, and the template editor then warns
+    ``missing_customer:[anonymisiert]`` instead of failing to load the definition. An emptied
+    ``escalation`` stays empty and its step falls back from ``on_timeout="escalate"`` to
+    ``"notify"`` (an escalation to nobody would only look configured).
     """
     try:
         definition = json.loads(raw)
@@ -1223,12 +1232,20 @@ def _rewrite_template_definition(raw: str, repl: dict[str, str]) -> str | None:
             if len(kept) == len(entries):
                 continue
             changed = True
-            step[key] = kept or [{"kind": "customer_user", "ref": _ANON_PLACEHOLDER}]
+            if key == "approvers" and not kept:
+                kept = [{"kind": "customer_user", "ref": _ANON_PLACEHOLDER}]
+            elif key == "escalation" and not kept and step.get("on_timeout") == "escalate":
+                step["on_timeout"] = "notify"
+            step[key] = kept
     return json.dumps(definition, ensure_ascii=False, separators=(",", ":")) if changed else None
 
 
 async def _approval_customer_rewrites(
-    session: AsyncSession, replacements: dict[str, str], skip_ticket_ids: set[int]
+    session: AsyncSession,
+    replacements: dict[str, str],
+    skip_ticket_ids: set[int],
+    *,
+    now: datetime,
 ) -> list[_ApprovalRewrite]:
     """Changes that take the erased customers out of approval rows of tickets not erased.
 
@@ -1237,9 +1254,11 @@ async def _approval_customer_rewrites(
     spell the login differently from the stored one. Principals ``customer:<login>``
     (``requester``, ``principal``, ``decided_by``, ``actor``), ``customer_login``, ``source_ref``
     and the ``customer_user`` refs in ``step.spec`` follow the new login; the vote comments of
-    these approvers become ``[anonymisiert]``; template entries naming them are dropped (see
-    :func:`_rewrite_template_definition`). Audit ``detail`` JSON holds ids, keys and statuses only
-    (recipients as ``requester`` / ``substitute:<user_id>``), so it needs no rewrite.
+    these approvers and the title and description of their own requests (customer-written text)
+    become ``[anonymisiert]``; template entries naming them are dropped (see
+    :func:`_rewrite_template_definition`, ``change_time`` = *now*). Audit ``detail`` JSON holds
+    ids, keys and statuses only (recipients as ``requester`` / ``substitute:<user_id>``), so it
+    needs no rewrite.
     """
     repl = {old.lower(): new for old, new in replacements.items()}
     if not repl or not await _table_exists(session, "tiqora_approval"):
@@ -1259,12 +1278,20 @@ async def _approval_customer_rewrites(
     for row in outside(
         await _select_in(
             session,
-            "SELECT id, ticket_id, requester FROM tiqora_approval WHERE LOWER(requester) IN :k",
+            "SELECT id, ticket_id, requester, title, description FROM tiqora_approval"
+            " WHERE LOWER(requester) IN :k",
             {"k": keys},
         )
     ):
         new = _new_principal(row["requester"], repl)
-        add("tiqora_approval", row, {"requester": new} if new else {})
+        if not new:
+            continue
+        updates_r: dict[str, Any] = {"requester": new}
+        if row["title"] != _ANON_PLACEHOLDER:
+            updates_r["title"] = _ANON_PLACEHOLDER
+        if row["description"] and row["description"] != _ANON_PLACEHOLDER:
+            updates_r["description"] = _ANON_PLACEHOLDER
+        add("tiqora_approval", row, updates_r)
 
     approver_ids: list[int] = []
     for row in outside(
@@ -1337,7 +1364,7 @@ async def _approval_customer_rewrites(
     templates = (
         await session.execute(
             text(
-                "SELECT id, template_key, definition FROM tiqora_approval_template"
+                "SELECT id, template_key, definition, change_time FROM tiqora_approval_template"
                 " WHERE definition LIKE :p"
             ),
             pattern,
@@ -1346,7 +1373,12 @@ async def _approval_customer_rewrites(
     for tpl in templates:
         new_definition = _rewrite_template_definition(str(tpl["definition"]), repl)
         if new_definition:
-            add(_APPROVAL_TEMPLATE_TABLE, dict(tpl), {"definition": new_definition})
+            # change_time moves so an editor holding the old definition sees it changed
+            add(
+                _APPROVAL_TEMPLATE_TABLE,
+                dict(tpl),
+                {"definition": new_definition, "change_time": now},
+            )
     return rewrites
 
 
@@ -1362,7 +1394,10 @@ async def _approval_preview_counts(
     }
     # Any value other than the login itself marks exactly the columns that would change.
     rewrites = await _approval_customer_rewrites(
-        session, {login: _ANON_PLACEHOLDER for login in logins}, set(ticket_ids)
+        session,
+        {login: _ANON_PLACEHOLDER for login in logins},
+        set(ticket_ids),
+        now=datetime.now(UTC).replace(tzinfo=None),
     )
     approver_ids = [r.row_id for r in rewrites if r.table == "tiqora_approval_approver"]
     counts["tiqora_approval_token"] += await _count_in(
@@ -1382,7 +1417,7 @@ async def _erase_approval_customer_refs(
 ) -> tuple[int, int]:
     """Applies :func:`_approval_customer_rewrites` with changed-column backups and deletes the
     link tokens of the rewritten approvers (full-row backup). Returns (rows rewritten, tokens)."""
-    rewrites = await _approval_customer_rewrites(session, replacements, skip_ticket_ids)
+    rewrites = await _approval_customer_rewrites(session, replacements, skip_ticket_ids, now=now)
     for rw in rewrites:
         await _add_backup(
             session,
@@ -2645,14 +2680,18 @@ async def rollback_job(
                 continue
 
             if table in _APPROVAL_TABLES:
-                # Deleted approval rows (full row) are re-inserted; rewritten ones (changed
-                # columns of rows outside the erased tickets) are updated back, also in a ticket
-                # hard-delete job, whose branch below would INSERT them.
-                if await _fetch_full_row(session, table, pk) is None:
-                    await _insert_row(session, table, {**pk, **original})
-                else:
+                # Rewritten rows (changed columns, outside the erased tickets) are updated back,
+                # also in a ticket hard-delete job, whose branch below would INSERT them; deleted
+                # rows (full row) are re-inserted. Either may have gone since (an admin deleted
+                # the template, a later erasure the other ticket's set): skip them.
+                if await _fetch_full_row(session, table, pk) is not None:
                     await _update_row(session, table, pk, original)
-                restored += 1
+                    restored += 1
+                elif "ticket_id" in original:
+                    row = await _restorable_approval_row(session, table, original)
+                    if row is not None:
+                        await _insert_row(session, table, row)
+                        restored += 1
                 continue
 
             if is_ticket_delete:
@@ -2761,6 +2800,46 @@ async def rollback_job(
             force_parallel=force_parallel,
         )
     return {"restored_rows": restored}
+
+
+# FK parents of each approval table (column -> table); rollback re-inserts parents first.
+_APPROVAL_PARENTS: dict[str, tuple[tuple[str, str], ...]] = {
+    "tiqora_approval_step": (("approval_id", "tiqora_approval"),),
+    "tiqora_approval_approver": (
+        ("approval_id", "tiqora_approval"),
+        ("step_id", "tiqora_approval_step"),
+    ),
+    "tiqora_approval_vote": (
+        ("approval_id", "tiqora_approval"),
+        ("step_id", "tiqora_approval_step"),
+        ("approver_id", "tiqora_approval_approver"),
+    ),
+    "tiqora_approval_token": (
+        ("approval_id", "tiqora_approval"),
+        ("approver_id", "tiqora_approval_approver"),
+    ),
+    "tiqora_approval_event": (("approval_id", "tiqora_approval"),),
+}
+
+
+async def _restorable_approval_row(
+    session: AsyncSession, table: str, original: dict[str, Any]
+) -> dict[str, Any] | None:
+    """The full-row backup to re-insert, or None when a parent row is gone (a later erasure
+    deleted it). A request whose template was deleted since comes back without it, like the
+    FK's ``ON DELETE SET NULL`` would have left it."""
+    for column, parent in _APPROVAL_PARENTS.get(table, ()):
+        if await _fetch_full_row(session, parent, {"id": original[column]}) is None:
+            return None
+    row = dict(original)
+    template_id = row.get("template_id")
+    if (
+        table == "tiqora_approval"
+        and template_id is not None
+        and await _fetch_full_row(session, _APPROVAL_TEMPLATE_TABLE, {"id": template_id}) is None
+    ):
+        row["template_id"] = None
+    return row
 
 
 async def _rollback_login_renames(session: AsyncSession, job_id: int) -> None:
