@@ -199,7 +199,9 @@ abstimmen dürfen. Ist die Stimme nicht mehr möglich (Sie haben im Schritt scho
 Ihre eigene Anfrage), steht dort „nicht möglich (bereits abgestimmt)“ beziehungsweise
 „nicht möglich (eigene Anfrage)“. Der Zähler zählt nur Zeilen, über die Sie noch abstimmen können.
 **Die Oberfläche verlangt bei „Ablehnen“ eine Begründung**; die API verlangt sie nicht.
-Ein Kommentar darf höchstens 2000 Zeichen lang sein.
+Ein Kommentar darf höchstens 2000 Zeichen lang sein (gezählt ohne Leerzeichen am Anfang und Ende).
+Längere Kommentare lehnt Tiqora auf jedem Weg (Oberfläche, API, MCP, Portal, E-Mail-Link) gleich ab:
+422 `comment_too_long`.
 
 ### Im Ticket
 
@@ -224,7 +226,9 @@ Weil der Link wie ein Passwort wirkt, gelten diese Sicherungen:
 - **Einmalig und nur für eine Person.** Der Link gehört zu genau einer Freigeber-Zeile. Er
   gilt weder für andere Zeilen derselben Person noch für Vertretungen. Sobald diese Zeile entschieden,
   weitergeleitet oder nicht mehr nötig ist (auf irgendeinem Weg) oder die Anfrage endet, ist der
-  Link ungültig. Ein verbrauchter Link antwortet „bereits benutzt“ (`link_used`).
+  Link ungültig. Ein verbrauchter Link antwortet „bereits benutzt“ (`link_used`). Ist der Zugang
+  der Person inzwischen deaktiviert (Agent oder Kunde ungültig), lehnt der Link mit 403
+  `approver_invalid` ab; die Zeile entfernt der Hintergrunddienst bei seinem nächsten Lauf.
 - **Zufälliger Token, nur als Hash gespeichert.** Der Token ist 256 Bit lang und zufällig. In der
   Datenbank steht nur sein SHA-256-Wert; auch ein Datenbankauszug enthält keinen verwendbaren Link.
   Warum kein signierter Link: Kapitel 10, Abweichung D9.
@@ -244,8 +248,9 @@ Weil der Link wie ein Passwort wirkt, gelten diese Sicherungen:
 - **Sparsame Auskunft.** Die Bestätigungsseite zeigt nur, was Sie für Ihre Entscheidung brauchen:
   Titel, Beschreibung, Ticketnummer und -titel, Schritt, Regel, Frist und Ihren Namen. Nicht
   angezeigt werden der Antragsteller, andere Freigeber und fremde Kommentare.
-- **Bremse gegen Raten.** Tiqora sperrt eine Client-Adresse zeitweise, wenn sie viele ungültige
-  Links ausprobiert (Einstellungen `TIQORA_APPROVAL_LINK_*`, Kapitel 8), und begrenzt auch die
+- **Bremse gegen Raten.** Tiqora sperrt eine Client-Adresse zeitweise, wenn sie viele unbekannte
+  Links ausprobiert (nur Tokens, die es nie gab; ein abgelaufener, verbrauchter oder ungültig
+  gewordener Link zählt nicht, damit Kollegen hinter einer gemeinsamen Adresse sich nicht aussperren) (Einstellungen `TIQORA_APPROVAL_LINK_*`, Kapitel 8), und begrenzt auch die
   Anfragen je Link. Die Antwort ist dann „zu viele Anfragen“ (HTTP 429) mit einer Wartezeit.
 - **Links einzeln abschaltbar.** Die Einstellung „Entscheidungslinks in E-Mails“ schaltet alle Links
   ab, auch schon versendete; die E-Mails verweisen dann nur auf „Meine Freigaben“. Auch ein
@@ -262,7 +267,11 @@ Kunden im Portal unter **Freigaben** ihre offenen und erledigten Anfragen und en
 sehen nur Anfragen, bei denen sie selbst Freigeber sind, und nur, solange sie zur Firma des Tickets
 gehören. Für alles andere antwortet das Portal „nicht gefunden“ (404) mit derselben Antwort wie für
 eine nicht vorhandene Anfrage. Wer eine Zeile hat, aber nicht mehr zur Firma gehört, bekommt beim
-Abstimmen 403 `customer_approver_outside_company`. Sind Kunden-Freigeber oder Freigaben im Portal abgeschaltet, oder ist
+Abstimmen 403 `customer_approver_outside_company`, ebenso auf der Bestätigungsseite eines
+E-Mail-Links (ohne Titel und Beschreibung). Solche Kunden bekommen keine Mails und keine Links mehr;
+der Hintergrunddienst setzt ihre offenen Zeilen auf „nicht mehr nötig“ (Protokoll
+`approver_removed`, Grund `outside_company`), damit ein Schritt mit Regel „alle“ nicht auf sie
+wartet. Sind Kunden-Freigeber oder Freigaben im Portal abgeschaltet, oder ist
 das Portal selbst abgeschaltet, ist die ganze Freigabe-Oberfläche des Portals 404 (nur wer genau in
 dem Moment abstimmt, in dem der Administrator Kunden-Freigeber abschaltet, bekommt 403 `forbidden`). Kunden sehen nie andere Freigeber oder fremde Kommentare.
 
@@ -434,6 +443,8 @@ eindeutig (409 `list_name_taken`).
 
 **Admin, Vertretungen**: alle Vertretungen aller Agenten, laufende, geplante und (auf Wunsch)
 beendete. Ein Administrator trägt Vertretungen für jeden ein, etwa bei Krankheit, und beendet jede.
+Sich selbst als Vertretung eines anderen eintragen kann ein Administrator nicht (403 `forbidden`):
+Administratorrechte erlauben nie, an Stelle eines anderen zu entscheiden.
 
 ### Einstellungen
 

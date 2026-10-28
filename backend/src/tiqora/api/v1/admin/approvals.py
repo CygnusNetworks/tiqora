@@ -79,13 +79,15 @@ async def get_overview(
     session: DbSession,
     status_: Annotated[ApprovalStatusName | None, Query(alias="status")] = None,
     ticket_id: Annotated[int | None, Query(ge=1)] = None,
+    ticket_number: Annotated[str | None, Query(min_length=1, max_length=50)] = None,
     subject_type: Annotated[str | None, Query(max_length=64)] = None,
     overdue: Annotated[bool | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ApprovalAdminPage:
-    """Every approval request, newest first. ``overdue`` = an active step is past its deadline
-    (``true``) or none is (``false``)."""
+    """Every approval request, newest first. ``ticket_number`` is the ticket's number as
+    shown (exact match; an unknown one gives an empty page). ``overdue`` = an active step is
+    past its deadline (``true``) or none is (``false``)."""
     _ = admin
     now = utc_now()
     conditions: list[Any] = []
@@ -93,6 +95,10 @@ async def get_overview(
         conditions.append(TiqoraApproval.status == status_)
     if ticket_id is not None:
         conditions.append(TiqoraApproval.ticket_id == ticket_id)
+    if ticket_number is not None:
+        # the number resolves on the Znuny side first: an IN list, no join (collation 1267)
+        found = await session.execute(select(Ticket.id).where(Ticket.tn == ticket_number.strip()))
+        conditions.append(TiqoraApproval.ticket_id.in_([int(i) for i in found.scalars()]))
     if subject_type is not None:
         conditions.append(TiqoraApproval.subject_type == subject_type)
     if overdue is not None:
@@ -202,6 +208,7 @@ async def _template_out(session: AsyncSession, row: templates.TemplateRow) -> Ap
         origin=row.origin,
         valid=row.valid,
         warnings=check.warnings,
+        change_time=row.change_time,
     )
 
 
@@ -297,7 +304,8 @@ async def put_template(
     template_id: int, body: ApprovalTemplateIn, admin: AdminUser, session: DbSession
 ) -> ApprovalTemplateOut:
     """Replaces name, description, subject types, definition and validity. The key is
-    immutable (consumers address templates by it): another one is 422 ``invalid_definition``."""
+    immutable (consumers address templates by it): another one is 422 ``invalid_definition``.
+    With ``change_time`` (as loaded) a template changed meanwhile is 409 ``template_changed``."""
     current = await _run(session, templates.get_template(session, template_id))
     if body.template_key != current.key:
         await session.rollback()
@@ -314,6 +322,7 @@ async def put_template(
             subject_types=body.subject_types,
             definition=body.definition,
             valid=body.valid,
+            expected_change_time=body.change_time,
         ),
     )
     out = await _template_out(session, row)
@@ -452,7 +461,11 @@ async def post_delegation(
 ) -> DelegationOut:
     """Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422
     ``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad
-    substitute, ``invalid_definition`` for an empty or already ended period."""
+    substitute, ``invalid_definition`` for an empty or already ended period; 403 ``forbidden``
+    when the admin names themselves the substitute of someone else (an admin never gains the
+    power to decide in another agent's place - the agent does that on their own page)."""
+    if body.substitute_user_id == admin.id and body.user_id != admin.id:
+        _refuse("forbidden", status.HTTP_403_FORBIDDEN, "an admin cannot become a substitute")
     ensure_period_open(body.valid_until)
     row = await _run(
         session,

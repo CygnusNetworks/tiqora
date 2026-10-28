@@ -304,7 +304,7 @@ class ApprovalsStore {
       if (method === "GET") return ok(this.templates);
       if (method === "POST") {
         if (this.templates.some((x) => x.template_key === b?.template_key)) return fail(409, "template_key_taken");
-        const row = { id: this.nextTemplateId++, origin: "admin", warnings: [], valid: true, ...b } as unknown as ApprovalTemplate;
+        const row = { id: this.nextTemplateId++, origin: "admin", warnings: [], valid: true, ...b, change_time: new Date().toISOString() } as unknown as ApprovalTemplate;
         this.templates.push(row);
         return ok(row, 201);
       }

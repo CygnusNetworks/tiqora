@@ -660,8 +660,9 @@ async def test_rollback_after_template_deleted(
             )
             await session.commit()
 
-        await rollback_job(factory, Settings(), job_id, force_parallel=True, actor="test")
+        result = await rollback_job(factory, Settings(), job_id, force_parallel=True, actor="test")
 
+        assert result["skipped_rows"] == 1  # the template's backup, counted (Task 18)
         after = await _rows(factory, seed.tickets)
         assert after["tiqora_approval_template"] == []
         expected_requests = [
@@ -696,8 +697,11 @@ async def test_rollback_after_later_erasure_of_other_ticket(
         )
         assert second.counts["tiqora_approval"] == 1  # the other ticket's set
 
-        await rollback_job(factory, Settings(), first_job, force_parallel=True, actor="test")
+        result = await rollback_job(
+            factory, Settings(), first_job, force_parallel=True, actor="test"
+        )
 
+        assert result["skipped_rows"] > 0  # the other ticket's rewritten rows are gone
         after = await _rows(factory, seed.tickets)
         for table in APPROVAL_TICKET_TABLES:
             assert after[table] == [

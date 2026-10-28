@@ -540,7 +540,8 @@ async def test_portal_decide_refused_when_setting_turned_off_meanwhile(
 async def test_portal_decision_input_is_strict(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
-    """Comment capped at 2000 like the link; no ``approver_id`` (a customer votes their own row)."""
+    """Comment: the engine's ``comment_too_long`` like every surface, checked after trimming;
+    no ``approver_id`` (a customer votes their own row)."""
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
             await _enable(session)
@@ -560,13 +561,16 @@ async def test_portal_decision_input_is_strict(
                     url, json={"decision": "approved", "comment": "x" * 2001}
                 )
                 assert too_long.status_code == 422
+                assert too_long.json()["detail"]["code"] == "comment_too_long"
                 body = {"decision": "approved", "approver_id": int(other_row)}
                 assert (await client.post(url, json=body)).status_code == 422
                 assert (await client.post(url, json={"decision": "maybe"})).status_code == 422
-                exact = await client.post(url, json={"decision": "approved", "comment": "x" * 2000})
+                padded = {"decision": "approved", "comment": "  " + "x" * 2000 + "  "}
+                exact = await client.post(url, json=padded)
                 assert exact.status_code == 200
             (vote,) = await _votes(session, aid)
             assert vote.decided_by == f"customer:{K2}"
+            assert vote.comment == "x" * 2000
 
 
 @pytest.mark.db

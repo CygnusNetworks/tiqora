@@ -417,13 +417,15 @@ erasure (both modes) handles it in two parts. The preview counts the affected ro
   erased customer, and the title and description of a request the customer made, become
   `[anonymisiert]`**. Entries naming the customer in an **approval template** are dropped (a step
   needs an approver, so an emptied customer entry becomes `[anonymisiert]` and the template editor
-  warns; `change_time` moves and a warning is logged). The link tokens of the rewritten approvers are
+  warns; `change_time` moves, so an admin who still has the template open gets 409
+  `template_changed` on saving instead of writing the login back, and a warning is logged). The link tokens of the rewritten approvers are
   deleted. The audit trail itself holds only ids, keys and statuses, so it needs no rewrite. A
   customer who is no longer valid is dropped from open steps by the approval sweeper, so nothing stays
   pending on an erased customer.
 - **Rollback** restores the deleted sets (parents before children) and the rewritten columns. A row whose parent
-  was deleted by a later erasure in the meantime is skipped, and a request whose template was deleted
-  since comes back without its template.
+  was deleted by a later erasure in the meantime is skipped (counted as `skipped_rows` in the
+  rollback's audit row and logged as `gdpr_rollback_row_skipped`), and a request whose template was
+  deleted since comes back without its template.
 
 ### Caveats
 

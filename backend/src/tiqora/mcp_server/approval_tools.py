@@ -163,7 +163,7 @@ async def approval_decide(
     Args:
         approval_id: Id from approval_list_mine.
         decision: 'approved' or 'rejected'.
-        comment: Optional reason (at most 2000 characters).
+        comment: Optional reason (at most 2000 characters; longer: comment_too_long).
     """
     user_id = _server._get_user_id(ctx)
     try:

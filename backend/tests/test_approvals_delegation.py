@@ -867,7 +867,8 @@ async def test_forward_to_target_who_voted_on_behalf_refused(
             err = await _refused(
                 service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
             )
-            assert (err.code, err.http_status) == ("already_decided", 409)
+            # a bad target, like every other one the UI maps (not the caller's own state)
+            assert (err.code, err.http_status) == ("forward_target_invalid", 422)
             assert len(await _approvers(session, aid)) == 3
             await _decide(session, aid, AG3)
             await _decide(session, aid, AG4)

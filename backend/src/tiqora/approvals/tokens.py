@@ -51,6 +51,15 @@ def link_digest(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+class UnknownLinkError(ApprovalError):
+    """``link_invalid`` for a token whose hash is not stored at all - the only answer that can
+    come from guessing. Routes count it towards the per-IP lock; revoked, used or expired links
+    are known hashes (a colleague decided, the request closed) and answer without counting."""
+
+    def __init__(self) -> None:
+        super().__init__("link_invalid", 410)
+
+
 @dataclass(frozen=True, slots=True)
 class LinkTarget:
     token_id: int
@@ -175,10 +184,11 @@ async def resolve_link(
 ) -> LinkTarget:
     """The approver row a live link stands for, without consuming it.
 
-    ``link_invalid`` (unknown, revoked, request closed, approver not pending or step not
-    active), ``link_used`` or ``link_expired`` (all HTTP 410). With *for_update* the token,
-    request, approver and step rows are read with locks; the caller must already hold the
-    request lock (``redeem_link`` does) so the lock order stays request first.
+    ``link_invalid`` (unknown - as :class:`UnknownLinkError` -, revoked, request closed, approver
+    not pending or step not active), ``link_used`` or ``link_expired`` (all HTTP 410). With
+    *for_update* the token, request, approver and step rows are read with locks; the caller
+    must already hold the request lock (``redeem_link`` does) so the lock order stays request
+    first.
     """
     digest = link_digest(token)
     row = await _one(
@@ -187,7 +197,7 @@ async def resolve_link(
         for_update,
     )
     if row is None:
-        raise ApprovalError("link_invalid", 410)
+        raise UnknownLinkError
     if row.used_at is not None:
         raise ApprovalError("link_used", 410)
     if row.revoked_at is not None:
@@ -311,7 +321,7 @@ async def redeem_link(
         )
     ).scalar_one_or_none()
     if approval_id is None:
-        raise ApprovalError("link_invalid", 410)
+        raise UnknownLinkError
     await session.rollback()
     try:
         await _engine.lock_approval(session, approval_id)

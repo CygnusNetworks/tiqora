@@ -26,6 +26,7 @@ from tiqora.approvals import _engine, access, audit, delegation, rules, template
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
+    COMMENT_MAX,
     EVENT_REQUESTED,
     EVENT_VOTED,
     Actor,
@@ -63,7 +64,6 @@ _KEY_MAX = 100
 _SUBJECT_REF_MAX = 190  # tiqora_approval.subject_ref VARCHAR(190)
 _CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
 _REASON_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
-_COMMENT_MAX = 2000
 _VOTED = frozenset({"approved", "rejected"})
 
 
@@ -495,8 +495,8 @@ async def decide(
     if decision not in _VOTED:
         raise ValueError(f"unknown decision: {decision!r}")
     text_ = comment.strip() if comment is not None else None
-    if text_ is not None and len(text_) > _COMMENT_MAX:
-        raise ApprovalError("comment_too_long", 422, f"at most {_COMMENT_MAX} characters")
+    if text_ is not None and len(text_) > COMMENT_MAX:
+        raise ApprovalError("comment_too_long", 422, f"at most {COMMENT_MAX} characters")
     reg = registry or get_registry()
     # lock_held only documents that the caller took the lock; re-locking a row this transaction
     # holds is free, and honouring the keyword would let any caller skip the F1/F6 lock
@@ -689,7 +689,7 @@ async def forward(
     if any(a.step_id == step.id and a.principal == target.key for a in approvers):
         raise ApprovalError("forward_target_invalid", 422, "the agent is already an approver")
     if target.key in await _engine.voters_in_step(session, step.id):
-        raise ApprovalError("already_decided", 409, "the agent already voted in this step")
+        raise ApprovalError("forward_target_invalid", 422, "the agent already voted in this step")
 
     new_id = await _engine.add_approver(
         session,

@@ -6,16 +6,22 @@ Pure data shapes, no database. Names are display labels ("Vorname Nachname", cus
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tiqora.approvals.contract import ApprovalDefinition
+from tiqora.approvals.contract import COMMENT_MAX, ApprovalDefinition
 from tiqora.domain.schemas import UtcDateTime
 
 ApprovalStatusName = Literal["pending", "approved", "rejected", "cancelled"]
 DecisionName = Literal["approved", "rejected"]
 ChannelName = Literal["ui", "email", "portal", "api", "mcp", "chat", "auto"]
+#: no transport cap: the engine checks the stripped text and answers ``comment_too_long``
+_COMMENT_HELP = (
+    f"Optional reason, at most {COMMENT_MAX} characters after trimming (longer: 422 "
+    "comment_too_long)."
+)
 
 
 class VoteOut(BaseModel):
@@ -153,8 +159,7 @@ class DecisionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: DecisionName
-    #: at most 2000 characters (the service answers ``comment_too_long``)
-    comment: str | None = None
+    comment: str | None = Field(None, description=_COMMENT_HELP)
     #: decide on a specific row (own row or one of a delegator); default = the caller's row
     approver_id: int | None = Field(None, ge=1)
 
@@ -252,7 +257,7 @@ class LinkDecideIn(BaseModel):
 
     token: str = Field(min_length=1, max_length=200)
     decision: DecisionName
-    comment: str | None = Field(None, max_length=2000)  # the engine's limit
+    comment: str | None = Field(None, description=_COMMENT_HELP)
 
 
 class LinkDecisionOut(BaseModel):
@@ -270,7 +275,7 @@ class PortalDecisionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: DecisionName
-    comment: str | None = Field(None, max_length=2000)  # the engine's limit, as on the link
+    comment: str | None = Field(None, description=_COMMENT_HELP)
 
 
 class PortalApprovalItemOut(BaseModel):
@@ -362,6 +367,9 @@ class ApprovalTemplateIn(BaseModel):
     subject_types: list[str] = Field(default_factory=list, max_length=50)
     definition: ApprovalDefinition
     valid: bool = True
+    #: PUT only: the ``change_time`` the editor loaded; a template changed since answers 409
+    #: ``template_changed`` (omitted: no check)
+    change_time: datetime | None = None
 
 
 class ApprovalTemplateOut(BaseModel):
@@ -375,6 +383,8 @@ class ApprovalTemplateOut(BaseModel):
     valid: bool
     #: approvers the definition names that no longer exist (they do not block saving)
     warnings: list[str]
+    #: version of the stored row; send it back with PUT to detect a concurrent change
+    change_time: UtcDateTime
 
 
 class DefinitionCheckIn(BaseModel):

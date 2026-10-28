@@ -6124,6 +6124,18 @@
       "ApprovalTemplateIn": {
         "additionalProperties": false,
         "properties": {
+          "change_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
+          },
           "definition": {
             "$ref": "#/components/schemas/ApprovalDefinition"
           },
@@ -6212,6 +6224,11 @@
       },
       "ApprovalTemplateOut": {
         "properties": {
+          "change_time": {
+            "format": "date-time",
+            "title": "Change Time",
+            "type": "string"
+          },
           "definition": {
             "$ref": "#/components/schemas/ApprovalDefinition"
           },
@@ -6269,7 +6286,8 @@
           "definition",
           "origin",
           "valid",
-          "warnings"
+          "warnings",
+          "change_time"
         ],
         "title": "ApprovalTemplateOut",
         "type": "object"
@@ -18333,6 +18351,7 @@
                 "type": "null"
               }
             ],
+            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).",
             "title": "Comment"
           },
           "decision": {
@@ -25481,13 +25500,13 @@
           "comment": {
             "anyOf": [
               {
-                "maxLength": 2000,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).",
             "title": "Comment"
           },
           "decision": {
@@ -34091,13 +34110,13 @@
           "comment": {
             "anyOf": [
               {
-                "maxLength": 2000,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
+            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).",
             "title": "Comment"
           },
           "decision": {
@@ -59896,7 +59915,7 @@
     },
     "/api/v1/admin/approvals": {
       "get": {
-        "description": "Every approval request, newest first. ``overdue`` = an active step is past its deadline\n(``true``) or none is (``false``).",
+        "description": "Every approval request, newest first. ``ticket_number`` is the ticket's number as\nshown (exact match; an unknown one gives an empty page). ``overdue`` = an active step is\npast its deadline (``true``) or none is (``false``).",
         "operationId": "get_overview_api_v1_admin_approvals_get",
         "parameters": [
           {
@@ -59936,6 +59955,24 @@
                 }
               ],
               "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket_number",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 50,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Number"
             }
           },
           {
@@ -60175,7 +60212,7 @@
         ]
       },
       "post": {
-        "description": "Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422\n``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad\nsubstitute, ``invalid_definition`` for an empty or already ended period.",
+        "description": "Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422\n``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad\nsubstitute, ``invalid_definition`` for an empty or already ended period; 403 ``forbidden``\nwhen the admin names themselves the substitute of someone else (an admin never gains the\npower to decide in another agent's place - the agent does that on their own page).",
         "operationId": "post_delegation_api_v1_admin_approvals_delegations_post",
         "parameters": [
           {
@@ -61114,7 +61151,7 @@
         ]
       },
       "put": {
-        "description": "Replaces name, description, subject types, definition and validity. The key is\nimmutable (consumers address templates by it): another one is 422 ``invalid_definition``.",
+        "description": "Replaces name, description, subject types, definition and validity. The key is\nimmutable (consumers address templates by it): another one is 422 ``invalid_definition``.\nWith ``change_time`` (as loaded) a template changed meanwhile is 409 ``template_changed``.",
         "operationId": "put_template_api_v1_admin_approvals_templates__template_id__put",
         "parameters": [
           {
@@ -91833,7 +91870,7 @@
     },
     "/api/v1/approval-links/inspect": {
       "post": {
-        "description": "What a decision link stands for, without using it (the confirm page reads this).\n\nA bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock.",
+        "description": "What a decision link stands for, without using it (the confirm page reads this).\n\nA bad link is a normal answer (200, ``valid`` false); only an unknown one counts towards the\nIP lock (a revoked, used or expired link is no guess). A\ncustomer approver who could not vote through the link (customer approvers off, the ticket\nleft their company) gets the vote's 403 instead, without anything about the request.",
         "operationId": "post_link_inspect_api_v1_approval_links_inspect_post",
         "requestBody": {
           "content": {
@@ -119406,7 +119443,7 @@
     },
     "/api/v1/tickets/{ticket_id}/approvals": {
       "get": {
-        "description": "Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket.",
+        "description": "Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket (or\nadmin).",
         "operationId": "list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get",
         "parameters": [
           {
@@ -119506,7 +119543,7 @@
         ]
       },
       "post": {
-        "description": "\"Freigabe anfordern\" on the ticket (subject ``ticket``): a template or an own\ndefinition. Needs ``rw`` on the ticket. An own definition may not approve when nobody can\ndecide or when the deadline passes: those outcomes are for admin templates (F9).",
+        "description": "\"Freigabe anfordern\" on the ticket (subject ``ticket``): a template or an own\ndefinition. Needs ``rw`` on the ticket (or admin). An own definition may not approve when\nnobody can decide or when the deadline passes: those outcomes are for admin templates (F9).",
         "operationId": "request_ticket_approval_api_v1_tickets__ticket_id__approvals_post",
         "parameters": [
           {

@@ -343,6 +343,7 @@ const ADMIN_TEMPLATES: ApprovalTemplate[] = [
     origin: "admin",
     valid: true,
     warnings: [],
+    change_time: "2026-10-15T08:00:00+00:00",
     definition: {
       steps: [{ name: "Freigabe", stage: 1, rule: "any", approvers: [{ kind: "resolver", ref: "ticket.owner" }], on_timeout: "notify", on_no_approver: "reject", allow_delegation: true, allow_email: true, escalation: [] }],
     },
@@ -356,6 +357,7 @@ const ADMIN_TEMPLATES: ApprovalTemplate[] = [
     origin: "admin",
     valid: true,
     warnings: [],
+    change_time: "2026-10-15T08:00:00+00:00",
     definition: {
       steps: [
         { name: "CAB", stage: 1, rule: "majority", approvers: [{ kind: "list", ref: "1" }], due_hours: 72, on_timeout: "escalate", on_no_approver: "reject", allow_delegation: true, allow_email: true, escalation: [{ kind: "list", ref: "1" }] },

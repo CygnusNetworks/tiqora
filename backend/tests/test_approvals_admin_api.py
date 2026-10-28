@@ -277,6 +277,8 @@ async def test_overview_filters(url_fixture: str, request: pytest.FixtureRequest
                 cancelled = await client.get(BASE, params={"status": "cancelled"})
                 pending = await client.get(BASE, params={"status": "pending"})
                 on_t2 = await client.get(BASE, params={"ticket_id": T2})
+                by_number = await client.get(BASE, params={"ticket_number": f"20261015{T2}"})
+                no_number = await client.get(BASE, params={"ticket_number": "20261015000000"})
                 by_subject = await client.get(BASE, params={"subject_type": SUBJECT})
                 by_other = await client.get(BASE, params={"subject_type": "ticket"})
                 overdue = await client.get(BASE, params={"overdue": "true"})
@@ -294,6 +296,8 @@ async def test_overview_filters(url_fixture: str, request: pytest.FixtureRequest
             assert ids(cancelled) == [gone]
             assert ids(pending) == [late, first]
             assert ids(on_t2) == [late]
+            assert (ids(by_number), by_number.json()["total"]) == ([late], 1)
+            assert (ids(no_number), no_number.json()["total"]) == ([], 0)
             assert ids(by_subject) == [gone, late, first]
             assert by_other.json() == {"items": [], "total": 0, "limit": 25, "offset": 0}
             assert ids(overdue) == [late]
@@ -442,6 +446,50 @@ async def test_template_crud_and_validate(url_fixture: str, request: pytest.Fixt
             assert deleted.status_code == 204 and deleted.content == b""
             assert (gone.status_code, _code(gone)) == (404, "template_not_found")
             assert (gone_delete.status_code, _code(gone_delete)) == (404, "template_not_found")
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_template_put_with_stale_change_time_is_409(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """M8: an editor that loaded an older version (another admin, a GDPR erasure saved since)
+    gets 409 ``template_changed`` and overwrites nothing; without ``change_time`` no check."""
+    async with approvals_session(request, url_fixture) as session:
+        await _seed_admin(session)
+        with installed_registry(make_fake_subject_type()):
+            async with await as_client(session, agent=ADMIN) as client:
+                created = (
+                    await client.post(f"{BASE}/templates", json=_template_body("appr97.v"))
+                ).json()
+                tid, loaded = created["id"], created["change_time"]
+                await session.execute(
+                    text(
+                        "UPDATE tiqora_approval_template SET name = 'appr97 Erasure',"
+                        " change_time = :t WHERE id = :i"
+                    ),
+                    {"t": utc_now().replace(microsecond=0) + timedelta(seconds=5), "i": tid},
+                )
+                await session.commit()
+                stale = await client.put(
+                    f"{BASE}/templates/{tid}",
+                    json=_template_body("appr97.v", name="appr97 Alt", change_time=loaded),
+                )
+                fresh_version = (await client.get(f"{BASE}/templates/{tid}")).json()
+                fresh = await client.put(
+                    f"{BASE}/templates/{tid}",
+                    json=_template_body(
+                        "appr97.v", name="appr97 Neu", change_time=fresh_version["change_time"]
+                    ),
+                )
+                unchecked = await client.put(
+                    f"{BASE}/templates/{tid}", json=_template_body("appr97.v", name="appr97 Ohne")
+                )
+            assert (stale.status_code, _code(stale)) == (409, "template_changed")
+            assert fresh_version["name"] == "appr97 Erasure"  # the stale PUT changed nothing
+            assert fresh_version["change_time"] != loaded
+            assert fresh.status_code == 200 and fresh.json()["name"] == "appr97 Neu"
+            assert unchecked.status_code == 200 and unchecked.json()["name"] == "appr97 Ohne"
 
 
 @pytest.mark.db
@@ -653,6 +701,9 @@ async def test_admin_delegation_validation(
                 bad_substitute = await client.post(
                     f"{BASE}/delegations", json={"user_id": AG1, "substitute_user_id": GONE_USER}
                 )
+                admin_as_substitute = await client.post(
+                    f"{BASE}/delegations", json={"user_id": AG1, "substitute_user_id": ADMIN}
+                )
                 reversed_range = await client.post(
                     f"{BASE}/delegations",
                     json={
@@ -684,6 +735,11 @@ async def test_admin_delegation_validation(
             assert (bad_substitute.status_code, _code(bad_substitute)) == (
                 422,
                 "forward_target_invalid",
+            )
+            # M5: an admin never gains decide-as through a delegation to themselves
+            assert (admin_as_substitute.status_code, _code(admin_as_substitute)) == (
+                403,
+                "forbidden",
             )
             for refused in (reversed_range, ended, ended_own):
                 assert (refused.status_code, _code(refused)) == (422, "invalid_definition")
@@ -760,6 +816,27 @@ async def test_admin_can_cancel_but_not_decide_as(
             assert still_open.json()["steps"][0]["approved_count"] == 0
             assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
             assert [i["id"] for i in overview.json()["items"]] == [aid]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_admin_ticket_approvals_follow_the_access_rule(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """M7: like ``access.can_view`` an admin without queue rights sees the ticket's requests;
+    a missing ticket stays 404."""
+    async with approvals_session(request, url_fixture) as session:
+        await _seed_admin(session)
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session)
+            async with await as_client(session, agent=ADMIN) as client:
+                listed = await client.get(f"/api/v1/tickets/{T1}/approvals")
+                missing = await client.get(f"/api/v1/tickets/{GONE_USER}/approvals")
+                detail = await client.get(f"{AGENT}/{aid}")
+            assert listed.status_code == 200, listed.text
+            assert [i["id"] for i in listed.json()] == [aid]
+            assert (missing.status_code, _code(missing)) == (404, "ticket_not_found")
+            assert detail.status_code == 200
 
 
 def test_openapi_has_admin_routes() -> None:

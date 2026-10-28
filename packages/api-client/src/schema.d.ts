@@ -2047,8 +2047,9 @@ export interface paths {
         };
         /**
          * Get Overview
-         * @description Every approval request, newest first. ``overdue`` = an active step is past its deadline
-         *     (``true``) or none is (``false``).
+         * @description Every approval request, newest first. ``ticket_number`` is the ticket's number as
+         *     shown (exact match; an unknown one gives an empty page). ``overdue`` = an active step is
+         *     past its deadline (``true``) or none is (``false``).
          */
         get: operations["get_overview_api_v1_admin_approvals_get"];
         put?: never;
@@ -2077,7 +2078,9 @@ export interface paths {
          * Post Delegation
          * @description Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422
          *     ``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad
-         *     substitute, ``invalid_definition`` for an empty or already ended period.
+         *     substitute, ``invalid_definition`` for an empty or already ended period; 403 ``forbidden``
+         *     when the admin names themselves the substitute of someone else (an admin never gains the
+         *     power to decide in another agent's place - the agent does that on their own page).
          */
         post: operations["post_delegation_api_v1_admin_approvals_delegations_post"];
         delete?: never;
@@ -2234,6 +2237,7 @@ export interface paths {
          * Put Template
          * @description Replaces name, description, subject types, definition and validity. The key is
          *     immutable (consumers address templates by it): another one is 422 ``invalid_definition``.
+         *     With ``change_time`` (as loaded) a template changed meanwhile is 409 ``template_changed``.
          */
         put: operations["put_template_api_v1_admin_approvals_templates__template_id__put"];
         post?: never;
@@ -7001,7 +7005,10 @@ export interface paths {
          * Post Link Inspect
          * @description What a decision link stands for, without using it (the confirm page reads this).
          *
-         *     A bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock.
+         *     A bad link is a normal answer (200, ``valid`` false); only an unknown one counts towards the
+         *     IP lock (a revoked, used or expired link is no guess). A
+         *     customer approver who could not vote through the link (customer approvers off, the ticket
+         *     left their company) gets the vote's 403 instead, without anything about the request.
          */
         post: operations["post_link_inspect_api_v1_approval_links_inspect_post"];
         delete?: never;
@@ -12578,15 +12585,16 @@ export interface paths {
         };
         /**
          * List Ticket Approvals
-         * @description Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket.
+         * @description Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket (or
+         *     admin).
          */
         get: operations["list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get"];
         put?: never;
         /**
          * Request Ticket Approval
          * @description "Freigabe anfordern" on the ticket (subject ``ticket``): a template or an own
-         *     definition. Needs ``rw`` on the ticket. An own definition may not approve when nobody can
-         *     decide or when the deadline passes: those outcomes are for admin templates (F9).
+         *     definition. Needs ``rw`` on the ticket (or admin). An own definition may not approve when
+         *     nobody can decide or when the deadline passes: those outcomes are for admin templates (F9).
          */
         post: operations["request_ticket_approval_api_v1_tickets__ticket_id__approvals_post"];
         delete?: never;
@@ -16001,6 +16009,8 @@ export interface components {
         };
         /** ApprovalTemplateIn */
         ApprovalTemplateIn: {
+            /** Change Time */
+            change_time?: string | null;
             definition: components["schemas"]["ApprovalDefinition"];
             /** Description */
             description?: string | null;
@@ -16029,6 +16039,11 @@ export interface components {
         };
         /** ApprovalTemplateOut */
         ApprovalTemplateOut: {
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
             definition: components["schemas"]["ApprovalDefinition"];
             /** Description */
             description?: string | null;
@@ -20079,7 +20094,10 @@ export interface components {
         DecisionIn: {
             /** Approver Id */
             approver_id?: number | null;
-            /** Comment */
+            /**
+             * Comment
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).
+             */
             comment?: string | null;
             /**
              * Decision
@@ -22615,7 +22633,10 @@ export interface components {
         };
         /** LinkDecideIn */
         LinkDecideIn: {
-            /** Comment */
+            /**
+             * Comment
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).
+             */
             comment?: string | null;
             /**
              * Decision
@@ -25500,7 +25521,10 @@ export interface components {
          * @description A customer approver's vote. No ``approver_id``: a customer decides only their own row.
          */
         PortalDecisionIn: {
-            /** Comment */
+            /**
+             * Comment
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).
+             */
             comment?: string | null;
             /**
              * Decision
@@ -36019,6 +36043,7 @@ export interface operations {
             query?: {
                 status?: ("pending" | "approved" | "rejected" | "cancelled") | null;
                 ticket_id?: number | null;
+                ticket_number?: string | null;
                 subject_type?: string | null;
                 overdue?: boolean | null;
                 limit?: number;

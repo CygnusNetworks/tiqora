@@ -69,6 +69,7 @@ from tiqora.approvals.schemas import (
     ResolverOptionOut,
 )
 from tiqora.approvals.settings import load_approval_settings
+from tiqora.db.legacy.ticket import Ticket
 from tiqora.domain.ticket_access import TicketAccessDenied, require_ticket
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
 from tiqora.extensions.core import get_registry
@@ -459,7 +460,13 @@ async def _require_ticket(
     session: AsyncSession, user: CurrentUser, ticket_id: int, *, write: bool = False
 ) -> None:
     """``ro`` on the ticket's queue, else 404 ``ticket_not_found``; with *write* also ``rw``,
-    else 403 ``forbidden``."""
+    else 403 ``forbidden``. An admin passes like :mod:`tiqora.approvals.access` lets them
+    (``can_view`` / ``can_request``): the ticket only has to exist."""
+    if await PermissionEngine(session).is_admin(user.id):
+        found = await session.execute(select(Ticket.id).where(Ticket.id == ticket_id))
+        if found.first() is None:
+            _refuse("ticket_not_found", status.HTTP_404_NOT_FOUND)
+        return
     try:
         await require_ticket(session, ticket_id, user_id=user.id, write=write)
     except TicketAccessDenied as exc:
@@ -474,7 +481,8 @@ async def list_ticket_approvals(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ApprovalSummaryOut]:
-    """Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket."""
+    """Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket (or
+    admin)."""
     await _require_ticket(session, user, ticket_id)
     rows = (
         await session.execute(
@@ -500,8 +508,8 @@ async def request_ticket_approval(
     settings: AppSettings,
 ) -> ApprovalDetailOut:
     """ "Freigabe anfordern" on the ticket (subject ``ticket``): a template or an own
-    definition. Needs ``rw`` on the ticket. An own definition may not approve when nobody can
-    decide or when the deadline passes: those outcomes are for admin templates (F9)."""
+    definition. Needs ``rw`` on the ticket (or admin). An own definition may not approve when
+    nobody can decide or when the deadline passes: those outcomes are for admin templates (F9)."""
     await _require_ticket(session, user, ticket_id, write=True)
     subject = get_registry().get(APPROVAL_SUBJECT_TYPES, "ticket")
     if subject is None or not subject.agent_requestable:
@@ -604,7 +612,8 @@ async def post_link_inspect(
 ) -> LinkInspectOut:
     """What a decision link stands for, without using it (the confirm page reads this).
 
-    A bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock. A
+    A bad link is a normal answer (200, ``valid`` false); only an unknown one counts towards the
+    IP lock (a revoked, used or expired link is no guess). A
     customer approver who could not vote through the link (customer approvers off, the ticket
     left their company) gets the vote's 403 instead, without anything about the request.
     """
@@ -616,7 +625,7 @@ async def post_link_inspect(
         await session.rollback()
         if not err.code.startswith("link_"):
             raise _http(err) from err
-        if err.code != "link_used":  # a spent link is no guess: it does not feed the IP lock
+        if isinstance(err, tokens.UnknownLinkError):  # a known (dead) link is no guess
             await limiter.record_auth_failure(ip)
         return LinkInspectOut(valid=False, code=err.code)
     await session.rollback()  # read only: end the transaction
@@ -643,7 +652,7 @@ async def post_link_decide(
         await session.rollback()  # nothing is committed after a refusal (used_at included)
         if not err.code.startswith("link_"):
             raise _http(err) from err
-        if err.code != "link_used":
+        if isinstance(err, tokens.UnknownLinkError):
             await limiter.record_auth_failure(ip)
         raise _http(err) from err
     await session.commit()

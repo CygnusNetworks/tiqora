@@ -1373,7 +1373,7 @@ async def _approval_customer_rewrites(
     for tpl in templates:
         new_definition = _rewrite_template_definition(str(tpl["definition"]), repl)
         if new_definition:
-            # change_time moves so an editor holding the old definition sees it changed
+            # change_time moves: an admin editor holding the old version gets 409 template_changed
             add(
                 _APPROVAL_TEMPLATE_TABLE,
                 dict(tpl),
@@ -2581,7 +2581,12 @@ async def rollback_job(
     actor: str = "admin",
     force_parallel: bool = True,
 ) -> dict[str, int]:
-    """Restore all rows from ``tiqora_gdpr_backup`` for *job_id*."""
+    """Restore all rows from ``tiqora_gdpr_backup`` for *job_id*.
+
+    Returns ``restored_rows`` and ``skipped_rows``: approval rows whose backup could not come
+    back (the row and a parent it needs are gone since, e.g. a later erasure deleted the other
+    ticket's set) are skipped, counted and logged (``gdpr_rollback_row_skipped``).
+    """
     async with session_factory() as session:
         await require_write_gate(
             session,
@@ -2612,6 +2617,7 @@ async def rollback_job(
             raise ErasureError("no backup rows available (already purged?)")
 
         restored = 0
+        skipped = 0
         ticket_ids: list[int] = []
         cmdb_ci_ids: list[int] = []
         # A ticket hard-delete job (delete_tickets) backs up EVERY affected row
@@ -2687,11 +2693,16 @@ async def rollback_job(
                 if await _fetch_full_row(session, table, pk) is not None:
                     await _update_row(session, table, pk, original)
                     restored += 1
-                elif "ticket_id" in original:
+                    continue
+                row = None
+                if "ticket_id" in original:
                     row = await _restorable_approval_row(session, table, original)
-                    if row is not None:
-                        await _insert_row(session, table, row)
-                        restored += 1
+                if row is not None:
+                    await _insert_row(session, table, row)
+                    restored += 1
+                else:  # counted and logged: the admin sees what did not come back
+                    skipped += 1
+                    logger.warning("gdpr_rollback_row_skipped", job_id=job_id, table=table, pk=pk)
                 continue
 
             if is_ticket_delete:
@@ -2796,10 +2807,10 @@ async def rollback_job(
             action="erasure_rollback",
             target=f"job:{job_id}",
             actor=actor,
-            counts={"restored_rows": restored},
+            counts={"restored_rows": restored, "skipped_rows": skipped},
             force_parallel=force_parallel,
         )
-    return {"restored_rows": restored}
+    return {"restored_rows": restored, "skipped_rows": skipped}
 
 
 # FK parents of each approval table (column -> table); rollback re-inserts parents first.

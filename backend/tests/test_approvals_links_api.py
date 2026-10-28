@@ -477,12 +477,32 @@ async def test_decide_body_is_strict(url_fixture: str, request: pytest.FixtureRe
                 )
                 too_long = await client.post(f"{BASE}/inspect", json={"token": "t" * 201})
                 extra = await client.post(f"{BASE}/inspect", json={"token": BAD, "approver_id": 1})
+            assert bad_decision.status_code == too_long.status_code == extra.status_code == 422
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_decide_comment_length_is_the_engines(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """M2: ``comment_too_long`` (422) like the agent route, counted after trimming."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid, token = await _link(session)
+            async with _client(session) as client:
                 long_comment = await client.post(
                     f"{BASE}/decide",
-                    json={"token": BAD, "decision": "approved", "comment": "x" * 2001},
+                    json={"token": token, "decision": "approved", "comment": "x" * 2001},
                 )
-            assert bad_decision.status_code == too_long.status_code == extra.status_code == 422
+                padded = await client.post(
+                    f"{BASE}/decide",
+                    json={"token": token, "decision": "approved", "comment": f" {'x' * 2000} "},
+                )
             assert long_comment.status_code == 422
+            assert _detail(long_comment)["code"] == "comment_too_long"
+            assert padded.status_code == 200, padded.text
+            (vote,) = await _votes(session, aid)
+            assert vote.comment == "x" * 2000
 
 
 # --- rate limit ------------------------------------------------------------------------------
@@ -577,6 +597,46 @@ async def test_used_link_does_not_feed_the_ip_lock_and_locked_ip_spares_the_budg
                 locked = await client.post(f"{BASE}/inspect", json={"token": BAD})
             assert locked.status_code == 429
             assert await redis.get(budget_key) == before  # the lock answered before the budget
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_known_dead_links_do_not_feed_the_ip_lock(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """M3: revoked (another approver decided) and expired links are known hashes, not guesses:
+    one company NAT opening yesterday's mail must not lock its live links."""
+    settings = Settings(environment="test", approval_link_fail_max=2)
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid, revoked = await _link(session)  # rule any over AG3, AG4: AG4 decides
+            await service.decide(
+                session, aid, actor=Actor.agent(AG4), decision="approved", channel="ui",
+                settings=SETTINGS,
+            )  # fmt: skip
+            _, expired = await _link(session, key="zweite-freigabe")
+            await session.execute(
+                update(TiqoraApprovalToken)
+                .where(TiqoraApprovalToken.token_hash == tokens.link_digest(expired))
+                .values(expires_at=utc_now() - timedelta(minutes=1))
+            )
+            await session.commit()
+            _, live = await _link(session, key="dritte-freigabe")
+            redis = FakeRedis()
+            fail_key = "tiqora:approval-link:fail:ip:" + IP_A
+            async with _client(session, redis, settings=settings) as client:
+                for _ in range(2):  # four dead-link answers: twice the IP limit, each link's budget
+                    gone = await client.post(f"{BASE}/inspect", json={"token": revoked})
+                    late = await client.post(
+                        f"{BASE}/decide", json={"token": expired, "decision": "approved"}
+                    )
+                    assert gone.json()["code"] == "link_invalid"
+                    assert _detail(late)["code"] == "link_expired"
+                assert await redis.get(fail_key) is None
+                ok = await client.post(f"{BASE}/inspect", json={"token": live})
+                assert (ok.status_code, ok.json()["valid"]) == (200, True)
+                await client.post(f"{BASE}/inspect", json={"token": BAD})  # unknown: counts
+                assert int(await redis.get(fail_key)) == 1
 
 
 async def test_counter_without_ttl_heals() -> None:

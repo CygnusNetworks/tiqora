@@ -252,6 +252,11 @@ class ApprovalInfo:  # what the service returns to consumers
     decided_at: datetime | None
 
 
+#: longest vote comment after ``strip()``; every surface (agent, MCP, portal, link) answers a
+#: longer one with ``comment_too_long`` (422) from the engine, never with a transport error
+COMMENT_MAX: Final = 2000
+
+
 class ApprovalError(Exception):
     def __init__(self, code: str, http_status: int, detail: str | None = None) -> None:
         super().__init__(code if detail is None else f"{code}: {detail}")

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import structlog
 from pydantic import ValidationError
@@ -43,6 +44,8 @@ class TemplateRow:
     definition: ApprovalDefinition
     origin: str
     valid: bool
+    #: naive UTC, whole seconds: the version an editor sends back (``template_changed``)
+    change_time: datetime
 
 
 @dataclass(slots=True)
@@ -63,7 +66,15 @@ def _row(entity: TiqoraApprovalTemplate) -> TemplateRow:
         definition=ApprovalDefinition.model_validate(json.loads(entity.definition)),
         origin=entity.origin,
         valid=bool(entity.valid),
+        change_time=_second(entity.change_time),
     )
+
+
+def _second(value: datetime) -> datetime:
+    """Whole seconds, naive UTC: MariaDB ``DATETIME`` keeps no fraction, PostgreSQL does."""
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC).replace(tzinfo=None)
+    return value.replace(microsecond=0)
 
 
 def _dump_subjects(subject_types: Iterable[str]) -> str:
@@ -275,7 +286,7 @@ async def create_template(
         raise ApprovalError("invalid_definition", 422, ",".join(check.errors))
     if await _template_by_key(session, key) is not None:
         raise ApprovalError("template_key_taken", 409)
-    now = utc_now()
+    now = utc_now().replace(microsecond=0)
     entity = TiqoraApprovalTemplate(
         template_key=key,
         name=name,
@@ -305,16 +316,21 @@ async def update_template(
     clear_description: bool = False,
     subject_types: Iterable[str] | None = None,
     valid: bool | None = None,
+    expected_change_time: datetime | None = None,
 ) -> TemplateRow:
     """Changes the given fields. The key is immutable (consumers address templates by it).
 
     ``description=None`` leaves the text alone; ``clear_description=True`` empties it (a PUT
-    that replaces the whole record).
+    that replaces the whole record). With *expected_change_time* (the ``change_time`` the
+    editor loaded) a template changed since - by another admin or a GDPR erasure - is refused
+    with ``template_changed`` (409) instead of being overwritten.
     """
-    entity = await session.get(TiqoraApprovalTemplate, template_id)
+    entity = await session.get(TiqoraApprovalTemplate, template_id, with_for_update=True)
     if entity is None:
         raise ApprovalError("template_not_found", 404)
     current = _row(entity)
+    if expected_change_time is not None and _second(expected_change_time) != current.change_time:
+        raise ApprovalError("template_changed", 409)
     types = (
         current.subject_types
         if subject_types is None
@@ -335,7 +351,7 @@ async def update_template(
         entity.valid = valid
     entity.subject_types = _dump_subjects(types)
     entity.definition = parsed.model_dump_json()
-    entity.change_time = utc_now()
+    entity.change_time = utc_now().replace(microsecond=0)
     entity.change_by = actor_id
     await session.flush()
     return _row(entity)
@@ -375,7 +391,7 @@ async def ensure_template(
     existing = await _template_by_key(session, key)
     if existing is not None:
         return _row(existing)
-    now = utc_now()
+    now = utc_now().replace(microsecond=0)
     entity = TiqoraApprovalTemplate(
         template_key=key,
         name=_clean_name(name),
