@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 import structlog
 from httpx import ASGITransport, AsyncClient
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,12 @@ from tiqora.approvals.models import (
     TiqoraApprovalApprover,
     TiqoraApprovalToken,
     TiqoraApprovalVote,
+)
+from tiqora.approvals.schemas import (
+    COMMENT_TRANSPORT_MAX,
+    DecisionIn,
+    LinkDecideIn,
+    PortalDecisionIn,
 )
 from tiqora.approvals.settings import APPROVALS_SECTION, ApprovalSettings
 from tiqora.config import Settings
@@ -503,6 +510,45 @@ async def test_decide_comment_length_is_the_engines(
             assert padded.status_code == 200, padded.text
             (vote,) = await _votes(session, aid)
             assert vote.comment == "x" * 2000
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_decide_comment_over_the_transport_cap_is_refused_unparsed(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Minor 5: over 10000 characters the body is invalid (plain 422 before the route runs);
+    the link stays unused and nothing is voted."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid, token = await _link(session)
+            async with _client(session) as client:
+                huge = await client.post(
+                    f"{BASE}/decide",
+                    json={
+                        "token": token,
+                        "decision": "approved",
+                        "comment": "x" * (COMMENT_TRANSPORT_MAX + 1),
+                    },
+                )
+            assert huge.status_code == 422
+            assert huge.json()["detail"][0]["loc"] == ["body", "comment"]
+            assert await _votes(session, aid) == []
+            assert (await _token_row(session, aid)).used_at is None
+
+
+@pytest.mark.parametrize("model", [DecisionIn, LinkDecideIn, PortalDecisionIn])
+def test_every_decision_comment_has_the_transport_cap(model: type[BaseModel]) -> None:
+    """The cap sits on every decision body; at the cap the engine still decides the length."""
+    extra = {"token": "t"} if model is LinkDecideIn else {}
+    at_cap = model.model_validate(
+        {**extra, "decision": "approved", "comment": "x" * COMMENT_TRANSPORT_MAX}
+    )
+    assert len(at_cap.comment) == COMMENT_TRANSPORT_MAX  # type: ignore[attr-defined]
+    with pytest.raises(ValidationError):
+        model.model_validate(
+            {**extra, "decision": "approved", "comment": "x" * (COMMENT_TRANSPORT_MAX + 1)}
+        )
 
 
 # --- rate limit ------------------------------------------------------------------------------

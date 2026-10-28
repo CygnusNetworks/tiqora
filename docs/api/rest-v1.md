@@ -1051,7 +1051,7 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/approvals/42/decision" \
 | `GET /api/v1/approvals/resolvers` | Dynamic approver sources; customer ones only where customers may approve. |
 | `GET /api/v1/reference/roles` | Every valid Znuny role `{id, name}` for approver pickers (any agent, names only). |
 | `GET /api/v1/approvals/{approval_id}` | One request: steps, approvers, votes, audit trail, and what you may do. 404 unless you may see it. No ticket articles. |
-| `POST /api/v1/approvals/{approval_id}/decision` | Vote `{"decision": "approved"|"rejected", "comment": "...", "approver_id": n}` (comment up to 2000 characters after trimming, else 422 `comment_too_long` - the same on every surface; `approver_id` only to decide on behalf of a delegator). Channel `api`. |
+| `POST /api/v1/approvals/{approval_id}/decision` | Vote `{"decision": "approved"|"rejected", "comment": "...", "approver_id": n}` (comment up to 2000 characters after trimming, else 422 `comment_too_long` - the same on every surface; over 10000 characters the body is refused as invalid before that check; `approver_id` only to decide on behalf of a delegator). Channel `api`. |
 | `POST /api/v1/approvals/{approval_id}/approvers/{approver_id}/forward` | Hand your own open row to another agent `{"user_id": n}`; a target that cannot take it (yourself, invalid, already an approver or already voted in the step) is 422 `forward_target_invalid`. |
 | `POST /api/v1/approvals/{approval_id}/cancel` | Withdraw an open request (requester, creator, `rw` on the ticket, admin). No body. |
 | `POST /api/v1/approvals/{approval_id}/refresh-approvers` | "Freigeber neu ermitteln": re-resolve the open steps (`rw` on the ticket or admin). |
@@ -1086,7 +1086,7 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/approvals/42/decision" \
 | `POST /api/v1/admin/approvals/templates` | Create a template (`template_key`, `name`, `subject_types`, `definition`). |
 | `POST /api/v1/admin/approvals/templates/validate` | Check a definition without saving it (errors and warnings). |
 | `GET /api/v1/admin/approvals/templates/{template_id}` | One template. |
-| `PUT /api/v1/admin/approvals/templates/{template_id}` | Replace name, description, subject types, definition, validity (the key is fixed). Send the loaded `change_time` back: a template changed since (another admin, a GDPR erasure) is 409 `template_changed`. |
+| `PUT /api/v1/admin/approvals/templates/{template_id}` | Replace name, description, subject types, definition, validity (the key is fixed). Send the loaded `change_time` back: a template changed since (another admin, a GDPR erasure) is 409 `template_changed` (whole seconds: a change within the same second as the load goes unnoticed). |
 | `DELETE /api/v1/admin/approvals/templates/{template_id}` | Delete a template; running requests keep their copy. |
 | `GET /api/v1/admin/approvals/lists` | All approval groups, valid or not. |
 | `POST /api/v1/admin/approvals/lists` | Create a group (`name`, `description`, `member_ids`, `valid`); 409 `list_name_taken`. |

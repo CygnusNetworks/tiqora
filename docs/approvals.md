@@ -201,7 +201,8 @@ Ihre eigene Anfrage), steht dort „nicht möglich (bereits abgestimmt)“ bezie
 **Die Oberfläche verlangt bei „Ablehnen“ eine Begründung**; die API verlangt sie nicht.
 Ein Kommentar darf höchstens 2000 Zeichen lang sein (gezählt ohne Leerzeichen am Anfang und Ende).
 Längere Kommentare lehnt Tiqora auf jedem Weg (Oberfläche, API, MCP, Portal, E-Mail-Link) gleich ab:
-422 `comment_too_long`.
+422 `comment_too_long`. Über 10 000 Zeichen (samt Leerzeichen) nimmt die REST-API den Kommentar gar
+nicht erst an (422 ohne diesen Code); diese Grenze schützt nur die Übertragung.
 
 ### Im Ticket
 
@@ -426,6 +427,12 @@ gelöscht), zeigt die Vorlage einen Hinweis, und eine Anforderung mit ihr wird m
 Kopie der Schritte). Vorlagen, die eine Funktion selbst angelegt hat, zeigen „Von … angelegt“ und
 werden von Updates nie überschrieben, damit Ihre Änderungen erhalten bleiben. Eine Vorlage mit
 Gegenstandstypen kann nur für diese Typen verwendet werden.
+
+Hat jemand die Vorlage geändert, während Sie sie bearbeitet haben (ein anderer Administrator oder eine
+DSGVO-Löschung), wird Ihr Speichern mit 409 `template_changed` abgewiesen („Die Vorlage wurde
+inzwischen geändert“); laden Sie sie neu. Dazu schickt der Editor den geladenen Zeitstempel
+`change_time` mit. Der Zeitstempel ist sekundengenau: Eine Änderung in derselben Sekunde, in der Sie
+die Vorlage geladen haben, erkennt diese Prüfung nicht.
 
 Nur in Vorlagen (nicht ad hoc) sind die Optionen „Freigeben, wenn niemand freigeben kann“ und
 „Automatisch freigeben bei Fristablauf“ möglich.

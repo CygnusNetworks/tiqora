@@ -20096,7 +20096,7 @@ export interface components {
             approver_id?: number | null;
             /**
              * Comment
-             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).
              */
             comment?: string | null;
             /**
@@ -22635,7 +22635,7 @@ export interface components {
         LinkDecideIn: {
             /**
              * Comment
-             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).
              */
             comment?: string | null;
             /**
@@ -25523,7 +25523,7 @@ export interface components {
         PortalDecisionIn: {
             /**
              * Comment
-             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).
              */
             comment?: string | null;
             /**

@@ -18345,13 +18345,14 @@
           "comment": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).",
+            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).",
             "title": "Comment"
           },
           "decision": {
@@ -25500,13 +25501,14 @@
           "comment": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).",
+            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).",
             "title": "Comment"
           },
           "decision": {
@@ -34110,13 +34112,14 @@
           "comment": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long).",
+            "description": "Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).",
             "title": "Comment"
           },
           "decision": {

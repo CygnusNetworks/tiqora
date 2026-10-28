@@ -7,7 +7,7 @@ Pure data shapes, no database. Names are display labels ("Vorname Nachname", cus
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,10 +17,12 @@ from tiqora.domain.schemas import UtcDateTime
 ApprovalStatusName = Literal["pending", "approved", "rejected", "cancelled"]
 DecisionName = Literal["approved", "rejected"]
 ChannelName = Literal["ui", "email", "portal", "api", "mcp", "chat", "auto"]
-#: no transport cap: the engine checks the stripped text and answers ``comment_too_long``
+#: transport cap only (bounds what is parsed, also on the unauthenticated link route); the
+#: real limit is the engine's, which checks the stripped text and answers ``comment_too_long``
+COMMENT_TRANSPORT_MAX: Final = 10_000
 _COMMENT_HELP = (
     f"Optional reason, at most {COMMENT_MAX} characters after trimming (longer: 422 "
-    "comment_too_long)."
+    f"comment_too_long; over {COMMENT_TRANSPORT_MAX} characters the request is invalid)."
 )
 
 
@@ -159,7 +161,7 @@ class DecisionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: DecisionName
-    comment: str | None = Field(None, description=_COMMENT_HELP)
+    comment: str | None = Field(None, max_length=COMMENT_TRANSPORT_MAX, description=_COMMENT_HELP)
     #: decide on a specific row (own row or one of a delegator); default = the caller's row
     approver_id: int | None = Field(None, ge=1)
 
@@ -257,7 +259,7 @@ class LinkDecideIn(BaseModel):
 
     token: str = Field(min_length=1, max_length=200)
     decision: DecisionName
-    comment: str | None = Field(None, description=_COMMENT_HELP)
+    comment: str | None = Field(None, max_length=COMMENT_TRANSPORT_MAX, description=_COMMENT_HELP)
 
 
 class LinkDecisionOut(BaseModel):
@@ -275,7 +277,7 @@ class PortalDecisionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: DecisionName
-    comment: str | None = Field(None, description=_COMMENT_HELP)
+    comment: str | None = Field(None, max_length=COMMENT_TRANSPORT_MAX, description=_COMMENT_HELP)
 
 
 class PortalApprovalItemOut(BaseModel):
