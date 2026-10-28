@@ -47,6 +47,7 @@ from tiqora.db.tiqora.models import (
     TiqoraReportRunFile,
     TiqoraReportSchedule,
 )
+from tiqora.domain.mail_address import clean_line, normalise_address
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.mail_outbound import build_outbound_sender
 from tiqora.domain.notification_sender import (
@@ -78,8 +79,6 @@ from tiqora.reporting.run_service import RequestError, RunOverrides, prepare_ref
 from tiqora.reporting.schedule_schemas import (
     ScheduleRunFileOut,
     ScheduleRunOut,
-    clean_line,
-    normalise_address,
 )
 from tiqora.reporting.schedules import (
     FAILURES_BEFORE_PAUSE,

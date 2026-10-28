@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.domain.mail_address import normalise_address, usable_sender_email
 from tiqora.domain.settings_store import KEY_NOTIFICATION_SENDER_EMAIL, get_setting
-from tiqora.reporting.schedule_schemas import normalise_address
-from tiqora.worker.notification_templates import usable_sender_email
 from tiqora.znuny.sysconfig import SysConfig
 
 

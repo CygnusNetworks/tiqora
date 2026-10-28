@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.channels.email.placeholder import PlaceholderContext
 from tiqora.config import Settings
+from tiqora.domain.mail_address import usable_sender_email
 from tiqora.domain.settings_store import (
     KEY_NOTIFICATION_SENDER_EMAIL,
     KEY_NOTIFICATION_SENDER_NAME,
@@ -26,7 +27,6 @@ logger = structlog.get_logger(__name__)
 
 _ENCODED_TAG = re.compile(r"&lt;((?:OTRS|TIQORA)_[A-Za-z0-9_:]+(?:\[\d+\])?)&gt;", re.IGNORECASE)
 _PREFIX = r"<(?:OTRS|TIQORA)_CONFIG_"
-_UNRESOLVED_TAG = re.compile(r"<(?:OTRS|TIQORA)_", re.IGNORECASE)
 _TIQORA_SENDER_NAME = "Tiqora Notifications"
 _LEGACY_SEPARATOR = r"(?:\\?;|&amp;|&)"
 _LEGACY_TICKET_URL = re.compile(
@@ -98,16 +98,6 @@ async def configure_notification_context(
             "httptype": url.scheme,
         }
     )
-
-
-def usable_sender_email(raw: str | None) -> str | None:
-    """``raw`` when it is a configured address, ``None`` for empty or unresolved values.
-
-    Znuny ships ``NotificationSenderEmail`` as ``znuny@<OTRS_CONFIG_FQDN>``; the tag is
-    never replaced here, so such a value is not an address anybody can send as.
-    """
-    value = (raw or "").strip()
-    return value if value and not _UNRESOLVED_TAG.search(value) else None
 
 
 async def resolve_notification_sender(

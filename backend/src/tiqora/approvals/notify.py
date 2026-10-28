@@ -62,6 +62,7 @@ from tiqora.db.legacy.customer import CustomerPreferences, CustomerUser
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
 from tiqora.domain import mail_outbound
+from tiqora.domain.mail_address import clean_line, normalise_address
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.notification_sender import resolve_notification_sender_address
 from tiqora.domain.subject_hook import SubjectHookConfig, hooked_subject, load_subject_config
@@ -71,7 +72,6 @@ from tiqora.extensions.registry import Registry
 from tiqora.jobs.context import JobContext, JobRetry
 from tiqora.jobs.registry import MAIL_LANE, JobHandler
 from tiqora.jobs.service import enqueue_job, utc_now
-from tiqora.reporting.schedule_schemas import clean_line, normalise_address
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)

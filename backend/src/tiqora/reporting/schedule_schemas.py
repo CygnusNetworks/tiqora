@@ -7,12 +7,11 @@ document.
 
 from __future__ import annotations
 
-import re
-from email.utils import parseaddr
 from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from tiqora.domain.mail_address import clean_line, normalise_address
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.reporting.definition import TimeRange
@@ -20,32 +19,10 @@ from tiqora.reporting.recurrence import Recurrence
 from tiqora.reporting.schemas import ParameterValue, ReportOwnerOut
 from tiqora.reporting.sql import Grain
 
-_CONTROL: Final = re.compile(r"[\r\n\t]+")
 #: largest value of an INTEGER column: bigger ids and versions are a 422, not a database error
 INT32_MAX: Final = 2**31 - 1
 #: agent / group / role id (Znuny INTEGER ids)
 RecipientRef = Annotated[int, Field(ge=1, le=INT32_MAX)]
-_FORBIDDEN_IN_ADDRESS: Final = re.compile(r"[\s,;<>\"()\[\]\\]")
-
-
-def clean_line(value: str) -> str:
-    """One-line free text: control characters become a space (they would break mail headers)."""
-    return _CONTROL.sub(" ", value).strip()
-
-
-def normalise_address(value: str) -> str | None:
-    """Lower-cased single addr-spec, or None when ``value`` is anything else."""
-    candidate = value.strip().lower()
-    if not candidate or _FORBIDDEN_IN_ADDRESS.search(candidate):
-        return None
-    if candidate.count("@") != 1 or parseaddr(candidate) != ("", candidate):
-        return None
-    local, domain = candidate.split("@")
-    if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
-        return None
-    if ".." in domain or not candidate.isascii():
-        return None
-    return candidate
 
 
 class ScheduleItemOverrides(BaseModel):
