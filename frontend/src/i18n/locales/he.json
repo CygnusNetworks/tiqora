@@ -9228,6 +9228,133 @@
       "delegation_overlap": "There is already a delegation for this period.",
       "rate_limited": "Too many attempts. Please wait a few minutes.",
       "unknown": "The approval could not be processed. Please try again."
+    },
+    "overdue": "overdue",
+    "status": {
+      "pending": "Open",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Withdrawn",
+      "waiting": "Waiting",
+      "active": "In progress",
+      "forwarded": "Forwarded",
+      "removed": "Removed",
+      "not_needed": "Not needed"
+    },
+    "source": {
+      "user": "Named directly",
+      "group": "Via group",
+      "role": "Via role",
+      "list": "Via approval group",
+      "customer_user": "Customer",
+      "resolver": "By rule",
+      "escalation": "Escalation",
+      "forward": "Forwarded"
+    },
+    "steps": {
+      "stage": "Stage {{stage}}",
+      "progress": "{{approved}} of {{required}} approvals",
+      "due": "Due {{date}}",
+      "decisive": "Decides alone",
+      "onBehalf": "{{name}} voted as a substitute"
+    },
+    "audit": {
+      "title": "History ({{count}})",
+      "empty": "No entries yet.",
+      "requested": "Requested",
+      "step_activated": "Step started",
+      "approver_added": "Approver added",
+      "approver_excluded": "Approver excluded",
+      "approver_removed": "Approver removed",
+      "notified": "Notified",
+      "reminded": "Reminder sent",
+      "link_issued": "Decision link issued",
+      "voted": "Voted",
+      "forwarded": "Forwarded",
+      "step_decided": "Step decided",
+      "overdue": "Deadline passed",
+      "escalated": "Escalated",
+      "timeout_decided": "Decided by deadline",
+      "refreshed": "Approvers refreshed",
+      "decided": "Decided",
+      "auto_decided": "Decided automatically",
+      "cancelled": "Withdrawn",
+      "superseded": "Replaced by a newer request",
+      "hook_done": "Result handed over",
+      "hook_failed": "Handing over the result failed",
+      "note_skipped": "Ticket note skipped"
+    },
+    "decision": {
+      "title": "Your decision",
+      "approve": "Approve",
+      "reject": "Reject",
+      "comment": "Comment (optional)",
+      "commentRequired": "Reason for the rejection",
+      "commentMissing": "Please give a reason for the rejection."
+    },
+    "forward": {
+      "title": "Forward approval",
+      "description": "Another agent decides instead of you.",
+      "agent": "Agent",
+      "submit": "Forward"
+    },
+    "picker": {
+      "agent": "Choose an agent",
+      "group": "Choose a group",
+      "role": "Choose a role",
+      "roleId": "Role number",
+      "list": "Choose an approval group",
+      "customer": "Choose a customer",
+      "customerSearch": "Search customers (2 letters or more)",
+      "resolver": "Choose a rule"
+    },
+    "entry": {
+      "kindLabel": "Kind",
+      "kind": {
+        "user": "Agent",
+        "group": "Group",
+        "role": "Role",
+        "list": "Approval group",
+        "customer_user": "Customer",
+        "resolver": "Rule"
+      },
+      "members": "{{count}} members",
+      "add": "Add approver",
+      "remove": "Remove approver"
+    },
+    "definition": {
+      "name": "Name of the step",
+      "stage": "Stage",
+      "rule": "Rule",
+      "ruleOption": {
+        "any": "One",
+        "all": "All",
+        "quorum": "Minimum number",
+        "majority": "Majority"
+      },
+      "quorum": "Approvals needed",
+      "approvers": "Approvers",
+      "dueHours": "Deadline in hours (empty: none)",
+      "onTimeout": "When the deadline passes",
+      "timeout": {
+        "notify": "Only remind",
+        "escalate": "Escalate",
+        "reject": "Reject",
+        "approve": "Approve"
+      },
+      "escalation": "Escalation to",
+      "allowForward": "Forwarding allowed",
+      "allowEmail": "Decision by e-mail link",
+      "addStep": "Add step",
+      "removeStep": "Remove step",
+      "moveUp": "Move step up",
+      "moveDown": "Move step down",
+      "problem": {
+        "name": "Please name the step.",
+        "approvers": "Please name at least one approver and complete every row.",
+        "quorum": "Please enter how many approvals are needed.",
+        "escalation": "Please name who the step is escalated to."
+      }
     }
   }
 }

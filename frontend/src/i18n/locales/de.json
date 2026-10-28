@@ -9236,6 +9236,133 @@
       "delegation_overlap": "Für diesen Zeitraum gibt es schon eine Vertretung.",
       "rate_limited": "Zu viele Versuche. Bitte warten Sie einige Minuten.",
       "unknown": "Die Freigabe konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut."
+    },
+    "overdue": "überfällig",
+    "status": {
+      "pending": "Offen",
+      "approved": "Freigegeben",
+      "rejected": "Abgelehnt",
+      "cancelled": "Zurückgezogen",
+      "waiting": "Wartet",
+      "active": "In Bearbeitung",
+      "forwarded": "Weitergeleitet",
+      "removed": "Entfernt",
+      "not_needed": "Nicht nötig"
+    },
+    "source": {
+      "user": "Direkt benannt",
+      "group": "Über Gruppe",
+      "role": "Über Rolle",
+      "list": "Über Freigabegruppe",
+      "customer_user": "Kunde",
+      "resolver": "Nach Regel",
+      "escalation": "Eskalation",
+      "forward": "Weitergeleitet"
+    },
+    "steps": {
+      "stage": "Stufe {{stage}}",
+      "progress": "{{approved}} von {{required}} Freigaben",
+      "due": "Fällig am {{date}}",
+      "decisive": "Entscheidet allein",
+      "onBehalf": "{{name}} hat in Vertretung abgestimmt"
+    },
+    "audit": {
+      "title": "Verlauf ({{count}})",
+      "empty": "Noch keine Einträge.",
+      "requested": "Angefordert",
+      "step_activated": "Schritt gestartet",
+      "approver_added": "Freigeber hinzugefügt",
+      "approver_excluded": "Freigeber ausgeschlossen",
+      "approver_removed": "Freigeber entfernt",
+      "notified": "Benachrichtigt",
+      "reminded": "Erinnerung gesendet",
+      "link_issued": "Entscheidungslink erstellt",
+      "voted": "Abgestimmt",
+      "forwarded": "Weitergeleitet",
+      "step_decided": "Schritt entschieden",
+      "overdue": "Frist überschritten",
+      "escalated": "Eskaliert",
+      "timeout_decided": "Wegen Frist entschieden",
+      "refreshed": "Freigeber aktualisiert",
+      "decided": "Entschieden",
+      "auto_decided": "Automatisch entschieden",
+      "cancelled": "Zurückgezogen",
+      "superseded": "Durch neuere Anfrage ersetzt",
+      "hook_done": "Ergebnis übergeben",
+      "hook_failed": "Übergabe des Ergebnisses fehlgeschlagen",
+      "note_skipped": "Ticketnotiz übersprungen"
+    },
+    "decision": {
+      "title": "Ihre Entscheidung",
+      "approve": "Freigeben",
+      "reject": "Ablehnen",
+      "comment": "Kommentar (optional)",
+      "commentRequired": "Begründung der Ablehnung",
+      "commentMissing": "Bitte geben Sie eine Begründung für die Ablehnung an."
+    },
+    "forward": {
+      "title": "Freigabe weiterleiten",
+      "description": "Ein anderer Agent entscheidet an Ihrer Stelle.",
+      "agent": "Agent",
+      "submit": "Weiterleiten"
+    },
+    "picker": {
+      "agent": "Agent wählen",
+      "group": "Gruppe wählen",
+      "role": "Rolle wählen",
+      "roleId": "Rollennummer",
+      "list": "Freigabegruppe wählen",
+      "customer": "Kunde wählen",
+      "customerSearch": "Kunden suchen (ab 2 Buchstaben)",
+      "resolver": "Regel wählen"
+    },
+    "entry": {
+      "kindLabel": "Art",
+      "kind": {
+        "user": "Agent",
+        "group": "Gruppe",
+        "role": "Rolle",
+        "list": "Freigabegruppe",
+        "customer_user": "Kunde",
+        "resolver": "Regel"
+      },
+      "members": "{{count}} Mitglieder",
+      "add": "Freigeber hinzufügen",
+      "remove": "Freigeber entfernen"
+    },
+    "definition": {
+      "name": "Name des Schritts",
+      "stage": "Stufe",
+      "rule": "Regel",
+      "ruleOption": {
+        "any": "Einer",
+        "all": "Alle",
+        "quorum": "Mindestanzahl",
+        "majority": "Mehrheit"
+      },
+      "quorum": "Nötige Freigaben",
+      "approvers": "Freigeber",
+      "dueHours": "Frist in Stunden (leer: keine)",
+      "onTimeout": "Wenn die Frist abläuft",
+      "timeout": {
+        "notify": "Nur erinnern",
+        "escalate": "Eskalieren",
+        "reject": "Ablehnen",
+        "approve": "Freigeben"
+      },
+      "escalation": "Eskalation an",
+      "allowForward": "Weiterleiten erlaubt",
+      "allowEmail": "Entscheidung per E-Mail-Link",
+      "addStep": "Schritt hinzufügen",
+      "removeStep": "Schritt entfernen",
+      "moveUp": "Schritt nach oben",
+      "moveDown": "Schritt nach unten",
+      "problem": {
+        "name": "Bitte geben Sie dem Schritt einen Namen.",
+        "approvers": "Bitte nennen Sie mindestens einen Freigeber und füllen Sie jede Zeile aus.",
+        "quorum": "Bitte geben Sie an, wie viele Freigaben nötig sind.",
+        "escalation": "Bitte nennen Sie, an wen der Schritt eskaliert wird."
+      }
     }
   }
 }
