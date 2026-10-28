@@ -23,7 +23,7 @@ from tiqora.channels.phone.service import phone_ticket_auto_response_configured
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.queue import Queue, Service, ServiceSla, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType, TicketType
-from tiqora.db.legacy.user import Users
+from tiqora.db.legacy.user import Roles, Users
 from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.field_options import (
     ATTRIBUTE_OPTION_FIELDS,
@@ -694,3 +694,20 @@ class ShareGroupOut(BaseModel):
 async def list_share_groups(user: CurrentUser, session: DbSession) -> list[ShareGroupOut]:
     """Groups the agent may share a report / search / dashboard with (admin: every valid group)."""
     return [ShareGroupOut(id=g.id, name=g.name) for g in await share_groups_for(session, user.id)]
+
+
+class RoleRefOut(BaseModel):
+    id: int
+    name: str
+
+
+@router.get("/roles", response_model=list[RoleRefOut])
+async def list_roles(user: CurrentUser, session: DbSession) -> list[RoleRefOut]:
+    """Every valid role (id, name) for approver pickers; names only, no members."""
+    _ = user
+    rows = (
+        await session.execute(
+            select(Roles.id, Roles.name).where(Roles.valid_id == _VALID).order_by(Roles.name)
+        )
+    ).all()
+    return [RoleRefOut(id=r[0], name=r[1]) for r in rows]

@@ -15,6 +15,7 @@ from tiqora.api.v1.admin import (
     ai_audit,
     ai_models,
     api_keys,
+    approvals,
     attachments,
     auth_config,
     auto_responses,
@@ -135,5 +136,6 @@ admin_router.include_router(dashboard_kiosk_links.router)
 admin_router.include_router(webservices.router)
 admin_router.include_router(itsm.router)
 admin_router.include_router(itsm_import.router)
+admin_router.include_router(approvals.router)
 
 __all__ = ["admin_router"]

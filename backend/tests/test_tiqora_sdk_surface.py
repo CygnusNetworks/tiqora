@@ -231,12 +231,16 @@ def test_core_mcp_tool_names_cover_server_source() -> None:
     import re
     from pathlib import Path
 
+    import tiqora.mcp_server.approval_tools as approval_tools
     import tiqora.mcp_server.cmdb_tools as cmdb_tools
     import tiqora.mcp_server.server as server
     from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES
 
-    # The CMDB tools live in their own module and register on the same ``mcp`` instance.
-    src = Path(server.__file__).read_text() + "\n" + Path(cmdb_tools.__file__).read_text()
+    # The CMDB and approval tools live in their own modules and register on the same ``mcp``.
+    src = "\n".join(
+        Path(m.__file__).read_text()
+        for m in (server, cmdb_tools, approval_tools)  # type: ignore[arg-type]
+    )
     names = set(re.findall(r"@mcp\.tool\((?:[^@]*?)\)\n(?:async )?def (\w+)", src))
     assert names == CORE_MCP_TOOL_NAMES
 

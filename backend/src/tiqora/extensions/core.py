@@ -17,6 +17,7 @@ def register_core(registry: Registry) -> None:
     for descriptor in core_channel_descriptors():
         registry.add(CHANNELS, descriptor)
 
+    from tiqora.approvals.settings import APPROVALS_SECTION
     from tiqora.avatars.settings import AVATARS_SECTION
     from tiqora.cmdb.settings import CMDB_SECTION
     from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION
@@ -32,6 +33,7 @@ def register_core(registry: Registry) -> None:
         REPORTING_SECTION,
         ITSM_SECTION,
         CMDB_SECTION,
+        APPROVALS_SECTION,
     ):
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
@@ -43,6 +45,8 @@ def register_core(registry: Registry) -> None:
     registry.add(CI_PROVIDERS, CiProviderFactory(mode="znuny_readthrough", create=ZnunyCiProvider))
     registry.add(CI_PROVIDERS, tiqora_provider_factory())
 
+    from tiqora.approvals.hooks import APPROVAL_HOOK_JOB
+    from tiqora.approvals.notify import APPROVAL_MAIL_JOB
     from tiqora.cmdb.archive import CMDB_ARCHIVE_JOB
     from tiqora.cmdb.propagation import CMDB_PROPAGATION_JOB
     from tiqora.cmdb.reindex import CMDB_REINDEX_JOB
@@ -86,6 +90,8 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, PLUGIN_UNINSTALL_JOB)
     registry.add(JOB_HANDLERS, PLUGIN_REPOSITORY_REFRESH_JOB)
     registry.add(JOB_HANDLERS, PLUGIN_FETCH_JOB)
+    registry.add(JOB_HANDLERS, APPROVAL_HOOK_JOB)
+    registry.add(JOB_HANDLERS, APPROVAL_MAIL_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
@@ -112,6 +118,13 @@ def register_core(registry: Registry) -> None:
 
     for module in core_condition_modules():
         registry.add(CONDITION_MODULES, module)
+
+    from tiqora.approvals.contract import APPROVAL_SUBJECT_TYPES, APPROVER_RESOLVERS
+    from tiqora.approvals.core_types import core_resolvers, ticket_subject_type
+
+    registry.add(APPROVAL_SUBJECT_TYPES, ticket_subject_type())
+    for resolver in core_resolvers():
+        registry.add(APPROVER_RESOLVERS, resolver)
 
 
 def get_registry() -> Registry:

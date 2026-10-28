@@ -28,6 +28,7 @@ from tiqora.db.tiqora.models import (
     TiqoraReportScheduleItem,
     TiqoraReportScheduleRecipient,
 )
+from tiqora.domain.mail_address import normalise_address
 from tiqora.domain.timezones import resolve_user_time_zone, valid_time_zone
 from tiqora.domain.user_preferences import bulk_get_preferences
 from tiqora.extensions.core import get_registry
@@ -55,7 +56,6 @@ from tiqora.reporting.schedule_schemas import (
     ScheduleItemSummaryOut,
     ScheduleRecipientOut,
     ScheduleRecipientsIn,
-    normalise_address,
 )
 from tiqora.reporting.schemas import ReportOwnerOut
 from tiqora.reporting.settings import ReportingSettings

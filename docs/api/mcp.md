@@ -74,13 +74,13 @@ missing trailing slash in a way that breaks concurrent MCP session setup;
 see the reverse-proxy notes in
 [`../deploy/docker-compose.md`](../deploy/docker-compose.md).)
 
-## Tools (43)
+## Tools (46)
 
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR —
 those stay on REST; the one addition beyond tickets and the knowledge base is
-the read-only [CMDB](#cmdb-read-only) trio. The 43 core tools are the 40
-`@mcp.tool` handlers in `tiqora.mcp_server.server` plus the three in
-`tiqora.mcp_server.cmdb_tools`; installed plugins add more
+the read-only [CMDB](#cmdb-read-only) trio and the three [approval](#approvals) tools. The 46 core
+tools are the 40 `@mcp.tool` handlers in `tiqora.mcp_server.server` plus the three in
+`tiqora.mcp_server.cmdb_tools` and the three in `tiqora.mcp_server.approval_tools`; installed plugins add more
 ([Plugin tools](#plugin-tools)). Mutations go through `TicketWriteService`
 (same permission gates and, for agent email replies, SMTP outbound as REST).
 
@@ -177,6 +177,36 @@ site". The API-key area `cmdb` is not needed for MCP; `mcp` is.
 {"name": "cmdb_search", "arguments": {"query": "mail", "class_key": "server", "limit": 10}}
 {"name": "cmdb_impact", "arguments": {"ci_id": 12, "max_depth": 3}}
 ```
+
+### Approvals
+
+Three tools for the [approval engine](../approvals.md) (German product guide). They run as the
+key's user: a request that user may not see is answered like an unknown one
+(`{"error": "approval_not_found"}`), so MCP cannot be used to find out whether a request exists.
+Tool-allowlist names: `tool:approval_list_mine`, `tool:approval_get`, `tool:approval_decide`.
+
+| Tool | Purpose |
+|---|---|
+| `approval_list_mine` | The key user's approvals: `state` `pending` (default; includes rows they may decide as a substitute) or `decided`, `limit` (max 100), `offset`. Returns `approval_id`, `ticket_id`, `ticket_number`, `title`, `step`, `rule`, `due_at`, `on_behalf_of`. Read-only (`mcp:ro` suffices). |
+| `approval_get` | One request: steps, approvers, votes and the audit trail (action, time, actor only; no detail objects). Read-only. |
+| `approval_decide` | Records a **binding** vote (`decision` `approved` or `rejected`, optional `comment` up to 2000 characters) in the name of the key's owner. **Off by default**, see below. Returns `{ok, status, step_status}` or `{"error": code}`. |
+
+**`approval_decide` is gated three ways.** A model reads text from tickets, mails and tool results, and
+one injected sentence must never be enough to cast a vote in a change board. The tool runs only when
+
+1. the key's scopes name `tool:approval_decide` **explicitly** (or `*`): an unrestricted key (no
+   scopes) and a key with only other `tool:` entries are refused with `{"error": "tool_not_allowed"}`;
+2. the key has write scope (`mcp:rw`); otherwise `{"error": "write_scope_required"}`; and
+3. an administrator switched on **Admin, Einstellungen, Freigaben, "Abstimmen über MCP erlauben"**
+   (`approvals.mcp_decide_enabled`, default off); otherwise `{"error": "mcp_decide_disabled"}`.
+
+The tool description tells the client that this is a binding vote that may be cast only on the
+explicit instruction of the key's owner. The engine's own rules apply as for a person (no vote on
+your own request, one vote per person and step, the first decision of a step with rule "any"
+counts); a refusal is `{"error": "<code>"}` with the engine's codes (`not_an_approver`,
+`already_decided`, `self_approval_forbidden`, `approval_closed`, `step_not_active`,
+`comment_too_long`). The vote is recorded with the channel `mcp`. Use a dedicated service-account key
+that holds this scope only where you want an automated approver.
 
 ### Plugin tools
 

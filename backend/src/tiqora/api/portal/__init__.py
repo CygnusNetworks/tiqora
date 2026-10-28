@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from tiqora.api.portal import (
+    approvals,
     attachments,
     auth,
     auth_sso,
@@ -24,6 +25,7 @@ portal_router.include_router(attachments.router)
 portal_router.include_router(cmdb.router)
 portal_router.include_router(kb.router)
 portal_router.include_router(process.router)
+portal_router.include_router(approvals.router)
 portal_router.include_router(preferences.router)
 portal_router.include_router(webchat.router)
 

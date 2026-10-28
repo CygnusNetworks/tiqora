@@ -17,9 +17,11 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
+import structlog
 from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.approvals.models import APPROVAL_TICKET_TABLES
 from tiqora.avatars.service import EMAIL, cache_key, email_key, forget_cached
 from tiqora.cmdb.erasure import CREATED_SUFFIX as CMDB_CREATED_SUFFIX
 from tiqora.cmdb.erasure import PARTIAL_TABLES as CMDB_PARTIAL_TABLES
@@ -59,6 +61,8 @@ from tiqora.gi.debug_store import delete_debug_entries_for_tickets
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
+
+logger = structlog.get_logger(__name__)
 
 # Znuny CacheType sets (mirrored from admin/common — avoid gdpr→api layering).
 _CUSTOMER_USER_CACHE_TYPES: tuple[str, ...] = (
@@ -123,6 +127,9 @@ _TICKET_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
     # ticket (root cause, workaround, update bodies). Updates are deleted explicitly before
     # their major incident so every row is backed up (the FK cascade would skip the backup).
     *((table, "ticket_id", "ticket") for table in ITSM_TICKET_TABLES),
+    # Approval sets (tiqora-owned, no FK to Znuny or to the ITSM tables): request title and
+    # description, vote comments, customer approvers. Children first, so every row is backed up.
+    *((table, "ticket_id", "ticket") for table in APPROVAL_TICKET_TABLES),
     ("article_search_index", "ticket_id", "ticket"),  # FK to article + ticket
     ("time_accounting", "ticket_id", "ticket"),  # FK to article + ticket
     ("ticket_history", "ticket_id", "ticket"),  # FK to article + ticket
@@ -863,6 +870,7 @@ async def build_erasure_preview_for_ids(
         "customer_preferences": pref_count,
         "customer_user_customer": cuc_count,
         "group_customer_user": gcu_count,
+        **await _approval_preview_counts(session, logins, ticket_ids),
     }
 
     sample: list[SampleRow] = []
@@ -1107,6 +1115,335 @@ async def build_customer_record_preview(
 
 
 # ---------------------------------------------------------------------------
+# Approval engine (tiqora_approval*)
+# ---------------------------------------------------------------------------
+
+_APPROVAL_TEMPLATE_TABLE = "tiqora_approval_template"
+# Every approval table an erasure writes: whole sets of erased tickets are deleted (full-row
+# backup), customer refs elsewhere are rewritten in place (changed-column backup).
+_APPROVAL_TABLES: frozenset[str] = frozenset({*APPROVAL_TICKET_TABLES, _APPROVAL_TEMPLATE_TABLE})
+# counts key: approval rows outside the erased tickets whose customer refs are rewritten
+_APPROVAL_REFS_KEY = "tiqora_approval_customer_refs"
+_CUSTOMER_PRINCIPAL = "customer:"
+_IN_CHUNK = 500
+
+
+@dataclass
+class _ApprovalRewrite:
+    table: str
+    row_id: int
+    original: dict[str, Any]  # changed columns, old values
+    updates: dict[str, Any]
+
+
+def _chunked(values: list[Any]) -> list[list[Any]]:
+    return [values[i : i + _IN_CHUNK] for i in range(0, len(values), _IN_CHUNK)]
+
+
+async def _count_in(session: AsyncSession, table: str, column: str, ids: list[int]) -> int:
+    total = 0
+    for chunk in _chunked(sorted(ids)):
+        stmt = text(
+            f"SELECT COUNT(*) FROM {_qi(table)} WHERE {_qi(column)} IN :ids"  # noqa: S608
+        ).bindparams(bindparam("ids", expanding=True))
+        total += int((await session.execute(stmt, {"ids": chunk})).scalar_one())
+    return total
+
+
+async def _select_in(
+    session: AsyncSession, sql: str, params: dict[str, list[Any]]
+) -> list[dict[str, Any]]:
+    """Runs *sql* once per chunk of the expanding lists *params*; rows by id.
+
+    The lists are sliced in lockstep, so they must be equally long (callers pass the same logins
+    in different spellings).
+    """
+    sizes = {len(values) for values in params.values()}
+    if len(sizes) != 1:
+        raise ValueError(f"_select_in needs equally long lists, got sizes {sorted(sizes)}")
+    stmt = text(sql).bindparams(*(bindparam(name, expanding=True) for name in params))
+    size = sizes.pop()
+    out: dict[int, dict[str, Any]] = {}
+    for start in range(0, size, _IN_CHUNK):
+        chunk = {name: values[start : start + _IN_CHUNK] for name, values in params.items()}
+        for row in (await session.execute(stmt, chunk)).mappings():
+            out[int(row["id"])] = dict(row)
+    return [out[i] for i in sorted(out)]
+
+
+def _new_principal(value: Any, repl: dict[str, str]) -> str | None:
+    """``customer:<new>`` when *value* is the principal of an erased login, else None."""
+    key = str(value or "")
+    if not key.lower().startswith(_CUSTOMER_PRINCIPAL):
+        return None
+    new = repl.get(key[len(_CUSTOMER_PRINCIPAL) :].lower())
+    return f"{_CUSTOMER_PRINCIPAL}{new}" if new is not None else None
+
+
+def _is_erased_entry(entry: Any, repl: dict[str, str]) -> bool:
+    return (
+        isinstance(entry, dict)
+        and entry.get("kind") == "customer_user"
+        and str(entry.get("ref") or "").lower() in repl
+    )
+
+
+def _rewrite_step_spec(raw: str, repl: dict[str, str]) -> str | None:
+    """``step.spec`` with the erased logins' ``customer_user`` refs renamed (None: unchanged)."""
+    try:
+        spec = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(spec, dict):
+        return None
+    changed = False
+    for key in ("approvers", "escalation"):
+        entries = spec.get(key)
+        for entry in entries if isinstance(entries, list) else []:
+            if _is_erased_entry(entry, repl):
+                entry["ref"] = repl[str(entry["ref"]).lower()]
+                changed = True
+    return json.dumps(spec, ensure_ascii=False, separators=(",", ":")) if changed else None
+
+
+def _rewrite_template_definition(raw: str, repl: dict[str, str]) -> str | None:
+    """Template definition without the erased logins' entries (None: unchanged).
+
+    An ``approvers`` list the drop would empty keeps one ``customer_user`` entry
+    ``[anonymisiert]``: a step needs an approver, and the template editor then warns
+    ``missing_customer:[anonymisiert]`` instead of failing to load the definition. An emptied
+    ``escalation`` stays empty and its step falls back from ``on_timeout="escalate"`` to
+    ``"notify"`` (an escalation to nobody would only look configured).
+    """
+    try:
+        definition = json.loads(raw)
+    except ValueError:
+        return None
+    steps = definition.get("steps") if isinstance(definition, dict) else None
+    changed = False
+    for step in steps if isinstance(steps, list) else []:
+        if not isinstance(step, dict):
+            continue
+        for key in ("approvers", "escalation"):
+            entries = step.get(key)
+            if not isinstance(entries, list):
+                continue
+            kept = [e for e in entries if not _is_erased_entry(e, repl)]
+            if len(kept) == len(entries):
+                continue
+            changed = True
+            if key == "approvers" and not kept:
+                kept = [{"kind": "customer_user", "ref": _ANON_PLACEHOLDER}]
+            elif key == "escalation" and not kept and step.get("on_timeout") == "escalate":
+                step["on_timeout"] = "notify"
+            step[key] = kept
+    return json.dumps(definition, ensure_ascii=False, separators=(",", ":")) if changed else None
+
+
+async def _approval_customer_rewrites(
+    session: AsyncSession,
+    replacements: dict[str, str],
+    skip_ticket_ids: set[int],
+    *,
+    now: datetime,
+) -> list[_ApprovalRewrite]:
+    """Changes that take the erased customers out of approval rows of tickets not erased.
+
+    *replacements* maps each erased login to its new value (the anonymised login, or on delete
+    the stable token the tickets get). Logins compare case-insensitively: an approver entry may
+    spell the login differently from the stored one. Principals ``customer:<login>``
+    (``requester``, ``principal``, ``decided_by``, ``actor``), ``customer_login``, ``source_ref``
+    and the ``customer_user`` refs in ``step.spec`` follow the new login; the vote comments of
+    these approvers and the title and description of their own requests (customer-written text)
+    become ``[anonymisiert]``; template entries naming them are dropped (see
+    :func:`_rewrite_template_definition`, ``change_time`` = *now*). Audit ``detail`` JSON holds
+    ids, keys and statuses only (recipients as ``requester`` / ``substitute:<user_id>``), so it
+    needs no rewrite.
+    """
+    repl = {old.lower(): new for old, new in replacements.items()}
+    if not repl or not await _table_exists(session, "tiqora_approval"):
+        return []
+    lows = sorted(repl)
+    keys = [f"{_CUSTOMER_PRINCIPAL}{low}" for low in lows]
+    rewrites: list[_ApprovalRewrite] = []
+
+    def add(table: str, row: dict[str, Any], updates: dict[str, Any]) -> None:
+        if updates:
+            original = {col: row[col] for col in updates}
+            rewrites.append(_ApprovalRewrite(table, int(row["id"]), original, updates))
+
+    def outside(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [r for r in rows if int(r["ticket_id"]) not in skip_ticket_ids]
+
+    for row in outside(
+        await _select_in(
+            session,
+            "SELECT id, ticket_id, requester, title, description FROM tiqora_approval"
+            " WHERE LOWER(requester) IN :k",
+            {"k": keys},
+        )
+    ):
+        new = _new_principal(row["requester"], repl)
+        if not new:
+            continue
+        updates_r: dict[str, Any] = {"requester": new}
+        if row["title"] != _ANON_PLACEHOLDER:
+            updates_r["title"] = _ANON_PLACEHOLDER
+        if row["description"] and row["description"] != _ANON_PLACEHOLDER:
+            updates_r["description"] = _ANON_PLACEHOLDER
+        add("tiqora_approval", row, updates_r)
+
+    approver_ids: list[int] = []
+    for row in outside(
+        await _select_in(
+            session,
+            "SELECT id, ticket_id, principal, customer_login, source_kind, source_ref"
+            " FROM tiqora_approval_approver"
+            " WHERE LOWER(customer_login) IN :l1 OR LOWER(principal) IN :k"
+            " OR (source_kind = 'customer_user' AND LOWER(source_ref) IN :l2)",
+            {"l1": lows, "k": keys, "l2": lows},
+        )
+    ):
+        updates: dict[str, Any] = {}
+        new_principal = _new_principal(row["principal"], repl)
+        if new_principal:
+            updates["principal"] = new_principal
+        login = str(row["customer_login"] or "").lower()
+        if login in repl:
+            updates["customer_login"] = repl[login]
+        ref = str(row["source_ref"] or "").lower()
+        if ref in repl and (row["source_kind"] == "customer_user" or new_principal):
+            updates["source_ref"] = repl[ref]
+        add("tiqora_approval_approver", row, updates)
+        if updates:
+            approver_ids.append(int(row["id"]))
+
+    votes = await _select_in(
+        session,
+        "SELECT id, ticket_id, approver_id, decided_by, comment FROM tiqora_approval_vote"
+        " WHERE LOWER(decided_by) IN :k",
+        {"k": keys},
+    )
+    if approver_ids:
+        votes += await _select_in(
+            session,
+            "SELECT id, ticket_id, approver_id, decided_by, comment FROM tiqora_approval_vote"
+            " WHERE approver_id IN :a",
+            {"a": approver_ids},
+        )
+    for row in outside(list({int(v["id"]): v for v in votes}.values())):
+        updates = {}
+        new_by = _new_principal(row["decided_by"], repl)
+        if new_by:
+            updates["decided_by"] = new_by
+        if row["comment"] and row["comment"] != _ANON_PLACEHOLDER:
+            updates["comment"] = _ANON_PLACEHOLDER
+        add("tiqora_approval_vote", row, updates)
+
+    for row in outside(
+        await _select_in(
+            session,
+            "SELECT id, ticket_id, actor FROM tiqora_approval_event WHERE LOWER(actor) IN :k",
+            {"k": keys},
+        )
+    ):
+        new = _new_principal(row["actor"], repl)
+        add("tiqora_approval_event", row, {"actor": new} if new else {})
+
+    pattern = {"p": "%customer_user%"}
+    steps = (
+        await session.execute(
+            text("SELECT id, ticket_id, spec FROM tiqora_approval_step WHERE spec LIKE :p"),
+            pattern,
+        )
+    ).mappings()
+    for step in outside([dict(r) for r in steps]):
+        new_spec = _rewrite_step_spec(str(step["spec"]), repl)
+        add("tiqora_approval_step", step, {"spec": new_spec} if new_spec else {})
+
+    templates = (
+        await session.execute(
+            text(
+                "SELECT id, template_key, definition, change_time FROM tiqora_approval_template"
+                " WHERE definition LIKE :p"
+            ),
+            pattern,
+        )
+    ).mappings()
+    for tpl in templates:
+        new_definition = _rewrite_template_definition(str(tpl["definition"]), repl)
+        if new_definition:
+            # change_time moves: an admin editor holding the old version gets 409 template_changed
+            add(
+                _APPROVAL_TEMPLATE_TABLE,
+                dict(tpl),
+                {"definition": new_definition, "change_time": now},
+            )
+    return rewrites
+
+
+async def _approval_preview_counts(
+    session: AsyncSession, logins: list[str], ticket_ids: list[int]
+) -> dict[str, int]:
+    """What :func:`run_erasure` will do to approvals, under the keys of its own counts."""
+    if not await _table_exists(session, "tiqora_approval"):
+        return {}
+    counts = {
+        table: await _count_in(session, table, "ticket_id", ticket_ids)
+        for table in APPROVAL_TICKET_TABLES
+    }
+    # Any value other than the login itself marks exactly the columns that would change.
+    rewrites = await _approval_customer_rewrites(
+        session,
+        {login: _ANON_PLACEHOLDER for login in logins},
+        set(ticket_ids),
+        now=datetime.now(UTC).replace(tzinfo=None),
+    )
+    approver_ids = [r.row_id for r in rewrites if r.table == "tiqora_approval_approver"]
+    counts["tiqora_approval_token"] += await _count_in(
+        session, "tiqora_approval_token", "approver_id", approver_ids
+    )
+    counts[_APPROVAL_REFS_KEY] = len(rewrites)
+    return counts
+
+
+async def _erase_approval_customer_refs(
+    session: AsyncSession,
+    *,
+    job_id: int,
+    replacements: dict[str, str],
+    skip_ticket_ids: set[int],
+    now: datetime,
+) -> tuple[int, int]:
+    """Applies :func:`_approval_customer_rewrites` with changed-column backups and deletes the
+    link tokens of the rewritten approvers (full-row backup). Returns (rows rewritten, tokens)."""
+    rewrites = await _approval_customer_rewrites(session, replacements, skip_ticket_ids, now=now)
+    for rw in rewrites:
+        await _add_backup(
+            session,
+            job_id=job_id,
+            table_name=rw.table,
+            row_pk={"id": rw.row_id},
+            original_row=rw.original,
+            created=now,
+        )
+        await _update_row(session, rw.table, {"id": rw.row_id}, rw.updates)
+        if rw.table == _APPROVAL_TEMPLATE_TABLE:
+            # an admin should look at the template: a configured approver is gone
+            logger.warning("gdpr_approval_template_customer_removed", template_id=rw.row_id)
+    approver_ids = [rw.row_id for rw in rewrites if rw.table == "tiqora_approval_approver"]
+    tokens = await _backup_and_delete_by(
+        session,
+        job_id=job_id,
+        table="tiqora_approval_token",
+        fk_col="approver_id",
+        ids=approver_ids,
+        now=now,
+    )
+    return len(rewrites), tokens
+
+
+# ---------------------------------------------------------------------------
 # Apply
 # ---------------------------------------------------------------------------
 
@@ -1172,6 +1509,8 @@ async def run_erasure(
         "tiqora_chat_message": 0,
         "tiqora_chat_session": 0,
         **{table: 0 for table in ITSM_TICKET_TABLES},
+        **{table: 0 for table in APPROVAL_TICKET_TABLES},
+        _APPROVAL_REFS_KEY: 0,
         "customer_preferences": 0,
         "customer_user_customer": 0,
         "group_customer_user": 0,
@@ -1939,6 +2278,30 @@ async def run_erasure(
                     now=now,
                 )
                 counts[itsm_table] = counts.get(itsm_table, 0) + n_itsm
+            # Approval sets of these tickets go whole too (request texts, vote comments,
+            # approvers), like on the hard-delete path.
+            for approval_table in APPROVAL_TICKET_TABLES:
+                counts[approval_table] += await _backup_and_delete_by(
+                    session,
+                    job_id=job_id,
+                    table=approval_table,
+                    fk_col="ticket_id",
+                    ids=ticket_ids,
+                    now=now,
+                )
+
+        # ---- approvals elsewhere: the erased customers as approver, voter, requester or actor
+        # on tickets that are not erased (both modes: these are other tickets' decision records,
+        # so the rows stay and follow the login the tickets got, unlike favorites).
+        n_refs, n_tokens = await _erase_approval_customer_refs(
+            session,
+            job_id=job_id,
+            replacements=login_to_new,
+            skip_ticket_ids=set(ticket_ids),
+            now=now,
+        )
+        counts[_APPROVAL_REFS_KEY] += n_refs
+        counts["tiqora_approval_token"] += n_tokens
 
         # ---- customer_company: anonymize PII (keep PK) or delete if orphan ----
         company_ids = sorted({str(c.customer_id) for c in ordered if c.customer_id})
@@ -2218,7 +2581,12 @@ async def rollback_job(
     actor: str = "admin",
     force_parallel: bool = True,
 ) -> dict[str, int]:
-    """Restore all rows from ``tiqora_gdpr_backup`` for *job_id*."""
+    """Restore all rows from ``tiqora_gdpr_backup`` for *job_id*.
+
+    Returns ``restored_rows`` and ``skipped_rows``: approval rows whose backup could not come
+    back (the row and a parent it needs are gone since, e.g. a later erasure deleted the other
+    ticket's set) are skipped, counted and logged (``gdpr_rollback_row_skipped``).
+    """
     async with session_factory() as session:
         await require_write_gate(
             session,
@@ -2249,6 +2617,7 @@ async def rollback_job(
             raise ErasureError("no backup rows available (already purged?)")
 
         restored = 0
+        skipped = 0
         ticket_ids: list[int] = []
         cmdb_ci_ids: list[int] = []
         # A ticket hard-delete job (delete_tickets) backs up EVERY affected row
@@ -2314,6 +2683,26 @@ async def rollback_job(
                         {"now": datetime.now(UTC).replace(tzinfo=None), "sid": pk["schedule_id"]},
                     )
                     restored += 1
+                continue
+
+            if table in _APPROVAL_TABLES:
+                # Rewritten rows (changed columns, outside the erased tickets) are updated back,
+                # also in a ticket hard-delete job, whose branch below would INSERT them; deleted
+                # rows (full row) are re-inserted. Either may have gone since (an admin deleted
+                # the template, a later erasure the other ticket's set): skip them.
+                if await _fetch_full_row(session, table, pk) is not None:
+                    await _update_row(session, table, pk, original)
+                    restored += 1
+                    continue
+                row = None
+                if "ticket_id" in original:
+                    row = await _restorable_approval_row(session, table, original)
+                if row is not None:
+                    await _insert_row(session, table, row)
+                    restored += 1
+                else:  # counted and logged: the admin sees what did not come back
+                    skipped += 1
+                    logger.warning("gdpr_rollback_row_skipped", job_id=job_id, table=table, pk=pk)
                 continue
 
             if is_ticket_delete:
@@ -2418,10 +2807,50 @@ async def rollback_job(
             action="erasure_rollback",
             target=f"job:{job_id}",
             actor=actor,
-            counts={"restored_rows": restored},
+            counts={"restored_rows": restored, "skipped_rows": skipped},
             force_parallel=force_parallel,
         )
-    return {"restored_rows": restored}
+    return {"restored_rows": restored, "skipped_rows": skipped}
+
+
+# FK parents of each approval table (column -> table); rollback re-inserts parents first.
+_APPROVAL_PARENTS: dict[str, tuple[tuple[str, str], ...]] = {
+    "tiqora_approval_step": (("approval_id", "tiqora_approval"),),
+    "tiqora_approval_approver": (
+        ("approval_id", "tiqora_approval"),
+        ("step_id", "tiqora_approval_step"),
+    ),
+    "tiqora_approval_vote": (
+        ("approval_id", "tiqora_approval"),
+        ("step_id", "tiqora_approval_step"),
+        ("approver_id", "tiqora_approval_approver"),
+    ),
+    "tiqora_approval_token": (
+        ("approval_id", "tiqora_approval"),
+        ("approver_id", "tiqora_approval_approver"),
+    ),
+    "tiqora_approval_event": (("approval_id", "tiqora_approval"),),
+}
+
+
+async def _restorable_approval_row(
+    session: AsyncSession, table: str, original: dict[str, Any]
+) -> dict[str, Any] | None:
+    """The full-row backup to re-insert, or None when a parent row is gone (a later erasure
+    deleted it). A request whose template was deleted since comes back without it, like the
+    FK's ``ON DELETE SET NULL`` would have left it."""
+    for column, parent in _APPROVAL_PARENTS.get(table, ()):
+        if await _fetch_full_row(session, parent, {"id": original[column]}) is None:
+            return None
+    row = dict(original)
+    template_id = row.get("template_id")
+    if (
+        table == "tiqora_approval"
+        and template_id is not None
+        and await _fetch_full_row(session, _APPROVAL_TEMPLATE_TABLE, {"id": template_id}) is None
+    ):
+        row["template_id"] = None
+    return row
 
 
 async def _rollback_login_renames(session: AsyncSession, job_id: int) -> None:

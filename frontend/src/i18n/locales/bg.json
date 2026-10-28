@@ -80,7 +80,8 @@
     "templates": "Шаблони",
     "escalatedCount": "{{count}} ескалирани",
     "customers": "Customers",
-    "searches": "Saved searches"
+    "searches": "Saved searches",
+    "approvals": "My approvals"
   },
   "views": {
     "mine": "Моите тикети",
@@ -1376,7 +1377,8 @@
       "newTicket": "Нов билет",
       "kb": "Помощни статии",
       "preferences": "Настройки",
-      "cmdb": "Devices and systems"
+      "cmdb": "Devices and systems",
+      "approvals": "Approvals"
     },
     "login": {
       "stepUp": {
@@ -2244,7 +2246,11 @@
       "cmdbCatalog": "CMDB catalog",
       "itsm": "ITSM",
       "itsmLinkTypes": "Link types",
-      "itsmImport": "ITSM import"
+      "itsmImport": "ITSM import",
+      "approvals": "Approvals",
+      "approvalsTemplates": "Approval templates",
+      "approvalsLists": "Approval groups",
+      "approvalsDelegations": "Delegations"
     },
     "table": {
       "id": "ID",
@@ -3468,6 +3474,10 @@
           "name": "Clean up report runs",
           "description": "Deletes the run history of scheduled reports, including the generated files, after the retention period."
         },
+        "approvals": {
+          "name": "Approvals",
+          "description": "Reports and acts on approval deadlines: sends reminders, escalates or closes steps whose deadline passed, removes approvers who are no longer valid, cancels requests of deleted tickets and cleans up old decision links."
+        },
         "webchat_sweep": {
           "name": "Web chat housekeeping",
           "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."
@@ -3898,7 +3908,12 @@
       "itsm": "ITSM mode, setup, priority matrix and services",
       "itsmLinkTypes": "Link types between tickets, configuration items and services",
       "settingsItsm": "Ticket types, workaround state, limits and the Znuny address for ITSM",
-      "itsmImport": "Import ITSM data from Znuny into the Tiqora CMDB and switch over."
+      "itsmImport": "Import ITSM data from Znuny into the Tiqora CMDB and switch over.",
+      "approvals": "All approval requests with status and deadline; withdraw requests",
+      "approvalsTemplates": "Reusable approval flows with steps, rules and deadlines",
+      "approvalsLists": "Groups of approvers such as a CAB, used in templates",
+      "approvalsDelegations": "Who stands in for whom during absence",
+      "settingsApprovals": "Deadlines, reminders, decision links, customers as approvers and MCP voting"
     },
     "types": {
       "title_plural": "Типове тикети",
@@ -4468,6 +4483,59 @@
           "znuny_agent_url": {
             "label": "Znuny agent address",
             "help": "Address of the Znuny agent interface for “Edit in Znuny”. Empty derives it from the Znuny configuration. Must start with http:// or https://."
+          }
+        }
+      },
+      "approvals": {
+        "title": "Approvals",
+        "fields": {
+          "default_due_hours": {
+            "label": "Default deadline (hours)",
+            "help": "Deadline of a step that sets none. 0 means no deadline."
+          },
+          "reminder_interval_hours": {
+            "label": "Reminder interval (hours)",
+            "help": "How often pending approvers are reminded. 0 switches reminders off."
+          },
+          "reminder_max": {
+            "label": "Maximum reminders",
+            "help": "How many reminders one step sends at most."
+          },
+          "email_links_enabled": {
+            "label": "Decision links in e-mails",
+            "help": "Approvers can decide with one click from the e-mail. Without it the e-mail only points to the inbox."
+          },
+          "link_ttl_hours": {
+            "label": "Link validity (hours)",
+            "help": "How long a decision link works."
+          },
+          "max_links_per_approver": {
+            "label": "Active links per approver",
+            "help": "Older links of the same approver stop working when this number is exceeded."
+          },
+          "customer_approvers_enabled": {
+            "label": "Customers as approvers",
+            "help": "Allows customer users as approvers. They decide in the portal or by link."
+          },
+          "portal_approvals_enabled": {
+            "label": "Approvals in the portal",
+            "help": "Shows customers their open approvals in the portal. Only effective with customers as approvers and the portal switched on."
+          },
+          "history_entries": {
+            "label": "Entries in the ticket history",
+            "help": "Writes a short line to the ticket history for every request, vote and decision."
+          },
+          "decision_note": {
+            "label": "Internal note on decision",
+            "help": "Adds an internal note to the ticket when a request is finally decided."
+          },
+          "mail_requester_on_decision": {
+            "label": "Tell the requester",
+            "help": "Sends the requester an e-mail when a request is finally decided."
+          },
+          "mcp_decide_enabled": {
+            "label": "Allow voting via MCP",
+            "help": "Warning: lets an MCP client with the explicit tool permission “approval_decide” cast binding votes in the name of its user. Leave this off unless you trust the client and its prompts."
           }
         }
       }
@@ -6585,7 +6653,9 @@
         "cmdb_reindex": "Rebuild CMDB search",
         "itsm_linked_articles": "Note to linked tickets",
         "itsm_import": "Import Znuny ITSM data",
-        "itsm_switch": "Switch ITSM to Tiqora"
+        "itsm_switch": "Switch ITSM to Tiqora",
+        "approval_hook": "Approval follow-up",
+        "approval_mail": "Approval e-mails"
       },
       "gi_mail": "Send email from a web service request"
     },
@@ -9101,6 +9171,396 @@
     "newTicket": {
       "recentIncident": "This service already had an incident {{minutes}} minutes ago: #{{tn}} {{title}}. Is it the same problem?",
       "openTicket": "Open ticket"
+    }
+  },
+  "approvals": {
+    "agent": {
+      "title": "My approvals",
+      "empty": "No open approvals. You will be notified by email when an approval is waiting for you.",
+      "emptyDone": "No decided approvals yet.",
+      "loadFailed": "The approvals could not be loaded. Please try again.",
+      "detail": "Approval details",
+      "back": "Back to list",
+      "requestedBy": "Requested by {{name}}",
+      "ticket": "Ticket #{{number}}",
+      "onBehalfOf": "on behalf of {{name}}",
+      "myDecision": "Your decision: {{decision}}",
+      "prev": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{pages}}",
+      "tabs": {
+        "open": "Open",
+        "done": "Decided",
+        "delegation": "Substitute"
+      },
+      "blocked": {
+        "already_voted": "not possible (already voted)",
+        "own_request": "not possible (your own request)"
+      },
+      "delegation": {
+        "title": "Substitute",
+        "hint": "While a substitute is active, that person can decide approvals in your place. One person casts only one vote per step.",
+        "empty": "You have not named a substitute.",
+        "new": "Name a substitute",
+        "substitute": "Substitute",
+        "from": "From (optional, default: now)",
+        "until": "Until (optional)",
+        "periodHint": "Without an end date the substitute stays active until you end it.",
+        "substituteMissing": "Please choose a substitute.",
+        "untilPast": "The end must be in the future.",
+        "untilBeforeFrom": "The end must be after the start.",
+        "create": "Save substitute",
+        "revoke": "End now",
+        "running": "active",
+        "planned": "planned",
+        "noEnd": "no end",
+        "alreadyEnded": "Already ended."
+      },
+      "cannotVote": "You cannot vote on this request (any more)."
+    },
+    "portal": {
+      "title": "Approvals",
+      "unavailable": "Not available",
+      "loadError": "The approvals could not be loaded. Please try again.",
+      "empty": "No open approvals. You will be notified by email when an approval is waiting for you.",
+      "emptyDone": "No decided approvals yet.",
+      "back": "Back to approvals",
+      "decidedAt": "decided {{date}}",
+      "myApproved": "You approved",
+      "myRejected": "You rejected"
+    },
+    "link": {
+      "title": "Approval",
+      "incomplete": "The link is incomplete.",
+      "loading": "Loading approval",
+      "ticket": "Ticket {{number}}",
+      "step": "Step: {{name}}",
+      "due": "Due: {{date}}",
+      "decidingAs": "You are deciding as {{name}}",
+      "doneApproved": "Thank you, your approval has been saved.",
+      "doneRejected": "Your rejection has been saved.",
+      "requestStatus": "Status of the request: {{status}}",
+      "closeHint": "You can close this window now.",
+      "retryIn": "Please try again in {{seconds}} seconds.",
+      "reopen": "Please open the link from the e-mail again.",
+      "retry": "Try again"
+    },
+    "subject": {
+      "ticket": "Ticket"
+    },
+    "resolver": {
+      "ticket_customer_user": "Customer of the ticket",
+      "ticket_owner": "Owner of the ticket",
+      "ticket_responsible": "Responsible agent of the ticket"
+    },
+    "rule": {
+      "any": "One approval is enough",
+      "all": "All approvers must approve",
+      "quorum": "{{required}} approvals needed",
+      "majority": "Majority needed ({{required}} approvals)",
+      "majorityOpen": "Majority required"
+    },
+    "errors": {
+      "approval_not_found": "This approval does not exist or you may not see it.",
+      "ticket_not_found": "This ticket does not exist or you may not see it.",
+      "template_not_found": "This approval template does not exist.",
+      "list_not_found": "This approval group does not exist.",
+      "forbidden": "You are not allowed to do this.",
+      "not_an_approver": "You are not an approver of this request.",
+      "self_approval_forbidden": "You cannot approve a request you made yourself.",
+      "customer_approver_outside_company": "This customer belongs to a different company than the ticket and cannot be an approver.",
+      "delegation_not_active": "This delegation is not active (any more).",
+      "comment_too_long": "The comment is too long.",
+      "already_decided": "A decision has already been made here.",
+      "approval_closed": "This request is already closed.",
+      "step_not_active": "This step is not waiting for a decision at the moment.",
+      "forward_not_allowed": "This request cannot be forwarded.",
+      "forward_target_invalid": "The chosen person cannot take over this approval.",
+      "invalid_definition": "The template is not valid. Please check steps, approvers and deadlines.",
+      "unknown_subject_type": "This kind of request is not known.",
+      "subject_not_requestable": "This kind of request cannot be started by hand.",
+      "customer_approvers_not_allowed": "Customers cannot approve this kind of request.",
+      "unknown_resolver": "An approver rule in the template does not exist.",
+      "link_invalid": "This link is no longer valid. A decision may already have been made, or the request was withdrawn.",
+      "link_expired": "This link has expired. Please sign in and decide under “My approvals”.",
+      "link_used": "A decision was already made with this link.",
+      "invalid_member": "The chosen person does not exist or is not valid.",
+      "list_name_taken": "An approval group with this name already exists.",
+      "list_in_use": "This approval group is still used by a template or a running request.",
+      "template_key_taken": "An approval template with this identifier already exists.",
+      "delegation_overlap": "There is already a delegation for this period.",
+      "rate_limited": "Too many attempts. Please wait a few minutes.",
+      "unknown": "The approval could not be processed. Please try again.",
+      "approver_invalid": "Your account is no longer active, so you cannot decide on this approval anymore.",
+      "template_changed": "The template was changed in the meantime. Please reload it."
+    },
+    "overdue": "overdue",
+    "status": {
+      "pending": "Open",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Withdrawn",
+      "waiting": "Waiting",
+      "active": "In progress",
+      "forwarded": "Forwarded",
+      "removed": "Removed",
+      "not_needed": "Not needed"
+    },
+    "source": {
+      "user": "Named directly",
+      "group": "Via group",
+      "role": "Via role",
+      "list": "Via approval group",
+      "customer_user": "Customer",
+      "resolver": "By rule",
+      "escalation": "Escalation",
+      "forward": "Forwarded",
+      "via": {
+        "group": "via group {{name}}",
+        "role": "via role {{name}}",
+        "list": "via approval group {{name}}"
+      }
+    },
+    "steps": {
+      "stage": "Stage {{stage}}",
+      "progress": "{{approved}} of {{required}} approvals",
+      "due": "Due {{date}}",
+      "decisive": "Decides alone",
+      "onBehalf": "{{name}} voted as a substitute",
+      "startsAfter": "Starts after stage {{stage}}",
+      "approversLater": "The approvers are determined when this stage starts."
+    },
+    "audit": {
+      "title": "History ({{count}})",
+      "empty": "No entries yet.",
+      "requested": "Requested",
+      "step_activated": "Step started",
+      "approver_added": "Approver added",
+      "approver_excluded": "Approver excluded",
+      "approver_removed": "Approver removed",
+      "notified": "Notified",
+      "reminded": "Reminder sent",
+      "link_issued": "Decision link issued",
+      "voted": "Voted",
+      "forwarded": "Forwarded",
+      "step_decided": "Step decided",
+      "overdue": "Deadline passed",
+      "escalated": "Escalated",
+      "timeout_decided": "Decided by deadline",
+      "refreshed": "Approvers refreshed",
+      "decided": "Decided",
+      "auto_decided": "Decided automatically",
+      "cancelled": "Withdrawn",
+      "superseded": "Replaced by a newer request",
+      "hook_done": "Result handed over",
+      "hook_failed": "Handing over the result failed",
+      "note_skipped": "Ticket note skipped"
+    },
+    "decision": {
+      "title": "Your decision",
+      "approve": "Approve",
+      "reject": "Reject",
+      "comment": "Comment (optional)",
+      "commentRequired": "Reason for the rejection",
+      "commentMissing": "Please give a reason for the rejection.",
+      "commentUntilChosen": "Comment (required when rejecting)",
+      "counter": "{{count}} / {{max}}"
+    },
+    "forward": {
+      "title": "Forward approval",
+      "description": "Another agent decides instead of you.",
+      "agent": "Agent",
+      "submit": "Forward"
+    },
+    "picker": {
+      "agent": "Choose an agent",
+      "group": "Choose a group",
+      "role": "Choose a role",
+      "list": "Choose an approval group",
+      "customer": "Choose a customer",
+      "customerSearch": "Search customers (2 letters or more)",
+      "resolver": "Choose a rule",
+      "rolesFailed": "The roles could not be loaded. Please try again.",
+      "roleGone": "Role #{{id}} (no longer exists)"
+    },
+    "entry": {
+      "kindLabel": "Kind",
+      "kind": {
+        "user": "Agent",
+        "group": "Group",
+        "role": "Role",
+        "list": "Approval group",
+        "customer_user": "Customer",
+        "resolver": "Rule"
+      },
+      "members": "{{count}} members",
+      "add": "Add approver",
+      "remove": "Remove approver"
+    },
+    "definition": {
+      "name": "Name of the step",
+      "stage": "Stage",
+      "rule": "Rule",
+      "ruleOption": {
+        "any": "One",
+        "all": "All",
+        "quorum": "Minimum number",
+        "majority": "Majority"
+      },
+      "quorum": "Approvals needed",
+      "approvers": "Approvers",
+      "dueHours": "Deadline in hours (empty: none)",
+      "onTimeout": "When the deadline passes",
+      "timeout": {
+        "notify": "Only remind",
+        "escalate": "Escalate",
+        "reject": "Reject",
+        "approve": "Approve",
+        "approveTemplatesOnly": "Approve automatically (templates only)"
+      },
+      "escalation": "Escalation to",
+      "allowForward": "Forwarding allowed",
+      "allowEmail": "Decision by e-mail link",
+      "addStep": "Add step",
+      "removeStep": "Remove step",
+      "moveUp": "Move step up",
+      "moveDown": "Move step down",
+      "problem": {
+        "name": "Please name the step.",
+        "approvers": "Please name at least one approver and complete every row.",
+        "quorum": "Please enter how many approvals are needed.",
+        "escalation": "Please name who the step is escalated to."
+      },
+      "dueDefault": "Default",
+      "dueHint": "Empty: the default deadline from the settings. 0: no deadline.",
+      "allowForwardHint": "Switching this off also stops substitutes from deciding in place of the approver, not only forwarding."
+    },
+    "ticket": {
+      "title": "Approvals",
+      "request": "Request approval",
+      "older": "Older approvals ({{count}})",
+      "details": "Details",
+      "hideDetails": "Hide details",
+      "stage": "Stage {{stage}}",
+      "noStage": "Finished",
+      "requestedBy": "Requested by {{name}}",
+      "refresh": "Re-determine approvers",
+      "loadFailed": "The approvals could not be loaded."
+    },
+    "request": {
+      "title": "Request approval",
+      "mode": "Kind",
+      "modeTemplate": "Template",
+      "modeCustom": "Own approvers",
+      "template": "Template",
+      "templatePlaceholder": "Choose a template",
+      "templateMissing": "Please choose a template.",
+      "noTemplates": "No templates are available. Name the approvers yourself.",
+      "name": "Title",
+      "nameMissing": "Please enter a title.",
+      "description": "Description (optional)",
+      "definitionIncomplete": "Please complete every step first.",
+      "submit": "Request"
+    },
+    "admin": {
+      "settings": "Settings",
+      "overview": {
+        "filter": {
+          "status": "Status",
+          "statusAll": "All",
+          "subjectType": "Subject type",
+          "overdue": "Overdue only",
+          "ticketNumber": "Ticket number"
+        },
+        "empty": "There are no approval requests yet.",
+        "emptyFiltered": "No approval request matches these filters.",
+        "openApprovers": "{{count}} still to decide"
+      },
+      "templates": {
+        "new": "New template",
+        "edit": "Edit template",
+        "empty": "No templates yet.",
+        "key": "Key",
+        "keyHint": "Used by features to find the template. Cannot be changed after saving.",
+        "keyLocked": "The key cannot be changed.",
+        "name": "Name",
+        "description": "Description",
+        "subjectTypes": "Subject types",
+        "subjectTypesHint": "Separate several with commas. Empty means every subject type.",
+        "allSubjects": "All subject types",
+        "valid": "Valid",
+        "invalid": "Not valid",
+        "hasWarnings": "{{count}} notes",
+        "originHint": "Created by {{feature}}",
+        "definition": "Steps",
+        "deleteTitle": "Delete template?",
+        "deleteMessage": "The template “{{name}}” is removed. Running requests are not affected.",
+        "check": {
+          "running": "Checking …",
+          "ok": "The definition is valid.",
+          "stepPrefix": "Step {{n}} ({{name}}):",
+          "invalid_definition": "An entry is invalid ({{path}}).",
+          "field": {
+            "name": "The name is missing or too long.",
+            "stage": "The stage is invalid.",
+            "rule": "The rule is invalid.",
+            "quorum": "The number of required approvals is invalid.",
+            "approvers": "The approvers are incomplete or invalid.",
+            "due_hours": "The deadline is invalid.",
+            "on_timeout": "The action on timeout is invalid.",
+            "escalation": "The escalation is incomplete or invalid."
+          },
+          "unknown_resolver": "The rule “{{arg}}” does not exist.",
+          "invalid_ref": "An approver entry is invalid ({{arg}}).",
+          "customer_entry_not_allowed": "Customers cannot be approvers for these subject types.",
+          "unknown_subject_type": "The subject type “{{arg}}” does not exist.",
+          "missing_user": "Agent #{{arg}} no longer exists or is invalid.",
+          "missing_group": "Group #{{arg}} no longer exists or is invalid.",
+          "missing_role": "Role #{{arg}} no longer exists or is invalid.",
+          "missing_list": "Approver group #{{arg}} no longer exists or is invalid.",
+          "missing_customer": "Customer {{arg}} no longer exists or is invalid."
+        },
+        "keyMissing": "Please enter a key."
+      },
+      "lists": {
+        "new": "New approver group",
+        "edit": "Edit approver group",
+        "empty": "No approver groups yet.",
+        "name": "Name",
+        "nameMissing": "Please enter a name.",
+        "description": "Description",
+        "valid": "Valid",
+        "invalid": "Not valid",
+        "members": "Members",
+        "membersEmpty": "No members",
+        "addMember": "Add member",
+        "removeMember": "Remove {{name}}",
+        "deleteTitle": "Delete approver group?",
+        "deleteMessage": "The approver group “{{name}}” is removed."
+      },
+      "delegations": {
+        "filterUser": "Substituted person",
+        "filterClear": "All",
+        "includeEnded": "Show ended",
+        "empty": "There are no substitutes.",
+        "person": "{{to}} substitutes for {{from}}",
+        "state": {
+          "running": "active",
+          "planned": "planned",
+          "ended": "ended"
+        },
+        "new": "Name a substitute for someone",
+        "user": "Substituted person",
+        "peopleMissing": "Please choose both people."
+      },
+      "discardTitle": "Discard changes?",
+      "discardMessage": "Your changes have not been saved and will be lost.",
+      "discard": "Discard changes"
+    },
+    "withdraw": {
+      "action": "Withdraw request",
+      "title": "Withdraw request?",
+      "message": "The request “{{title}}” is closed without a decision. Nobody can decide on it any more."
     }
   }
 }

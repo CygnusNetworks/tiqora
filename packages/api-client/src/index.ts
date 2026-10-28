@@ -317,6 +317,7 @@ export {
   type PriorityRef,
   type StateRef,
   type AgentRef,
+  type RoleRef,
   type CustomerRef,
   type QueueRef,
   type ComposeContext,

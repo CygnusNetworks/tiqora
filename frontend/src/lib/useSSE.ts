@@ -51,12 +51,21 @@ export type ChatEventMessage = {
   topic_ref?: string;
 };
 
+/** User-scoped (the backend forwards it only to the affected agents): their approvals changed.
+ * Carries no details; the UI re-reads. The ticket panel's `["tickets", id, "approvals"]` list is
+ * refreshed by the `ticket_changed` the outbox sends for the same change. */
+type ApprovalChangedMessage = {
+  type: "approval_changed";
+  user_ids?: number[];
+};
+
 export type SSEMessage =
   | TicketChangedMessage
   | PresenceChangedMessage
   | TicketNewInQueueMessage
   | CallEventMessage
   | AiLimitChangedMessage
+  | ApprovalChangedMessage
   | ChatEventMessage;
 
 const listeners = new Set<(message: SSEMessage) => void>();
@@ -115,6 +124,12 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     // presence state itself is never pushed over SSE, only this marker —
     // clients react by refetching GET .../presence instead.
     void queryClient.invalidateQueries({ queryKey: presenceQueryKey(message.ticket_id) });
+    return;
+  }
+
+  if (message.type === "approval_changed") {
+    // Inbox, count badge, detail, templates and delegations all live under the "approvals" key.
+    void queryClient.invalidateQueries({ queryKey: ["approvals"] });
     return;
   }
 

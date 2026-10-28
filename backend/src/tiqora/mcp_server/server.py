@@ -2302,4 +2302,8 @@ __all__ = [
     "run_mcp_server",
 ]
 
-from tiqora.mcp_server import cmdb_tools  # noqa: E402,F401  — registers the CMDB tools
+# Register the tool modules (they import this module, so the import sits at the bottom).
+from tiqora.mcp_server import (  # noqa: E402,F401
+    approval_tools,
+    cmdb_tools,
+)

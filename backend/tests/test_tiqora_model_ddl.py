@@ -364,3 +364,93 @@ def test_cmdb_ddl() -> None:
     assert fks == {"tiqora_itsm_link_type.name"}
     archive = TiqoraBase.metadata.tables["tiqora_cmdb_ci_version_archive"]
     assert "AUTO_INCREMENT" not in _column_ddl(archive, "id ", mysql_dialect.dialect())
+
+
+def test_approvals_ddl_equals_migration() -> None:
+    """The approval ORM tables carry the same server defaults, key widths and text types as
+    migration ``20261010_0083`` (database-level comparison: ``test_approvals_models.py``)."""
+    from tiqora.approvals.models import (
+        TiqoraApproval,
+        TiqoraApprovalApprover,
+        TiqoraApprovalDelegation,
+        TiqoraApprovalEvent,
+        TiqoraApprovalList,
+        TiqoraApprovalListMember,
+        TiqoraApprovalStep,
+        TiqoraApprovalTemplate,
+        TiqoraApprovalToken,
+        TiqoraApprovalVote,
+    )
+
+    tables = [
+        c.__table__
+        for c in (
+            TiqoraApproval,
+            TiqoraApprovalStep,
+            TiqoraApprovalApprover,
+            TiqoraApprovalVote,
+            TiqoraApprovalToken,
+            TiqoraApprovalEvent,
+            TiqoraApprovalTemplate,
+            TiqoraApprovalList,
+            TiqoraApprovalListMember,
+            TiqoraApprovalDelegation,
+        )
+    ]
+    assert len(tables) == 10
+    for table in tables:
+        # no foreign key leaves the approval family (Znuny rows are referenced by value)
+        assert all(
+            fk.column.table.name.startswith("tiqora_approval") for fk in table.foreign_keys
+        ), table.name
+    for dialect in (mysql.dialect(), postgresql.dialect()):
+        approval = TiqoraApproval.__table__
+        assert "DEFAULT false" in _column_ddl(approval, "allow_self_approval", dialect)
+        assert "VARCHAR(250) NOT NULL" in _column_ddl(approval, "requester", dialect)
+        approver = TiqoraApprovalApprover.__table__
+        assert "DEFAULT false" in _column_ddl(approver, "decisive", dialect)
+        assert "VARCHAR(250) NOT NULL" in _column_ddl(approver, "principal", dialect)
+        assert "VARCHAR(200)" in _column_ddl(approver, "customer_login", dialect)
+        assert "DEFAULT false" in _column_ddl(TiqoraApprovalVote.__table__, "on_behalf", dialect)
+        assert "DEFAULT '0'" in _column_ddl(TiqoraApprovalStep.__table__, "reminder_count", dialect)
+        template = TiqoraApprovalTemplate.__table__
+        assert "DEFAULT '[]'" in _column_ddl(template, "subject_types", dialect)
+        assert "DEFAULT 'admin'" in _column_ddl(template, "origin", dialect)
+        assert "DEFAULT true" in _column_ddl(template, "valid", dialect)
+        assert "DEFAULT true" in _column_ddl(TiqoraApprovalList.__table__, "valid", dialect)
+        assert (
+            _column_ddl(TiqoraApprovalToken.__table__, "token_hash", dialect)
+            == "token_hash CHAR(64) NOT NULL,"
+        )
+        assert _column_ddl(TiqoraApprovalEvent.__table__, "job_id", dialect) == "job_id BIGINT,"
+        for col in ("create_time", "change_time"):
+            assert "DEFAULT" not in _column_ddl(template, col, dialect)
+        # ids of the integer-keyed tables are generated, the member table's keys are not
+        member = TiqoraApprovalListMember.__table__
+        assert "AUTO_INCREMENT" not in _column_ddl(member, "list_id", dialect)
+        assert "SERIAL" not in _column_ddl(member, "user_id", dialect)
+    mysql_dialect = mysql.dialect()
+    for table, column in (
+        (TiqoraApproval.__table__, "description"),
+        (TiqoraApprovalStep.__table__, "spec"),
+        (TiqoraApprovalVote.__table__, "comment"),
+        (TiqoraApprovalEvent.__table__, "detail"),
+        (TiqoraApprovalTemplate.__table__, "definition"),
+        (TiqoraApprovalList.__table__, "description"),
+    ):
+        assert "MEDIUMTEXT" in _column_ddl(table, column, mysql_dialect), (table.name, column)
+        assert _column_ddl(table, column, postgresql.dialect()).split()[1].startswith("TEXT"), (
+            column
+        )
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261010_0083_approvals.py"
+    ).read_text()
+    assert 'revision: str = "20261010_0083"' in migration
+    assert 'down_revision: str | None = "20261010_0082"' in migration
+    # every boolean default of the ORM is a boolean default in the migration, and no other
+    assert migration.count("server_default=sa.false()") == 3
+    assert migration.count("server_default=sa.true()") == 2
+    assert migration.count('server_default="0"') == 1
+    assert migration.count('server_default="[]"') == 1
+    assert migration.count('server_default="admin"') == 1
+    assert migration.count("MEDIUM_TEXT,") == 7

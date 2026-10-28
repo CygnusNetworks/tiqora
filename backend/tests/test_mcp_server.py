@@ -352,16 +352,19 @@ async def test_mcp_every_tool_checks_allowlist() -> None:
 
     async with Client(mcp) as client:
         names = {t.name for t in await client.list_tools()}
+    import tiqora.mcp_server.approval_tools as approval_tools
     import tiqora.mcp_server.cmdb_tools as cmdb_tools
     import tiqora.mcp_server.server as srv
 
     def _source(name: str) -> str:
-        # the CMDB tools live in their own module, the rest in server.py
-        fn = getattr(srv, name, None) or getattr(cmdb_tools, name)
+        # the CMDB and approval tools live in their own modules, the rest in server.py
+        fn = getattr(srv, name, None) or getattr(cmdb_tools, name, None)
+        fn = fn or getattr(approval_tools, name)
         return inspect.getsource(fn)
 
     missing = [n for n in sorted(names) if f'_assert_tool_allowed("{n}")' not in _source(n)]
     assert {"cmdb_search", "cmdb_get", "cmdb_impact"} <= names
+    assert {"approval_list_mine", "approval_get", "approval_decide"} <= names
     assert not missing, f"tools without allowlist check: {missing}"
 
 
@@ -553,10 +556,13 @@ async def test_mcp_tools_list(mcp_mariadb: dict[str, Any]) -> None:
         "cmdb_search",
         "cmdb_get",
         "cmdb_impact",
+        "approval_list_mine",
+        "approval_get",
+        "approval_decide",
     }
     missing = expected - tool_names
     assert not missing, f"Missing MCP tools: {missing}"
-    assert len(tool_names) == 43, f"Expected 43 tools, got {len(tool_names)}: {sorted(tool_names)}"
+    assert len(tool_names) == 46, f"Expected 46 tools, got {len(tool_names)}: {sorted(tool_names)}"
 
 
 @pytest.mark.db

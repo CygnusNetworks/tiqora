@@ -31,7 +31,7 @@
 | [api/rest-v1.md](api/rest-v1.md) | Guided `/api/v1` reference with curl examples |
 | [api/openapi.json](api/openapi.json) | Generated OpenAPI schema (exhaustive; also served live at `GET /openapi.json`) |
 | [api/compat.md](api/compat.md) | `/znuny-compat` GenericInterface emulation — quick pointer into [compatibility.md](compatibility.md) |
-| [api/mcp.md](api/mcp.md) | MCP server: transport, auth, tool list, prompt-injection warning |
+| [api/mcp.md](api/mcp.md) | MCP server: transport, auth, tool list (incl. the approval tools), prompt-injection warning |
 | [ai-integration.md](ai-integration.md) | Webhook schema, MCP interface, external agent patterns, and the **built-in AI subsystem** (§5: providers, model catalog/profiles/task routing, cost/tool-round budgets, per-queue policies, drafts, summaries, triage, refine, auto-reply, human handoff, per-ticket pause, origin traces, PII masking, audit) |
 
 ## Znuny parallel operation and migration
@@ -57,6 +57,7 @@
 | [process-management.md](process-management.md) | BPM ticket processes: reused `pm_*` tables, engine flow, process designer, deploy (also through TiqoraSync while Znuny runs), agent + portal CustomerInterface, REST API, supported/deferred scope |
 | [itsm.md](itsm.md) | ITSM: modes (off / A = Znuny leads, read-only / B = Tiqora leads), incident, problem and major incident, service and priority matrix, link types and link graph, coexistence with Znuny ITSM, switching with the importer, the `TiqoraITSM` Znuny add-on (**German**, English summary) |
 | [cmdb.md](cmdb.md) | Tiqora CMDB (ITSM Mode B): classes and designer, CIs and versions, search, links, impact analysis, CSV/XLSX import and export, bulk edit, customer portal view "Meine Geräte und Systeme", MCP tools `cmdb_*` (**German**, English summary) |
+| [approvals.md](approvals.md) | Approvals ("Freigaben"): stages and steps, rules (one, all, at least n, majority), approvers (agents, groups, roles, approval groups such as a CAB, customers), deadlines, reminders, escalation, substitutes and forwarding, decisions in the inbox, ticket, e-mail link, portal, API and MCP, audit trail, admin pages, developer interface (**German**, English summary) |
 | [itsm-import.md](itsm-import.md) | Znuny ITSM schema survey (6.5 and 7.3), Mode A read rules, importer mapping and report, golden validation (**German**, English summary) |
 | [reporting.md](reporting.md) | Reports: built-in catalogue, report builder, saved reports and sharing, Znuny statistics import, PDF and schedules, report data and rights (English) |
 | [plugins.md](plugins.md) | Plugin system: install and operate (Part 1, **German**), developer guide for SDK 0.2.0, signed packages and repositories (Part 2, English), limits (Part 3, **German**) |

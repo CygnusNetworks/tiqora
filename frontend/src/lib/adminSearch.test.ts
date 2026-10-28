@@ -58,4 +58,20 @@ describe("ADMIN_PAGES", () => {
       expect(rankAdminPages(ADMIN_PAGES, query, t).map((p) => p.slug), query).toContain("cmdb-classes");
     }
   });
+
+  it("lists the approval pages and finds them by their German names", async () => {
+    await i18n.changeLanguage("de");
+    const t = (key: string) => i18n.t(key);
+    const routes = Object.fromEntries(ADMIN_PAGES.map((p) => [p.slug, p.route]));
+    expect(routes["approvals"]).toBe("/admin/approvals");
+    expect(routes["approval-templates"]).toBe("/admin/approvals/templates");
+    expect(routes["approval-lists"]).toBe("/admin/approvals/lists");
+    expect(routes["approval-delegations"]).toBe("/admin/approvals/delegations");
+    expect(routes["settings-approvals"]).toBe("/admin/settings/approvals");
+    const slugs = (q: string) => rankAdminPages(ADMIN_PAGES, q, t).map((p) => p.slug);
+    expect(slugs("Freigabegruppen")).toContain("approval-lists");
+    expect(slugs("Vertretung")).toContain("approval-delegations");
+    expect(slugs("Freigabevorlagen")).toContain("approval-templates");
+    expect(t("admin.nav.approvals")).toBe("Freigaben");
+  });
 });

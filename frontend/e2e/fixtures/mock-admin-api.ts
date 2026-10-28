@@ -1,5 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 import { mockApi, loginAsAgent } from "./mock-api";
+import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
 import type { AdminProcess, DeployStatus } from "../../src/lib/deployStatusApi";
 
 async function json(route: Route, status: number, body: unknown) {
@@ -426,6 +427,19 @@ export async function mockAdminApi(page: Page) {
     const method = req.method();
 
     if (await handleProcessDesigner(route, path, method)) return;
+
+    // Approvals admin (overview, templates, Freigabegruppen, delegations): stateful per test, see approvals-store.ts.
+    if (path.includes("/api/v1/admin/approvals")) {
+      const out = approvalsStore().handle(path, method, url.search, bodyOf(req));
+      if (out) {
+        await fulfillAnswer(route, out);
+        return;
+      }
+      if (method === "DELETE") {
+        await route.fulfill({ status: 204 });
+        return;
+      }
+    }
 
     // ProcessManagement overview (read-only)
     if (path.endsWith("/api/v1/admin/processes") && method === "GET") {

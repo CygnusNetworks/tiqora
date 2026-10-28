@@ -15,6 +15,7 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
+import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
@@ -685,6 +686,15 @@ export async function mockApi(page: Page) {
       const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
       if (out) {
         await json(route, out.status, out.body);
+        return;
+      }
+    }
+
+    // Approvals (inbox, detail, ticket panel, delegations, public link): stateful per test, see approvals-store.ts.
+    if (/\/api\/v1\/(approvals|approval-links)(\/|$)|\/api\/v1\/reference\/(roles|agents)$|\/api\/v1\/tickets\/\d+\/approvals$/.test(path)) {
+      const out = approvalsStore().handle(path, method, url.search, bodyOf(req));
+      if (out) {
+        await fulfillAnswer(route, out);
         return;
       }
     }
