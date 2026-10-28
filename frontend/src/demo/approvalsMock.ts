@@ -291,6 +291,13 @@ const RESOLVERS: ApprovalResolverOption[] = [
   { key: "ticket.responsible", title_key: "approvals.resolver.ticket_responsible", yields_customers: false },
 ];
 
+/** Roles for the approver picker (`GET /reference/roles`). */
+const DEMO_ROLES = [
+  { id: 1, name: "Change-Manager" },
+  { id: 2, name: "Netzwerk" },
+  { id: 3, name: "Service-Desk" },
+];
+
 const DELEGATION: ApprovalDelegation = {
   id: 1,
   user_id: 1,
@@ -467,6 +474,7 @@ export function resolveApprovalsData(path: string, method: string, search = ""):
   if (path.endsWith("/api/v1/admin/approvals/delegations") && method === "POST") return DELEGATION;
 
   // Agent plane
+  if (path.endsWith("/api/v1/reference/roles") && get) return DEMO_ROLES;
   if (path.endsWith("/api/v1/approvals/inbox") && get) return demoApprovalInbox(new URLSearchParams(search).get("state"));
   if (path.endsWith("/api/v1/approvals/inbox/count") && get) return { pending: demoApprovalInbox("pending").items.length };
   if (path.endsWith("/api/v1/approvals/templates") && get) return TEMPLATES;

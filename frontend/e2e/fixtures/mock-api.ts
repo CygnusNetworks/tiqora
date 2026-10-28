@@ -691,7 +691,7 @@ export async function mockApi(page: Page) {
     }
 
     // Approvals (inbox, detail, ticket panel, public link): the demo resolver's records, with `?state=`.
-    if (/\/api\/v1\/(approvals|approval-links)(\/|$)|\/api\/v1\/tickets\/\d+\/approvals$/.test(path)) {
+    if (/\/api\/v1\/(approvals|approval-links)(\/|$)|\/api\/v1\/reference\/roles$|\/api\/v1\/tickets\/\d+\/approvals$/.test(path)) {
       const out = resolveApprovalsData(path, method, url.search);
       if (out !== undefined) {
         await json(route, method === "POST" && path.endsWith("/approvals") ? 201 : 200, out);

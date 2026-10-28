@@ -29,6 +29,13 @@ describe("demo approvals", () => {
     expect(resolveApprovalsData(path, "GET")).not.toBeUndefined();
   });
 
+  it("lists example roles for the approver picker, sorted by name", () => {
+    const roles = resolveApprovalsData("/api/v1/reference/roles", "GET") as { id: number; name: string }[];
+    expect(roles.map((r) => r.name)).toEqual(["Change-Manager", "Netzwerk", "Service-Desk"]);
+    expect(resolveApprovalsData("/api/v1/reference/roles", "POST")).toBeUndefined();
+    expect(resolveData("/api/v1/reference/roles", "GET")).toEqual(roles);
+  });
+
   it("answers the writes the UI sends", () => {
     for (const [path, method] of [
       ["/api/v1/approvals/501/decision", "POST"],
