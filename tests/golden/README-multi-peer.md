@@ -340,12 +340,14 @@ rows, so the module refuses to start when they exist (left by an aborted run; th
 
 Results (2026-10-28, cached images `tiqora-golden-peer-znuny-6.5` / `-7.3`, DB volumes migrated to
 `20261010_0084` by `golden-seed`): 5 passed on `znuny-6.5-itsm` and 5 passed on `znuny-7.3-itsm`,
-no difference between the lines. The reader and the archive showed no parity difference. Together
-with `test_itsm_peer_smoke.py`, `test_itsm_mode_a.py`, `test_itsm_import.py` and
-`test_gi_config_items.py` on `znuny-7.3-itsm`: 54 passed, 3 skipped, 1 failed. The failure is
-`test_itsm_import.py::test_second_run_reports_only_unchanged`: the CI importer's `links` step
-reports the two work order->CI links of the change seed as `unsupported_object` and counts them
-`skipped` (open, see the Task 28 report). The same session found and fixed two follow-ups of the
-change work in the older modules: `_itsm_import_support.run_importer_with_id` passes `settings`
-(new argument of `run_import`) and snapshots the legacy change tables the import now writes, and
-`test_setup_on_itsm_peer_is_noop` expects the change group's dynamic fields as `missing`.
+no difference between the lines. The reader and the archive showed no parity difference. All five
+ITSM modules together (`test_itsm_peer_smoke.py`, `test_itsm_mode_a.py`, `test_itsm_import.py`,
+`test_gi_config_items.py`, `test_itsm_change_legacy.py`): 55 passed, 3 skipped on each ITSM peer,
+and the peers hold no ticket, CMDB, archive or setup row of the modules afterwards. Follow-ups of
+the change work fixed in the same round: the CI importer's `links` step leaves links with a change
+or work order end to step `changes` (no `unsupported_object`, not counted `skipped`; the seed's
+work order->CI links had turned `test_second_run_reports_only_unchanged` red),
+`_itsm_import_support.run_importer_with_id` passes `settings` (new argument of `run_import`) and
+snapshots the legacy change tables the import now writes, `test_setup_on_itsm_peer_is_noop`
+expects the change group's dynamic fields as `missing`, and `test_itsm_mode_a.py` deletes its
+`itsm28 …` tickets (`TicketDelete`) at the end.
