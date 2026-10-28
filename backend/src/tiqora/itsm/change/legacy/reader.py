@@ -7,6 +7,10 @@ module, never input. Joins stay inside Znuny's own tables (``change_history`` wi
 lists are chunked (:data:`~tiqora.itsm.znuny_adapter.catalog.CHUNK`). The reader never writes
 and never commits. The schema is identical in both Znuny lines (survey Q9).
 
+Text search (like the CI search of ``znuny_adapter.reader``): number and title match every needle,
+description and justification from three characters on; a search with text is bounded by
+``statement_timeout`` (a hit is :class:`LegacySearchTooBroad`).
+
 Links (survey Q1, ruling S1): a change links only to tickets; CIs and services hang off its work
 orders, so the links of both are read and the work-order ones carry its number. Only ``Valid``
 relations count, in either direction.
@@ -25,6 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.itsm.change.legacy.mapping import (
     change_window,
     dynamic_field_text,
+    history_display,
+    history_ids,
     plain_text,
     znuny_time,
 )
@@ -38,7 +44,12 @@ from tiqora.itsm.change.legacy.model import (
 )
 from tiqora.itsm.znuny_adapter.catalog import chunks
 from tiqora.itsm.znuny_adapter.detect import detect_znuny_itsm
-from tiqora.itsm.znuny_adapter.reader import like_contains
+from tiqora.itsm.znuny_adapter.reader import (
+    ATTRIBUTE_SEARCH_MIN_CHARS,
+    SEARCH_TIMEOUT_SECONDS,
+    like_contains,
+)
+from tiqora.reporting.sql import ReportQueryTimeout, statement_timeout
 
 #: most changes one :func:`read_changes` call reads
 MAX_READ: Final = 100
@@ -95,10 +106,14 @@ _LINKS_SQL: Final = (
     " WHERE ls.name = 'Valid' AND ((so.name = :obj AND lr.source_key IN :keys)"
     " OR (tob.name = :obj AND lr.target_key IN :keys))"
 )
-_TEXT_MATCH: Final = (
-    "(lower(change_number) LIKE lower(:pat) ESCAPE '!' OR lower(title) LIKE lower(:pat) ESCAPE '!'"
+#: number and title: every needle
+_SHORT_TEXT_MATCH: Final = (
+    "lower(change_number) LIKE lower(:pat) ESCAPE '!' OR lower(title) LIKE lower(:pat) ESCAPE '!'"
+)
+#: the long texts only from :data:`ATTRIBUTE_SEARCH_MIN_CHARS` characters on (like the CI search)
+_LONG_TEXT_MATCH: Final = (
     " OR lower(description_plain) LIKE lower(:pat) ESCAPE '!'"
-    " OR lower(justification_plain) LIKE lower(:pat) ESCAPE '!')"
+    " OR lower(justification_plain) LIKE lower(:pat) ESCAPE '!'"
 )
 
 
@@ -121,8 +136,13 @@ def _int(value: object) -> int | None:
 
 
 def _dt(value: object) -> datetime:
-    assert isinstance(value, datetime)
+    if not isinstance(value, datetime):
+        raise TypeError(f"expected a datetime from the database, got {type(value).__name__}")
     return value.replace(tzinfo=None, microsecond=0)
+
+
+class LegacySearchTooBroad(Exception):
+    """The text search ran into its statement timeout (the route answers 409)."""
 
 
 async def change_tables_present(session: AsyncSession) -> bool:
@@ -199,55 +219,49 @@ async def _dynamic_fields(
 
 async def read_changes(session: AsyncSession, ids: Sequence[int]) -> list[LegacyChange]:
     """The changes among ``ids`` (at most :data:`MAX_READ`), in the order of ``ids``; missing
-    ids are left out. Catalog values and users are resolved by IN lists."""
+    ids are left out. Catalog values and users (also those the history refers to) are resolved
+    by IN lists."""
     wanted = list(dict.fromkeys(int(i) for i in ids))
     if len(wanted) > MAX_READ:
         raise ValueError(f"read_changes reads at most {MAX_READ} changes per call")
     if not wanted:
         return []
-    changes: dict[int, tuple[Any, ...]] = {
-        int(r[0]): tuple(r)
-        for r in (
-            await session.execute(
-                _in(f"{_CHANGE_COLUMNS} WHERE id IN :ids", "ids"), {"ids": wanted}
-            )
-        ).all()
+    stmt = _in(f"{_CHANGE_COLUMNS} WHERE id IN :ids", "ids")
+    changes = {
+        int(r["id"]): r for r in (await session.execute(stmt, {"ids": wanted})).mappings().all()
     }
     if not changes:
         return []
     change_ids = sorted(changes)
 
-    orders: dict[int, list[tuple[Any, ...]]] = defaultdict(list)
+    orders: dict[int, list[Any]] = defaultdict(list)
     wo_number: dict[int, int] = {}
     wo_change: dict[int, int] = {}
     stmt = _in(f"{_WORKORDER_COLUMNS} WHERE change_id IN :ids ORDER BY workorder_number, id", "ids")
-    for wo in (await session.execute(stmt, {"ids": change_ids})).all():
-        orders[int(wo[1])].append(tuple(wo))
-        wo_number[int(wo[0])] = int(wo[2])
-        wo_change[int(wo[0])] = int(wo[1])
+    for wo in (await session.execute(stmt, {"ids": change_ids})).mappings().all():
+        orders[int(wo["change_id"])].append(wo)
+        wo_number[int(wo["id"])] = int(wo["workorder_number"])
+        wo_change[int(wo["id"])] = int(wo["change_id"])
 
-    cab: dict[int, list[tuple[CabKind, int | str]]] = defaultdict(list)
+    cab: dict[int, list[Any]] = defaultdict(list)
     stmt = _in(
         "SELECT change_id, user_id, customer_user_id FROM change_cab WHERE change_id IN :ids"
         " ORDER BY change_id, id",
         "ids",
     )
-    for change_id, user_id, customer in (await session.execute(stmt, {"ids": change_ids})).all():
-        if user_id is not None:
-            cab[int(change_id)].append(("user", int(user_id)))
-        elif customer is not None:
-            cab[int(change_id)].append(("customer_user", str(customer)))
+    for member in (await session.execute(stmt, {"ids": change_ids})).mappings().all():
+        cab[int(member["change_id"])].append(member)
 
-    history: dict[int, list[tuple[Any, ...]]] = defaultdict(list)
+    history: dict[int, list[Any]] = defaultdict(list)
     stmt = _in(
-        "SELECT h.change_id, h.workorder_id, t.name, h.fieldname, h.content_old, h.content_new,"
-        " h.create_time, h.create_by FROM change_history h"
+        "SELECT h.change_id, h.workorder_id, t.name AS history_type, h.fieldname,"
+        " h.content_old, h.content_new, h.create_time, h.create_by FROM change_history h"
         " LEFT JOIN change_history_type t ON t.id = h.type_id"
         " WHERE h.change_id IN :ids ORDER BY h.create_time, h.id",
         "ids",
     )
-    for entry in (await session.execute(stmt, {"ids": change_ids})).all():
-        history[int(entry[0])].append(tuple(entry))
+    for entry in (await session.execute(stmt, {"ids": change_ids})).mappings().all():
+        history[int(entry["change_id"])].append(entry)
 
     links: dict[int, list[LegacyLink]] = defaultdict(list)
     for own, obj, key, link_type, direction in await _links(session, CHANGE_OBJECT, change_ids):
@@ -264,92 +278,123 @@ async def read_changes(session: AsyncSession, ids: Sequence[int]) -> list[Legacy
     catalog_ids: set[int] = set()
     user_ids: set[int] = set()
     for c in changes.values():
-        catalog_ids.update(int(c[i]) for i in (7, 10, 11, 12))
-        user_ids.update(int(c[i]) for i in (8, 9) if c[i] is not None)
+        catalog_ids.update(
+            int(c[k]) for k in ("change_state_id", "category_id", "impact_id", "priority_id")
+        )
+        user_ids.update(
+            int(c[k]) for k in ("change_manager_id", "change_builder_id") if c[k] is not None
+        )
     for wos in orders.values():
         for w in wos:
-            catalog_ids.update((int(w[8]), int(w[9])))
-            if w[10] is not None:
-                user_ids.add(int(w[10]))
-    for cab_rows in cab.values():
-        user_ids.update(int(ref) for kind, ref in cab_rows if kind == "user")
+            catalog_ids.update((int(w["workorder_state_id"]), int(w["workorder_type_id"])))
+            if w["workorder_agent_id"] is not None:
+                user_ids.add(int(w["workorder_agent_id"]))
+    for members in cab.values():
+        user_ids.update(int(m["user_id"]) for m in members if m["user_id"] is not None)
     for entries in history.values():
-        user_ids.update(int(h[7]) for h in entries if h[7] is not None)
+        for h in entries:
+            if h["create_by"] is not None:
+                user_ids.add(int(h["create_by"]))
+            for raw in (h["content_old"], h["content_new"]):
+                more_catalog, more_users = history_ids(_str(h["fieldname"]), _str(raw))
+                catalog_ids |= more_catalog
+                user_ids |= more_users
     catalog = await _catalog_names(session, catalog_ids)
     logins = await _user_logins(session, user_ids)
 
     def login(user_id: object) -> str | None:
         return None if user_id is None else logins.get(int(str(user_id)))
 
+    def work_order(w: Any) -> LegacyWorkOrder:
+        return LegacyWorkOrder(
+            number=int(w["workorder_number"]),
+            title=_str(w["title"]),
+            work_order_type=catalog.get(int(w["workorder_type_id"])),
+            state=catalog.get(int(w["workorder_state_id"])),
+            agent_login=login(w["workorder_agent_id"]),
+            planned_start=znuny_time(w["planned_start_time"]),
+            planned_end=znuny_time(w["planned_end_time"]),
+            actual_start=znuny_time(w["actual_start_time"]),
+            actual_end=znuny_time(w["actual_end_time"]),
+            planned_effort=float(w["planned_effort"] or 0),
+            accounted_time=float(w["accounted_time"] or 0),
+            instruction=plain_text(_str(w["instruction_plain"]), _str(w["instruction"])),
+            report=plain_text(_str(w["report_plain"]), _str(w["report"])),
+            dynamic_fields=wo_dfs.get(int(w["id"]), {}),
+        )
+
+    def history_entry(h: Any) -> LegacyHistoryEntry:
+        field = _str(h["fieldname"]) or None
+        old, new = _str(h["content_old"]), _str(h["content_new"])
+        workorder_id = h["workorder_id"]
+        return LegacyHistoryEntry(
+            created_at=_dt(h["create_time"]),
+            user_login=login(h["create_by"]),
+            history_type=str(h["history_type"] or ""),
+            field=field,
+            old=old,
+            new=new,
+            workorder_number=0 if workorder_id is None else wo_number.get(int(workorder_id), 0),
+            old_display=history_display(field, old, catalog, logins),
+            new_display=history_display(field, new, catalog, logins),
+        )
+
+    def cab_members(members: list[Any]) -> tuple[tuple[CabKind, str], ...]:
+        """Agents by login in user id order, then customer users by login (like ChangeGet)."""
+        out: list[tuple[CabKind, str]] = []
+        for user_id in sorted({int(m["user_id"]) for m in members if m["user_id"] is not None}):
+            if (name := login(user_id)) is not None:
+                out.append(("user", name))
+        customers = {
+            str(m["customer_user_id"])
+            for m in members
+            if m["user_id"] is None and m["customer_user_id"] is not None
+        }
+        out.extend(("customer_user", c) for c in sorted(customers))
+        return tuple(out)
+
     out: list[LegacyChange] = []
     for change_id in wanted:
         row = changes.get(change_id)
         if row is None:
             continue
-        work_orders = tuple(
-            LegacyWorkOrder(
-                number=int(w[2]),
-                title=_str(w[3]),
-                work_order_type=catalog.get(int(w[9])),
-                state=catalog.get(int(w[8])),
-                agent_login=login(w[10]),
-                planned_start=znuny_time(w[11]),
-                planned_end=znuny_time(w[12]),
-                actual_start=znuny_time(w[13]),
-                actual_end=znuny_time(w[14]),
-                planned_effort=float(w[15] or 0),
-                accounted_time=float(w[16] or 0),
-                instruction=plain_text(_str(w[5]), _str(w[4])),
-                report=plain_text(_str(w[7]), _str(w[6])),
-                dynamic_fields=wo_dfs.get(int(w[0]), {}),
-            )
-            for w in orders.get(change_id, [])
-        )
+        own_orders = orders.get(change_id, [])
         planned_start, planned_end, actual_start, actual_end = change_window(
-            [(w[11], w[12], w[13], w[14]) for w in orders.get(change_id, [])]
-        )
-        own_cab = cab.get(change_id, [])
-        members: list[tuple[CabKind, str]] = []
-        for user_id in sorted({int(r) for k, r in own_cab if k == "user"}):
-            if (name := login(user_id)) is not None:
-                members.append(("user", name))
-        for customer in sorted({str(r) for k, r in own_cab if k == "customer_user"}):
-            members.append(("customer_user", customer))
-        own_history = tuple(
-            LegacyHistoryEntry(
-                created_at=_dt(h[6]),
-                user_login=login(h[7]),
-                history_type=str(h[2] or ""),
-                field=_str(h[3]) or None,
-                old=_str(h[4]),
-                new=_str(h[5]),
-                workorder_number=0 if h[1] is None else wo_number.get(int(h[1]), 0),
-            )
-            for h in history.get(change_id, [])
+            [
+                (
+                    w["planned_start_time"],
+                    w["planned_end_time"],
+                    w["actual_start_time"],
+                    w["actual_end_time"],
+                )
+                for w in own_orders
+            ]
         )
         out.append(
             LegacyChange(
                 znuny_change_id=change_id,
-                number=str(row[1]),
-                title=_str(row[2]),
-                state=catalog.get(int(row[7])),
-                category=catalog.get(int(row[10])),
-                impact=catalog.get(int(row[11])),
-                priority=catalog.get(int(row[12])),
-                manager_login=login(row[8]),
-                builder_login=login(row[9]),
-                requested_time=znuny_time(row[13]),
+                number=str(row["change_number"]),
+                title=_str(row["title"]),
+                state=catalog.get(int(row["change_state_id"])),
+                category=catalog.get(int(row["category_id"])),
+                impact=catalog.get(int(row["impact_id"])),
+                priority=catalog.get(int(row["priority_id"])),
+                manager_login=login(row["change_manager_id"]),
+                builder_login=login(row["change_builder_id"]),
+                requested_time=znuny_time(row["requested_time"]),
                 planned_start=planned_start,
                 planned_end=planned_end,
                 actual_start=actual_start,
                 actual_end=actual_end,
-                created_at=_dt(row[14]),
-                changed_at=_dt(row[15]),
-                description=plain_text(_str(row[4]), _str(row[3])),
-                justification=plain_text(_str(row[6]), _str(row[5])),
-                cab=tuple(members),
-                workorders=work_orders,
-                history=own_history,
+                created_at=_dt(row["create_time"]),
+                changed_at=_dt(row["change_time"]),
+                description=plain_text(_str(row["description_plain"]), _str(row["description"])),
+                justification=plain_text(
+                    _str(row["justification_plain"]), _str(row["justification"])
+                ),
+                cab=cab_members(cab.get(change_id, [])),
+                workorders=tuple(work_order(w) for w in own_orders),
+                history=tuple(history_entry(h) for h in history.get(change_id, [])),
                 dynamic_fields=change_dfs.get(change_id, {}),
                 links=tuple(
                     sorted(
@@ -390,18 +435,13 @@ async def _linked_change_ids(session: AsyncSession, obj: str, key: int) -> set[i
 async def _summaries(session: AsyncSession, ids: Sequence[int]) -> list[LegacyChangeSummary]:
     if not ids:
         return []
+    stmt = _in(
+        "SELECT id, change_number, title, change_state_id, change_time"
+        " FROM change_item WHERE id IN :ids",
+        "ids",
+    )
     rows = {
-        int(r[0]): tuple(r)
-        for r in (
-            await session.execute(
-                _in(
-                    "SELECT id, change_number, title, change_state_id, change_time"
-                    " FROM change_item WHERE id IN :ids",
-                    "ids",
-                ),
-                {"ids": list(ids)},
-            )
-        ).all()
+        int(r["id"]): r for r in (await session.execute(stmt, {"ids": list(ids)})).mappings().all()
     }
     times: dict[int, list[tuple[Any, Any, Any, Any]]] = defaultdict(list)
     stmt = _in(
@@ -409,9 +449,16 @@ async def _summaries(session: AsyncSession, ids: Sequence[int]) -> list[LegacyCh
         " actual_end_time FROM change_workorder WHERE change_id IN :ids",
         "ids",
     )
-    for change_id, ps, pe, a_s, a_e in (await session.execute(stmt, {"ids": list(ids)})).all():
-        times[int(change_id)].append((ps, pe, a_s, a_e))
-    states = await _catalog_names(session, {int(r[3]) for r in rows.values()})
+    for w in (await session.execute(stmt, {"ids": list(ids)})).mappings().all():
+        times[int(w["change_id"])].append(
+            (
+                w["planned_start_time"],
+                w["planned_end_time"],
+                w["actual_start_time"],
+                w["actual_end_time"],
+            )
+        )
+    states = await _catalog_names(session, {int(r["change_state_id"]) for r in rows.values()})
     out: list[LegacyChangeSummary] = []
     for change_id in ids:
         row = rows.get(change_id)
@@ -421,13 +468,13 @@ async def _summaries(session: AsyncSession, ids: Sequence[int]) -> list[LegacyCh
         out.append(
             LegacyChangeSummary(
                 znuny_change_id=change_id,
-                number=str(row[1]),
-                title=_str(row[2]),
-                state=states.get(int(row[3])),
+                number=str(row["change_number"]),
+                title=_str(row["title"]),
+                state=states.get(int(row["change_state_id"])),
                 planned_start=planned_start,
                 planned_end=planned_end,
                 workorder_count=len(times.get(change_id, [])),
-                changed_at=_dt(row[4]),
+                changed_at=_dt(row["change_time"]),
             )
         )
     return out
@@ -441,19 +488,25 @@ async def search(
     ci_znuny_id: int | None,
     limit: int,
     offset: int,
+    timeout_seconds: int = SEARCH_TIMEOUT_SECONDS,
 ) -> tuple[list[LegacyChangeSummary], int]:
     """Changes, newest change first, and the number of matches.
 
-    ``text`` matches number, title, description and justification (case-insensitive contains,
-    ``%``/``_`` literal); ``ticket_id`` / ``ci_znuny_id`` keep the changes linked to that ticket
-    (directly or through a work order) / to that CI (through a work order). The caller checks
-    that it may read the ticket or CI.
+    ``text`` matches number and title (case-insensitive contains, ``%``/``_`` literal), from
+    :data:`ATTRIBUTE_SEARCH_MIN_CHARS` characters on also description and justification;
+    ``ticket_id`` / ``ci_znuny_id`` keep the changes linked to that ticket (directly or through a
+    work order) / to that CI (through a work order). The caller checks that it may read the
+    ticket or CI. A text search over ``timeout_seconds`` raises :class:`LegacySearchTooBroad`.
     """
     limit = max(1, min(limit, MAX_PAGE))
     offset = max(0, offset)
     needle = (text or "").strip()
-    where = _TEXT_MATCH if needle else "1 = 1"
-    params: dict[str, Any] = {"pat": like_contains(needle)} if needle else {}
+    where = "1 = 1"
+    params: dict[str, Any] = {}
+    if needle:
+        long_match = _LONG_TEXT_MATCH if len(needle) >= ATTRIBUTE_SEARCH_MIN_CHARS else ""
+        where = f"({_SHORT_TEXT_MATCH}{long_match})"
+        params["pat"] = like_contains(needle)
 
     candidates: set[int] | None = None
     if ticket_id is not None:
@@ -462,14 +515,32 @@ async def search(
         by_ci = await _linked_change_ids(session, CI_OBJECT, ci_znuny_id)
         candidates = by_ci if candidates is None else candidates & by_ci
 
+    try:
+        if needle:
+            async with statement_timeout(session, timeout_seconds):
+                page, total = await _matching(session, where, params, candidates, limit, offset)
+        else:
+            page, total = await _matching(session, where, params, candidates, limit, offset)
+    except ReportQueryTimeout as exc:
+        raise LegacySearchTooBroad("legacy change search exceeded its time limit") from exc
+    if needle and session.get_bind().dialect.name == "postgresql":
+        # SET LOCAL lasts until the transaction ends (MariaDB's variant is reset by the helper)
+        await session.execute(_in("RESET statement_timeout"))
+    return await _summaries(session, page), total
+
+
+async def _matching(
+    session: AsyncSession,
+    where: str,
+    params: dict[str, Any],
+    candidates: set[int] | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[int], int]:
+    """The ids of one page and the number of matches (``where`` is built from constants)."""
     if candidates is None:
-        total = int(
-            (
-                await session.execute(
-                    _in(f"SELECT COUNT(*) FROM change_item WHERE {where}"), params
-                )
-            ).scalar_one()
-        )
+        count = _in(f"SELECT COUNT(*) FROM change_item WHERE {where}")
+        total = int((await session.execute(count, params)).scalar_one())
         rows = await session.execute(
             _in(
                 f"SELECT id FROM change_item WHERE {where}"
@@ -477,15 +548,12 @@ async def search(
             ),
             {**params, "limit": limit, "offset": offset},
         )
-        return await _summaries(session, [int(r[0]) for r in rows]), total
-
+        return [int(r[0]) for r in rows], total
     found: list[tuple[datetime, int]] = []
     stmt = _in(f"SELECT id, change_time FROM change_item WHERE id IN :ids AND {where}", "ids")
     for part in chunks(sorted(candidates)):
-        for change_id, changed in (
-            await session.execute(stmt, {**params, "ids": list(part)})
-        ).all():
+        rows = await session.execute(stmt, {**params, "ids": list(part)})
+        for change_id, changed in rows.all():
             found.append((_dt(changed), int(change_id)))
     found.sort(reverse=True)
-    page = [change_id for _, change_id in found[offset : offset + limit]]
-    return await _summaries(session, page), len(found)
+    return [change_id for _, change_id in found[offset : offset + limit]], len(found)

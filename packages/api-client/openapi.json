@@ -27533,6 +27533,17 @@
             ],
             "title": "New"
           },
+          "new_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Display"
+          },
           "old": {
             "anyOf": [
               {
@@ -27543,6 +27554,17 @@
               }
             ],
             "title": "Old"
+          },
+          "old_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Display"
           },
           "user_login": {
             "anyOf": [
@@ -27567,6 +27589,8 @@
           "field",
           "old",
           "new",
+          "old_display",
+          "new_display",
           "workorder_number"
         ],
         "title": "LegacyHistoryOut",
@@ -110319,7 +110343,7 @@
     },
     "/api/v1/itsm/legacy-changes": {
       "get": {
-        "description": "Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy\nchange group. ``q`` matches number, title, description and justification; ``ticket_id`` /\n``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page\nwhen the caller cannot read it. Times are UTC.",
+        "description": "Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy\nchange group. ``q`` matches number, title, description and justification; ``ticket_id`` /\n``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page\nwhen the caller cannot read it; a text search over its time limit answers 409\n``search_too_broad``. Times are UTC.",
         "operationId": "get_legacy_changes_api_v1_itsm_legacy_changes_get",
         "parameters": [
           {

@@ -122,7 +122,8 @@ class VisibleLinks:
     tickets: tuple[VisibleTicketLink, ...]
     cis: tuple[VisibleCiLink, ...]
     services: tuple[VisibleServiceLink, ...]
-    #: linked tickets/CIs left out because the caller cannot read them (a number only)
+    #: distinct linked tickets/CIs left out (unreadable or gone), as a number only; a ticket
+    #: linked to the change and to one of its work orders counts once
     hidden: int
 
 
@@ -157,14 +158,14 @@ async def visible_links(
     service_links = [
         li for li in change.links if li.object == reader.SERVICE_OBJECT and li.key.isdigit()
     ]
-    hidden = 0
+    hidden: set[tuple[str, str]] = set()  # (object, key): a link counts once
 
     facts = await readable_tickets(session, [int(li.key) for li in ticket_links], user_id=user_id)
     tickets: list[VisibleTicketLink] = []
     for li in ticket_links:
         found = facts.get(int(li.key))
         if found is None:
-            hidden += 1
+            hidden.add((li.object, li.key))
             continue
         tickets.append(
             VisibleTicketLink(
@@ -184,13 +185,13 @@ async def visible_links(
     cis: list[VisibleCiLink] = []
     for li, ref in ci_links:
         if ref is None or provider is None:
-            hidden += 1
+            hidden.add((li.object, li.key))
             continue
         shown: tuple[str | None, str | None, str | None] = (None, None, None)
         if ref.source == own_source:
             summary = summaries.get(ref)
             if summary is None:
-                hidden += 1
+                hidden.add((li.object, li.key))
                 continue
             shown = (summary.number, summary.name, summary.class_name)
         cis.append(
@@ -216,4 +217,4 @@ async def visible_links(
         )
         for li in service_links
     )
-    return VisibleLinks(tuple(tickets), tuple(cis), services, hidden)
+    return VisibleLinks(tuple(tickets), tuple(cis), services, len(hidden))

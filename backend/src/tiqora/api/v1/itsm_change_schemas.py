@@ -623,6 +623,10 @@ class LegacyHistoryOut(BaseModel):
     #: raw Znuny values (ids for ``*ID`` fields, ``%%``-joined lists)
     old: str | None
     new: str | None
+    #: for display: catalog ids as names, user ids as logins, CAB lists comma-separated;
+    #: anything else (or unresolvable) as the raw value
+    old_display: str | None
+    new_display: str | None
     #: 0 = the change itself
     workorder_number: int
 
@@ -727,10 +731,6 @@ def _workorder_out(w: LegacyWorkOrder) -> LegacyWorkOrderOut:
     )
 
 
-#: internal rows of Znuny's work order renumbering; its history screen does not show them
-_HIDDEN_HISTORY_FIELDS = frozenset({"NoNumberCalc"})
-
-
 def legacy_change_out(
     source: Literal["live", "archive"],
     change: LegacyChange,
@@ -760,11 +760,7 @@ def legacy_change_out(
         justification=change.justification,
         cab=[LegacyCabMemberOut(kind=kind, login=login) for kind, login in change.cab],
         workorders=[_workorder_out(w) for w in change.workorders],
-        history=[
-            LegacyHistoryOut.model_validate(h, from_attributes=True)
-            for h in change.history
-            if h.field not in _HIDDEN_HISTORY_FIELDS
-        ],
+        history=[LegacyHistoryOut.model_validate(h, from_attributes=True) for h in change.history],
         dynamic_fields=_dynamic_fields_out(change.dynamic_fields),
         tickets=[
             LegacyTicketLinkOut.model_validate(t, from_attributes=True) for t in links.tickets

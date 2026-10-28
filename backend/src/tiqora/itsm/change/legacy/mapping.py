@@ -8,13 +8,15 @@
   like ``WorkOrderChangeTimeGet`` (survey Q2, ruling S2): MIN of the starts, MAX of the ends with
   the sentinel as the largest value, so one work order without an end blanks the change's end,
   and the planned start is set only when every work order has one.
+* History values keep Znuny's raw content; :func:`history_display` resolves the id fields for
+  display like Znuny's history screen (survey Q3).
 """
 
 from __future__ import annotations
 
 import html
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Final
 
@@ -80,3 +82,61 @@ def dynamic_field_text(
     if value_int is not None:
         return str(int(value_int))
     return None
+
+
+# --- history display (survey Q3) --------------------------------------------------------------
+
+#: ``fieldname`` of ``*Update`` rows whose values are ``general_catalog`` ids
+CATALOG_ID_FIELDS: Final = frozenset(
+    {
+        "ChangeStateID",
+        "CategoryID",
+        "ImpactID",
+        "PriorityID",
+        "WorkOrderStateID",
+        "WorkOrderTypeID",
+    }
+)
+#: ``fieldname`` of ``*Update`` rows whose values are user ids
+USER_ID_FIELDS: Final = frozenset({"ChangeManagerID", "ChangeBuilderID", "WorkOrderAgentID"})
+#: ``ChangeCABUpdate`` / ``ChangeCABDelete``: ``%%``-joined user ids / customer logins
+CAB_AGENTS: Final = "CABAgents"
+CAB_CUSTOMERS: Final = "CABCustomers"
+
+
+def _parts(value: str) -> list[str]:
+    return [p for p in value.split("%%") if p != ""]
+
+
+def history_ids(field: str | None, value: str | None) -> tuple[set[int], set[int]]:
+    """``(catalog ids, user ids)`` a history value refers to (empty for every other field)."""
+    if not field or not value:
+        return set(), set()
+    if field in CATALOG_ID_FIELDS and value.isdigit():
+        return {int(value)}, set()
+    if field in USER_ID_FIELDS and value.isdigit():
+        return set(), {int(value)}
+    if field == CAB_AGENTS:
+        return set(), {int(p) for p in _parts(value) if p.isdigit()}
+    return set(), set()
+
+
+def history_display(
+    field: str | None,
+    value: str | None,
+    catalog: Mapping[int, str],
+    logins: Mapping[int, str],
+) -> str | None:
+    """A history value as Znuny's change history screen shows it: catalog ids as names, user ids
+    as logins, CAB lists comma-separated. Anything unknown or unresolvable stays raw."""
+    if not field or not value:
+        return value
+    if field in CATALOG_ID_FIELDS and value.isdigit():
+        return catalog.get(int(value), value)
+    if field in USER_ID_FIELDS and value.isdigit():
+        return logins.get(int(value), value)
+    if field == CAB_AGENTS:
+        return ", ".join(logins.get(int(p), p) if p.isdigit() else p for p in _parts(value))
+    if field == CAB_CUSTOMERS:
+        return ", ".join(_parts(value))
+    return value

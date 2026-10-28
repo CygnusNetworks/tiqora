@@ -79,6 +79,7 @@ from tiqora.itsm.change.impact import (
     enqueue_impact,
     read_impact,
 )
+from tiqora.itsm.change.legacy.reader import LegacySearchTooBroad
 from tiqora.itsm.change.legacy.sources import (
     LegacyChangeSource,
     get_legacy_source,
@@ -786,7 +787,8 @@ async def get_legacy_changes(
     """Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy
     change group. ``q`` matches number, title, description and justification; ``ticket_id`` /
     ``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page
-    when the caller cannot read it. Times are UTC."""
+    when the caller cannot read it; a text search over its time limit answers 409
+    ``search_too_broad``. Times are UTC."""
     source = await _legacy_source(session, settings, user_id=user.id)
     ci_ref: CiRef | None = None
     if ci:
@@ -804,9 +806,12 @@ async def get_legacy_changes(
             and ci_ref not in await provider.get_many(session, [ci_ref], user_id=user.id)
         ):
             return legacy_page_out(source.kind, [], 0)
-    items, total = await source.search(
-        session, text=q, ticket_id=ticket_id, ci_ref=ci_ref, limit=limit, offset=offset
-    )
+    try:
+        items, total = await source.search(
+            session, text=q, ticket_id=ticket_id, ci_ref=ci_ref, limit=limit, offset=offset
+        )
+    except LegacySearchTooBroad as exc:
+        raise ChangeError("search_too_broad", 409) from exc
     return legacy_page_out(source.kind, items, total)
 
 

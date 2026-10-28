@@ -10227,7 +10227,8 @@ export interface paths {
          * @description Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy
          *     change group. ``q`` matches number, title, description and justification; ``ticket_id`` /
          *     ``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page
-         *     when the caller cannot read it. Times are UTC.
+         *     when the caller cannot read it; a text search over its time limit answers 409
+         *     ``search_too_broad``. Times are UTC.
          */
         get: operations["get_legacy_changes_api_v1_itsm_legacy_changes_get"];
         put?: never;
@@ -23539,8 +23540,12 @@ export interface components {
             history_type: string;
             /** New */
             new: string | null;
+            /** New Display */
+            new_display: string | null;
             /** Old */
             old: string | null;
+            /** Old Display */
+            old_display: string | null;
             /** User Login */
             user_login: string | null;
             /** Workorder Number */

@@ -1,7 +1,7 @@
 """``/api/v1/itsm/legacy-changes``: the read-only Mode A view of Znuny changes (Task 18).
 
 Both dialects x both profiles for the live view (``itsm_db_url``); the seeded rows (see
-``test_itsm_legacy_change_reader.seed_legacy_world``, band 946060-946098) are flushed in a
+``tests/_itsm_legacy_helpers.seed_legacy_world``, band 946060-946099) are flushed in a
 session that is rolled back (the routes' ``commit`` is turned into ``flush``). The mode row, the
 profile packages and the Znuny URL setting are committed before the session starts and removed by
 ``prepare``.
@@ -22,15 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from tests._itsm_adapter_helpers import count_statements, itsm_session
 from tests._itsm_db import ITSM_PARAMS
-from tests._itsm_mode_helpers import (
-    itsm_url,
-    make_factory,
-    plain_url,
-    profile_packages,
-    seed_packages,
-    store,
-)
-from tests.test_itsm_legacy_change_reader import (
+from tests._itsm_legacy_helpers import (
     AGENT,
     FIRMWARE,
     GROUP_A,
@@ -48,6 +40,14 @@ from tests.test_itsm_legacy_change_reader import (
     group_id,
     seed_legacy_world,
 )
+from tests._itsm_mode_helpers import (
+    itsm_url,
+    make_factory,
+    plain_url,
+    profile_packages,
+    seed_packages,
+    store,
+)
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.config import Settings
@@ -58,6 +58,7 @@ from tiqora.itsm.change.legacy import reader
 from tiqora.itsm.change.legacy.sources import ZnunyLiveSource, get_legacy_source
 from tiqora.itsm.mode import SETTING_MODE
 from tiqora.itsm.znuny_adapter.detect import clear_detect_cache
+from tiqora.reporting.sql import ReportQueryTimeout
 
 pytestmark = pytest.mark.db
 
@@ -242,7 +243,9 @@ async def test_legacy_links_filtered_by_ro(
                 "workorder_number": 2,
             }
         ]
-        assert body["hidden_links"] == 2  # TICKET_B and the secret CI, as a number only
+        # TICKET_B (linked to the change and to the backout), the secret CI and the CI that is
+        # gone (linked from two work orders): each counted once, as a number only
+        assert body["hidden_links"] == 3
         assert "chg94-secret-01" not in res.text and f"chg94 ticket {TICKET_B}" not in res.text
 
         # filters by something the caller cannot read answer an empty page
@@ -262,7 +265,8 @@ async def test_legacy_links_filtered_by_ro(
         full = (await w.client.get(f"{BASE}/{MAIL}")).json()
         assert {t["ticket_id"] for t in full["tickets"]} == {TICKET_A, TICKET_B}
         assert {c["name"] for c in full["cis"]} == {"chg94-srv-01", "chg94-secret-01"}
-        assert full["hidden_links"] == 0
+        assert full["hidden_links"] == 1  # only the CI that no longer exists
+        assert sorted(t["workorder_number"] for t in full["tickets"]) == [0, 0, 2]
         by_ticket = (await w.client.get(BASE, params={"ticket_id": TICKET_B})).json()
         assert _ids(by_ticket) == [UPTIME, MAIL]
 
@@ -294,17 +298,37 @@ async def test_legacy_detail_shape(
         assert [wo["number"] for wo in body["workorders"]] == [1, 2, 3]
         assert body["workorders"][0]["dynamic_fields"] == {"chg94LWorkOrderRef": ["WO-94-1"]}
         assert body["dynamic_fields"] == {"chg94LChangeRef": ["CHG-94-MAIL", "CHG-94-MAIL-2"]}
-        # Znuny's history screen hides the renumbering rows; so does the view
-        assert [h["history_type"] for h in body["history"]] == [
-            "ChangeAdd",
-            "ChangeUpdate",
-            "WorkOrderAdd",
-        ]
+        manager = next(h for h in body["history"] if h["field"] == "ChangeManagerID")
+        assert (manager["old"], manager["new"]) == (str(MEMBER), str(MANAGER))  # raw
+        shown = (manager["old_display"], manager["new_display"])
+        assert shown == ("chg94.lmember", "chg94.lmanager")
+        cab = next(h for h in body["history"] if h["field"] == "CABAgents")
+        assert cab["new_display"] == "chg94.lagent, chg94.lmanager"
+        title = next(h for h in body["history"] if h["field"] == "ChangeTitle")
+        assert title["new_display"] == title["new"] == "chg94 Mail relay replacement"
+        assert len(body["history"]) == 8
         page = (await w.client.get(BASE, params={"q": "uptime"})).json()
         (item,) = page["items"]
         assert item["planned_start"].startswith("2026-11-09T18:00:00")
         assert (item["workorder_count"], item["state"]) == (1, "requested")
         assert (await w.client.get(BASE, params={"limit": 101})).status_code == 422
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_legacy_search_timeout_is_409(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, dialect: str, profile: str
+) -> None:
+    @asynccontextmanager
+    async def timed_out(_session: Any, _seconds: int) -> AsyncIterator[None]:
+        raise ReportQueryTimeout("statement timeout")
+        yield
+
+    async with live_world(request, dialect, profile) as w:
+        monkeypatch.setattr(reader, "statement_timeout", timed_out)
+        res = await w.client.get(BASE, params={"q": "relay"})
+        assert res.status_code == 409
+        assert res.json()["detail"] == {"code": "search_too_broad"}
+        assert (await w.client.get(BASE)).status_code == 200  # no text: no time limit
 
 
 @pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)

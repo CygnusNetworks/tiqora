@@ -57,6 +57,10 @@ class LegacyHistoryEntry:
     old: str | None
     new: str | None
     workorder_number: int
+    #: ``old`` / ``new`` for display: catalog ids as names, user ids as logins, CAB lists
+    #: comma-separated; everything else (and anything unresolvable) as the raw value
+    old_display: str | None = None
+    new_display: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
