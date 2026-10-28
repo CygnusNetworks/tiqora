@@ -228,7 +228,7 @@ const overdueEscalated: ApprovalDetail = {
 
 const DETAILS: Record<number, ApprovalDetail> = { 501: cabChange, 502: adHocDecided, 503: overdueEscalated };
 
-const summaryOf = (d: ApprovalDetail): ApprovalSummary => ({
+export const summaryOf = (d: ApprovalDetail): ApprovalSummary => ({
   id: d.id,
   ticket_id: d.ticket_id,
   subject_type: d.subject_type,
@@ -245,7 +245,7 @@ const summaryOf = (d: ApprovalDetail): ApprovalSummary => ({
   my_pending: d.my_rows.length > 0 && d.status === "pending",
 });
 
-const inboxItemOf = (d: ApprovalDetail): ApprovalInboxItem => {
+export const inboxItemOf = (d: ApprovalDetail): ApprovalInboxItem => {
   const step = d.steps.find((s) => s.status === "active") ?? d.steps[d.steps.length - 1];
   const row = d.my_rows[0];
   return {

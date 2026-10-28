@@ -1,4 +1,4 @@
-import { resolveApprovalsData } from "../../src/demo/approvalsMock";
+import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
 import type { Page, Route } from "@playwright/test";
 
 const customer = {
@@ -276,9 +276,9 @@ export async function mockPortalApi(page: Page) {
     }
 
     if (path.includes("/api/portal/approvals")) {
-      const out = resolveApprovalsData(path, method, new URL(req.url()).search);
-      if (out !== undefined) {
-        await json(route, 200, out);
+      const out = approvalsStore().handle(path, method, url.search, bodyOf(req));
+      if (out) {
+        await fulfillAnswer(route, out);
         return;
       }
     }
