@@ -9487,7 +9487,7 @@
         "name": "Name",
         "description": "Beschreibung",
         "subjectTypes": "Gegenstandstypen",
-        "subjectTypesHint": "Mehrere mit Komma trennen. Leer bedeutet alle Gegenstandstypen.",
+        "subjectTypesHint": "Wählen Sie, wofür die Vorlage verwendet werden darf. Ohne Auswahl gilt sie für alle Gegenstandstypen.",
         "allSubjects": "Alle Gegenstandstypen",
         "valid": "Gültig",
         "invalid": "Ungültig",
@@ -9520,7 +9520,8 @@
           "missing_role": "Rolle #{{arg}} existiert nicht mehr oder ist ungültig.",
           "missing_list": "Freigabegruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
           "missing_customer": "Kunde {{arg}} existiert nicht mehr oder ist ungültig."
-        }
+        },
+        "keyMissing": "Bitte geben Sie einen Schlüssel ein."
       },
       "lists": {
         "new": "Neue Freigabegruppe",
@@ -9552,7 +9553,10 @@
         "new": "Vertretung für eine Person eintragen",
         "user": "Vertretene Person",
         "peopleMissing": "Bitte wählen Sie beide Personen aus."
-      }
+      },
+      "discardTitle": "Änderungen verwerfen?",
+      "discardMessage": "Ihre Änderungen sind nicht gespeichert und gehen verloren.",
+      "discard": "Änderungen verwerfen"
     }
   }
 }

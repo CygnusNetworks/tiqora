@@ -11,6 +11,7 @@ import { inputCls } from "@/components/approvals/pickers";
 import { approvalErrorMessage, approvalsApi, approvalsKeys } from "@/lib/approvalsApi";
 import { approvalsAdminApi, approvalsAdminKeys, type ApprovalAdminItem } from "@/lib/approvalsAdminApi";
 import { formatDateTime } from "@/lib/format";
+import { useSubjectTypes } from "./useSubjectTypes";
 import { AdminApprovalsHeader } from "./AdminApprovalsHeader";
 
 const PAGE_SIZE = 25;
@@ -80,7 +81,8 @@ export function ApprovalsOverviewPage() {
   const qc = useQueryClient();
   const [status, setStatus] = useState("all");
   const [ticket, setTicket] = useState("");
-  const [subjectType, setSubjectType] = useState("");
+  const [subjectType, setSubjectType] = useState("all");
+  const subjects = useSubjectTypes();
   const [overdue, setOverdue] = useState(false);
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -89,7 +91,7 @@ export function ApprovalsOverviewPage() {
   const query = {
     status: status === "all" ? undefined : status,
     ticket_id: ticketId,
-    subject_type: subjectType.trim() || undefined,
+    subject_type: subjectType === "all" ? undefined : subjectType,
     overdue: overdue || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
@@ -105,7 +107,7 @@ export function ApprovalsOverviewPage() {
     void qc.invalidateQueries({ queryKey: ["admin", "approvals", "overview"] });
     void qc.invalidateQueries({ queryKey: approvalsKeys.all() });
   };
-  const filtered = status !== "all" || ticket !== "" || subjectType !== "" || overdue;
+  const filtered = status !== "all" || ticket !== "" || subjectType !== "all" || overdue;
   const changed = (fn: () => void) => {
     fn();
     setPage(0);
@@ -142,16 +144,21 @@ export function ApprovalsOverviewPage() {
             data-testid="admin-approvals-filter-ticket"
           />
         </label>
-        <label className="block text-xs font-medium text-muted">
+        <div className="text-xs font-medium text-muted">
           {t("approvals.admin.overview.filter.subjectType")}
-          <input
-            className={`${inputCls} mt-1`}
-            value={subjectType}
-            onChange={(e) => changed(() => setSubjectType(e.target.value))}
-            placeholder="ticket"
-            data-testid="admin-approvals-filter-subject"
-          />
-        </label>
+          <div className="mt-1">
+            <SelectField
+              items={[
+                { value: "all", label: t("approvals.admin.overview.filter.statusAll") },
+                ...subjects.types.map((s) => ({ value: s.key, label: subjects.title(s.key) })),
+              ]}
+              value={subjectType}
+              onChange={(v) => changed(() => setSubjectType(v))}
+              testId="admin-approvals-filter-subject"
+              aria-label={t("approvals.admin.overview.filter.subjectType")}
+            />
+          </div>
+        </div>
         <label className="flex items-center gap-2 self-end pb-1.5 text-sm text-ink">
           <Switch
             checked={overdue}
@@ -188,7 +195,7 @@ export function ApprovalsOverviewPage() {
                     {t("approvals.agent.ticket", { number: it.ticket_number ?? it.ticket_id })}
                     {it.ticket_title ? ` – ${it.ticket_title}` : ""}
                     {" · "}
-                    {it.subject_type}
+                    {subjects.title(it.subject_type)}
                     {" · "}
                     {t("approvals.agent.requestedBy", { name: it.requester_label })}
                     {" · "}

@@ -31,6 +31,12 @@ export function mockApi(extra: Record<string, Handler> = {}) {
     if (path === "/api/v1/reference/customers") {
       return [{ login: "kunde@example.org", email: "kunde@example.org", customer_id: "example", full_name: "Kim Kunde" }];
     }
+    if (path === "/api/v1/admin/approvals/subject-types") {
+      return [
+        { key: "itsm.change", title_key: "approvals.subject.itsm_change" },
+        { key: "ticket", title_key: "approvals.subject.ticket" },
+      ];
+    }
     if (path === "/api/v1/approvals/lists") return [{ id: 1, name: "CAB Netzwerk", member_count: 3 }];
     if (path === "/api/v1/approvals/resolvers") {
       return resolveApprovalsData("/api/v1/approvals/resolvers", "GET");

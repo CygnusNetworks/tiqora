@@ -486,6 +486,7 @@ export function resolveApprovalsData(path: string, method: string, search = ""):
   if (path.endsWith("/api/v1/admin/approvals") && get) {
     return { items: ADMIN_ITEMS, total: ADMIN_ITEMS.length, limit: 25, offset: 0 };
   }
+  if (path.endsWith("/api/v1/admin/approvals/subject-types") && get) return [{ key: "ticket", title_key: "approvals.subject.ticket" }];
   if (path.endsWith("/api/v1/admin/approvals/templates") && get) return ADMIN_TEMPLATES;
   if (path.endsWith("/api/v1/admin/approvals/templates") && method === "POST") return ADMIN_TEMPLATES[0];
   if (path.endsWith("/api/v1/admin/approvals/templates/validate") && method === "POST") return { errors: [], warnings: [] };

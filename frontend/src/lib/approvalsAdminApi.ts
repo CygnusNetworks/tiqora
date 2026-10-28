@@ -10,6 +10,7 @@ export type ApprovalDefinition = Schemas["ApprovalDefinition"];
 export type ApprovalDefinitionCheck = Schemas["DefinitionCheckOut"];
 export type ApprovalList = Schemas["ApprovalListOut"];
 export type ApprovalListIn = Schemas["ApprovalListIn"];
+export type ApprovalSubjectTypeOption = Schemas["SubjectTypeOut"];
 export type AdminDelegationIn = Schemas["AdminDelegationIn"];
 
 export type ApprovalAdminQuery = {
@@ -26,6 +27,7 @@ const BASE = "/api/v1/admin/approvals";
 export const approvalsAdminKeys = {
   overview: (query: ApprovalAdminQuery) => ["admin", "approvals", "overview", query] as const,
   templates: () => ["admin", "approvals", "templates"] as const,
+  subjectTypes: () => ["admin", "approvals", "subject-types"] as const,
   lists: () => ["admin", "approvals", "lists"] as const,
   delegations: (userId?: number | null, includeEnded?: boolean) =>
     ["admin", "approvals", "delegations", userId ?? null, !!includeEnded] as const,
@@ -34,6 +36,9 @@ export const approvalsAdminKeys = {
 export const approvalsAdminApi = {
   overview(query: ApprovalAdminQuery = {}, signal?: AbortSignal) {
     return api.request<ApprovalAdminPage>("GET", BASE, { query, signal });
+  },
+  subjectTypes(signal?: AbortSignal) {
+    return api.request<ApprovalSubjectTypeOption[]>("GET", `${BASE}/subject-types`, { signal });
   },
   templates(signal?: AbortSignal) {
     return api.request<ApprovalTemplate[]>("GET", `${BASE}/templates`, { signal });

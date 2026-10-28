@@ -61,4 +61,21 @@ describe("ApprovalListsPage", () => {
     expect(msg).toHaveTextContent(/verwendet/i);
     expect(screen.getByTestId("list-row")).toBeInTheDocument();
   });
+
+  it("asks before closing an edited group and keeps it open on cancel", async () => {
+    mockApi({ [LISTS]: lists });
+    renderApproval(<ApprovalListsPage />);
+    fireEvent.click(await screen.findByTestId("list-edit"));
+    fireEvent.click(await screen.findByTestId("list-cancel"));
+    expect(screen.queryByTestId("list-dialog")).toBeNull();
+    fireEvent.click(screen.getByTestId("list-edit"));
+    fireEvent.change(await screen.findByTestId("list-name"), { target: { value: "CAB Neu" } });
+    fireEvent.click(screen.getByTestId("list-cancel"));
+    expect(await screen.findByText("Änderungen verwerfen?")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(screen.getByTestId("list-name")).toHaveValue("CAB Neu");
+    fireEvent.click(screen.getByTestId("list-cancel"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("list-dialog")).toBeNull());
+  });
 });

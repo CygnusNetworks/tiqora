@@ -73,4 +73,43 @@ describe("ApprovalTemplatesPage", () => {
     fireEvent.click(screen.getAllByTestId("template-edit")[0]);
     expect(await screen.findByTestId("template-origin-hint")).toHaveTextContent("Von itsm-change angelegt");
   });
+
+  it("offers the registered subject types by title and checks the definition for every chosen type", async () => {
+    const validate = vi.fn(() => ({ errors: [], warnings: [] }));
+    mockApi({ [TEMPLATES]: () => [], [VALIDATE]: validate });
+    renderApproval(<ApprovalTemplatesPage />);
+    fireEvent.click(await screen.findByTestId("template-new"));
+    const ticket = await screen.findByTestId("template-subject-ticket");
+    expect(ticket.closest("label")).toHaveTextContent("Ticket");
+    // A type whose title has no translation shows its raw key.
+    expect(screen.getByTestId("template-subject-itsm.change").closest("label")).toHaveTextContent("itsm.change");
+    fireEvent.click(ticket);
+    fireEvent.click(screen.getByTestId("template-subject-itsm.change"));
+    await waitFor(() => {
+      const subjects = validate.mock.calls.map((c) => (c as unknown as [{ body: { subject_type: string | null } }])[0].body.subject_type);
+      expect(subjects).toEqual(expect.arrayContaining([null, "ticket", "itsm.change"]));
+    });
+    const lastTwo = validate.mock.calls.slice(-2).map((c) => (c as unknown as [{ body: { subject_type: string } }])[0].body.subject_type);
+    expect(lastTwo.sort()).toEqual(["itsm.change", "ticket"]);
+  });
+
+  it("asks before discarding changes and requires a key for a new template", async () => {
+    mockApi({ [TEMPLATES]: () => [], [VALIDATE]: () => ({ errors: [], warnings: [] }) });
+    renderApproval(<ApprovalTemplatesPage />);
+    fireEvent.click(await screen.findByTestId("template-new"));
+    fireEvent.click(await screen.findByTestId("template-cancel"));
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    expect(screen.queryByTestId("template-dialog")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("template-new"));
+    expect(await screen.findByTestId("template-key-error")).toHaveTextContent("Bitte geben Sie einen Schlüssel ein.");
+    fireEvent.change(screen.getByTestId("template-name"), { target: { value: "Neu" } });
+    fireEvent.click(screen.getByTestId("template-cancel"));
+    expect(await screen.findByText("Änderungen verwerfen?")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(screen.getByTestId("template-dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("template-cancel"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("template-dialog")).toBeNull());
+  });
 });

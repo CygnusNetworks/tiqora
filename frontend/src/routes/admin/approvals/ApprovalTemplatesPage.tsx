@@ -17,6 +17,7 @@ import {
   type ApprovalTemplate,
   type ApprovalTemplateIn,
 } from "@/lib/approvalsAdminApi";
+import { useSubjectTypes } from "./useSubjectTypes";
 import { AdminApprovalsHeader } from "./AdminApprovalsHeader";
 import { describeCheck } from "./adminCheck";
 
@@ -38,9 +39,6 @@ const blankDefinition = (): ApprovalDefinition => ({
   ],
 });
 
-const splitTypes = (s: string) =>
-  [...new Set(s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))];
-
 function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | null; onClose: () => void }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -48,33 +46,50 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
   const [key, setKey] = useState(template?.template_key ?? "");
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [types, setTypes] = useState((template?.subject_types ?? []).join(", "));
+  const [subjectTypes, setSubjectTypes] = useState<string[]>(template?.subject_types ?? []);
+  const [touched, setTouched] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const subjects = useSubjectTypes();
   const [valid, setValid] = useState(template?.valid ?? true);
   const [definition, setDefinition] = useState<ApprovalDefinition>(() =>
     template ? structuredClone(template.definition) : blankDefinition(),
   );
 
-  const subjectTypes = splitTypes(types);
-  // The check answers for one subject type; with several the first is used (the save is checked for all).
-  const checkInput = useDebounced(JSON.stringify({ definition, subject: subjectTypes[0] ?? null }), 400);
-  const live = JSON.stringify({ definition, subject: subjectTypes[0] ?? null });
+  const initial = useState(() => JSON.stringify([template?.template_key ?? "", template?.name ?? "", template?.description ?? "", template?.subject_types ?? [], template?.valid ?? true, template?.definition ?? blankDefinition()]))[0];
+  const dirty = JSON.stringify([key, name, description, subjectTypes, valid, definition]) !== initial;
+  const close = () => (dirty ? setDiscarding(true) : onClose());
+
+  // The validate route checks against one subject type (customer approvers depend on it), so the
+  // definition is checked once per selected type and the answers are merged; no type = one check without.
+  const liveInput = JSON.stringify({ definition, subjects: subjectTypes });
+  const checkInput = useDebounced(liveInput, 400);
+  const live = liveInput;
   const check = useQuery({
     queryKey: ["admin", "approvals", "validate", checkInput],
-    queryFn: () => {
-      const parsed = JSON.parse(checkInput) as { definition: Record<string, unknown>; subject: string | null };
-      return approvalsAdminApi.validateTemplate(parsed.definition, parsed.subject);
+    queryFn: async () => {
+      const parsed = JSON.parse(checkInput) as { definition: Record<string, unknown>; subjects: string[] };
+      const answers = await Promise.all(
+        (parsed.subjects.length ? parsed.subjects : [null]).map((subject) =>
+          approvalsAdminApi.validateTemplate(parsed.definition, subject),
+        ),
+      );
+      return {
+        errors: [...new Set(answers.flatMap((a) => a.errors))],
+        warnings: [...new Set(answers.flatMap((a) => a.warnings))],
+      };
     },
     staleTime: Infinity,
     gcTime: 0,
   });
   const checkCurrent = checkInput === live && check.isSuccess;
   const errors = checkCurrent ? check.data.errors.map((e) => describeCheck(e, t)) : [];
-  const warnings = [
-    ...(template?.warnings ?? []).filter(() => !checkCurrent),
-    ...(checkCurrent ? check.data.warnings : []),
-  ].map((w) => describeCheck(w, t));
+  // Until the live check is back, show what the server already knew about the stored template.
+  const warningCodes = checkCurrent ? check.data.warnings : (template?.warnings ?? []);
+  const warnings = warningCodes.map((w) => describeCheck(w, t));
 
   const keyOk = key.trim() !== "";
+  const toggleSubject = (k: string) =>
+    setSubjectTypes((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
   const complete = definitionComplete(definition);
   const canSave = keyOk && name.trim() !== "" && complete && checkCurrent && errors.length === 0;
 
@@ -101,15 +116,23 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={close}
       size="2xl"
       title={editing ? t("approvals.admin.templates.edit") : t("approvals.admin.templates.new")}
       footer={
         <>
-          <Button onClick={onClose} data-testid="template-cancel">
+          <Button onClick={close} data-testid="template-cancel">
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" disabled={!canSave || save.isPending} onClick={() => save.mutate()} data-testid="template-save">
+          <Button
+            variant="primary"
+            disabled={!canSave || save.isPending}
+            onClick={() => {
+              setTouched(true);
+              save.mutate();
+            }}
+            data-testid="template-save"
+          >
             {t("common.save")}
           </Button>
         </>
@@ -130,8 +153,14 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
               maxLength={100}
               readOnly={editing}
               onChange={(e) => setKey(e.target.value)}
+              aria-invalid={!editing && touched && !keyOk}
               data-testid="template-key"
             />
+            {!editing && !keyOk && (
+              <span className="mt-1 block text-danger" role="alert" data-testid="template-key-error">
+                {t("approvals.admin.templates.keyMissing")}
+              </span>
+            )}
             <span className="mt-1 block text-[11px] font-normal">
               {editing ? t("approvals.admin.templates.keyLocked") : t("approvals.admin.templates.keyHint")}
             </span>
@@ -144,11 +173,18 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
             {t("approvals.admin.templates.description")}
             <textarea className={`${inputCls} mt-1`} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} data-testid="template-description" />
           </label>
-          <label className="block text-xs font-medium text-muted">
-            {t("approvals.admin.templates.subjectTypes")}
-            <input className={`${inputCls} mt-1`} value={types} onChange={(e) => setTypes(e.target.value)} placeholder="ticket" data-testid="template-subjects" />
+          <fieldset className="text-xs font-medium text-muted" data-testid="template-subjects">
+            <legend>{t("approvals.admin.templates.subjectTypes")}</legend>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm font-normal text-ink">
+              {[...new Set([...subjects.types.map((s) => s.key), ...subjectTypes])].map((k) => (
+                <label key={k} className="flex items-center gap-2">
+                  <input type="checkbox" checked={subjectTypes.includes(k)} onChange={() => toggleSubject(k)} data-testid={`template-subject-${k}`} />
+                  {subjects.title(k)}
+                </label>
+              ))}
+            </div>
             <span className="mt-1 block text-[11px] font-normal">{t("approvals.admin.templates.subjectTypesHint")}</span>
-          </label>
+          </fieldset>
           <label className="flex items-center gap-2 self-end pb-1.5 text-sm text-ink">
             <Switch checked={valid} onChange={setValid} testId="template-valid" aria-label={t("approvals.admin.templates.valid")} />
             {t("approvals.admin.templates.valid")}
@@ -197,6 +233,15 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
           </p>
         )}
       </div>
+      <ConfirmDialog
+        open={discarding}
+        title={t("approvals.admin.discardTitle")}
+        message={t("approvals.admin.discardMessage")}
+        variant="danger"
+        confirmLabel={t("approvals.admin.discard")}
+        onConfirm={onClose}
+        onCancel={() => setDiscarding(false)}
+      />
     </Dialog>
   );
 }
@@ -207,6 +252,7 @@ export function ApprovalTemplatesPage() {
   const qc = useQueryClient();
   const [editor, setEditor] = useState<{ template: ApprovalTemplate | null } | null>(null);
   const [deleting, setDeleting] = useState<ApprovalTemplate | null>(null);
+  const subjects = useSubjectTypes();
   const q = useQuery({
     queryKey: approvalsAdminKeys.templates(),
     queryFn: ({ signal }) => approvalsAdminApi.templates(signal),
@@ -249,7 +295,7 @@ export function ApprovalTemplatesPage() {
                 <p className="flex flex-wrap items-center gap-1 text-xs text-muted">
                   {tpl.subject_types.length === 0
                     ? t("approvals.admin.templates.allSubjects")
-                    : tpl.subject_types.join(", ")}
+                    : tpl.subject_types.map(subjects.title).join(", ")}
                   {tpl.origin !== "admin" && (
                     <Badge tone="muted" data-testid="template-origin">
                       {t("approvals.admin.templates.originHint", { feature: tpl.origin })}

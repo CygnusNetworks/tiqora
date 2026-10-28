@@ -17,6 +17,7 @@ const AGENT_GETS = [
 const PORTAL_GETS = ["/api/portal/approvals", "/api/portal/approvals/601"];
 const ADMIN_GETS = [
   "/api/v1/admin/approvals",
+  "/api/v1/admin/approvals/subject-types",
   "/api/v1/admin/approvals/templates",
   "/api/v1/admin/approvals/templates/1",
   "/api/v1/admin/approvals/lists",

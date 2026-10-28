@@ -400,6 +400,11 @@ class ApprovalListIn(BaseModel):
     valid: bool = True
 
 
+class SubjectTypeOut(BaseModel):
+    key: str
+    title_key: str
+
+
 class ApprovalListMemberOut(BaseModel):
     id: int
     label: str

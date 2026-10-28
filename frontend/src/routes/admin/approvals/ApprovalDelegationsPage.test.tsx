@@ -65,4 +65,34 @@ describe("ApprovalDelegationsPage", () => {
     await waitFor(() => expect(list.mock.calls.length).toBeGreaterThanOrEqual(2));
     expect(screen.queryByTestId("admin-delegation-row-error")).toBeNull();
   });
+
+  it("explains a past end date when the server refuses the period", async () => {
+    mockApi({
+      [LIST]: () => [],
+      "POST /api/v1/admin/approvals/delegations": () => {
+        throw new ApiError(422, { detail: { code: "invalid_definition", detail: "valid_until in the past" } }, "/x");
+      },
+    });
+    renderApproval(<ApprovalDelegationsPage />);
+    fireEvent.click(await screen.findByTestId("admin-delegation-user"));
+    fireEvent.click(await screen.findByTestId("admin-delegation-user-menu-option-2"));
+    fireEvent.click(screen.getByTestId("admin-delegation-substitute"));
+    fireEvent.click(await screen.findByTestId("admin-delegation-substitute-menu-option-3"));
+    fireEvent.change(screen.getByTestId("admin-delegation-until"), { target: { value: "2030-11-03T10:00" } });
+    fireEvent.click(screen.getByTestId("admin-delegation-create"));
+    expect(await screen.findByTestId("admin-delegation-create-error")).toHaveTextContent("Das Ende muss in der Zukunft liegen.");
+  });
+
+  it("pages with limit 50 and offsets", async () => {
+    const full = Array.from({ length: 50 }, (_, i) => ({ ...D, id: i + 1 }));
+    const list = vi.fn((init: { query?: { offset?: number } } | undefined) => (init?.query?.offset ? [{ ...D, id: 99 }] : full));
+    mockApi({ [LIST]: list as never });
+    renderApproval(<ApprovalDelegationsPage />);
+    await screen.findAllByTestId("admin-delegation-row");
+    expect(screen.getAllByTestId("admin-delegation-row")).toHaveLength(50);
+    fireEvent.click(screen.getByTestId("admin-delegations-next"));
+    await waitFor(() => expect(screen.getAllByTestId("admin-delegation-row")).toHaveLength(1));
+    expect((list.mock.calls.at(-1) as unknown as [{ query: { limit: number; offset: number } }])[0].query).toMatchObject({ limit: 50, offset: 50 });
+    expect(screen.getByTestId("admin-delegations-next")).toBeDisabled();
+  });
 });

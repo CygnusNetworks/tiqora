@@ -125,6 +125,7 @@ def _code(response: Response) -> str:
 
 ADMIN_ROUTES: list[tuple[str, str, dict[str, Any] | None]] = [
     ("GET", "", None),
+    ("GET", "/subject-types", None),
     ("GET", "/templates", None),
     ("POST", "/templates", _template_body("appr97.x")),
     ("POST", "/templates/validate", {"definition": _definition()}),
@@ -235,6 +236,24 @@ async def test_api_key_needs_the_admin_area(
 
 
 # --- overview ----------------------------------------------------------------------------------
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_subject_types_listed_sorted(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        await _seed_admin(session)
+        with installed_registry(make_fake_subject_type()):
+            async with await as_client(session, agent=ADMIN) as client:
+                response = await client.get(f"{BASE}/subject-types")
+        assert response.status_code == 200
+        body = response.json()
+        keys = [row["key"] for row in body]
+        assert keys == sorted(keys)
+        assert SUBJECT in keys
+        assert all(set(row) == {"key", "title_key"} and row["title_key"] for row in body)
 
 
 @pytest.mark.db

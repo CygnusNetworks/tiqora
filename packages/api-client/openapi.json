@@ -45195,6 +45195,24 @@
         "title": "SubjectHookZnunyOut",
         "type": "object"
       },
+      "SubjectTypeOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "title_key": {
+            "title": "Title Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title_key"
+        ],
+        "title": "SubjectTypeOut",
+        "type": "object"
+      },
       "SystemAddressCreate": {
         "properties": {
           "comments": {
@@ -60661,6 +60679,76 @@
           }
         },
         "summary": "Put List",
+        "tags": [
+          "admin:approvals"
+        ]
+      }
+    },
+    "/api/v1/admin/approvals/subject-types": {
+      "get": {
+        "description": "The registered subject types (what an approval can be about), sorted by key.",
+        "operationId": "get_subject_types_api_v1_admin_approvals_subject_types_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SubjectTypeOut"
+                  },
+                  "title": "Response Get Subject Types Api V1 Admin Approvals Subject Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Subject Types",
         "tags": [
           "admin:approvals"
         ]

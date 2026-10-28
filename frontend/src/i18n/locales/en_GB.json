@@ -9520,7 +9520,8 @@
           "missing_role": "Role #{{arg}} no longer exists or is invalid.",
           "missing_list": "Approver group #{{arg}} no longer exists or is invalid.",
           "missing_customer": "Customer {{arg}} no longer exists or is invalid."
-        }
+        },
+        "keyMissing": "Please enter a key."
       },
       "lists": {
         "new": "New approver group",
@@ -9552,7 +9553,10 @@
         "new": "Name a substitute for someone",
         "user": "Substituted person",
         "peopleMissing": "Please choose both people."
-      }
+      },
+      "discardTitle": "Discard changes?",
+      "discardMessage": "Your changes have not been saved and will be lost.",
+      "discard": "Discard changes"
     }
   }
 }

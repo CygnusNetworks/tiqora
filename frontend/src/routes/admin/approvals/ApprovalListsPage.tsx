@@ -20,6 +20,10 @@ function ListDialog({ list, onClose }: { list: ApprovalList | null; onClose: () 
   const [valid, setValid] = useState(list?.valid ?? true);
   const [memberIds, setMemberIds] = useState<number[]>(list?.member_ids ?? []);
   const [touched, setTouched] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const initial = useState(() => JSON.stringify([list?.name ?? "", list?.description ?? "", list?.valid ?? true, list?.member_ids ?? []]))[0];
+  const dirty = JSON.stringify([name, description, valid, memberIds]) !== initial;
+  const close = () => (dirty ? setDiscarding(true) : onClose());
 
   // Names of members the list already had come with the list; new ones from the agent reference data.
   const agents = useQuery({
@@ -54,12 +58,12 @@ function ListDialog({ list, onClose }: { list: ApprovalList | null; onClose: () 
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={close}
       size="lg"
       title={list ? t("approvals.admin.lists.edit") : t("approvals.admin.lists.new")}
       footer={
         <>
-          <Button onClick={onClose} data-testid="list-cancel">
+          <Button onClick={close} data-testid="list-cancel">
             {t("common.cancel")}
           </Button>
           <Button variant="primary" disabled={save.isPending} onClick={submit} data-testid="list-save">
@@ -124,6 +128,15 @@ function ListDialog({ list, onClose }: { list: ApprovalList | null; onClose: () 
           </p>
         )}
       </div>
+      <ConfirmDialog
+        open={discarding}
+        title={t("approvals.admin.discardTitle")}
+        message={t("approvals.admin.discardMessage")}
+        variant="danger"
+        confirmLabel={t("approvals.admin.discard")}
+        onConfirm={onClose}
+        onCancel={() => setDiscarding(false)}
+      />
     </Dialog>
   );
 }

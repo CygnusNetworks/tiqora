@@ -2155,6 +2155,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/approvals/subject-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subject Types
+         * @description The registered subject types (what an approval can be about), sorted by key.
+         */
+        get: operations["get_subject_types_api_v1_admin_approvals_subject_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/approvals/templates": {
         parameters: {
             query?: never;
@@ -29037,6 +29057,13 @@ export interface components {
             /** Subject Format */
             subject_format: string;
         };
+        /** SubjectTypeOut */
+        SubjectTypeOut: {
+            /** Key */
+            key: string;
+            /** Title Key */
+            title_key: string;
+        };
         /** SystemAddressCreate */
         SystemAddressCreate: {
             /** Comments */
@@ -36300,6 +36327,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subject_types_api_v1_admin_approvals_subject_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectTypeOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

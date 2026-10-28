@@ -53,6 +53,7 @@ from tiqora.approvals.schemas import (
     DefinitionCheckIn,
     DefinitionCheckOut,
     DelegationOut,
+    SubjectTypeOut,
 )
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
@@ -202,6 +203,16 @@ async def _template_out(session: AsyncSession, row: templates.TemplateRow) -> Ap
         valid=row.valid,
         warnings=check.warnings,
     )
+
+
+@router.get("/subject-types", response_model=list[SubjectTypeOut])
+async def get_subject_types(admin: AdminUser) -> list[SubjectTypeOut]:
+    """The registered subject types (what an approval can be about), sorted by key."""
+    _ = admin
+    found = get_registry().items(APPROVAL_SUBJECT_TYPES)
+    return [
+        SubjectTypeOut(key=t.key, title_key=t.title_key) for t in sorted(found, key=lambda t: t.key)
+    ]
 
 
 @router.get("/templates", response_model=list[ApprovalTemplateOut])

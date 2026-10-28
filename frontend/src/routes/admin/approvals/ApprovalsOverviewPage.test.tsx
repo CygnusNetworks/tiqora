@@ -61,4 +61,38 @@ describe("ApprovalsOverviewPage", () => {
     await screen.findByTestId("admin-approval-detail");
     expect(screen.queryByTestId("admin-approval-cancel")).toBeNull();
   });
+
+  it("shows subject type titles and filters by a registered type", async () => {
+    const overview = vi.fn(page);
+    mockApi({ [OVERVIEW]: overview });
+    renderApproval(<ApprovalsOverviewPage />);
+    const rows = await screen.findAllByTestId("admin-approval-row");
+    // `ticket` is translated; `itsm.change` has no title text and stays as the raw key.
+    expect(rows[1]).toHaveTextContent("· Ticket ·");
+    expect(rows[0]).toHaveTextContent("· itsm.change ·");
+    fireEvent.click(screen.getByTestId("admin-approvals-filter-subject"));
+    fireEvent.click(await screen.findByTestId("admin-approvals-filter-subject-menu-option-ticket"));
+    await waitFor(() => {
+      const q = (overview.mock.calls.at(-1) as unknown as [{ query: Record<string, unknown> }])[0].query;
+      expect(q.subject_type).toBe("ticket");
+    });
+  });
+
+  it("pages through the requests 25 at a time", async () => {
+    const items = (resolveApprovalsData("/api/v1/admin/approvals", "GET") as { items: unknown[] }).items;
+    const overview = vi.fn((init: { query?: { offset?: number } } | undefined) => ({
+      items,
+      total: 60,
+      limit: 25,
+      offset: init?.query?.offset ?? 0,
+    }));
+    mockApi({ [OVERVIEW]: overview as never });
+    renderApproval(<ApprovalsOverviewPage />);
+    await screen.findAllByTestId("admin-approval-row");
+    expect(screen.getByTestId("admin-approvals-paging")).toHaveTextContent("Seite 1 von 3");
+    expect(screen.getByTestId("admin-approvals-prev")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("admin-approvals-next"));
+    await waitFor(() => expect(screen.getByTestId("admin-approvals-paging")).toHaveTextContent("Seite 2 von 3"));
+    expect((overview.mock.calls.at(-1) as unknown as [{ query: { offset: number } }])[0].query.offset).toBe(25);
+  });
 });
