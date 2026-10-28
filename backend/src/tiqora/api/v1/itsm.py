@@ -45,6 +45,8 @@ from tiqora.api.v1.itsm_schemas import (
     RecentIncidentOut,
     ServiceIncidentStateOut,
     ServiceItsmOut,
+    TicketChangeOut,
+    TicketChangeTaskOut,
     TicketItsmDialogsOut,
     TicketItsmOut,
     incident_state_out,
@@ -942,6 +944,25 @@ async def get_ticket_itsm(
         ),
         known_error_category_configured=cfg.known_error_kb_category_id > 0,
         major_incident_customer_reply=cfg.major_incident_customer_reply,
+        change=None
+        if s.change is None
+        else TicketChangeOut(
+            change_type=s.change.change_type,
+            phase=s.change.phase,
+            risk_level=s.change.risk_level,
+            planned_start=s.change.planned_start,
+            planned_end=s.change.planned_end,
+        ),
+        change_task=None
+        if s.change_task is None
+        else TicketChangeTaskOut(
+            change_ticket_id=s.change_task.change_ticket_id,
+            change_tn=s.change_task.change_tn,
+            position=s.change_task.position,
+            task_kind=s.change_task.task_kind,
+            planned_start=s.change_task.planned_start,
+            planned_end=s.change_task.planned_end,
+        ),
     )
 
 

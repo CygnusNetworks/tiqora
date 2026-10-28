@@ -30707,6 +30707,40 @@ export interface components {
             priority?: number | null;
         };
         /**
+         * TicketChangeOut
+         * @description Change facts of a change ticket (Mode B only).
+         */
+        TicketChangeOut: {
+            /** Change Type */
+            change_type: string;
+            /** Phase */
+            phase: string;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Risk Level */
+            risk_level: string | null;
+        };
+        /**
+         * TicketChangeTaskOut
+         * @description Task facts of a change task ticket (Mode B only).
+         */
+        TicketChangeTaskOut: {
+            /** Change Ticket Id */
+            change_ticket_id: number;
+            /** Change Tn */
+            change_tn: string | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Task Kind */
+            task_kind: string;
+        };
+        /**
          * TicketChatOut
          * @description The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
          *
@@ -31128,6 +31162,8 @@ export interface components {
          * @description ``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up.
          */
         TicketItsmOut: {
+            change: components["schemas"]["TicketChangeOut"] | null;
+            change_task: components["schemas"]["TicketChangeTaskOut"] | null;
             /** Ci Count */
             ci_count: number | null;
             /** Criticality */

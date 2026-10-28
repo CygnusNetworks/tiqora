@@ -49337,6 +49337,125 @@
         "title": "TicketAttributeRelationUpdate",
         "type": "object"
       },
+      "TicketChangeOut": {
+        "description": "Change facts of a change ticket (Mode B only).",
+        "properties": {
+          "change_type": {
+            "title": "Change Type",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          }
+        },
+        "required": [
+          "change_type",
+          "phase",
+          "risk_level",
+          "planned_start",
+          "planned_end"
+        ],
+        "title": "TicketChangeOut",
+        "type": "object"
+      },
+      "TicketChangeTaskOut": {
+        "description": "Task facts of a change task ticket (Mode B only).",
+        "properties": {
+          "change_ticket_id": {
+            "title": "Change Ticket Id",
+            "type": "integer"
+          },
+          "change_tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Tn"
+          },
+          "planned_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned End"
+          },
+          "planned_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Start"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "task_kind": {
+            "title": "Task Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_ticket_id",
+          "change_tn",
+          "position",
+          "task_kind",
+          "planned_start",
+          "planned_end"
+        ],
+        "title": "TicketChangeTaskOut",
+        "type": "object"
+      },
       "TicketChatOut": {
         "description": "The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).\n\n``visitor_email_verified`` is True only for a chat with a verified identity\n(``identity_source`` set, signed token or portal login) that carries an address\n(R-NOTIFY b); otherwise the address is what the visitor typed.",
         "properties": {
@@ -50428,6 +50547,26 @@
       "TicketItsmOut": {
         "description": "``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up.",
         "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketChangeTaskOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "ci_count": {
             "anyOf": [
               {
@@ -50581,7 +50720,9 @@
           "recent_incident",
           "dialogs",
           "known_error_category_configured",
-          "major_incident_customer_reply"
+          "major_incident_customer_reply",
+          "change",
+          "change_task"
         ],
         "title": "TicketItsmOut",
         "type": "object"
