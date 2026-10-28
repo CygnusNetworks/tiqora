@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import timedelta
+
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from tests._approvals_helpers import (
     AG1,
@@ -11,8 +17,10 @@ from tests._approvals_helpers import (
     ROLE,
     T1,
     approvals_session,
+    ensure_tiqora_tables,
     installed_registry,
     make_fake_subject_type,
+    to_async_url,
 )
 from tiqora.approvals import lists, templates
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
@@ -335,9 +343,9 @@ async def test_key_race_answers_taken_or_shares_the_winner(
         real = templates._template_by_key  # noqa: SLF001
         calls: list[str] = []
 
-        async def first_misses(s: object, key: str) -> object:
+        async def first_misses(s: object, key: str, **kw: bool) -> object:
             calls.append(key)
-            return None if len(calls) == 1 else await real(session, key)
+            return None if len(calls) == 1 else await real(session, key, **kw)
 
         monkeypatch.setattr(templates, "_template_by_key", first_misses)
         again = await templates.ensure_template(
@@ -374,3 +382,91 @@ async def test_delete_template_keeps_the_callers_objects_usable(
         with pytest.raises(ApprovalError) as err:
             await templates.get_template(session, gone.id)
         assert err.value.code == "template_not_found"
+
+
+_COMMITTED_KEYS = ("appr97.c-version", "appr97.c-race")
+
+
+@asynccontextmanager
+async def _committed(url: str) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Real commits on separate connections (no world needed); the test's templates go again."""
+    ensure_tiqora_tables(url)
+    engine = create_async_engine(to_async_url(url), poolclass=NullPool)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        yield factory
+    finally:
+        async with factory() as cleanup:
+            await cleanup.execute(
+                text("DELETE FROM tiqora_approval_template WHERE template_key IN :k").bindparams(
+                    bindparam("k", expanding=True)
+                ),
+                {"k": list(_COMMITTED_KEYS)},
+            )
+            await cleanup.commit()
+        await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_version_check_sees_a_change_committed_after_the_load(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The PUT's session holds the loaded template object, another session changed and
+    committed it, then the PUT saves with the loaded change_time: 409 ``template_changed``, the
+    other save stays (the locking read refreshes the object already in the session; without
+    ``populate_existing`` it would keep the stale values and the check would pass)."""
+    async with _committed(request.getfixturevalue(url_fixture)) as factory:
+        async with factory() as setup:
+            row = await templates.ensure_template(
+                setup, key="appr97.c-version", name="appr97 Alt", definition=USER, origin="test"
+            )
+            await setup.commit()
+        async with factory() as put:
+            loaded = await put.get(TiqoraApprovalTemplate, row.id)  # held: stays in the session
+            assert loaded is not None
+            async with factory() as other:
+                await other.execute(
+                    text(
+                        "UPDATE tiqora_approval_template SET name = 'appr97 Anderer',"
+                        " change_time = :t WHERE id = :i"
+                    ),
+                    {"t": loaded.change_time + timedelta(hours=1), "i": row.id},
+                )
+                await other.commit()
+            with pytest.raises(ApprovalError) as err:
+                await templates.update_template(
+                    put,
+                    row.id,
+                    actor_id=AG1,
+                    name="appr97 Meins",
+                    expected_change_time=loaded.change_time,
+                )
+            assert loaded.name == "appr97 Anderer"  # the refreshed object
+            await put.rollback()
+        assert (err.value.code, err.value.http_status) == ("template_changed", 409)
+        async with factory() as check:
+            assert (await templates.get_template(check, row.id)).name == "appr97 Anderer"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_ensure_template_loser_reads_the_committed_winner(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The loser's transaction read before the winner committed (on MariaDB its snapshot
+    hides the winner); after its insert fails it still returns the winner's row."""
+    async with _committed(request.getfixturevalue(url_fixture)) as factory:
+        async with factory() as loser:
+            with pytest.raises(ApprovalError):
+                await templates.get_template_by_key(loser, "appr97.c-race")
+            async with factory() as first:
+                winner = await templates.ensure_template(
+                    first, key="appr97.c-race", name="appr97 Sieger", definition=USER, origin="test"
+                )
+                await first.commit()
+            got = await templates.ensure_template(
+                loser, key="appr97.c-race", name="appr97 Verlierer", definition=USER, origin="test"
+            )
+            await loser.commit()
+        assert (got.id, got.name) == (winner.id, "appr97 Sieger")

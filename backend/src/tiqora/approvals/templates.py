@@ -196,12 +196,15 @@ async def validate_definition_refs(
     return check
 
 
-async def _template_by_key(session: AsyncSession, key: str) -> TiqoraApprovalTemplate | None:
-    return (
-        await session.execute(
-            select(TiqoraApprovalTemplate).where(TiqoraApprovalTemplate.template_key == key)
-        )
-    ).scalar_one_or_none()
+async def _template_by_key(
+    session: AsyncSession, key: str, *, lock: bool = False
+) -> TiqoraApprovalTemplate | None:
+    """*lock*: a locking read, which sees rows committed after this transaction's snapshot
+    (MariaDB REPEATABLE READ)."""
+    stmt = select(TiqoraApprovalTemplate).where(TiqoraApprovalTemplate.template_key == key)
+    if lock:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 def _clean_key(key: str) -> str:
@@ -325,7 +328,11 @@ async def update_template(
     editor loaded) a template changed since - by another admin or a GDPR erasure - is refused
     with ``template_changed`` (409) instead of being overwritten.
     """
-    entity = await session.get(TiqoraApprovalTemplate, template_id, with_for_update=True)
+    # populate_existing: the locked row's values replace an object this session loaded before
+    # (the PUT's own get_template), else the version check compares stale with stale
+    entity = await session.get(
+        TiqoraApprovalTemplate, template_id, with_for_update=True, populate_existing=True
+    )
     if entity is None:
         raise ApprovalError("template_not_found", 404)
     current = _row(entity)
@@ -406,7 +413,8 @@ async def ensure_template(
         change_by=1,
     )
     if not await _insert(session, entity):
-        winner = await _template_by_key(session, key)
+        # locking read: a plain one on MariaDB would only see the snapshot of the check above
+        winner = await _template_by_key(session, key, lock=True)
         if winner is None:  # the other insert was rolled back again: nothing to share
             raise ApprovalError("template_key_taken", 409)
         return _row(winner)
