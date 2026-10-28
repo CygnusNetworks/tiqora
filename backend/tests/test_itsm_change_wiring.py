@@ -1,7 +1,7 @@
 """Wiring of the change module into the rest of Tiqora (Task 21).
 
-Seed band 947800-947899 is not needed: the rolled-back ``tests._change_fixtures`` world creates
-every row through the services (ids come from the database).
+Seed band 947800-947899: only the Znuny calendar 947801. The rolled-back ``tests._change_fixtures``
+world creates every other row through the services (ids come from the database).
 """
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ async def test_title_edit_resyncs_calendar_mirror(w: ChangeWorld) -> None:
     tid = await _change(w)
     row = await w.session.get(TiqoraItsmChange, tid)
     assert row is not None
-    row.phase = "scheduled"
+    row.phase = "scheduled"  # fixture shortcut: the mirror is what is tested, not the phase walk
     row.planned_start, row.planned_end = datetime(2026, 11, 2, 8), datetime(2026, 11, 2, 10)
     await w.session.flush()
     from tiqora.itsm.change.calendar_mirror import sync_appointment
@@ -175,11 +175,33 @@ async def test_title_edit_resyncs_calendar_mirror(w: ChangeWorld) -> None:
     assert row.calendar_appointment_id == appt.id
 
 
+async def test_title_edit_survives_a_failing_resync(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    tid = await _change(w)
+    row = await w.session.get(TiqoraItsmChange, tid)
+    assert row is not None
+    row.calendar_appointment_id = 1  # "mirrored", so the resync really runs
+    await w.session.flush()
+
+    async def boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("settings unavailable")
+
+    monkeypatch.setattr("tiqora.itsm.change.calendar_mirror.load_change_settings", boom)
+    await change_title(w.session, ticket_id=tid, new_title="Trotzdem gespeichert", user_id=U_FULL)
+    got = await w.session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
+    assert got.scalar_one() == "Trotzdem gespeichert"
+    assert any(r.message == "change_calendar_mirror_failed" for r in caplog.records)
+    # the transaction is still usable (PostgreSQL would refuse otherwise)
+    assert (await w.session.execute(text("SELECT 1"))).scalar_one() == 1
+
+
 async def test_title_edit_without_mirror_does_nothing(w: ChangeWorld) -> None:
     tid = await _change(w)
     await change_title(w.session, ticket_id=tid, new_title="Neuer Titel", user_id=U_FULL)
     got = await w.session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
     assert got.scalar_one() == "Neuer Titel"
+    assert (await w.session.execute(select(CalendarAppointment.id))).first() is None
 
 
 def _core() -> Registry:

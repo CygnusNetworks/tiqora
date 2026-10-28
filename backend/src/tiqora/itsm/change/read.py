@@ -711,11 +711,11 @@ async def my_tasks(
 
 
 async def change_refs_for_tickets(
-    session: AsyncSession, ticket_ids: Sequence[int]
+    session: AsyncSession, ticket_ids: Sequence[int], *, mode_b: bool | None = None
 ) -> dict[int, ChangeRef]:
     """Short change facts of the given tickets (those that are changes). No permission filter:
-    the callers already hold the tickets."""
-    if not ticket_ids or not await _is_mode_b(session):
+    the callers already hold the tickets. ``mode_b`` skips the mode read for a caller that knows."""
+    if not ticket_ids or not (mode_b if mode_b is not None else await _is_mode_b(session)):
         return {}
     out: dict[int, ChangeRef] = {}
     for part in _chunked(ticket_ids):
@@ -731,13 +731,18 @@ async def change_refs_for_tickets(
 
 
 async def task_refs_for_tickets(
-    session: AsyncSession, ticket_ids: Sequence[int], *, user_id: int | None = None
+    session: AsyncSession,
+    ticket_ids: Sequence[int],
+    *,
+    user_id: int | None = None,
+    mode_b: bool | None = None,
 ) -> dict[int, ChangeTaskRef]:
     """Short task facts of the given tickets (those that are change tasks).
 
     ``change_tn`` is only given when ``user_id`` is passed and may read the change ticket.
+    ``mode_b`` skips the mode read for a caller that knows.
     """
-    if not ticket_ids or not await _is_mode_b(session):
+    if not ticket_ids or not (mode_b if mode_b is not None else await _is_mode_b(session)):
         return {}
     rows: list[TiqoraItsmChangeTask] = []
     for part in _chunked(ticket_ids):

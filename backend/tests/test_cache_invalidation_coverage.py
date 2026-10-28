@@ -51,6 +51,16 @@ def _uid() -> str:
     return uuid.uuid4().hex[:12]
 
 
+def _stub_change_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests build a bare Znuny schema (no ``tiqora_itsm_change``): stub the lazy hooks."""
+
+    async def _noop(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr("tiqora.itsm.change.impact.enqueue_impact_if_change", _noop)
+    monkeypatch.setattr("tiqora.itsm.change.calendar_mirror.resync_after_title_edit", _noop)
+
+
 async def _seed_tiqora_tables(session: AsyncSession) -> None:
     for ddl in (
         """CREATE TABLE IF NOT EXISTS tiqora_cache_invalidation (
@@ -130,8 +140,12 @@ async def _assert_new_invalidation(
 
 
 @pytest.mark.db
-async def test_write_ops_enqueue_cache_invalidation(mariadb_znuny_url: str) -> None:
+async def test_write_ops_enqueue_cache_invalidation(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Each mutating write op inserts ≥1 cache row for the ticket(s) it touches."""
+    # bare Znuny schema without the change table: the change hooks of the generic write path
+    _stub_change_hooks(monkeypatch)
     url = _mysql_async(mariadb_znuny_url)
     engine = create_async_engine(url)
     factory = async_sessionmaker(engine, expire_on_commit=False)

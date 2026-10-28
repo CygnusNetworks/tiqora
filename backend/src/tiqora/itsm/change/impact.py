@@ -31,7 +31,6 @@ from typing import Any, Final
 
 from pydantic import BaseModel
 from sqlalchemy import bindparam, case, delete, select, text
-from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.impact import affected_set, services_reached_from
@@ -254,17 +253,7 @@ async def enqueue_impact(
 
 async def enqueue_impact_if_change(session: AsyncSession, ticket_id: int) -> None:
     """Called when a ticket gets or loses a CI link (``cmdb.links.signal_ticket_link``)."""
-    # a column-only probe in a savepoint: a plain ticket pays one narrow statement, and a database
-    # without the change table (generic ticket edit on a bare Znuny schema) is just "no change"
-    try:
-        async with session.begin_nested():
-            probe = await session.execute(
-                select(TiqoraItsmChange.ticket_id).where(TiqoraItsmChange.ticket_id == ticket_id)
-            )
-            found = probe.first() is not None
-    except ProgrammingError:
-        return
-    if not found:
+    if await session.get(TiqoraItsmChange, ticket_id) is None:
         return
     await enqueue_impact(session, ticket_id=ticket_id, user_id=None)
 

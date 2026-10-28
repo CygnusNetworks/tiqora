@@ -275,11 +275,15 @@ async def ticket_itsm_summary(
         except CiUnavailable:
             out.ci_count = None
     out.dialogs = await _dialogs(session)
-    if state.mode == "tiqora":  # both readers are empty outside Mode B: skip their statements
-        out.change = (await change_refs_for_tickets(session, [ticket_id])).get(ticket_id)
-        out.change_task = (await task_refs_for_tickets(session, [ticket_id], user_id=user_id)).get(
+    if (
+        state.mode == "tiqora"
+    ):  # both readers are empty outside Mode B: skip them (and the mode read)
+        out.change = (await change_refs_for_tickets(session, [ticket_id], mode_b=True)).get(
             ticket_id
         )
+        out.change_task = (
+            await task_refs_for_tickets(session, [ticket_id], user_id=user_id, mode_b=True)
+        ).get(ticket_id)
     return out
 
 

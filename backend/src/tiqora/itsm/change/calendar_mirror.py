@@ -18,7 +18,6 @@ import logging
 from typing import Final
 
 from sqlalchemy import select
-from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.calendar.schemas import AppointmentIn
@@ -139,7 +138,8 @@ async def sync_appointment(
 async def resync_after_title_edit(session: AsyncSession, *, ticket_id: int, user_id: int) -> None:
     """The mirrored appointment carries the ticket title: called by the generic title edit.
 
-    Does nothing for a ticket without a mirrored appointment (one lookup); never fails the caller.
+    Does nothing for a ticket without a mirrored appointment (one lookup). Everything runs in its
+    own savepoint and any error is logged: a mirror error never fails the title write.
     """
     try:
         async with session.begin_nested():
@@ -149,22 +149,22 @@ async def resync_after_title_edit(session: AsyncSession, *, ticket_id: int, user
                 )
             )
             first = mirrored.first()
-    except ProgrammingError:  # a bare Znuny schema has no change table
-        return
-    if first is None or first[0] is None:
-        return
-    try:
-        settings = get_settings()
-        cfg = await load_change_settings(session, settings)
-        ticket = await session.get(Ticket, ticket_id)
-        if ticket is not None:
-            await session.refresh(ticket)  # the title was written with a raw UPDATE
+            if first is None or first[0] is None:
+                return
+            settings = get_settings()
+            cfg = await load_change_settings(session, settings)
+            ticket = await session.get(Ticket, ticket_id)
+            if ticket is not None:
+                await session.refresh(ticket)  # the title was written with a raw UPDATE
+            await sync_appointment(
+                session,
+                cfg,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                base_url=settings.public_base_url,
+            )
     except Exception:  # noqa: BLE001 - a mirror error never fails the caller
         logger.exception("change_calendar_mirror_failed", extra={"ticket_id": ticket_id})
-        return
-    await sync_appointment(
-        session, cfg, ticket_id=ticket_id, user_id=user_id, base_url=settings.public_base_url
-    )
 
 
 __all__ = ["MIRRORED_PHASES", "resync_after_title_edit", "sync_appointment"]

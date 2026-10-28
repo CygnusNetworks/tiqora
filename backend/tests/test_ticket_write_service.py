@@ -54,6 +54,16 @@ def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
 
 
+def _stub_change_hooks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests build a bare Znuny schema (no ``tiqora_itsm_change``): stub the lazy hooks."""
+
+    async def _noop(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr("tiqora.itsm.change.impact.enqueue_impact_if_change", _noop)
+    monkeypatch.setattr("tiqora.itsm.change.calendar_mirror.resync_after_title_edit", _noop)
+
+
 async def _seed_tiqora_tables(session: AsyncSession) -> None:
     """Create tiqora_* tables in testcontainer DB (Alembic not run there)."""
     dialects_ddl = [
@@ -586,8 +596,12 @@ async def test_change_state_closes_escalation_mariadb(mariadb_znuny_url: str) ->
 
 
 @pytest.mark.db
-async def test_change_title_mariadb(mariadb_znuny_url: str) -> None:
+async def test_change_title_mariadb(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """change_title updates the ticket title."""
+    # bare Znuny schema without the change table: the change hooks of the generic write path
+    _stub_change_hooks(monkeypatch)
     url = _mysql_async(mariadb_znuny_url)
     engine = create_async_engine(url)
     factory = async_sessionmaker(engine, expire_on_commit=False)

@@ -24,7 +24,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from tests._change_fixtures import Q_A, U_FULL, URL_FIXTURES, ChangeWorld, change_world
+from tests._change_fixtures import Q_A, Q_B, U_FULL, URL_FIXTURES, ChangeWorld, change_world
 from tests._itsm_adapter_helpers import count_statements, itsm_session, seed_service
 from tests._itsm_db import ITSM_PARAMS
 from tests._itsm_fake_provider import INCIDENT, OPERATIONAL, FakeCiProvider
@@ -510,3 +510,17 @@ async def test_summary_change_none_in_mode_a(w: World) -> None:
     assert got.change is None and got.change_task is None
     body = await w.get()
     assert body["change"] is None and body["change_task"] is None
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_summary_task_hides_number_of_unreadable_change(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with _change_summary_world(request, url_fixture) as (cw, change, task):
+        # the change moves to a queue the caller cannot read; the task stays readable
+        await cw.session.execute(
+            text("UPDATE ticket SET queue_id = :q WHERE id = :t"), {"q": Q_B, "t": change}
+        )
+        got = await ticket_itsm_summary(cw.session, task, user_id=U_FULL, cfg=ItsmSettings())
+        assert got.change_task is not None
+        assert got.change_task.change_ticket_id == change and got.change_task.change_tn is None
