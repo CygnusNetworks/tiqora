@@ -1,0 +1,68 @@
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { ApiError } from "@/lib/api";
+import { mockApi, renderApproval, useGerman } from "@/test/approvalsHarness";
+import { ApprovalDelegationsPage } from "./ApprovalDelegationsPage";
+
+beforeAll(useGerman);
+
+const D = {
+  id: 1,
+  user_id: 2,
+  user_label: "Alex Turner",
+  substitute_user_id: 3,
+  substitute_label: "Erika Muster",
+  valid_from: "2026-10-20T00:00:00Z",
+  valid_until: "2030-11-03T00:00:00Z",
+  created_at: "2026-10-12T08:00:00Z",
+};
+const LIST = "GET /api/v1/admin/approvals/delegations";
+
+describe("ApprovalDelegationsPage", () => {
+  it("lists both people of every delegation", async () => {
+    const list = vi.fn(() => [D]);
+    mockApi({ [LIST]: list });
+    renderApproval(<ApprovalDelegationsPage />);
+    expect(await screen.findByTestId("admin-delegation-people")).toHaveTextContent("Erika Muster vertritt Alex Turner");
+    const q = (list.mock.calls[0] as unknown as [{ query: Record<string, unknown> }])[0].query;
+    expect(q).toMatchObject({ limit: 50, offset: 0 });
+  });
+
+  it("creates a substitute for another agent", async () => {
+    const create = vi.fn(() => D);
+    mockApi({ [LIST]: () => [], "POST /api/v1/admin/approvals/delegations": create });
+    renderApproval(<ApprovalDelegationsPage />);
+    fireEvent.click(await screen.findByTestId("admin-delegation-user"));
+    fireEvent.click(await screen.findByTestId("admin-delegation-user-menu-option-2"));
+    fireEvent.click(screen.getByTestId("admin-delegation-substitute"));
+    fireEvent.click(await screen.findByTestId("admin-delegation-substitute-menu-option-3"));
+    fireEvent.click(screen.getByTestId("admin-delegation-create"));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    const body = (create.mock.calls[0] as unknown as [{ body: Record<string, unknown> }])[0].body;
+    expect(body).toEqual({ user_id: 2, substitute_user_id: 3, valid_from: null, valid_until: null });
+  });
+
+  it("asks for both people before saving", async () => {
+    const create = vi.fn();
+    mockApi({ [LIST]: () => [], "POST /api/v1/admin/approvals/delegations": create });
+    renderApproval(<ApprovalDelegationsPage />);
+    fireEvent.click(await screen.findByTestId("admin-delegation-create"));
+    expect(await screen.findByTestId("admin-delegation-missing")).toHaveTextContent("Bitte wählen Sie beide Personen aus.");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("says an already ended delegation is ended and reloads", async () => {
+    const list = vi.fn(() => [D]);
+    mockApi({
+      [LIST]: list,
+      "DELETE /api/v1/admin/approvals/delegations/1": () => {
+        throw new ApiError(403, { detail: { code: "delegation_not_active", detail: null } }, "/x");
+      },
+    });
+    renderApproval(<ApprovalDelegationsPage />);
+    fireEvent.click(await screen.findByTestId("admin-delegation-revoke"));
+    expect(await screen.findByTestId("admin-delegation-ended")).toHaveTextContent("Bereits beendet");
+    await waitFor(() => expect(list.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(screen.queryByTestId("admin-delegation-row-error")).toBeNull();
+  });
+});

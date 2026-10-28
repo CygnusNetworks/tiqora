@@ -9452,6 +9452,99 @@
       "description": "Description (optional)",
       "definitionIncomplete": "Please complete every step first.",
       "submit": "Request"
+    },
+    "admin": {
+      "settings": "Settings",
+      "overview": {
+        "filter": {
+          "status": "Status",
+          "statusAll": "All",
+          "ticketId": "Ticket ID",
+          "subjectType": "Subject type",
+          "overdue": "Overdue only"
+        },
+        "empty": "There are no approval requests yet.",
+        "emptyFiltered": "No approval request matches these filters.",
+        "openApprovers": "{{count}} still to decide",
+        "cancelTitle": "Withdraw request?",
+        "cancelMessage": "The request “{{title}}” is closed without a decision. Approvers are no longer asked."
+      },
+      "templates": {
+        "new": "New template",
+        "edit": "Edit template",
+        "empty": "No templates yet.",
+        "key": "Key",
+        "keyHint": "Used by features to find the template. Cannot be changed after saving.",
+        "keyLocked": "The key cannot be changed.",
+        "name": "Name",
+        "description": "Description",
+        "subjectTypes": "Subject types",
+        "subjectTypesHint": "Separate several with commas. Empty means every subject type.",
+        "allSubjects": "All subject types",
+        "valid": "Valid",
+        "invalid": "Not valid",
+        "hasWarnings": "{{count}} notes",
+        "originHint": "Created by {{feature}}",
+        "definition": "Steps",
+        "deleteTitle": "Delete template?",
+        "deleteMessage": "The template “{{name}}” is removed. Running requests are not affected.",
+        "check": {
+          "running": "Checking …",
+          "ok": "The definition is valid.",
+          "stepPrefix": "Step {{n}} ({{name}}):",
+          "invalid_definition": "An entry is invalid ({{path}}).",
+          "field": {
+            "name": "The name is missing or too long.",
+            "stage": "The stage is invalid.",
+            "rule": "The rule is invalid.",
+            "quorum": "The number of required approvals is invalid.",
+            "approvers": "The approvers are incomplete or invalid.",
+            "due_hours": "The deadline is invalid.",
+            "on_timeout": "The action on timeout is invalid.",
+            "escalation": "The escalation is incomplete or invalid."
+          },
+          "unknown_resolver": "The rule “{{arg}}” does not exist.",
+          "invalid_ref": "An approver entry is invalid ({{arg}}).",
+          "customer_entry_not_allowed": "Customers cannot be approvers for these subject types.",
+          "unknown_subject_type": "The subject type “{{arg}}” does not exist.",
+          "missing_user": "Agent #{{arg}} no longer exists or is invalid.",
+          "missing_group": "Group #{{arg}} no longer exists or is invalid.",
+          "missing_role": "Role #{{arg}} no longer exists or is invalid.",
+          "missing_list": "Approver group #{{arg}} no longer exists or is invalid.",
+          "missing_customer": "Customer {{arg}} no longer exists or is invalid."
+        }
+      },
+      "lists": {
+        "new": "New approver group",
+        "edit": "Edit approver group",
+        "empty": "No approver groups yet.",
+        "name": "Name",
+        "nameMissing": "Please enter a name.",
+        "description": "Description",
+        "valid": "Valid",
+        "invalid": "Not valid",
+        "members": "Members",
+        "membersEmpty": "No members",
+        "addMember": "Add member",
+        "removeMember": "Remove {{name}}",
+        "deleteTitle": "Delete approver group?",
+        "deleteMessage": "The approver group “{{name}}” is removed."
+      },
+      "delegations": {
+        "filterUser": "Substituted person",
+        "filterClear": "All",
+        "includeEnded": "Show ended",
+        "empty": "There are no substitutes.",
+        "person": "{{to}} substitutes for {{from}}",
+        "state": {
+          "running": "active",
+          "planned": "planned",
+          "ended": "ended"
+        },
+        "new": "Name a substitute for someone",
+        "user": "Substituted person",
+        "peopleMissing": "Please choose both people."
+      }
     }
   }
 }

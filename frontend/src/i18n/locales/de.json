@@ -9460,6 +9460,99 @@
       "description": "Beschreibung (optional)",
       "definitionIncomplete": "Bitte vervollständigen Sie zuerst jeden Schritt.",
       "submit": "Anfordern"
+    },
+    "admin": {
+      "settings": "Einstellungen",
+      "overview": {
+        "filter": {
+          "status": "Status",
+          "statusAll": "Alle",
+          "ticketId": "Ticket-ID",
+          "subjectType": "Gegenstandstyp",
+          "overdue": "Nur überfällige"
+        },
+        "empty": "Es gibt noch keine Freigabeanfragen.",
+        "emptyFiltered": "Keine Freigabeanfrage passt zu diesen Filtern.",
+        "openApprovers": "{{count}} Entscheidung(en) offen",
+        "cancelTitle": "Anfrage zurückziehen?",
+        "cancelMessage": "Die Anfrage „{{title}}“ wird ohne Entscheidung geschlossen. Die Freigebenden werden nicht mehr gefragt."
+      },
+      "templates": {
+        "new": "Neue Vorlage",
+        "edit": "Vorlage bearbeiten",
+        "empty": "Noch keine Vorlagen.",
+        "key": "Schlüssel",
+        "keyHint": "Daran finden Funktionen die Vorlage. Nach dem Speichern nicht mehr änderbar.",
+        "keyLocked": "Der Schlüssel kann nicht geändert werden.",
+        "name": "Name",
+        "description": "Beschreibung",
+        "subjectTypes": "Gegenstandstypen",
+        "subjectTypesHint": "Mehrere mit Komma trennen. Leer bedeutet alle Gegenstandstypen.",
+        "allSubjects": "Alle Gegenstandstypen",
+        "valid": "Gültig",
+        "invalid": "Ungültig",
+        "hasWarnings": "{{count}} Hinweise",
+        "originHint": "Von {{feature}} angelegt",
+        "definition": "Schritte",
+        "deleteTitle": "Vorlage löschen?",
+        "deleteMessage": "Die Vorlage „{{name}}“ wird entfernt. Laufende Anfragen bleiben unberührt.",
+        "check": {
+          "running": "Wird geprüft …",
+          "ok": "Die Definition ist gültig.",
+          "stepPrefix": "Schritt {{n}} ({{name}}):",
+          "invalid_definition": "Eine Angabe ist ungültig ({{path}}).",
+          "field": {
+            "name": "Der Name fehlt oder ist zu lang.",
+            "stage": "Die Stufe ist ungültig.",
+            "rule": "Die Regel ist ungültig.",
+            "quorum": "Die Zahl der nötigen Freigaben ist ungültig.",
+            "approvers": "Die Freigebenden sind unvollständig oder ungültig.",
+            "due_hours": "Die Frist ist ungültig.",
+            "on_timeout": "Die Aktion bei Fristablauf ist ungültig.",
+            "escalation": "Die Eskalation ist unvollständig oder ungültig."
+          },
+          "unknown_resolver": "Die Regel „{{arg}}“ gibt es nicht.",
+          "invalid_ref": "Ein Eintrag bei den Freigebenden ist ungültig ({{arg}}).",
+          "customer_entry_not_allowed": "Kunden dürfen für diese Gegenstandstypen nicht freigeben.",
+          "unknown_subject_type": "Den Gegenstandstyp „{{arg}}“ gibt es nicht.",
+          "missing_user": "Agent #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_group": "Gruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_role": "Rolle #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_list": "Freigabegruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_customer": "Kunde {{arg}} existiert nicht mehr oder ist ungültig."
+        }
+      },
+      "lists": {
+        "new": "Neue Freigabegruppe",
+        "edit": "Freigabegruppe bearbeiten",
+        "empty": "Noch keine Freigabegruppen.",
+        "name": "Name",
+        "nameMissing": "Bitte geben Sie einen Namen ein.",
+        "description": "Beschreibung",
+        "valid": "Gültig",
+        "invalid": "Ungültig",
+        "members": "Mitglieder",
+        "membersEmpty": "Keine Mitglieder",
+        "addMember": "Mitglied hinzufügen",
+        "removeMember": "{{name}} entfernen",
+        "deleteTitle": "Freigabegruppe löschen?",
+        "deleteMessage": "Die Freigabegruppe „{{name}}“ wird entfernt."
+      },
+      "delegations": {
+        "filterUser": "Vertretene Person",
+        "filterClear": "Alle",
+        "includeEnded": "Beendete anzeigen",
+        "empty": "Es gibt keine Vertretungen.",
+        "person": "{{to}} vertritt {{from}}",
+        "state": {
+          "running": "aktiv",
+          "planned": "geplant",
+          "ended": "beendet"
+        },
+        "new": "Vertretung für eine Person eintragen",
+        "user": "Vertretene Person",
+        "peopleMissing": "Bitte wählen Sie beide Personen aus."
+      }
     }
   }
 }
