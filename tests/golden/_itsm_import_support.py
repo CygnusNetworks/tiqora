@@ -29,6 +29,7 @@ import pymysql
 from _helpers import znuny_console, znuny_perl_eval
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraItsmImportRun
 from tiqora.itsm.importer.pipeline import run_import
 from tiqora.itsm.importer.report import ImportReport
@@ -50,6 +51,8 @@ SNAPSHOT_TABLES: tuple[str, ...] = (
     "tiqora_cmdb_class_definition",
     "tiqora_cmdb_class",
     "tiqora_cmdb_catalog",
+    "tiqora_itsm_legacy_change_ref",
+    "tiqora_itsm_legacy_change",
     "tiqora_itsm_link",
     "tiqora_itsm_link_type",
     "tiqora_itsm_import_map",
@@ -547,5 +550,6 @@ async def run_importer_with_id(
         page_size=page_size,
         progress=progress,
         check_cancelled=check_cancelled,
+        settings=Settings(environment="test"),  # the change archive's tombstone key
     )
     return report, run_id
