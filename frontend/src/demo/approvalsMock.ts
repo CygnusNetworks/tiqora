@@ -198,7 +198,7 @@ const overdueEscalated: ApprovalDetail = {
   decided_at: null,
   can_cancel: true,
   can_refresh: true,
-  my_rows: [{ approver_id: 9007, step_id: 7004, on_behalf_of_label: "Erika Muster", can_forward: false }],
+  my_rows: [{ approver_id: 9007, step_id: 7004, on_behalf_of_label: null, can_forward: true }],
   steps: [
     {
       id: 7004,
@@ -214,7 +214,7 @@ const overdueEscalated: ApprovalDetail = {
       due_at: DUE_PAST,
       overdue: true,
       approvers: [
-        approver(9006, "Erika Muster", "pending", { source_label: "Vertretung: Alex Turner" }),
+        approver(9006, "Erika Muster", "pending"),
         approver(9007, "Alex Turner", "pending", { decisive: true, source_kind: "escalation", source_label: "Eskalation" }),
       ],
     },

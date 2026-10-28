@@ -177,7 +177,9 @@ describe("approval error codes", () => {
   });
 
   const contract = resolve(process.cwd(), "../backend/src/tiqora/approvals/contract.py");
-  it.skipIf(!existsSync(contract))("covers every ERROR_STATUS code of the backend plus rate_limited", () => {
+  it("covers every ERROR_STATUS code of the backend plus rate_limited", () => {
+    // Must not skip: a layout without backend/ should fail loudly, not drop the guard.
+    expect(existsSync(contract), `${contract} missing`).toBe(true);
     const src = readFileSync(contract, "utf8");
     const block = src.slice(src.indexOf("ERROR_STATUS: Final"));
     const body = block.slice(block.indexOf("{"), block.indexOf("}"));
