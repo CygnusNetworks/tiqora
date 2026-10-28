@@ -20,16 +20,19 @@ stored impact set.
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Final, Literal
 
-from sqlalchemy import ColumnElement, and_, bindparam, func, not_, or_, select, text
+from sqlalchemy import ColumnElement, and_, bindparam, case, func, not_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.calendar.recurrence import to_utc_naive
+from tiqora.cmdb.impact import services_reached_from
+from tiqora.config import get_settings
 from tiqora.domain.ticket_access import CHUNK, TicketFacts, readable_tickets
 from tiqora.itsm.change.conflicts import (
     OVERLAP_PHASES,
@@ -49,7 +52,11 @@ from tiqora.itsm.change.models import (
     TiqoraItsmChangeTask,
 )
 from tiqora.itsm.change.phases import FINAL_PHASES, PHASES
+from tiqora.itsm.ci_provider import CiRef
 from tiqora.itsm.mode import get_itsm_mode
+from tiqora.itsm.providers import get_ci_provider
+from tiqora.itsm.settings import load_itsm_settings
+from tiqora.znuny.sysconfig import SysConfig
 
 #: change rows one scan reads (newest first); the answer says ``truncated`` beyond it
 LIST_SCAN_CAP: Final = 5000
@@ -57,8 +64,11 @@ LIST_SCAN_CAP: Final = 5000
 MAX_RANGE: Final = timedelta(days=92)
 #: services one PSA answer carries
 PSA_SERVICE_CAP: Final = 200
+logger = logging.getLogger(__name__)
 #: phases that do not occupy the schedule
 _OFF_CALENDAR: Final = ("cancelled", "rejected")
+#: phases whose tasks are no longer to be done ("rejected" can be reopened, but is parked)
+_TASKS_DONE_PHASES: Final = (*sorted(FINAL_PHASES), "rejected")
 #: impact row kind (a variable: the cross-join guard reads string literals as table names)
 _SERVICE_KIND: Final = "service"
 _CLOSED_STATE_TYPES: Final = frozenset({"closed", "removed", "merged"})
@@ -306,7 +316,12 @@ async def _scan(
     """
     stmt = select(*_REC_COLUMNS).where(*where)
     if order_by_start:
-        stmt = stmt.order_by(TiqoraItsmChange.planned_start, TiqoraItsmChange.ticket_id)
+        # NULLs last on both dialects (MariaDB sorts them first by default)
+        stmt = stmt.order_by(
+            case((TiqoraItsmChange.planned_start.is_(None), 1), else_=0),
+            TiqoraItsmChange.planned_start,
+            TiqoraItsmChange.ticket_id,
+        )
     else:
         stmt = stmt.order_by(TiqoraItsmChange.updated_at.desc(), TiqoraItsmChange.ticket_id.desc())
     rows = (await session.execute(stmt.limit(LIST_SCAN_CAP + 1))).all()
@@ -399,6 +414,74 @@ async def items_for_changes(
     return await _items(session, ordered, facts, await _owners(session, facts))
 
 
+async def _readable_cis(session: AsyncSession, ci_ids: Iterable[int], *, user_id: int) -> set[int]:
+    """The CI ids among ``ci_ids`` the caller may read (none when the CMDB is unavailable)."""
+    wanted = sorted(set(ci_ids))
+    provider = get_ci_provider("tiqora", SysConfig(session))
+    if provider is None or not wanted:
+        return set()
+    out: set[int] = set()
+    for part in _chunked(wanted):
+        got = await provider.get_many(session, [CiRef("tiqora", c) for c in part], user_id=user_id)
+        out.update(ref.id for ref in got)
+    return out
+
+
+async def _visible_services(
+    session: AsyncSession, sets: dict[int, ImpactSet], ids: Iterable[int], *, user_id: int
+) -> dict[int, frozenset[int]]:
+    """Per change the services of its stored impact set the caller may see: the direct ones and
+    those reached from CIs the caller can read (the rule of ``read_impact``; services reached only
+    through hidden CIs stay unnamed)."""
+    wanted = [i for i in ids if i in sets]
+    out = {i: sets[i].direct_services for i in wanted}
+    needs = [i for i in wanted if sets[i].services - sets[i].direct_services]
+    if not needs:
+        return out
+    readable = await _readable_cis(
+        session, {c for i in needs for c in sets[i].cis}, user_id=user_id
+    )
+    reached: dict[frozenset[int], frozenset[int]] = {}
+    for i in needs:
+        seen = frozenset(sets[i].cis & readable)
+        if seen not in reached:
+            reached[seen] = (
+                await services_reached_from(session, sorted(seen)) if seen else frozenset()
+            )
+        out[i] = sets[i].direct_services | (sets[i].services & reached[seen])
+    return out
+
+
+def _like_escape(value: str) -> str:
+    return value.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
+
+async def _text_candidates(session: AsyncSession, needle: str) -> tuple[list[int], bool]:
+    """Change tickets whose number equals ``needle`` or whose title contains it (case-insensitive,
+    ``%``/``_`` literal), newest first, at most :data:`LIST_SCAN_CAP`; the flag says more exist.
+
+    Resolved on the Znuny side first so an old change is found by its number whatever the scan
+    cap; the ids then restrict the ``tiqora_itsm_change`` scan.
+    """
+    cfg = await load_itsm_settings(session, get_settings())
+    stmt = text(
+        "SELECT t.id FROM ticket t JOIN ticket_type tt ON tt.id = t.type_id"
+        " WHERE tt.name = :type AND (t.tn = :q OR LOWER(t.title) LIKE :pat ESCAPE '!')"
+        " ORDER BY t.id DESC LIMIT :lim"
+    )
+    rows = await session.execute(
+        stmt,
+        {
+            "type": cfg.change_type,
+            "q": needle,
+            "pat": f"%{_like_escape(needle.casefold())}%",
+            "lim": LIST_SCAN_CAP + 1,
+        },
+    )
+    ids = [int(r[0]) for r in rows]
+    return ids[:LIST_SCAN_CAP], len(ids) > LIST_SCAN_CAP
+
+
 # --- list ------------------------------------------------------------------------------------
 
 
@@ -407,12 +490,25 @@ async def list_changes(session: AsyncSession, q: ChangeQuery, *, user_id: int) -
 
     The database filters (phase, type, window, service, CI, "created by me") run on
     ``tiqora_itsm_change`` and cap at :data:`LIST_SCAN_CAP`; the read permission, "owned by me"
-    and the text search (number or title, case-insensitive) run on the scanned rows.
+    and the text search (number or title, case-insensitive) is resolved on the ticket side first
+    and restricts the scan. A ``service_id`` / ``ci_id`` filter never matches through a path the
+    caller cannot see (see :func:`_visible_services`).
     """
     if not await _is_mode_b(session):
         return ChangePage((), 0, False)
     ch = TiqoraItsmChange
     where: list[ColumnElement[bool]] = []
+    candidates_truncated = False
+    needle = (q.text or "").strip()
+    if needle:
+        found, candidates_truncated = await _text_candidates(session, needle)
+        if not found:
+            return ChangePage((), 0, False)
+        where.append(or_(*[ch.ticket_id.in_(part) for part in _chunked(found)]))
+    if q.ci_id is not None and q.ci_id not in await _readable_cis(
+        session, [q.ci_id], user_id=user_id
+    ):
+        return ChangePage((), 0, False)
     if q.phases:
         where.append(ch.phase.in_(list(q.phases)))
     if q.change_types:
@@ -432,14 +528,23 @@ async def list_changes(session: AsyncSession, q: ChangeQuery, *, user_id: int) -
     if q.mine == "created":
         where.append(ch.created_by == user_id)
     recs, truncated = await _scan(session, where)
+    truncated = truncated or candidates_truncated
     facts = await _readable(session, [r.ticket_id for r in recs], user_id=user_id)
     owners = await _owners(session, facts)
     items = await _items(session, recs, facts, owners)
     if q.mine == "owned":
         items = [i for i in items if i.owner_id == user_id]
-    needle = (q.text or "").strip().casefold()
-    if needle:
-        items = [i for i in items if needle in i.tn.casefold() or needle in i.title.casefold()]
+    if q.service_id is not None:
+        # a service named by the ticket itself always matches; one reached through the impact
+        # set only when the caller can see the path
+        indirect = [i.ticket_id for i in items if q.service_id not in i.service_ids]
+        sets = await impact_sets(session, indirect)
+        visible = await _visible_services(session, sets, indirect, user_id=user_id)
+        items = [
+            i
+            for i in items
+            if q.service_id in i.service_ids or q.service_id in visible.get(i.ticket_id, ())
+        ]
     if q.order == "planned_start":
         items.sort(key=_sort_key_start)
     else:  # the scan already is newest first
@@ -469,11 +574,13 @@ async def upcoming_changes(
 async def phase_counts(
     session: AsyncSession, *, user_id: int, queue_ids: Sequence[int] | None = None
 ) -> dict[str, int]:
-    """Readable changes per phase (every phase is a key; scans at most :data:`LIST_SCAN_CAP`)."""
+    """Readable changes per phase (every phase is a key). Counts the open phases only (scans at
+    most :data:`LIST_SCAN_CAP` of them, so a long history of finished changes cannot push live ones
+    out); ``closed`` and ``cancelled`` are always 0."""
     counts: dict[str, int] = dict.fromkeys(PHASES, 0)
     if not await _is_mode_b(session):
         return counts
-    recs, _ = await _scan(session, [])
+    recs, _ = await _scan(session, [not_(TiqoraItsmChange.phase.in_(sorted(FINAL_PHASES)))])
     facts = await _readable(session, [r.ticket_id for r in recs], user_id=user_id)
     for r in recs:
         f = facts.get(r.ticket_id)
@@ -551,29 +658,41 @@ async def my_tasks(
     """Task tickets the user owns and may read, soonest planned start first.
 
     ``open_only``: tasks in an open state type (not closed/removed/merged) of changes that are
-    not closed or cancelled. Scans the newest :data:`LIST_SCAN_CAP` task rows.
+    still alive: not closed, cancelled or rejected (a rejected change is parked until reworked).
+    The owner filter runs on the ticket side first, so the scan cap (:data:`LIST_SCAN_CAP`,
+    newest tickets) only ever sees the user's own tasks.
     """
     if not await _is_mode_b(session):
         return []
-    stmt = select(TiqoraItsmChangeTask)
+    cfg = await load_itsm_settings(session, get_settings())
+    sql = (
+        "SELECT t.id FROM ticket t JOIN ticket_type tt ON tt.id = t.type_id"
+        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+        " WHERE t.user_id = :u AND tt.name = :type"
+    )
+    params: dict[str, object] = {"u": user_id, "type": cfg.change_task_type, "lim": LIST_SCAN_CAP}
     if open_only:
-        stmt = stmt.where(
-            TiqoraItsmChangeTask.change_ticket_id.in_(
-                select(TiqoraItsmChange.ticket_id).where(
-                    not_(TiqoraItsmChange.phase.in_(sorted(FINAL_PHASES)))
+        sql += " AND tst.name NOT IN :closed"
+        params["closed"] = sorted(_CLOSED_STATE_TYPES)
+    stmt = text(sql + " ORDER BY t.id DESC LIMIT :lim")
+    if open_only:
+        stmt = stmt.bindparams(bindparam("closed", expanding=True))
+    owned = [int(r[0]) for r in await session.execute(stmt, params)]
+    t = TiqoraItsmChangeTask
+    rows: list[TiqoraItsmChangeTask] = []
+    for part in _chunked(owned):
+        q = select(t).where(t.ticket_id.in_(part))
+        if open_only:
+            q = q.where(
+                t.change_ticket_id.in_(
+                    select(TiqoraItsmChange.ticket_id).where(
+                        not_(TiqoraItsmChange.phase.in_(list(_TASKS_DONE_PHASES)))
+                    )
                 )
             )
-        )
-    rows = list(
-        (
-            await session.execute(
-                stmt.order_by(TiqoraItsmChangeTask.ticket_id.desc()).limit(LIST_SCAN_CAP)
-            )
-        ).scalars()
-    )
-    owners = await _owners(session, [r.ticket_id for r in rows])
-    mine = [r for r in rows if owners.get(r.ticket_id) == user_id]
-    items = await _task_items(session, mine, user_id=user_id)
+        rows.extend((await session.execute(q)).scalars())
+    items = await _task_items(session, rows, user_id=user_id)
     if open_only:
         items = [i for i in items if not i.finished]
     far = datetime.max
@@ -695,15 +814,19 @@ async def calendar(
 ) -> ChangeCalendar:
     """Changes, tasks and freeze occurrences of ``[start, end)`` with conflict flags.
 
-    The range may not exceed :data:`MAX_RANGE` (422 ``range_too_large``). Cancelled and rejected
-    changes are not shown. ``service_ids`` keeps the changes that touch one of the services (and
-    the tasks of those changes); freezes are always shown. Conflict flags are computed for every
-    shown change against all changes of the range, readable or not.
+    Outside Mode B the answer is empty; the range may not exceed :data:`MAX_RANGE` (422
+    ``range_too_large``). Cancelled and rejected changes (and their tasks) are not shown.
+    ``service_ids`` keeps the changes that touch one of the services the caller can see (the
+    rule of ``read_impact``) and the tasks of those changes; freezes are always shown.
+
+    Conflict flags equal what ``read_conflicts`` reports: they are computed against all changes
+    and freeze occurrences over the union of the shown changes' own windows (at most
+    :data:`MAX_RANGE` beyond the range), readable or not, in one batched pass.
     """
     lo, hi = to_utc_naive(start), to_utc_naive(end)
-    _check_range(lo, hi)
     if not await _is_mode_b(session):
         return ChangeCalendar(lo, hi, (), (), (), False, False)
+    _check_range(lo, hi)
     ch = TiqoraItsmChange
     recs, truncated = await _scan(
         session,
@@ -718,16 +841,37 @@ async def calendar(
     items = {i.ticket_id: i for i in await _items(session, recs, facts, owners)}
     sets = await impact_sets(session, [r.ticket_id for r in recs])
     wanted = set(service_ids)
-    shown = [
-        r
-        for r in recs
-        if r.ticket_id in items
-        and (
-            not wanted
-            or wanted & (set(items[r.ticket_id].service_ids) | set(sets[r.ticket_id].services))
+    shown = [r for r in recs if r.ticket_id in items]
+    if wanted:
+        visible = await _visible_services(
+            session, sets, [r.ticket_id for r in shown], user_id=user_id
         )
-    ]
-    found = await occurrences(session, start=lo, end=hi)
+        shown = [
+            r
+            for r in shown
+            if wanted & (set(items[r.ticket_id].service_ids) | visible.get(r.ticket_id, set()))
+        ]
+
+    # the conflict window: everything the shown changes can collide with, not only the range
+    starts = [r.planned_start for r in shown if r.planned_start is not None]
+    ends = [r.planned_end for r in shown if r.planned_end is not None]
+    wide_lo = max(min([lo, *starts]), lo - MAX_RANGE)
+    wide_hi = min(max([hi, *ends]), hi + MAX_RANGE)
+    pool = list(recs)
+    if (wide_lo, wide_hi) != (lo, hi):
+        more, more_truncated = await _scan(
+            session,
+            [
+                ch.phase.in_(sorted(OVERLAP_PHASES)),
+                ch.ticket_id.not_in([r.ticket_id for r in recs]) if recs else ch.ticket_id > 0,
+                *_window_cond(ch.planned_start, ch.planned_end, wide_lo, wide_hi),
+            ],
+            order_by_start=True,
+        )
+        truncated = truncated or more_truncated
+        pool += more
+        sets.update(await impact_sets(session, [r.ticket_id for r in more]))
+    found = await occurrences(session, start=wide_lo, end=wide_hi)
     tasks_by_change = await _task_windows(session, [r.ticket_id for r in shown], user_id=user_id)
 
     others = sorted(
@@ -740,7 +884,7 @@ async def calendar(
                 sets[r.ticket_id].services,
                 sets[r.ticket_id].cis,
             )
-            for r in recs
+            for r in pool
             if r.phase in OVERLAP_PHASES
             and r.planned_start is not None
             and r.planned_end is not None
@@ -780,7 +924,12 @@ async def calendar(
     tasks: list[TaskListItem] = []
     if include_tasks:
         t = TiqoraItsmChangeTask
-        stmt = select(t).where(*_window_cond(t.planned_start, t.planned_end, lo, hi))
+        stmt = select(t).where(
+            *_window_cond(t.planned_start, t.planned_end, lo, hi),
+            t.change_ticket_id.in_(
+                select(ch.ticket_id).where(not_(ch.phase.in_(list(_OFF_CALENDAR))))
+            ),
+        )
         if wanted:
             stmt = stmt.where(
                 t.change_ticket_id.in_(select(ch.ticket_id).where(_service_cond(sorted(wanted))))
@@ -788,15 +937,21 @@ async def calendar(
         rows = list(
             (
                 await session.execute(
-                    stmt.order_by(t.planned_start, t.ticket_id).limit(LIST_SCAN_CAP + 1)
+                    stmt.order_by(
+                        case((t.planned_start.is_(None), 1), else_=0), t.planned_start, t.ticket_id
+                    ).limit(LIST_SCAN_CAP + 1)
                 )
             ).scalars()
         )
         if len(rows) > LIST_SCAN_CAP:
             truncated = True
         tasks = await _task_items(session, rows[:LIST_SCAN_CAP], user_id=user_id)
+        if wanted:  # same visibility rule as for the changes
+            keep = {r.ticket_id for r in shown}
+            tasks = [x for x in tasks if x.change_ticket_id in keep]
+    in_range = [f for f in found.items if f.end > lo and f.start < hi]
     return ChangeCalendar(
-        lo, hi, tuple(changes), tuple(tasks), tuple(found.items), truncated, found.truncated
+        lo, hi, tuple(changes), tuple(tasks), tuple(in_range), truncated, found.truncated
     )
 
 
@@ -840,11 +995,11 @@ async def service_availability(
     :data:`PSA_SERVICE_CAP` rows, the most affected first, then ordered by service name.
     """
     lo, hi = to_utc_naive(start), to_utc_naive(end)
-    _check_range(lo, hi)
     if not await _is_mode_b(session):
         return []
+    _check_range(lo, hi)
     ch = TiqoraItsmChange
-    recs, _ = await _scan(
+    recs, scan_truncated = await _scan(
         session,
         [
             ch.phase.in_(sorted(OVERLAP_PHASES)),
@@ -856,6 +1011,8 @@ async def service_availability(
     recs = [r for r in recs if r.ticket_id in facts and r.planned_start and r.planned_end]
     sets = await impact_sets(session, [r.ticket_id for r in recs])
     extras = await _extra_services(session, [r.ticket_id for r in recs])
+    # services reached only through CIs the caller cannot read stay out (like ``read_impact``)
+    visible = await _visible_services(session, sets, [r.ticket_id for r in recs], user_id=user_id)
     freezes = (await occurrences(session, start=lo, end=hi)).items
 
     windows: dict[int, list[ServiceWindow]] = defaultdict(list)
@@ -866,7 +1023,7 @@ async def service_availability(
         if facts[r.ticket_id].service_id is not None:
             direct.add(facts[r.ticket_id].service_id or 0)
         direct |= set(sets[r.ticket_id].direct_services)
-        for sid in sets[r.ticket_id].services | frozenset(direct):
+        for sid in visible[r.ticket_id] | frozenset(direct):
             windows[sid].append(
                 ServiceWindow(
                     "change",
@@ -904,6 +1061,13 @@ async def service_availability(
         if sid in names
     ]
     rows.sort(key=lambda r: (-r.minutes_affected, r.service_id))
+    if scan_truncated or len(rows) > PSA_SERVICE_CAP:
+        logger.warning(
+            "change PSA truncated (changes cut: %s, services: %d of cap %d)",
+            scan_truncated,
+            len(rows),
+            PSA_SERVICE_CAP,
+        )
     return sorted(rows[:PSA_SERVICE_CAP], key=lambda r: (r.service_name.casefold(), r.service_id))
 
 

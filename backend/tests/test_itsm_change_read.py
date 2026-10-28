@@ -20,6 +20,7 @@ from sqlalchemy import text, update
 
 from tests._change_fixtures import (
     APP_SETTINGS,
+    G_A,
     G_B,
     Q_A,
     Q_B,
@@ -29,14 +30,19 @@ from tests._change_fixtures import (
     ChangeWorld,
     change_world,
 )
+from tests._cmdb_helpers import make_ci, make_class
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
+from tiqora.cmdb.links import LinkEnd, LinkService
+from tiqora.cmdb.seed import seed_defaults
+from tiqora.cmdb.service import system_access
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.change import read as read_module
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import FreezeIn, create_freeze
+from tiqora.itsm.change.impact import recompute_impact
 from tiqora.itsm.change.models import TiqoraItsmChange, TiqoraItsmChangeImpact
 from tiqora.itsm.change.read import (
     LIST_SCAN_CAP,
@@ -63,8 +69,7 @@ pytestmark = pytest.mark.db
 
 D = datetime(2026, 11, 10)
 WIN = (D.replace(hour=8), D.replace(hour=12))
-SVC_A, SVC_B = 947330, 947331
-CI_A, CI_B = 947340, 947341
+SVC_A, SVC_B, SVC_C = 947330, 947331, 947332
 RANGE = (D - timedelta(days=1), D + timedelta(days=2))
 
 
@@ -146,6 +151,14 @@ async def _change(
     return tid
 
 
+async def _real_cis(w: ChangeWorld, *names: str) -> list[int]:
+    """CIs of a class in group ``G_A`` (readable for ``U_FULL``): the ``ci_id`` filter only
+    matches CIs the caller can read."""
+    await seed_defaults(w.session)
+    class_id = await make_class(w.session, key="chg94srv", group_id=G_A)
+    return [await make_ci(w.session, class_id, n, user_id=U_FULL) for n in names]
+
+
 async def _set_mode(w: ChangeWorld, mode: str) -> None:
     await w.session.execute(
         update(TiqoraSettings).where(TiqoraSettings.key == "itsm.mode").values(value=mode)
@@ -158,6 +171,7 @@ async def _ids(w: ChangeWorld, query: ChangeQuery, *, user: int = U_FULL) -> lis
 
 
 async def test_list_filters_phase_type_window_service_ci(w: ChangeWorld) -> None:
+    CI_A, CI_B = await _real_cis(w, "srv-a.example.org", "srv-b.example.org")
     a = await _change(w, phase="scheduled", services=(SVC_A,), cis=(CI_A,))
     b = await _change(
         w,
@@ -590,6 +604,7 @@ def make_client(w: ChangeWorld) -> Callable[[int, str], AsyncClient]:
 async def test_api_list_calendar_and_tasks(
     w: ChangeWorld, make_client: Callable[[int, str], AsyncClient]
 ) -> None:
+    (CI_A,) = await _real_cis(w, "srv-a.example.org")
     change = await _change(w, title="Switch-Tausch", services=(SVC_A,), cis=(CI_A,))
     await _change(w, queue=Q_B, services=(SVC_A,))
     task = await _task(w, change, "Aufgabe")
@@ -654,3 +669,198 @@ async def test_api_mode_a_is_refused(
             assert (await api.get(path)).status_code == 409
         window = {"start": RANGE[0].isoformat() + "Z", "end": RANGE[1].isoformat() + "Z"}
         assert (await api.get("/api/v1/itsm/change-calendar", params=window)).status_code == 409
+
+
+# --- review fixes -------------------------------------------------------------------------------
+
+
+async def _hidden_path_change(w: ChangeWorld) -> tuple[int, int]:
+    """A scheduled change whose only path to ``SVC_C`` runs through a CI of group ``G_B``
+    (unreadable for ``U_FULL``, readable for ``U_MANAGER``); returns ``(change, hidden CI)``."""
+    await seed_defaults(w.session)
+    await w.session.execute(
+        text(
+            "INSERT INTO service (id, name, valid_id, create_time, create_by, change_time,"
+            " change_by) VALUES (:id, 'chg94-service-c', 1, :t, 1, :t, 1)"
+        ),
+        {"id": SVC_C, "t": datetime(2026, 10, 1)},
+    )
+    change = await _change(w, services=(SVC_A,))
+    class_id = await make_class(w.session, key="chg94vault", group_id=G_B)
+    secret = await make_ci(w.session, class_id, "srv-vault-01.example.org", user_id=U_FULL)
+    link = LinkService(w.session)
+    await link.add(
+        system_access(U_FULL),
+        source=LinkEnd("ci", str(secret)),
+        target=LinkEnd("ticket", str(change)),
+        link_type_key="RelevantTo",
+        enforce_permissions=False,
+    )
+    await link.add(
+        system_access(U_FULL),
+        source=LinkEnd("service", str(SVC_C)),
+        target=LinkEnd("ci", str(secret)),
+        link_type_key="DependsOn",
+        enforce_permissions=False,
+    )
+    await recompute_impact(w.session, ticket_id=change)
+    stored = (
+        await w.session.execute(
+            text(
+                "SELECT ref_key FROM tiqora_itsm_change_impact WHERE ticket_id = :t"
+                " AND kind = 'service'"
+            ),
+            {"t": change},
+        )
+    ).all()
+    assert {int(r[0]) for r in stored} == {SVC_C}  # the ticket has no service of its own
+    return change, secret
+
+
+async def test_hidden_ci_path_does_not_reveal_service(w: ChangeWorld) -> None:
+    change, secret = await _hidden_path_change(w)
+    # the manager reads the CI: the service is visible everywhere
+    seen = await service_availability(w.session, user_id=U_MANAGER, start=RANGE[0], end=RANGE[1])
+    assert [r.service_id for r in seen] == [SVC_C]
+    assert await _ids(w, ChangeQuery(service_id=SVC_C), user=U_MANAGER) == [change]
+    cal = await calendar(
+        w.session, user_id=U_MANAGER, start=RANGE[0], end=RANGE[1], service_ids=(SVC_C,)
+    )
+    assert [c.item.ticket_id for c in cal.changes] == [change]
+    assert await _ids(w, ChangeQuery(ci_id=secret), user=U_MANAGER) == [change]
+    # U_FULL cannot read the CI: no PSA window, no service match, no CI match
+    assert await service_availability(w.session, user_id=U_FULL, start=RANGE[0], end=RANGE[1]) == []
+    assert await _ids(w, ChangeQuery(service_id=SVC_C)) == []
+    hidden_cal = await calendar(
+        w.session, user_id=U_FULL, start=RANGE[0], end=RANGE[1], service_ids=(SVC_C,)
+    )
+    assert hidden_cal.changes == ()
+    assert await _ids(w, ChangeQuery(ci_id=secret)) == []
+    # the change itself stays listed and its conflict flags still count the hidden path
+    assert await _ids(w, ChangeQuery()) == [change]
+
+
+async def test_text_search_finds_old_change_beyond_scan_cap(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    oldest = await _change(w, title="Uralt Router")
+    for i in range(3):
+        await _change(w, title=f"Neuer Switch {i}")
+    monkeypatch.setattr(read_module, "LIST_SCAN_CAP", 2)
+    plain = await list_changes(w.session, ChangeQuery(), user_id=U_FULL)
+    assert plain.truncated is True and oldest not in [i.ticket_id for i in plain.items]
+    monkeypatch.setattr(read_module, "LIST_SCAN_CAP", 5000)
+    tn = next(
+        i.tn
+        for i in (await list_changes(w.session, ChangeQuery(), user_id=U_FULL)).items
+        if i.ticket_id == oldest
+    )
+    monkeypatch.setattr(read_module, "LIST_SCAN_CAP", 2)
+    by_tn = await list_changes(w.session, ChangeQuery(text=tn), user_id=U_FULL)
+    assert [i.ticket_id for i in by_tn.items] == [oldest] and by_tn.truncated is False
+    by_title = await list_changes(w.session, ChangeQuery(text="uralt"), user_id=U_FULL)
+    assert [i.ticket_id for i in by_title.items] == [oldest] and by_title.truncated is False
+    many = await list_changes(w.session, ChangeQuery(text="switch"), user_id=U_FULL)
+    assert many.truncated is True and len(many.items) == 2  # the search itself exceeds the cap
+
+
+async def test_calendar_flags_match_read_conflicts_across_the_boundary(w: ChangeWorld) -> None:
+    from tiqora.itsm.change.conflicts import load_conflicts
+
+    day = D.replace(hour=0)
+    # the change crosses the start of the requested range
+    crossing = await _change(
+        w, services=(SVC_A,), window=(day - timedelta(hours=2), day + timedelta(hours=2))
+    )
+    before = await _change(
+        w, services=(SVC_A,), window=(day - timedelta(hours=3), day - timedelta(hours=1))
+    )
+    await create_freeze(
+        w.session,
+        data=FreezeIn.model_validate(
+            {
+                "name": "chg94-vorher",
+                "starts_at": (day - timedelta(hours=3)).isoformat() + "Z",
+                "ends_at": (day - timedelta(hours=1)).isoformat() + "Z",
+            }
+        ),
+        user_id=1,
+    )
+    real = await load_conflicts(w.session, ticket_id=crossing, user_id=U_FULL)
+    assert {c.kind for c in real} == {"freeze", "change_overlap"}
+    cal = await calendar(w.session, user_id=U_FULL, start=day, end=day + timedelta(days=1))
+    flags = {c.item.ticket_id: c for c in cal.changes}
+    assert set(flags) == {crossing}  # `before` ends before the range
+    assert flags[crossing].conflict_kinds == ("change_overlap", "freeze")
+    assert flags[crossing].conflict_severity == "block"
+    assert cal.freezes == ()  # the freeze itself lies outside the range
+    assert before not in flags
+
+
+async def test_tasks_of_off_calendar_and_rejected_changes(w: ChangeWorld) -> None:
+    live = await _change(w)
+    parked = await _change(w)
+    live_task = await _task(w, live, "Offen")
+    parked_task = await _task(w, parked, "Geparkt")
+    row = await w.session.get(TiqoraItsmChange, parked)
+    assert row is not None
+    row.phase = "rejected"
+    await w.session.flush()
+    for ticket in (live_task, parked_task):
+        await w.session.execute(
+            text("UPDATE tiqora_itsm_change_task SET planned_start = :s WHERE ticket_id = :t"),
+            {"s": WIN[0], "t": ticket},
+        )
+    cal = await calendar(w.session, user_id=U_FULL, start=RANGE[0], end=RANGE[1])
+    assert [t.ticket_id for t in cal.tasks] == [live_task]
+    assert [t.ticket_id for t in await my_tasks(w.session, user_id=U_FULL)] == [live_task]
+    everything = await my_tasks(w.session, user_id=U_FULL, open_only=False)
+    assert sorted(t.ticket_id for t in everything) == sorted([live_task, parked_task])
+
+
+async def test_my_tasks_owner_filter_precedes_the_scan_cap(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    change = await _change(w)
+    mine = await _task(w, change, "Meine")
+    for i in range(3):
+        await _task(w, change, f"Fremd {i}", owner=U_MANAGER)
+    monkeypatch.setattr(read_module, "LIST_SCAN_CAP", 1)
+    assert [t.ticket_id for t in await my_tasks(w.session, user_id=U_FULL)] == [mine]
+
+
+async def test_range_is_checked_after_the_mode(w: ChangeWorld) -> None:
+    await _set_mode(w, "znuny_readthrough")
+    too_long = D + timedelta(days=200)
+    cal = await calendar(w.session, user_id=U_FULL, start=D, end=too_long)
+    assert cal.changes == ()
+    assert await service_availability(w.session, user_id=U_FULL, start=too_long, end=D) == []
+
+
+async def test_api_services_route_mode_gates(
+    w: ChangeWorld, make_client: Callable[[int, str], AsyncClient]
+) -> None:
+    window = {"start": RANGE[0].isoformat() + "Z", "end": RANGE[1].isoformat() + "Z"}
+    async with make_client(U_FULL, "chg94-full") as api:
+        await _set_mode(w, "znuny_readthrough")
+        res = await api.get("/api/v1/itsm/change-calendar/services", params=window)
+        assert res.status_code == 409
+        await _set_mode(w, "off")
+        for path in ("/api/v1/itsm/changes", "/api/v1/itsm/change-calendar/services"):
+            assert (await api.get(path, params=window)).status_code == 404
+
+
+async def test_calendar_cap_keeps_dated_changes_before_open_start(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """NULL planned starts sort last on both dialects, so the scan cap drops them first."""
+    x = await _change(w)
+    y = await _change(w, window=(WIN[0] + timedelta(hours=1), WIN[1]))
+    z = await _change(w)
+    row = await w.session.get(TiqoraItsmChange, z)
+    assert row is not None
+    row.planned_start = None
+    await w.session.flush()
+    monkeypatch.setattr(read_module, "LIST_SCAN_CAP", 2)
+    cal = await calendar(w.session, user_id=U_FULL, start=RANGE[0], end=RANGE[1])
+    assert [c.item.ticket_id for c in cal.changes] == [x, y] and cal.truncated is True

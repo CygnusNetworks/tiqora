@@ -434,6 +434,8 @@ class ChangeListItemOut(BaseModel):
     risk_level: str | None
     planned_start: UtcDateTime | None
     planned_end: UtcDateTime | None
+    #: the ticket's service plus the change's extra services; a ``service_id`` filter can also
+    #: match a service reached through the impact set, which is then not listed here
     service_ids: list[int]
     updated_at: UtcDateTime
 
@@ -454,7 +456,8 @@ class ChangePageOut(BaseModel):
     items: list[ChangeListItemOut]
     #: matches among the scanned changes (a lower bound when ``truncated``)
     total: int
-    #: more changes matched than one scan reads; narrow the filters
+    #: more changes (or more title matches of the search text) than one scan reads; narrow the
+    #: filters or make the search text more specific
     truncated: bool
 
 
