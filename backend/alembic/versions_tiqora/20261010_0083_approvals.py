@@ -206,6 +206,9 @@ def upgrade() -> None:
         "ix_tiqora_approval_approver_user", "tiqora_approval_approver", ["user_id", "status"]
     )
     op.create_index("ix_tiqora_approval_approver_ticket", "tiqora_approval_approver", ["ticket_id"])
+    op.create_index(
+        "ix_tiqora_approval_approver_status", "tiqora_approval_approver", ["status", "approval_id"]
+    )
 
     op.create_table(
         "tiqora_approval_vote",

@@ -255,6 +255,8 @@ class TiqoraApprovalApprover(TiqoraBase):
         Index("ix_tiqora_approval_approver_inbox", "principal", "status"),
         Index("ix_tiqora_approval_approver_user", "user_id", "status"),
         Index("ix_tiqora_approval_approver_ticket", "ticket_id"),
+        #: the sweeper's invalid-approver scan (pending rows by request id)
+        Index("ix_tiqora_approval_approver_status", "status", "approval_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)

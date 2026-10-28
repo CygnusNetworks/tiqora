@@ -9299,7 +9299,9 @@
       "template_key_taken": "An approval template with this identifier already exists.",
       "delegation_overlap": "There is already a delegation for this period.",
       "rate_limited": "Too many attempts. Please wait a few minutes.",
-      "unknown": "The approval could not be processed. Please try again."
+      "unknown": "The approval could not be processed. Please try again.",
+      "approver_invalid": "Your account is no longer active, so you cannot decide on this approval anymore.",
+      "template_changed": "The template was changed in the meantime. Please reload it."
     },
     "overdue": "overdue",
     "status": {

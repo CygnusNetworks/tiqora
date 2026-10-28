@@ -127,6 +127,8 @@ class _Plan:
     #: ``UserEmail`` / ``UserLanguage`` of the agent recipients, loaded once
     emails: dict[int, str] = field(default_factory=dict)
     languages: dict[int, str] = field(default_factory=dict)
+    #: the subject type's ``describe`` lines, computed once and before any row lock (consumer code)
+    lines: list[str] = field(default_factory=list)
 
 
 def _result(
@@ -280,6 +282,7 @@ async def _plan(
         default_language=await SysConfig(session).default_language(),
         emails=await bulk_get_preferences(session, agent_ids, "UserEmail"),
         languages=await bulk_get_preferences(session, agent_ids, "UserLanguage"),
+        lines=await describe_lines(session, approval) if payload.kind in texts.ACTION_KINDS else [],
     )
 
 
@@ -430,15 +433,21 @@ async def _deliver(
     plan: _Plan,
     recipient: _Recipient,
 ) -> Literal["sent", "skipped", "failed"]:
-    """One recipient, one transaction (the caller rolls back on an exception)."""
+    """One recipient, one transaction (the caller rolls back on an exception).
+
+    For the kinds that need a pending request the request lock is the first statement: a cancel
+    or decision committed since the plan is seen, and none commits until this recipient's link
+    and audit row are written (the lock ends with the commit before SMTP).
+    """
     kind = payload.kind
-    approval = (
-        await session.execute(
-            select(TiqoraApproval)
-            .where(TiqoraApproval.id == payload.approval_id)
-            .execution_options(populate_existing=True)
-        )
-    ).scalar_one_or_none()
+    stmt = (
+        select(TiqoraApproval)
+        .where(TiqoraApproval.id == payload.approval_id)
+        .execution_options(populate_existing=True)
+    )
+    if kind in _PENDING_KINDS:
+        stmt = stmt.with_for_update()
+    approval = (await session.execute(stmt)).scalar_one_or_none()
     if approval is None or await _already_notified(session, approval.id, ctx.job_id, recipient):
         return "skipped"
     if kind in _PENDING_KINDS and approval.status != "pending":
@@ -511,7 +520,8 @@ async def _deliver(
         and step is not None
     ):
         link = await _decision_link(session, ctx, settings, row, step, now)
-    action = kind in texts.ACTION_KINDS
+    # the requester of an overdue request is told, not asked: no rule, link or inbox pointer
+    action = kind in texts.ACTION_KINDS and recipient.role != "requester"
     requester = ""
     if kind == "request" and (requester_principal := _parse(approval.requester)) is not None:
         requester = await _display_name(session, requester_principal)
@@ -537,11 +547,12 @@ async def _deliver(
         if action and step and step.due_at
         else None,
         description=approval.description if action else None,
-        lines=await describe_lines(session, approval) if action else (),
+        lines=plan.lines if action else (),
         link=link[0] if link else None,
         expires=texts.moment_text(link[1], locale) if link else None,
         inbox_url=_inbox_url(ctx, settings, recipient.principal) if action else None,
-        inbox_hint=recipient.principal.kind == "agent" or settings.portal_approvals_enabled,
+        inbox_hint=action
+        and (recipient.principal.kind == "agent" or settings.portal_approvals_enabled),
         age=age or None,
         name=name or None,
         status="rejected" if approval.status == "rejected" else "approved",

@@ -290,6 +290,8 @@ ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
         "list_in_use": 409,
         "template_key_taken": 409,
         "delegation_overlap": 409,
+        "approver_invalid": 403,
+        "template_changed": 409,
     }
 )
 

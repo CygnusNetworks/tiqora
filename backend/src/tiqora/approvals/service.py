@@ -60,6 +60,7 @@ from tiqora.jobs.service import utc_now
 
 _TITLE_MAX = 250
 _KEY_MAX = 100
+_SUBJECT_REF_MAX = 190  # tiqora_approval.subject_ref VARCHAR(190)
 _CANCEL_REASONS = frozenset({"cancelled", "superseded", "ticket_deleted"})
 _REASON_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
 _COMMENT_MAX = 2000
@@ -85,7 +86,7 @@ def _info(approval: TiqoraApproval) -> ApprovalInfo:
 # --- request ---------------------------------------------------------------------------------
 
 
-def _check_text(title: str, approval_key: str) -> tuple[str, str]:
+def _check_text(title: str, approval_key: str, subject_ref: str | None) -> tuple[str, str]:
     title = title.strip()
     approval_key = approval_key.strip()
     if not title or len(title) > _TITLE_MAX:
@@ -93,6 +94,10 @@ def _check_text(title: str, approval_key: str) -> tuple[str, str]:
     if not approval_key or len(approval_key) > _KEY_MAX:
         raise ApprovalError(
             "invalid_definition", 422, f"approval_key must be 1-{_KEY_MAX} characters"
+        )
+    if subject_ref is not None and len(subject_ref) > _SUBJECT_REF_MAX:
+        raise ApprovalError(
+            "invalid_definition", 422, f"subject_ref must be at most {_SUBJECT_REF_MAX} characters"
         )
     return title, approval_key
 
@@ -229,13 +234,14 @@ async def request_approval(
 ) -> ApprovalInfo:
     """Creates a request, activates stage one and queues the mails. Flushes, never commits.
 
-    Raises ``unknown_subject_type``, ``ticket_not_found``, ``invalid_definition``,
+    Raises ``unknown_subject_type``, ``ticket_not_found``, ``invalid_definition`` (also for a
+    title, key or ``subject_ref`` that does not fit its column),
     ``template_not_found``, ``customer_approvers_not_allowed`` or ``unknown_resolver``. With
     *supersede* a pending request with the same ``(ticket_id, approval_key)`` is cancelled
     (reason ``superseded``) and points at the new one through ``superseded_by``.
     """
     reg = registry or get_registry()
-    title, approval_key = _check_text(title, approval_key)
+    title, approval_key = _check_text(title, approval_key, subject_ref)
     await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
     asettings = await _engine.load_settings(session, settings)
     defn, template_id = await _validated_definition(
@@ -333,7 +339,7 @@ async def record_auto_decision(
     if not _REASON_RE.fullmatch(reason):
         raise ApprovalError("invalid_definition", 422, "reason must be a short lower-case code")
     reg = registry or get_registry()
-    title, approval_key = _check_text(title, approval_key)
+    title, approval_key = _check_text(title, approval_key, subject_ref)
     await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
     asettings = await _engine.load_settings(session, settings)
     requester_key = await _requester_key(session, None, actor)

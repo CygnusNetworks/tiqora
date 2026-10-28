@@ -359,6 +359,36 @@ async def test_expired_token(url_fixture: str, request: pytest.FixtureRequest) -
             assert (await _tokens(session, approver))[0].used_at is None
 
 
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_link_of_deactivated_agent_refused(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A link is a bearer credential: a deactivated agent cannot inspect or vote with it; the
+    row stays pending for the sweeper and the link stays unused."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _request(session, ONE_STEP)
+            approver = await _approver(session, aid, AG3)
+            token = await _issue(session, approver)
+            await session.execute(text("UPDATE users SET valid_id = 2 WHERE id = :u"), {"u": AG3})
+            await session.commit()
+            with pytest.raises(ApprovalError) as inspect_err:
+                await tokens.inspect_link(session, token, settings=SETTINGS)
+            await session.rollback()
+            with pytest.raises(ApprovalError) as redeem_err:
+                await tokens.redeem_link(
+                    session, token, decision="approved", comment=None, settings=SETTINGS
+                )
+            await session.rollback()
+            for err in (inspect_err.value, redeem_err.value):
+                assert (err.code, err.http_status) == ("approver_invalid", 403)
+            assert await _votes(session, aid) == []
+            assert (await _tokens(session, approver))[0].used_at is None
+            row = await session.get(TiqoraApprovalApprover, approver, populate_existing=True)
+            assert row is not None and row.status == "pending"
+
+
 # --- redeem --------------------------------------------------------------------------------------
 
 

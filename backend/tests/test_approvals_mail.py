@@ -33,6 +33,7 @@ from tests._approvals_helpers import (
 )
 from tests.approvals_consumer_kit import shared_session_factory
 from tiqora.approvals import delegation, service, tokens
+from tiqora.approvals import notify as notify_module
 from tiqora.approvals.contract import JOB_MAIL, Actor, ApprovalDefinition
 from tiqora.approvals.models import (
     TiqoraApprovalApprover,
@@ -998,10 +999,46 @@ async def test_overdue_notice_survives_step_closed_by_timeout(
                 assert str(message["Subject"]).endswith("Frist überschritten: Freigabe appr97")
                 assert "/approve#t=" not in _body(message)
             assert await _tokens(session, approval_id) == []
+            # the requester is informed, not asked: no rule and no pointer to an inbox
+            approver, requester = _body(by_to[EMAIL[AG3]]), _body(by_to[EMAIL[AG1]])
+            assert "Es genügt eine Freigabe" in approver and "Meine Freigaben" in approver
+            assert "Es genügt eine Freigabe" not in requester
+            assert "Meine Freigaben" not in requester
+            assert "Die Frist der folgenden Freigabe ist überschritten" in requester
 
             # a plain request mail for the same closed request is still skipped
             again = await _run(session, approval_id, "request", list(ids.values()), job_id=2)
             assert again["sent"] == 0
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_request_mail_skipped_when_cancelled_after_planning(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A request cancelled between the job's plan and the delivery gets no request mail."""
+    mail = CapturingMail(monkeypatch)
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session)
+        with installed_registry(make_fake_subject_type()):
+            approval_id = await _request(session, ONE)
+            ids = await _approver_ids(session, approval_id)
+            real_plan = notify_module._plan  # noqa: SLF001
+
+            async def plan_then_cancel(*args: Any) -> Any:
+                plan = await real_plan(*args)
+                await service.cancel_approval(
+                    session, approval_id, actor=REQUESTER, settings=SETTINGS
+                )
+                await session.commit()
+                return plan
+
+            monkeypatch.setattr(notify_module, "_plan", plan_then_cancel)
+            result = await _run(session, approval_id, "request", list(ids.values()))
+
+            assert (result["sent"], result["skipped"]) == (0, 1)
+            assert mail.sent == []
+            assert await _tokens(session, approval_id) == []
 
 
 @pytest.mark.db

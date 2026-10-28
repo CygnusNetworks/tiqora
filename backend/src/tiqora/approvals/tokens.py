@@ -30,9 +30,10 @@ from tiqora.approvals.models import (
     TiqoraApprovalStep,
     TiqoraApprovalToken,
 )
-from tiqora.approvals.resolve import customer_in_ticket_company
+from tiqora.approvals.resolve import customer_in_ticket_company, customer_rows
 from tiqora.approvals.settings import ApprovalSettings
 from tiqora.config import Settings
+from tiqora.db.legacy.user import Users
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
 
@@ -226,16 +227,35 @@ async def resolve_link(
     )
 
 
+async def _require_valid_principal(session: AsyncSession, principal: Principal) -> None:
+    """``approver_invalid`` (403) when the link's agent or customer user is gone or not valid.
+
+    A link is a bearer credential: authentication does not stop a deactivated person here, so
+    the link checks it itself. The approver row stays as it is; the sweeper takes it out.
+    """
+    if principal.kind == "agent":
+        valid = (
+            await session.execute(select(Users.valid_id).where(Users.id == principal.user_id))
+        ).scalar_one_or_none()
+        ok = valid == 1
+    else:
+        assert principal.login is not None  # noqa: S101 - Principal validates this
+        found = (await customer_rows(session, [principal.login])).get(principal.login.lower())
+        ok = found is not None and found[1] == 1
+    if not ok:
+        raise ApprovalError("approver_invalid", 403)
+
+
 async def inspect_link(
     session: AsyncSession, token: str, *, settings: Settings | None = None
 ) -> LinkTarget:
     """:func:`resolve_link` for the confirm page: it refuses what a vote through the link would
     be refused for before anything about the request is shown.
 
-    ``link_invalid`` while links are switched off; for a customer approver the errors
-    ``decide`` raises (``forbidden`` with customer approvers off,
-    ``customer_approver_outside_company`` once the ticket left the customer's company). Reads
-    only; the caller ends the transaction.
+    ``link_invalid`` while links are switched off; ``approver_invalid`` when the link's agent or
+    customer user is no longer valid; for a customer approver the errors ``decide`` raises
+    (``forbidden`` with customer approvers off, ``customer_approver_outside_company`` once the
+    ticket left the customer's company). Reads only; the caller ends the transaction.
     """
     from tiqora.approvals import _engine
 
@@ -243,6 +263,7 @@ async def inspect_link(
     if not asettings.email_links_enabled:
         raise ApprovalError("link_invalid", 410)
     target = await resolve_link(session, token)
+    await _require_valid_principal(session, target.principal)
     if target.principal.kind == "customer":
         assert target.principal.login is not None  # noqa: S101 - Principal validates this
         approval = (
@@ -276,9 +297,9 @@ async def redeem_link(
     decided row); the conditional ``UPDATE … WHERE used_at IS NULL AND revoked_at IS NULL``
     (rowcount 1, else ``link_used``) is a second barrier. The vote is cast
     through ``service.decide`` in the same transaction; when it raises, ``redeem_link`` rolls
-    back itself so ``used_at`` is undone. Links die while ``email_links_enabled`` is off. The
-    caller commits. Raises ``link_*`` (HTTP 410) or whatever
-    ``decide`` refuses with.
+    back itself so ``used_at`` is undone. Links die while ``email_links_enabled`` is off; a link
+    whose agent or customer user was deactivated answers ``approver_invalid`` (403). The caller
+    commits. Raises ``link_*`` (HTTP 410) or whatever ``decide`` refuses with.
     """
     from tiqora.approvals import _engine, service
 
@@ -299,6 +320,7 @@ async def redeem_link(
     if not (await _engine.load_settings(session, settings)).email_links_enabled:
         raise ApprovalError("link_invalid", 410)
     target = await resolve_link(session, token, for_update=True)
+    await _require_valid_principal(session, target.principal)
     consumed = await session.execute(
         update(TiqoraApprovalToken)
         .where(

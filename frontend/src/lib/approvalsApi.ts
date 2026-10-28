@@ -138,6 +138,8 @@ export const APPROVAL_ERROR_CODES = [
   "list_in_use",
   "template_key_taken",
   "delegation_overlap",
+  "approver_invalid",
+  "template_changed",
   "rate_limited",
 ] as const;
 

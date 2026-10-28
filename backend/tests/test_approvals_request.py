@@ -307,6 +307,22 @@ async def test_exactly_one_of_definition_or_template(
 
 @pytest.mark.db
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_subject_ref_too_long_is_invalid_definition(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """``subject_ref`` is VARCHAR(190): a longer one is 422, never a database error."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            info = await _request(session, subject_ref="r" * 190)
+            assert info.subject_ref == "r" * 190
+            with pytest.raises(ApprovalError) as excinfo:
+                await _request(session, subject_ref="r" * 191, approval_key="zu-lang")
+            assert (excinfo.value.code, excinfo.value.http_status) == ("invalid_definition", 422)
+            assert "subject_ref" in str(excinfo.value.detail)
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_unknown_subject_type(url_fixture: str, request: pytest.FixtureRequest) -> None:
     async with approvals_session(request, url_fixture) as session:
         with installed_registry(), pytest.raises(ApprovalError) as excinfo:
