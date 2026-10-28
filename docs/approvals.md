@@ -330,7 +330,7 @@ kein Schritt wird entschieden.
 
 ## 6 Vertretung und Weiterleiten
 
-**Vertretung (Standing Substitute).** Unter *Meine Freigaben*, Reiter *Vertretung*, nennt ein Agent
+**Vertretung.** Unter *Meine Freigaben*, Reiter *Vertretung*, nennt ein Agent
 eine andere Person, die für einen Zeitraum an seiner Stelle entscheiden darf (Beginn optional,
 Ende optional; ohne Ende gilt die Vertretung, bis sie beendet wird). Die Vertretung sieht die offenen
 Zeilen des Vertretenen und kann sie entscheiden; die erste Entscheidung zählt. Eine Stimme wird mit dem

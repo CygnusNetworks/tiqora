@@ -1020,7 +1020,7 @@ and e-mail decision links. Four route families, listed below. An API key needs t
 `/api/v1/approvals`, `/api/v1/reference/roles` and the ticket routes, and `admin` for
 `/api/v1/admin/approvals`; `/api/v1/approval-links` is public and takes no key. Deciding with an API
 key records the channel `api`. Errors have the usual shape `{"detail": {"code": "...", "detail": ...}}`;
-the codes are `approval_not_found` (404), `forbidden`, `not_an_approver`, `self_approval_forbidden`,
+the codes are `approval_not_found`, `ticket_not_found`, `template_not_found`, `list_not_found`, `delegation_not_found` (404), `forbidden`, `not_an_approver`, `self_approval_forbidden`,
 `customer_approver_outside_company`, `delegation_not_active` (403), `already_decided`,
 `approval_closed`, `step_not_active`, `forward_not_allowed`, `list_name_taken`, `list_in_use`,
 `template_key_taken`, `delegation_overlap` (409), `invalid_definition`, `unknown_subject_type`,

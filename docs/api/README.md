@@ -101,7 +101,7 @@ surface is documented by hand in [`mcp.md`](mcp.md) from the tool registry in
 
   | Area | Covers |
   |---|---|
-  | `tickets` | `/api/v1/tickets`, `queues`, `reference`, `templates`, `search`, `integrations`, `ticket-filters`, `saved-searches`, `avatars`, **`chat`** (agent web chat), **`jobs`** (shared with `stats`) |
+  | `tickets` | `/api/v1/tickets`, `queues`, `reference`, `templates`, `search`, `integrations`, `ticket-filters`, `saved-searches`, `avatars`, **`chat`** (agent web chat), **`jobs`** (shared with `stats`), **`approvals`** (`/api/v1/approvals`; `/admin/approvals` stays in `admin`; `/api/v1/approval-links` is public and needs no key) |
   | `customers` | `/api/v1/customers`, `customer-directory` |
   | `kb` | `/api/v1/kb` |
   | `calendar` | `/api/v1/calendar` |
