@@ -18,7 +18,9 @@ describe("ApprovalTemplatesPage", () => {
     const rows = await screen.findAllByTestId("template-row");
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("standard_einzel");
-    expect(rows[1]).toHaveTextContent("Alle Gegenstandstypen");
+    expect(rows[0]).toHaveTextContent("Ticket");
+    expect(rows[1]).toHaveTextContent("cab_normal");
+    expect(rows[1]).toHaveTextContent("Ticket");
     expect(screen.getByTestId("admin-approvals-settings-link")).toHaveAttribute("href", "/admin/settings/approvals");
   });
 
