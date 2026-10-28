@@ -54,6 +54,7 @@ _TABLES = (
     "tiqora_itsm_change_event",
     "tiqora_itsm_legacy_change",
     "tiqora_itsm_legacy_change_ref",
+    "tiqora_itsm_legacy_erased",
 )
 _PARAMS = ["mariadb_znuny_url", "postgres_znuny_url"]
 _BAND = "BETWEEN 946100 AND 946199"
@@ -214,7 +215,7 @@ def test_migration_creates_change_tables(migrated: str) -> None:
     sync_url = migrated
     assert _version(sync_url) == _NEW
     assert set(_TABLES) <= _tables(sync_url)
-    assert len(_TABLES) == 16
+    assert len(_TABLES) == 17
     engine = create_engine(sync_url)
     try:
         for name in _TABLES:
@@ -269,6 +270,10 @@ def test_migration_creates_change_tables(migrated: str) -> None:
             "tiqora_itsm_cab_agenda_item": (
                 "uq_tiqora_itsm_cab_agenda",
                 ["meeting_id", "change_ticket_id"],
+            ),
+            "tiqora_itsm_legacy_erased": (
+                "uq_tiqora_itsm_legacy_erased_hash",
+                ["identifier_hash"],
             ),
             "tiqora_itsm_legacy_change": (
                 "uq_tiqora_itsm_legacy_change_znuny",

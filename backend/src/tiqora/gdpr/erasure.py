@@ -2212,7 +2212,8 @@ async def run_erasure(
                 )
             )
         # Archived Znuny changes: the customer in CABs, history values and notification
-        # recipients (S5) is pseudonymised / redacted, their lookup rows go.
+        # recipients (S5) is pseudonymised / redacted, their lookup rows go, and a tombstone
+        # keeps them out of every later archive run (rollback deletes the new tombstones).
         if await _table_exists(session, "tiqora_itsm_legacy_change"):
             counts.update(
                 await erase_legacy_change_customers(
@@ -2220,6 +2221,7 @@ async def run_erasure(
                     replacements=login_to_new,
                     emails=erased_emails,
                     add_backup=_backup_saved,
+                    secret_key=settings.secret_key,
                 )
             )
         # GenericInterface debugger lines hold payloads of these tickets (customer names,

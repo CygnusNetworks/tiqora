@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
     DateTime,
@@ -467,3 +468,22 @@ class TiqoraItsmLegacyChangeRef(TiqoraBase):
     workorder_number: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=False, default=0, server_default="0"
     )
+
+
+class TiqoraItsmLegacyErased(TiqoraBase):
+    """GDPR tombstone: an erased customer login or address that never re-enters the archive.
+
+    Only a keyed hash (HMAC-SHA256 of the lowercased identifier, ``legacy.archive.erased_hash``)
+    is stored, never the identifier itself.
+    """
+
+    __tablename__ = "tiqora_itsm_legacy_erased"
+    __table_args__ = (
+        UniqueConstraint("identifier_hash", name="uq_tiqora_itsm_legacy_erased_hash"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    identifier_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    #: ``login`` | ``email``
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)

@@ -41,10 +41,10 @@ from tiqora.itsm.change.freeze import (
     update_freeze,
 )
 from tiqora.itsm.change.legacy.archive import (
-    ARCHIVE_DEDUPE_KEY,
     ARCHIVE_JOB_KIND,
     LegacyArchivePayload,
     archive_blocker,
+    archive_dedupe_key,
     archive_status,
 )
 from tiqora.itsm.change.risk import (
@@ -284,18 +284,18 @@ async def post_legacy_archive(
 ) -> JobAccepted:
     """Archive the Znuny changes again in the background (Mode B only; 409
     ``legacy_archive_mode_b_only`` / ``legacy_archive_no_tables`` otherwise). An active archive
-    job is answered instead of a second one. Poll ``GET /api/v1/jobs/{job_id}``."""
+    job of the same kind (dry run or real run) is answered instead of a second one. Poll
+    ``GET /api/v1/jobs/{job_id}``."""
     blocked = await archive_blocker(session)
     if blocked is not None:
         raise ChangeError(blocked.code, 409, message=blocked.message)
+    dry_run = False if body is None else body.dry_run
     job = await enqueue_job(
         session,
         kind=ARCHIVE_JOB_KIND,
-        payload=LegacyArchivePayload(
-            user_id=admin.id, dry_run=False if body is None else body.dry_run
-        ),
+        payload=LegacyArchivePayload(user_id=admin.id, dry_run=dry_run),
         created_by=admin.id,
-        dedupe_key=ARCHIVE_DEDUPE_KEY,
+        dedupe_key=archive_dedupe_key(dry_run),
     )
     out = JobAccepted(job_id=int(job.id), status="running" if job.status == "running" else "queued")
     await session.commit()

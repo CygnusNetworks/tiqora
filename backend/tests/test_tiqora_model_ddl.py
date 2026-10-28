@@ -477,6 +477,7 @@ def test_itsm_change_ddl_equals_migration() -> None:
         TiqoraItsmChangeTemplate,
         TiqoraItsmLegacyChange,
         TiqoraItsmLegacyChangeRef,
+        TiqoraItsmLegacyErased,
     )
 
     classes = (
@@ -496,8 +497,9 @@ def test_itsm_change_ddl_equals_migration() -> None:
         TiqoraItsmChangeEvent,
         TiqoraItsmLegacyChange,
         TiqoraItsmLegacyChangeRef,
+        TiqoraItsmLegacyErased,
     )
-    assert len(classes) == 16
+    assert len(classes) == 17
     for cls in classes:
         # no foreign key leaves the tiqora_itsm_* family (Znuny rows are referenced by value)
         assert all(
@@ -541,6 +543,9 @@ def test_itsm_change_ddl_equals_migration() -> None:
         assert "DEFAULT '0'" in _column_ddl(
             TiqoraItsmLegacyChangeRef.__table__, "workorder_number", dialect
         )
+        erased = TiqoraItsmLegacyErased.__table__
+        assert "CHAR(64) NOT NULL" in _column_ddl(erased, "identifier_hash", dialect)
+        assert "VARCHAR(16) NOT NULL" in _column_ddl(erased, "kind", dialect)
         assert "AUTO_INCREMENT" not in _column_ddl(
             TiqoraItsmLegacyChangeRef.__table__, "legacy_change_id", dialect
         )

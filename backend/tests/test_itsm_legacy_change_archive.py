@@ -31,7 +31,7 @@ from sqlalchemy.pool import NullPool
 from tests._itsm_adapter_helpers import count_statements, seed_customer
 from tests._itsm_db import ITSM_PARAMS, to_async_url
 from tests._itsm_fake_provider import OPERATIONAL, FakeCiProvider
-from tests._itsm_fixtures import seed_change_history
+from tests._itsm_fixtures import seed_change, seed_change_cab, seed_change_history
 from tests._itsm_legacy_helpers import (
     CUSTOMER,
     FIRMWARE,
@@ -73,11 +73,13 @@ from tiqora.itsm.change.legacy.archive import (
     run_legacy_archive_job,
     with_ci_refs,
 )
+from tiqora.itsm.change.legacy.redact import REDACTED, erased_hash
 from tiqora.itsm.change.legacy.sources import ArchiveSource, get_legacy_source, visible_links
 from tiqora.itsm.change.models import (
     TiqoraItsmChange,
     TiqoraItsmLegacyChange,
     TiqoraItsmLegacyChangeRef,
+    TiqoraItsmLegacyErased,
 )
 from tiqora.itsm.ci_provider import CiRef
 from tiqora.itsm.importer.mapstore import MapStore
@@ -101,6 +103,13 @@ RUN_CIS, RUN_ARCHIVE = 947610, 947611
 TEMPLATE_ID = 947620
 NOTIFY_HISTORY, OTHER_NOTIFY_HISTORY = 947630, 947631
 OTHER_ADDRESS = "chg94-other@example.org"
+#: a customer whose login is not its address (S5 "[gelöscht]" path)
+CUSTOMER2, CUSTOMER2_MAIL = "chg94.kunde", "chg94-kunde@example.org"
+CAB2, CAB2_HISTORY, CAB2_NOTIFY = 947632, 947633, 947634
+#: a change first seen after the erasure: id, CAB row, history row
+LATE_CHANGE, LATE_CAB, LATE_NOTIFY = 947650, 947651, 947652
+#: a customer whose login equals a ticket id
+NUMERIC_LOGIN, NUMERIC_MAIL = str(TICKET_A), "chg94-num@example.org"
 ARCHIVED = {MAIL, FIRMWARE, UPTIME}
 _WRITE = re.compile(r"^(?:insert into|update|delete from) ([^\s(]+)")
 
@@ -169,6 +178,7 @@ async def _archive(w: World, *, dry_run: bool = False, page_size: int = 2) -> Ar
         progress=_noop,
         check_cancelled=_noop,
         report=ArchiveReport(),
+        secret_key=SETTINGS.secret_key,
     )
 
 
@@ -538,8 +548,10 @@ async def test_standalone_job_only_in_mode_b(
             assert res.status_code == 202, res.text
             job_id = res.json()["job_id"]
             assert res.json()["status"] == "queued"
-            again = await client.post(path, json={"dry_run": True})
-            assert again.json()["job_id"] == job_id  # one active archive job
+            assert (await client.post(path, json={})).json()["job_id"] == job_id  # one active
+            dry = (await client.post(path, json={"dry_run": True})).json()["job_id"]
+            assert dry != job_id  # a dry run never joins a real run (and the other way round)
+            assert (await client.post(path, json={"dry_run": True})).json()["job_id"] == dry
             assert (await client.get(path)).json()["active_job_id"] == job_id
 
         async with w.factory() as s:
@@ -716,6 +728,7 @@ async def test_gdpr_erasure_anonymises_cab_customer(
 
         assert result.counts["tiqora_itsm_legacy_change"] == 1
         assert result.counts["tiqora_itsm_legacy_change_ref"] == 1
+        assert result.counts["tiqora_itsm_legacy_erased"] == 1  # login == address: one hash
         erased = (await _rows(w))[MAIL]
         assert CUSTOMER.lower() not in erased.data.lower()
         assert erased.fingerprint == original.fingerprint  # the next run does not re-read it
@@ -739,5 +752,199 @@ async def test_gdpr_erasure_anonymises_cab_customer(
         await rollback_job(w.factory, SETTINGS, result.job_id, force_parallel=True, actor="test")
 
         restored = (await _rows(w))[MAIL]
-        assert (restored.data, restored.title) == (original.data, original.title)
+        assert (restored.data, restored.title, restored.fingerprint) == (
+            original.data,
+            original.title,
+            original.fingerprint,
+        )
         assert await _refs(w, MAIL) == original_refs
+        assert await _tombstones(w) == []  # the erasure's tombstone went with the rollback
+
+
+async def _tombstones(w: World) -> list[tuple[str, str]]:
+    async with w.factory() as s:
+        rows = await s.execute(
+            select(TiqoraItsmLegacyErased.identifier_hash, TiqoraItsmLegacyErased.kind)
+        )
+        return sorted((str(h).strip(), str(k)) for h, k in rows.all())
+
+
+async def _customer(s: AsyncSession, login: str, email: str) -> int:
+    await s.execute(
+        text(
+            "INSERT INTO customer_user (login, email, customer_id, first_name, last_name,"
+            " valid_id, create_time, create_by, change_time, change_by)"
+            " VALUES (:l, :e, 'chg94-co-947641', 'Erika', 'Beispiel', 1, :t, 1, :t, 1)"
+        ),
+        {"l": login, "e": email, "t": at(1, 8)},
+    )
+    return int(
+        (
+            await s.execute(text("SELECT id FROM customer_user WHERE login = :l"), {"l": login})
+        ).scalar_one()
+    )
+
+
+async def _erase(w: World, customer_id: int) -> Any:
+    return await run_erasure(
+        w.factory,
+        SETTINGS,
+        customer_user_ids=[customer_id],
+        mode="anonymize",
+        seed=7,
+        force_parallel=True,
+        actor="test",
+    )
+
+
+def _absent(data: str, *values: str) -> bool:
+    return not any(v.lower() in data.lower() for v in values)
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_erasure_tombstone_keeps_customer_out(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """Erase -> Znuny change edited -> re-archive, and a change first archived after the
+    erasure: the customer stays out; rolling the erasure back lets it in again."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            customer_id = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+            await seed_change_history(
+                s,
+                history_id=CAB2_HISTORY,
+                change_id=MAIL,
+                history_type="ChangeCABUpdate",
+                created_at=at(1, 13),
+                fieldname="CABCustomers",
+                content_old=CUSTOMER,
+                content_new=f"{CUSTOMER}%%{CUSTOMER2}",
+                user_id=MANAGER,
+            )
+            await seed_change_history(
+                s,
+                history_id=CAB2_NOTIFY,
+                change_id=MAIL,
+                history_type="ChangeNotificationSent",
+                created_at=at(1, 14),
+                content_new=f"{CUSTOMER2_MAIL}%%ChangeUpdate",
+                user_id=MANAGER,
+            )
+            await s.commit()
+        await _archive(w)
+        before = (await _rows(w))[MAIL]
+        assert CUSTOMER2 in before.data and CUSTOMER2_MAIL in before.data
+
+        result = await _erase(w, customer_id)
+
+        # tombstones: keyed hashes of the lowercased login and address, never the plain value
+        assert await _tombstones(w) == sorted(
+            [
+                (erased_hash(SETTINGS.secret_key, CUSTOMER2), "login"),
+                (erased_hash(SETTINGS.secret_key, CUSTOMER2_MAIL), "email"),
+            ]
+        )
+        assert result.counts["tiqora_itsm_legacy_erased"] == 2
+        erased = change_from_data(json.loads((await _rows(w))[MAIL].data))
+        token = next(
+            login for kind, login in erased.cab if kind == "customer_user" and login != CUSTOMER
+        )
+        assert token not in (CUSTOMER2, REDACTED)
+        cab_row = next(h for h in erased.history if h.field == "CABCustomers" and h.old)
+        assert (cab_row.old, cab_row.new) == (CUSTOMER, f"{CUSTOMER}%%{token}")
+        assert cab_row.new_display == f"{CUSTOMER}, {token}"
+        sent = {h.new for h in erased.history if h.history_type == "ChangeNotificationSent"}
+        # S5 with a login that is not the address: the address becomes "[gelöscht]"
+        assert f"{REDACTED}%%ChangeUpdate" in sent
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+        assert _counts(await _archive(w)) == (0, 0, 3, 0)  # Znuny unchanged: nothing re-read
+
+        # 1) the change is edited in Znuny: the update keeps the customer out
+        async with w.factory() as s:
+            await s.execute(
+                text("UPDATE change_item SET title = :t, change_time = :c WHERE id = :i"),
+                {"t": "chg94 Mail relay replacement v2", "c": at(6, 9), "i": MAIL},
+            )
+            # 2) a change first seen after the erasure, with the erased customer in its CAB
+            await seed_change(
+                s,
+                change_id=LATE_CHANGE,
+                number="2026110194000650",
+                title=f"chg94 late change for {CUSTOMER2}",
+                state="requested",
+                builder_id=MANAGER,
+                created_at=at(6, 10),
+                description=f"Requested by {CUSTOMER2_MAIL}.",
+                profile=profile,
+            )
+            await seed_change_cab(
+                s, change_id=LATE_CHANGE, cab_id=LATE_CAB, customer_user_id=CUSTOMER2
+            )
+            await seed_change_history(
+                s,
+                history_id=LATE_NOTIFY,
+                change_id=LATE_CHANGE,
+                history_type="ChangeNotificationSent",
+                created_at=at(6, 11),
+                content_new=f"{CUSTOMER2_MAIL.upper()}%%ChangeAdd",
+                user_id=MANAGER,
+            )
+            await s.commit()
+        assert _counts(await _archive(w)) == (1, 1, 2, 0)
+        rows = await _rows(w)
+        for znuny_id in (MAIL, LATE_CHANGE):
+            assert _absent(rows[znuny_id].data, CUSTOMER2, CUSTOMER2_MAIL), znuny_id
+            assert ("customer_user", CUSTOMER2, 0) not in await _refs(w, znuny_id)
+        assert rows[MAIL].title == "chg94 Mail relay replacement v2"
+        assert CUSTOMER in rows[MAIL].data  # the other customer stays
+        assert ("customer_user", CUSTOMER, 0) in await _refs(w, MAIL)
+        late = change_from_data(json.loads(rows[LATE_CHANGE].data))
+        assert late.cab == (("customer_user", REDACTED),)
+        assert late.title == f"chg94 late change for {REDACTED}"
+        assert rows[LATE_CHANGE].title == late.title
+        assert late.description == f"Requested by {REDACTED}."
+        assert _counts(await _archive(w)) == (0, 0, 4, 0)  # stable while the tombstones stay
+
+        # rollback: the tombstones go, the next run brings the customer back
+        await rollback_job(w.factory, SETTINGS, result.job_id, force_parallel=True, actor="test")
+        assert await _tombstones(w) == []
+        assert _counts(await _archive(w)) == (0, 2, 2, 0)
+        rows = await _rows(w)
+        for znuny_id in (MAIL, LATE_CHANGE):
+            assert CUSTOMER2 in rows[znuny_id].data, znuny_id
+            assert ("customer_user", CUSTOMER2, 0) in await _refs(w, znuny_id)
+        assert CUSTOMER2_MAIL.upper() in rows[LATE_CHANGE].data
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_erasure_of_numeric_login_leaves_links_intact(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """A customer login equal to a ticket id: links, ids and refs are never rewritten."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            customer_id = await _customer(s, NUMERIC_LOGIN, NUMERIC_MAIL)
+            await s.commit()
+        await _archive(w)
+        before = {z: r.data for z, r in (await _rows(w)).items()}
+        refs_before = {z: await _refs(w, z) for z in ARCHIVED}
+        assert ("ticket", NUMERIC_LOGIN, 0) in refs_before[MAIL]
+
+        result = await _erase(w, customer_id)
+
+        assert result.counts["tiqora_itsm_legacy_change"] == 0
+        assert {z: r.data for z, r in (await _rows(w)).items()} == before
+        assert {z: await _refs(w, z) for z in ARCHIVED} == refs_before
+        assert len(await _tombstones(w)) == 2
+        # the archive's tombstone pass ignores links and ids as well
+        async with w.factory() as s:
+            await s.execute(
+                text("UPDATE change_item SET change_time = :c WHERE id = :i"),
+                {"c": at(7, 8), "i": MAIL},
+            )
+            await s.commit()
+        assert _counts(await _archive(w)) == (0, 1, 2, 0)
+        mail = change_from_data(json.loads((await _rows(w))[MAIL].data))
+        assert any(li.key == NUMERIC_LOGIN and li.object == "Ticket" for li in mail.links)
+        assert await _refs(w, MAIL) == refs_before[MAIL]

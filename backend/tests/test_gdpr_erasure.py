@@ -165,6 +165,7 @@ async def _seed_tiqora_tables(session: AsyncSession, *, mysql: bool) -> None:
         "tiqora_gdpr_job",
         "tiqora_gdpr_audit",
         "tiqora_cache_invalidation",
+        "tiqora_itsm_legacy_erased",
     ):
         with contextlib.suppress(Exception):
             await session.execute(text(f"DELETE FROM {tbl}"))
@@ -2536,6 +2537,7 @@ async def test_hard_delete_and_anonymize_remove_chat_rows(
         "tiqora_gdpr_backup",
         "tiqora_gdpr_job",
         "tiqora_gdpr_audit",
+        "tiqora_itsm_legacy_erased",
         "tiqora_cache_invalidation",
         "tiqora_event_outbox",
         "ticket_history",
@@ -2689,6 +2691,7 @@ async def test_gdpr_erasure_removes_itsm_rows(
         "tiqora_gdpr_backup",
         "tiqora_gdpr_job",
         "tiqora_gdpr_audit",
+        "tiqora_itsm_legacy_erased",
         "tiqora_cache_invalidation",
         "tiqora_event_outbox",
         "ticket_history",
@@ -2956,6 +2959,7 @@ async def test_gdpr_ticket_delete_removes_change_rows(
         "tiqora_gdpr_backup",
         "tiqora_gdpr_job",
         "tiqora_gdpr_audit",
+        "tiqora_itsm_legacy_erased",
         "tiqora_cache_invalidation",
         "tiqora_event_outbox",
         "ticket_history",

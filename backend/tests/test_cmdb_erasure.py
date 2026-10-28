@@ -34,6 +34,7 @@ _GDPR_TABLES = (
     "tiqora_gdpr_backup",
     "tiqora_gdpr_job",
     "tiqora_gdpr_audit",
+    "tiqora_itsm_legacy_erased",  # the erasure's tombstones for the change archive
     "tiqora_cache_invalidation",
     "tiqora_event_outbox",
     "tiqora_report_dirty_ticket",

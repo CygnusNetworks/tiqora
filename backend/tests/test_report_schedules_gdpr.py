@@ -43,6 +43,8 @@ _CLEANUP = (
     f"DELETE FROM tiqora_gdpr_backup WHERE job_id IN ({_JOBS})",
     "DELETE FROM tiqora_gdpr_job WHERE actor = 'rep52'",
     "DELETE FROM tiqora_gdpr_audit WHERE actor = 'rep52'",
+    # tombstones the erasure leaves for the change archive (only this module erases here)
+    "DELETE FROM tiqora_itsm_legacy_erased",
     "DELETE FROM tiqora_cache_invalidation"
     " WHERE ticket_id IS NULL OR ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_event_outbox WHERE ticket_id BETWEEN :lo AND :hi",

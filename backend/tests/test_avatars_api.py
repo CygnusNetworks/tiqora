@@ -72,6 +72,7 @@ def _cleanup(url: str) -> None:
             "tiqora_gdpr_backup",
             "tiqora_gdpr_job",
             "tiqora_gdpr_audit",
+            "tiqora_itsm_legacy_erased",  # tombstones the erasure leaves for the change archive
         ):
             conn.execute(text(f"DELETE FROM {table}"))
         conn.execute(text("DELETE FROM customer_user WHERE login LIKE :p"), {"p": PREFIX + "%"})

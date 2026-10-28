@@ -4,7 +4,7 @@ Revision ID: 20261010_0084
 Revises: 20261010_0083
 Create Date: 2026-10-27
 
-Sixteen tables. No foreign keys to Znuny tables: ``ticket_id``, ``service_id``, ``*_by``,
+Seventeen tables. No foreign keys to Znuny tables: ``ticket_id``, ``service_id``, ``*_by``,
 ``calendar_appointment_id`` and ``approval_id`` reference other rows by value; FKs only join
 ``tiqora_*`` tables. CAB members use the approval engine's approver vocabulary (kind + id as
 text). Free text is MEDIUMTEXT on MariaDB. Timestamps are naive UTC written by the app.
@@ -27,6 +27,7 @@ depends_on: str | Sequence[str] | None = None
 
 # children before parents
 _TABLES = (
+    "tiqora_itsm_legacy_erased",
     "tiqora_itsm_legacy_change_ref",
     "tiqora_itsm_legacy_change",
     "tiqora_itsm_change_event",
@@ -412,6 +413,16 @@ def upgrade() -> None:
         "ix_tiqora_itsm_legacy_change_ref",
         "tiqora_itsm_legacy_change_ref",
         ["ref_kind", "ref_key"],
+    )
+
+    op.create_table(
+        "tiqora_itsm_legacy_erased",
+        sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column("identifier_hash", sa.CHAR(64), nullable=False),
+        sa.Column("kind", sa.String(16), nullable=False),
+        sa.Column("created", sa.DateTime(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("identifier_hash", name="uq_tiqora_itsm_legacy_erased_hash"),
     )
 
 

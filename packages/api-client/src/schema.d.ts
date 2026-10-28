@@ -4275,7 +4275,8 @@ export interface paths {
          * Post Legacy Archive
          * @description Archive the Znuny changes again in the background (Mode B only; 409
          *     ``legacy_archive_mode_b_only`` / ``legacy_archive_no_tables`` otherwise). An active archive
-         *     job is answered instead of a second one. Poll ``GET /api/v1/jobs/{job_id}``.
+         *     job of the same kind (dry run or real run) is answered instead of a second one. Poll
+         *     ``GET /api/v1/jobs/{job_id}``.
          */
         post: operations["post_legacy_archive_api_v1_admin_itsm_change_legacy_archive_post"];
         delete?: never;
