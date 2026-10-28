@@ -27013,6 +27013,85 @@
         "title": "KnowledgeBundle",
         "type": "object"
       },
+      "LegacyArchiveStartIn": {
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          }
+        },
+        "title": "LegacyArchiveStartIn",
+        "type": "object"
+      },
+      "LegacyArchiveStatusOut": {
+        "description": "The Znuny change archive: can the job start now, what is stored, is a job active.",
+        "properties": {
+          "active_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Job Id"
+          },
+          "archived": {
+            "title": "Archived",
+            "type": "integer"
+          },
+          "blocked_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Code"
+          },
+          "blocked_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Message"
+          },
+          "can_start": {
+            "title": "Can Start",
+            "type": "boolean"
+          },
+          "last_archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Archived At"
+          }
+        },
+        "required": [
+          "can_start",
+          "blocked_code",
+          "blocked_message",
+          "archived",
+          "last_archived_at",
+          "active_job_id"
+        ],
+        "title": "LegacyArchiveStatusOut",
+        "type": "object"
+      },
       "LegacyCabMemberOut": {
         "properties": {
           "kind": {
@@ -76478,6 +76557,153 @@
           }
         },
         "summary": "Put Freeze Window",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/change/legacy-archive": {
+      "get": {
+        "description": "How many Znuny changes are archived, and whether the archive job can start now.",
+        "operationId": "get_legacy_archive_api_v1_admin_itsm_change_legacy_archive_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyArchiveStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Legacy Archive",
+        "tags": [
+          "admin:itsm-change"
+        ]
+      },
+      "post": {
+        "description": "Archive the Znuny changes again in the background (Mode B only; 409\n``legacy_archive_mode_b_only`` / ``legacy_archive_no_tables`` otherwise). An active archive\njob is answered instead of a second one. Poll ``GET /api/v1/jobs/{job_id}``.",
+        "operationId": "post_legacy_archive_api_v1_admin_itsm_change_legacy_archive_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LegacyArchiveStartIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Legacy Archive",
         "tags": [
           "admin:itsm-change"
         ]

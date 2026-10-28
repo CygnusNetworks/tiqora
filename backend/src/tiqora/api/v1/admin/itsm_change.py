@@ -1,6 +1,7 @@
 """Change-management administration — ``/api/v1/admin/itsm/change`` (admins only).
 
-Templates and freeze windows here; CABs, risk questions and the legacy archive join this router.
+Templates, freeze windows, CABs, risk questions and the legacy archive (Znuny changes, Mode B: the
+archive runs as a job, ``POST /legacy-archive`` starts it, ``GET /api/v1/jobs/{id}`` is polled).
 Settings are edited through the generic settings-sections API (section ``itsm_change``).
 ``ChangeError`` is an ``HTTPException``: the answer is ``{"detail": {"code", ...}}``.
 """
@@ -14,7 +15,10 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.itsm_change_schemas import (
     ChangeTemplateOut,
     FreezeWindowOut,
+    LegacyArchiveStartIn,
+    LegacyArchiveStatusOut,
     freeze_out,
+    legacy_archive_status_out,
     template_out,
 )
 from tiqora.api.v1.itsm_change_schemas import CabOut, cab_out
@@ -27,6 +31,7 @@ from tiqora.itsm.change.cab import (
     set_members,
     update_cab,
 )
+from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import (
     FreezeIn,
     create_freeze,
@@ -34,6 +39,13 @@ from tiqora.itsm.change.freeze import (
     get_freeze,
     list_freezes,
     update_freeze,
+)
+from tiqora.itsm.change.legacy.archive import (
+    ARCHIVE_DEDUPE_KEY,
+    ARCHIVE_JOB_KIND,
+    LegacyArchivePayload,
+    archive_blocker,
+    archive_status,
 )
 from tiqora.itsm.change.risk import (
     ChangeRiskExamplesOut,
@@ -55,6 +67,8 @@ from tiqora.itsm.change.templates import (
     list_templates,
     update_template,
 )
+from tiqora.jobs.schemas import JobAccepted
+from tiqora.jobs.service import enqueue_job
 
 router = APIRouter(prefix="/itsm/change", tags=["admin:itsm-change"])
 
@@ -255,3 +269,34 @@ async def delete_risk_question(question_id: int, admin: AdminUser, session: DbSe
     await delete_question(session, question_id=question_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/legacy-archive", response_model=LegacyArchiveStatusOut)
+async def get_legacy_archive(admin: AdminUser, session: DbSession) -> LegacyArchiveStatusOut:
+    """How many Znuny changes are archived, and whether the archive job can start now."""
+    _ = admin
+    return legacy_archive_status_out(await archive_status(session))
+
+
+@router.post("/legacy-archive", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
+async def post_legacy_archive(
+    admin: AdminUser, session: DbSession, body: LegacyArchiveStartIn | None = None
+) -> JobAccepted:
+    """Archive the Znuny changes again in the background (Mode B only; 409
+    ``legacy_archive_mode_b_only`` / ``legacy_archive_no_tables`` otherwise). An active archive
+    job is answered instead of a second one. Poll ``GET /api/v1/jobs/{job_id}``."""
+    blocked = await archive_blocker(session)
+    if blocked is not None:
+        raise ChangeError(blocked.code, 409, message=blocked.message)
+    job = await enqueue_job(
+        session,
+        kind=ARCHIVE_JOB_KIND,
+        payload=LegacyArchivePayload(
+            user_id=admin.id, dry_run=False if body is None else body.dry_run
+        ),
+        created_by=admin.id,
+        dedupe_key=ARCHIVE_DEDUPE_KEY,
+    )
+    out = JobAccepted(job_id=int(job.id), status="running" if job.status == "running" else "queued")
+    await session.commit()
+    return out

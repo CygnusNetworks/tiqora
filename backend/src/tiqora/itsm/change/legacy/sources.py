@@ -1,24 +1,31 @@
 """Where the legacy (Znuny) changes are read from, and what of their links a caller may see.
 
-Mode A with the change tables -> :class:`ZnunyLiveSource` (the live Znuny rows); Mode B reads
-the archive the importer stored (added with the archive); every other case has no source. The
+Mode A with the change tables -> :class:`ZnunyLiveSource` (the live Znuny rows); Mode B with
+archived changes -> :class:`ArchiveSource` (what the importer or the archive job stored in
+``tiqora_itsm_legacy_change``, read from ``tiqora_*`` tables only); every other case has no
+source. The
 sources do not check permissions: the route requires the legacy change group, and
 :func:`visible_links` leaves out linked tickets and CIs the caller cannot read (ruling F20).
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
 from tiqora.domain.ticket_access import readable_tickets
 from tiqora.itsm.change.legacy import reader
+from tiqora.itsm.change.legacy.archive import REF_CI, REF_TICKET, change_from_data
 from tiqora.itsm.change.legacy.model import LegacyChange, LegacyChangeSummary
+from tiqora.itsm.change.models import TiqoraItsmLegacyChange, TiqoraItsmLegacyChangeRef
 from tiqora.itsm.ci_provider import CiProvider, CiRef
 from tiqora.itsm.mode import get_itsm_mode
+from tiqora.itsm.znuny_adapter.reader import like_contains
 
 SourceKind = Literal["live", "archive"]
 
@@ -71,13 +78,101 @@ class ZnunyLiveSource:
         return found[0] if found else None
 
 
+class ArchiveSource:
+    """The changes the archive stored (Mode B); reads ``tiqora_*`` tables only.
+
+    ``text`` matches number and title (case-insensitive contains, ``%``/``_`` literal; the long
+    texts live in the JSON ``data`` and are not searched); ``ticket_id`` / ``ci_ref`` keep the
+    changes with that lookup row (a CI as ``tiqora:<id>`` or ``znuny:<id>``, as archived).
+    """
+
+    kind: SourceKind = "archive"
+
+    async def search(
+        self,
+        session: AsyncSession,
+        *,
+        text: str | None,
+        ticket_id: int | None,
+        ci_ref: CiRef | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[LegacyChangeSummary], int]:
+        row = TiqoraItsmLegacyChange
+        ref = TiqoraItsmLegacyChangeRef
+        conditions = []
+        needle = (text or "").strip()
+        if needle:
+            pattern = like_contains(needle.lower())
+            conditions.append(
+                or_(
+                    func.lower(row.change_number).like(pattern, escape="!"),
+                    func.lower(row.title).like(pattern, escape="!"),
+                )
+            )
+        for kind, key in ((REF_TICKET, ticket_id), (REF_CI, ci_ref)):
+            if key is None:
+                continue
+            conditions.append(
+                exists().where(
+                    ref.legacy_change_id == row.id, ref.ref_kind == kind, ref.ref_key == str(key)
+                )
+            )
+        total = int(
+            (
+                await session.execute(select(func.count()).select_from(row).where(*conditions))
+            ).scalar_one()
+        )
+        rows = (
+            await session.execute(
+                select(row)
+                .where(*conditions)
+                .order_by(row.znuny_changed_at.desc(), row.znuny_change_id.desc())
+                .limit(max(1, min(limit, reader.MAX_PAGE)))
+                .offset(max(0, offset))
+            )
+        ).scalars()
+        items = [
+            LegacyChangeSummary(
+                znuny_change_id=int(r.znuny_change_id),
+                number=r.change_number,
+                title=r.title,
+                state=r.state,
+                planned_start=r.planned_start,
+                planned_end=r.planned_end,
+                workorder_count=int(r.workorder_count),
+                changed_at=r.znuny_changed_at,
+            )
+            for r in rows
+        ]
+        return items, total
+
+    async def get(self, session: AsyncSession, znuny_change_id: int) -> LegacyChange | None:
+        raw = (
+            await session.execute(
+                select(TiqoraItsmLegacyChange.data).where(
+                    TiqoraItsmLegacyChange.znuny_change_id == znuny_change_id
+                )
+            )
+        ).scalar_one_or_none()
+        return None if raw is None else change_from_data(json.loads(raw))
+
+
+async def archive_present(session: AsyncSession) -> bool:
+    """At least one change is archived."""
+    found = await session.execute(select(TiqoraItsmLegacyChange.id).limit(1))
+    return found.first() is not None
+
+
 async def get_legacy_source(session: AsyncSession, settings: Settings) -> LegacyChangeSource | None:
-    """Mode A + change tables -> the live source; otherwise ``None`` (the Mode B archive source
-    comes with the archive)."""
+    """Mode A + change tables -> the live source; Mode B + archived changes -> the archive;
+    otherwise ``None``."""
     _ = settings
     state = await get_itsm_mode(session)
     if state.mode == "znuny_readthrough" and await reader.change_tables_present(session):
         return ZnunyLiveSource()
+    if state.mode == "tiqora" and await archive_present(session):
+        return ArchiveSource()
     return None
 
 

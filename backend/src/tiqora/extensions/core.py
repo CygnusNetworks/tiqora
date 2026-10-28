@@ -53,6 +53,7 @@ def register_core(registry: Registry) -> None:
     from tiqora.cmdb.transfer.import_job import CMDB_IMPORT_JOB
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
     from tiqora.itsm.change.impact import ITSM_CHANGE_IMPACT_JOB
+    from tiqora.itsm.change.legacy.archive import ITSM_LEGACY_CHANGE_ARCHIVE_JOB
     from tiqora.itsm.change.tasks import ITSM_CHANGE_TASKS_JOB
     from tiqora.itsm.importer.jobs import ITSM_IMPORT_JOB, ITSM_SWITCH_JOB
     from tiqora.itsm.linked_articles import LINKED_ARTICLES_JOB
@@ -74,6 +75,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, LINKED_ARTICLES_JOB)
     registry.add(JOB_HANDLERS, ITSM_CHANGE_TASKS_JOB)
     registry.add(JOB_HANDLERS, ITSM_CHANGE_IMPACT_JOB)
+    registry.add(JOB_HANDLERS, ITSM_LEGACY_CHANGE_ARCHIVE_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_SYNC_JOB)
     registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)

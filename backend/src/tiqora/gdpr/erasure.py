@@ -56,6 +56,8 @@ from tiqora.gdpr.saved_criteria import (
     scrub_schedule_items,
 )
 from tiqora.gi.debug_store import delete_debug_entries_for_tickets
+from tiqora.itsm.change.legacy.archive import GDPR_TABLES as LEGACY_CHANGE_GDPR_TABLES
+from tiqora.itsm.change.legacy.archive import erase_legacy_change_customers
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -2209,6 +2211,17 @@ async def run_erasure(
                     ),
                 )
             )
+        # Archived Znuny changes: the customer in CABs, history values and notification
+        # recipients (S5) is pseudonymised / redacted, their lookup rows go.
+        if await _table_exists(session, "tiqora_itsm_legacy_change"):
+            counts.update(
+                await erase_legacy_change_customers(
+                    session,
+                    replacements=login_to_new,
+                    emails=erased_emails,
+                    add_backup=_backup_saved,
+                )
+            )
         # GenericInterface debugger lines hold payloads of these tickets (customer names,
         # addresses). Debug logs are disposable, so they go in every mode, without backup.
         if ticket_ids:
@@ -2437,6 +2450,7 @@ async def rollback_job(
                     "tiqora_chat_session",
                     *ITSM_TICKET_TABLES,
                     *CHANGE_TICKET_TABLES,
+                    *LEGACY_CHANGE_GDPR_TABLES,
                 ):
                     await _insert_row(session, table, {**pk, **original})
                 else:

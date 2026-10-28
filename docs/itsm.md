@@ -484,8 +484,8 @@ vollständig nach Tiqora holen, löschen Sie die betroffenen CIs in Tiqora vor d
   übernimmt sie aber nicht. Eine in Znuny gelöschte Verknüpfung hinterlässt keine Zeile und wird nicht
   gezählt; in der Verknüpfen-Maske von Znuny sperrt TiqoraITSM auch das Löschen, über Webservice oder
   Konsole bleibt es unbemerkt. Stellen Sie die Aufrufer vor der Umstellung um (Schritt 4).
-- **Changes und Arbeitsaufträge** von Znuny werden nur gezählt (Meldung `changes_not_imported`), nicht
-  übernommen. Die Masken in Znuny bleiben bis zum Abbau von Znuny bestehen.
+- **Changes und Arbeitsaufträge** von Znuny übernimmt der Import in ein Change-Archiv (nur lesen);
+  Change-Vorlagen, Bedingungen und Benachrichtigungsregeln werden nur gezählt (Meldung `not_archived`).
 - **CI-Anhänge im Dateisystem** (Speicher „FS“ statt Datenbank) kann der Importer nicht lesen; sie
   erscheinen als `attachment_in_filesystem` im Bericht und müssen von Hand kopiert werden.
 - **ITSM-Statistiken** von Znuny werden nicht übernommen.

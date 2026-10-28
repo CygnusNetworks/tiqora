@@ -10,6 +10,7 @@ Seed band 946060-946098 (Znuny rows, flushed into a session the test rolls back)
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -33,6 +34,7 @@ from tests._itsm_fixtures import (
     seed_ci_link,
     seed_workorder,
 )
+from tiqora.itsm.change.legacy import reader
 
 NOW = datetime(2026, 10, 1, 8, 0, 0)  # noqa: DTZ001 - Znuny stores naive UTC
 
@@ -64,6 +66,16 @@ class LegacyWorld:
 
 async def sql(session: AsyncSession, sql: str, **params: Any) -> None:
     await session.execute(text(sql), params)
+
+
+async def change_checksums(session: AsyncSession) -> dict[str, str]:
+    """Dialect-neutral checksum of every change table and ``link_relation`` (F33)."""
+    out: dict[str, str] = {}
+    for table in (*reader.CHANGE_TABLES, "link_relation"):  # constants, never input
+        rows = (await session.execute(text(f"SELECT * FROM {table}"))).all()  # noqa: S608
+        blob = "\n".join(sorted(repr(tuple(r)) for r in rows))
+        out[table] = hashlib.sha256(blob.encode()).hexdigest()
+    return out
 
 
 async def _group(session: AsyncSession, gid: int, name: str) -> None:

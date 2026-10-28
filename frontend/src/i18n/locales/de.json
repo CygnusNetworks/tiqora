@@ -6744,6 +6744,7 @@
         "itsm_import": "Znuny-ITSM-Daten importieren",
         "itsm_change_tasks": "Change-Aufgaben anlegen",
         "itsm_change_impact": "Auswirkung eines Changes berechnen",
+        "itsm_legacy_change_archive": "Znuny-Changes archivieren",
         "itsm_switch": "ITSM auf Tiqora umstellen"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"

@@ -4258,6 +4258,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/change/legacy-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Legacy Archive
+         * @description How many Znuny changes are archived, and whether the archive job can start now.
+         */
+        get: operations["get_legacy_archive_api_v1_admin_itsm_change_legacy_archive_get"];
+        put?: never;
+        /**
+         * Post Legacy Archive
+         * @description Archive the Znuny changes again in the background (Mode B only; 409
+         *     ``legacy_archive_mode_b_only`` / ``legacy_archive_no_tables`` otherwise). An active archive
+         *     job is answered instead of a second one. Poll ``GET /api/v1/jobs/{job_id}``.
+         */
+        post: operations["post_legacy_archive_api_v1_admin_itsm_change_legacy_archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/itsm/change/risk-questions": {
         parameters: {
             query?: never;
@@ -23392,6 +23418,32 @@ export interface components {
             tags?: string[];
             /** Total */
             total: number;
+        };
+        /** LegacyArchiveStartIn */
+        LegacyArchiveStartIn: {
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+        };
+        /**
+         * LegacyArchiveStatusOut
+         * @description The Znuny change archive: can the job start now, what is stored, is a job active.
+         */
+        LegacyArchiveStatusOut: {
+            /** Active Job Id */
+            active_job_id: number | null;
+            /** Archived */
+            archived: number;
+            /** Blocked Code */
+            blocked_code: string | null;
+            /** Blocked Message */
+            blocked_message: string | null;
+            /** Can Start */
+            can_start: boolean;
+            /** Last Archived At */
+            last_archived_at: string | null;
         };
         /** LegacyCabMemberOut */
         LegacyCabMemberOut: {
@@ -43353,6 +43405,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_legacy_archive_api_v1_admin_itsm_change_legacy_archive_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyArchiveStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_legacy_archive_api_v1_admin_itsm_change_legacy_archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LegacyArchiveStartIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -195,10 +195,12 @@ async def test_full_pipeline_with_fake_source(world: _World, monkeypatch) -> Non
     report = await _run(world, _source(), monkeypatch)
 
     assert _order(report) == list(STEP_ORDER)
-    assert report.steps["changes"].skipped == 8  # 3 changes + 5 work orders, counted only
+    # the main test databases have no Change Management tables: the archive step counts nothing
+    # (the fake source's change counts only feed the switch status)
+    assert dataclasses.astuple(report.steps["changes"]) == (0, 0, 0, 0, 0)
     codes = {i.code for i in report.issues}
-    assert codes >= {"unsupported_object", "attachment_in_filesystem", "changes_not_imported"}
-    assert {i.step for i in report.issues if i.code == "changes_not_imported"} == {"changes"}
+    assert codes >= {"unsupported_object", "attachment_in_filesystem"}
+    assert not [i for i in report.issues if i.step == "changes"]
     assert report.steps["cis_pass2"].created == 10  # per CI: 10 CIs, 17 versions
     assert report.steps["links"].created == 4
     assert await _ci_count(world) == 10

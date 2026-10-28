@@ -151,6 +151,29 @@ async def change_tables_present(session: AsyncSession) -> bool:
     return (await detect_znuny_itsm(session)).change_installed
 
 
+#: what the archive leaves in Znuny and only counts (templates are opaque ``Data::Dumper`` text,
+#: ruling S4; conditions and notification rules have no Tiqora counterpart, plan D6/D10)
+NOT_ARCHIVED_TABLES: Final[dict[str, str]] = {
+    "templates": "change_template",
+    "conditions": "change_condition",
+    "notifications": "change_notification",
+}
+
+
+async def count_changes(session: AsyncSession) -> int:
+    """Number of changes (progress of the archive)."""
+    return int((await session.execute(text("SELECT COUNT(*) FROM change_item"))).scalar_one())
+
+
+async def not_archived_counts(session: AsyncSession) -> dict[str, int]:
+    """Rows per :data:`NOT_ARCHIVED_TABLES` kind (the content is never read)."""
+    out: dict[str, int] = {}
+    for kind, table in NOT_ARCHIVED_TABLES.items():  # constants, never input
+        count = await session.execute(text(f"SELECT COUNT(*) FROM {table}"))  # noqa: S608
+        out[kind] = int(count.scalar_one())
+    return out
+
+
 async def iter_change_ids(session: AsyncSession, *, after_id: int, limit: int) -> list[int]:
     """Change ids above ``after_id`` in id order, at most ``limit`` (keyset paging)."""
     rows = await session.execute(

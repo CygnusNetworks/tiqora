@@ -67,7 +67,8 @@ ISSUE_CODES: dict[str, str] = {
         "Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden "
         "nicht übernommen"
     ),
-    "changes_not_imported": (
-        "Änderungen (Changes) von Znuny ITSM werden nicht übernommen, es wurden nur gezählt"
+    "not_archived": (
+        "Change-Vorlagen, Bedingungen und Benachrichtigungsregeln von Znuny werden nicht "
+        "übernommen, sie wurden nur gezählt"
     ),
 }

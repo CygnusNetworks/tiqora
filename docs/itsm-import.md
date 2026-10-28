@@ -685,7 +685,7 @@ der Wechsel in den Mode B selbst (Schreibsperre in Znuny, Umstellung, Rückweg) 
 | Anhänge der Versionen | Anhänge der CI-Versionen | Nur aus der Datenbank, höchstens 50 MB je Datei |
 | Prioritätsmatrix (`cip_allocate`) | Prioritätsmatrix | Ersetzt die vorhandene Matrix als Ganzes |
 | ITSM-Angaben der Services (Typ, Kritikalität) | ITSM-Angaben des Services | Nur für Services, die es in Tiqora gibt |
-| Changes und Arbeitsaufträge | nicht übernommen | Nur gezählt (Bericht: `changes_not_imported`) |
+| Changes und Arbeitsaufträge | Change-Archiv (nur lesen) | Vorlagen, Bedingungen und Benachrichtigungsregeln werden nur gezählt (Bericht: `not_archived`) |
 
 Die Reihenfolge der Schritte im Bericht ist: Katalog, Klassen, CIs (Durchgang 1: Köpfe, Durchgang 2:
 Versionen), Verknüpfungen, Anhänge, Prioritätsmatrix, Service-Angaben, Changes, in Znuny gelöschte CIs und
@@ -747,7 +747,7 @@ einen Text. Die Codes bedeuten:
 | `deleted_in_znuny` | Das Konfigurationselement existiert in Znuny nicht mehr; in Tiqora bleibt es unverändert bestehen |
 | `priority_matrix_invalid` | Die Prioritätsmatrix von Znuny verweist auf eine Priorität, die es nicht gibt; die Matrix wurde nicht übernommen |
 | `service_unknown` | Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden nicht übernommen |
-| `changes_not_imported` | Changes und Arbeitsaufträge von Znuny ITSM werden nicht übernommen, es wurden nur gezählt |
+| `not_archived` | Change-Vorlagen, Bedingungen und Benachrichtigungsregeln von Znuny werden nicht übernommen, sie wurden nur gezählt |
 
 Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issue_codes.py`; ein Test
 (`test_itsm_import_issue_codes.py`) stellt sicher, dass Code, Tabelle und Importer übereinstimmen.
@@ -757,7 +757,7 @@ Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issu
 Die CSV-Datei („Vollständiger Bericht (CSV)“) hat die Spalten `Schritt`, `Code`, `Objekt` und `Meldung`, eine
 Zeile je Meldung, UTF-8 mit Byte-Order-Mark (damit Excel Umlaute richtig zeigt), Semikolon als Trenner
 und Zeilenende CRLF wie die übrigen Berichte. Filtern Sie zuerst nach `Code`: Meldungen wie
-`changes_not_imported` oder `deleted_in_znuny` sind Hinweise, `bad_value`, `unresolved_reference` und
+`not_archived` oder `deleted_in_znuny` sind Hinweise, `bad_value`, `unresolved_reference` und
 `definition_unreadable` bedeuten, dass Daten fehlen. Die Spalte `Objekt` führt direkt zum Datensatz in
 Znuny. Texte aus Znuny können in Excel als Formel gedeutet werden; deshalb erhält jede Zelle, die mit
 `=`, `+`, `-`, `@`, Tabulator oder Wagenrücklauf beginnt, einen vorangestellten Apostroph.

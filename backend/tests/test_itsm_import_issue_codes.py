@@ -55,7 +55,7 @@ def _passed_through() -> set[str]:
 
 def test_scan_sees_the_known_emitters() -> None:
     literals, dynamic = _emitted_literals()
-    assert {"bad_value", "no_definition", "changes_not_imported"} <= literals
+    assert {"bad_value", "no_definition", "not_archived"} <= literals
     assert dynamic >= 2  # classes (definition issues) and cis (attribute issues)
     assert _passed_through() >= {"unknown_attribute", "definition_key_invalid"}
 

@@ -6744,6 +6744,7 @@
         "itsm_import": "Import Znuny ITSM data",
         "itsm_change_tasks": "Create change tasks",
         "itsm_change_impact": "Calculate change impact",
+        "itsm_legacy_change_archive": "Archive Znuny changes",
         "itsm_switch": "Switch ITSM to Tiqora"
       },
       "gi_mail": "Send email from a web service request"

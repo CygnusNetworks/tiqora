@@ -17,7 +17,6 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from tests._itsm_adapter_helpers import count_statements, itsm_session
@@ -36,6 +35,7 @@ from tests._itsm_legacy_helpers import (
     TICKET_B,
     UPTIME,
     LegacyWorld,
+    change_checksums,
     grant,
     group_id,
     seed_legacy_world,
@@ -136,16 +136,6 @@ async def live_world(
         clear_detect_cache()
 
 
-async def _checksums(session: AsyncSession) -> dict[str, str]:
-    """Dialect-neutral checksum of every change table and ``link_relation`` (F33)."""
-    out: dict[str, str] = {}
-    for table in (*reader.CHANGE_TABLES, "link_relation"):  # constants, never input
-        rows = (await session.execute(text(f"SELECT * FROM {table}"))).all()  # noqa: S608
-        blob = "\n".join(sorted(repr(tuple(r)) for r in rows))
-        out[table] = hashlib.sha256(blob.encode()).hexdigest()
-    return out
-
-
 def _ids(body: dict[str, Any]) -> list[int]:
     return [i["znuny_change_id"] for i in body["items"]]
 
@@ -156,7 +146,7 @@ async def test_live_view_writes_nothing(
 ) -> None:
     async with live_world(request, dialect, profile) as w:
         assert len(reader.CHANGE_TABLES) == 20
-        before = await _checksums(w.session)
+        before = await change_checksums(w.session)
         assert before["change_item"] != hashlib.sha256(b"").hexdigest()  # the seed is seen
         with count_statements(w.engine) as seen:
             calls = [
@@ -181,7 +171,7 @@ async def test_live_view_writes_nothing(
         ]
         assert writes == []
         assert any("change_item" in s for s in seen)  # the calls really read Znuny
-        assert await _checksums(w.session) == before
+        assert await change_checksums(w.session) == before
 
 
 @pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
