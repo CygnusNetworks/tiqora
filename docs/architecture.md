@@ -22,7 +22,7 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 | Process | Image / command | Responsibility |
 |---|---|---|
 | `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1` (including the unauthenticated wallboard route `/api/v1/kiosk`), compat routes, the public web chat API `/api/chat/v1` and widget files `/chat/v1/`, SCIM 2.0 `/scim/v2`, plugin routes `/api/plugins/<id>/`, `/health`, `/ready`, `/metrics` (surface overview: [api/README.md](api/README.md)) |
-| `tiqora-worker` | `worker` | Plain asyncio tick loops (no external scheduler or task queue): Znuny-write poller, outbox drain, background-job runner (`tiqora.jobs`), postmaster/escalation/notifications/GA/unlock-timeout/pending-check (feature-flagged), Telegram poller, housekeeping |
+| `tiqora-worker` | `worker` | Plain asyncio tick loops (no external scheduler or task queue): Znuny-write poller, outbox drain, background-job runner (`tiqora.jobs`), postmaster/escalation/notifications/GA/unlock-timeout/pending-check (feature-flagged), approvals sweep (deadlines, reminders, escalation), Telegram poller, housekeeping |
 | `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: new-ticket triage (queue routing), auto-reply worker + auto-summary scan, the web chat assistant loop, isolated so a hung LLM call never stalls the main worker. It loads the plugin registry too, so AI sends pass the same plugin hooks. Inert unless `daemon.ai_worker.enabled`; triage and auto-reply additionally require `operation_mode=tiqora_primary` (auto-reply is exempt on Tiqora-only channels, currently Telegram) |
 | `tiqora-mcp` | `mcp` | FastMCP over streamable HTTP (core tools, read-only CMDB tools, tools of active plugins); imports `domain/` directly (no second business layer) |
 
@@ -1182,6 +1182,47 @@ The ITSM core lives in `tiqora.itsm` (user-facing description: [itsm.md](itsm.md
   contract with the Znuny add-on `TiqoraITSM`, which only reads them and the stored `itsm.mode`.
   Details: [itsm.md](itsm.md) chapter 7 and [itsm-import.md](itsm-import.md).
 
+### Approvals (`tiqora.approvals`)
+
+One shared approval engine (user-facing description: [approvals.md](approvals.md)). Features build on
+it; it never imports `tiqora.process`, `tiqora.itsm`, `tiqora.cmdb` or `tiqora.api` (a test guard).
+
+- **Modules.** `contract.py` and `rules.py` are pure (no database, network or settings access): principals,
+  definition models, subject types, resolvers, outcome and error codes, event and job names, the voting
+  rules. `models.py` holds the ten tables `tiqora_approval`, `_step`, `_approver`, `_vote`, `_token`,
+  `_event` (audit), `_delegation`, `_list`, `_list_member`, `_template` (migration `20261010_0083`; no FK to
+  Znuny tables, naive UTC). `service.py` is the API consumers call (`request_approval`, `decide`,
+  `cancel_approval`, `forward`, `refresh_approvers`, `record_auto_decision`, status queries); it
+  flushes and never commits. Around it: `resolve.py` (approver entries to a principal snapshot),
+  `templates.py` and `lists.py`, `access.py` (visibility), `delegation.py`, `inbox.py`, `tokens.py` (e-mail
+  links), `notify.py` and `texts.py` (mails), `audit.py` (audit rows, outbox events, `Misc` history
+  lines), `hooks.py`, `sweep.py`, `settings.py` (section `approvals`), `core_types.py` (subject type
+  `ticket`, resolvers `ticket.customer_user`, `ticket.owner`, `ticket.responsible`).
+- **Locking.** Every state-changing function starts with `SELECT … FOR UPDATE` on `tiqora_approval`,
+  then reads steps, approvers and tokens with locks (consumer row, then the request, then the rows
+  below it); route callers `rollback()` first so the lock is the first statement of the transaction.
+- **Extension points** (`sdk_stable=False`, core features only): `core.approval_subject_types`
+  (`ApprovalSubjectType`: key, `title_key`, customer approvers allowed, ad-hoc requestable, `describe`,
+  `on_decided`) and `core.approver_resolvers` (`ApproverResolver`: `<owner>.<name>`, `title_key`,
+  `resolve`). Both are registered from `register_core`, next to the job handlers
+  `core.approval_hook` and `core.approval_mail` and the settings section.
+- **Jobs and daemon.** `core.approval_hook` runs the optional decision note and the subject type's
+  `on_decided` after the deciding commit (row written in the deciding transaction, `max_attempts=5`).
+  `core.approval_mail` sends one notification per job; retries never double-send. The worker service
+  `approvals` (`worker/approvals_sweep.py`, interval `TIQORA_APPROVALS_SWEEP_INTERVAL`, default 60 s;
+  switch `daemon.approvals.enabled`, default on) handles deadlines, reminders, escalation, invalid
+  approvers, orphaned requests of deleted tickets and token purge, one short transaction per request.
+- **Events.** `TiqoraApprovalRequested`, `TiqoraApprovalVoted`, `TiqoraApprovalDecided`,
+  `TiqoraApprovalCancelled` and `TiqoraApprovalEscalated` go through `tiqora_event_outbox` (webhooks,
+  SSE); the SSE message `approval_changed` goes only to the affected agents. Event names, `action`
+  values of the audit table and column names are additive-only, because reports read the tables.
+- **Public links.** `/api/v1/approval-links/{inspect,decide}` need no session and no API key
+  (always-allowed prefix); the token is random (256 bit), stored as SHA-256, sent in the POST body, kept in
+  the URL fragment of the confirm page `/approve`, with an IP lock and a per-link budget in Redis.
+- **API.** `/api/v1/approvals` and the ticket routes (API-key area `tickets`),
+  `/api/v1/admin/approvals` (`admin`), `/api/portal/approvals` (customer session); list in
+  [api/rest-v1.md](api/rest-v1.md#approvals).
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).
@@ -1301,7 +1342,7 @@ Uses `fastmcp.http_app(transport="streamable-http")`.
 `Authorization: Bearer` header validated on every request via `TiqoraBearerAuth`
 middleware. The `user_id` is injected into `request.state.user_id` for tools.
 
-**Tools (43):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`,
+**Tools (46):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`,
 `ticket_history`, `list_attachments`, `get_attachment_meta`), ticket write
 (`ticket_create`, `ticket_reply`, `ticket_note`, `ticket_forward`, `ticket_bounce`,
 `ticket_update_state`/`queue`/`priority`/`owner`, `ticket_set_title`/`customer`/
@@ -1312,7 +1353,10 @@ middleware. The `user_id` is injected into `request.state.user_id` for tools.
 `customer_lookup` (these are the 40 tools of `mcp_server/server.py`), plus three read-only CMDB
 tools in `mcp_server/cmdb_tools.py` (`cmdb_search`, `cmdb_get`, `cmdb_impact`: they resolve the
 ITSM mode first, use the Tiqora CMDB in Mode B and the read-only Znuny adapter in Mode A, and
-filter by the class groups of the key's user). Full catalogue: [`api/mcp.md`](api/mcp.md).
+filter by the class groups of the key's user), plus three approval tools in
+`mcp_server/approval_tools.py` (`approval_list_mine`, `approval_get`, and `approval_decide`, which casts
+a binding vote and runs only with an explicit `tool:approval_decide` scope and the admin setting
+`approvals.mcp_decide_enabled`). Full catalogue: [`api/mcp.md`](api/mcp.md).
 
 **Plugin tools.** After the plugin registry is built, `register_plugin_mcp_tools` binds the
 `MCP_TOOLS` of active plugins as `<short_id>_<name>`; names in `CORE_MCP_TOOL_NAMES` are reserved.

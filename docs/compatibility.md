@@ -27,6 +27,13 @@ can migrate gradually.
 | `ConfigItemUpdate` | New CI version (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
 | `ConfigItemDelete` | Delete CIs (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
 
+Approvals ("Freigaben", [approvals.md](approvals.md)) are not part of the GenericInterface and have no
+Znuny equivalent; ITSMChangeManagement's CAB is the nearest Znuny concept, and Tiqora does not write it.
+
+| Feature | Behaviour towards Znuny |
+|---|---|
+| Approvals (Tiqora only) | Znuny sees `Misc` ticket history lines (`Approval #42: voted approved`, switch `approvals.history_entries`, default on) and, with `approvals.decision_note`, one internal note on the final decision. Nothing else is written to Znuny tables. Process steps (`ApprovalRequest`) and catalogue request approvals are not available yet. |
+
 The five `ConfigItem*` operations follow ITSMConfigurationManagement 6.5.4 and 7.3.5, which are identical
 for these operations, so the answer shape does not depend on the Znuny version you migrate from. Notes per
 operation in [ConfigItem operations](#configitem-operations) ([ConfigItemSearch](#configitemsearch),

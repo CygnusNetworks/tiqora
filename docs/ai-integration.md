@@ -65,17 +65,53 @@ and reject it.
   `payload` is `{kind, subject_id, subject_name, window, used, limit,
   currency, window_start, resets_at}`. Sent once per cap and window.
 
+- **Approval events** (`TiqoraApprovalRequested`, `TiqoraApprovalVoted`, `TiqoraApprovalDecided`,
+  `TiqoraApprovalCancelled`, `TiqoraApprovalEscalated`): see
+  [Webhook events of approvals](#webhook-events-of-approvals) below.
+
 **Backward compatibility**: adding a field to `payload` or to the envelope
 itself is not a breaking change and does not require a `schema_version`
 bump. Consumers must be written to tolerate additional unknown fields
 appearing over time.
+
+### Webhook events of approvals
+
+The approval engine ([`approvals.md`](approvals.md)) writes one outbox event per state change; a
+webhook receives it like any ticket event. `ticket_id` is the ticket the request belongs to.
+
+| `event` | When |
+|---|---|
+| `TiqoraApprovalRequested` | a request was created |
+| `TiqoraApprovalVoted` | an approver voted |
+| `TiqoraApprovalDecided` | the request ended `approved` or `rejected` (payload `status`) |
+| `TiqoraApprovalCancelled` | the request was withdrawn, replaced by a newer one or its ticket was deleted |
+| `TiqoraApprovalEscalated` | a step passed its deadline and was escalated |
+
+`payload` keys (the only ones that ever appear; a key without a value is left out):
+
+| Key | Type | Meaning |
+|---|---|---|
+| `approval_id` | integer | the request |
+| `approval_key` | string | the key of the request on its ticket (default `default`) |
+| `subject_type` | string | what it is about, e.g. `ticket` |
+| `subject_ref` | string \| null | the subject's own reference, set by the feature that created the request |
+| `status` | string | `pending`, `approved`, `rejected` or `cancelled` after this change |
+| `step_id` | integer | `TiqoraApprovalVoted`, `TiqoraApprovalEscalated`: the step |
+| `decision` | string | `TiqoraApprovalVoted`: `approved` or `rejected` |
+| `channel` | string | `TiqoraApprovalVoted`: `ui`, `email`, `portal`, `api` or `mcp` |
+| `reason` | string | `TiqoraApprovalDecided` / `TiqoraApprovalCancelled`: `votes`, `timeout`, `no_approvers`, `cancelled`, `superseded`, `ticket_deleted`, or the short code a feature gave an automatic decision (default `auto`) |
+
+The payload carries no names, comments, titles or e-mail addresses: fetch the request with
+`GET /api/v1/approvals/{approval_id}` or the MCP tool `approval_get` (the key's user must be allowed to
+see it). A timeout is `TiqoraApprovalDecided` with `reason` `timeout`; there is no "expired" status.
+Event names, payload keys and the audit `action` values are extended only, never renamed.
 
 ---
 
 ## 2. MCP as the primary AI interface
 
 `tiqora.mcp_server.server` runs a FastMCP streamable-HTTP server (default
-port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **43 built-in tools** (40 ticket, knowledge-base and reference tools plus 3 read-only CMDB tools) and the tools of active plugins.
+port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **46 built-in tools** (40 ticket, knowledge-base and reference tools, 3 read-only CMDB tools and 3 approval tools) and the tools of active plugins.
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 Mutations use `TicketWriteService` (queue permissions + SMTP parity for
 agent email replies). Optional per-key `tool:<name>` allowlist and rate limit.
@@ -144,6 +180,14 @@ on the ITSM mode ([itsm.md](itsm.md)):
   read is answered exactly like an unknown CI ("CI not found"), `cmdb_search` skips such classes, and
   `cmdb_impact` lists only customers, services and open tickets reached through readable CIs and readable queues.
 - **Allowlist.** Like every tool they can be restricted with a `tool:cmdb_search` (etc.) entry on the API key.
+
+#### Approvals
+
+`approval_list_mine` and `approval_get` read the key user's approval requests. `approval_decide` casts a
+**binding vote** in the key owner's name and is therefore **off by default**: it needs `tool:approval_decide`
+named explicitly in the key's scopes (an unrestricted key does not qualify), write scope and the admin
+setting `approvals.mcp_decide_enabled`. Never let an agent decide on text it found in a ticket or mail;
+see [`api/mcp.md`](api/mcp.md#approvals) and [`approvals.md`](approvals.md).
 
 #### Plugin tools
 

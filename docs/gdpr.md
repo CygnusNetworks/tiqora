@@ -254,6 +254,8 @@ does not bring it back.
 | Customer portal TOTP secret and passkeys (`tiqora_customer_totp`, `tiqora_customer_passkey`) | deleted | deleted | no; an anonymized account must not keep a working authenticator |
 | Uploaded customer photo (`tiqora_avatar`, matched by e-mail) and the cached Gravatar picture | deleted | deleted | the photo row is backed up and restored by a rollback, the cache is not |
 | ITSM problem / major-incident records of the customer's tickets | deleted | deleted | yes |
+| Approval requests of the customer's tickets (`tiqora_approval*`) | deleted | deleted | yes |
+| Customer-written or customer-named parts of approvals on other tickets | rewritten | rewritten | yes |
 | Web chat sessions and messages of the customer's tickets | deleted | deleted | yes |
 | `tiqora_telegram_message` rows of the tickets' articles | deleted | deleted | yes |
 | GenericInterface debugger entries of the tickets | deleted | deleted | no; see [below](#genericinterface-debugger) |
@@ -395,6 +397,33 @@ mode also erases it (`tiqora.cmdb.erasure`), with backups for the rollback:
   ticket `ticket [gelöscht]`. In `anonymize` mode the tickets stay with an
   anonymised title, so their lines keep the ticket number and lose the title
   (`ticket <tn> [gelöscht]`).
+
+### Approvals
+
+The [approval engine](approvals.md) keeps free text and customer references in `tiqora_approval*`, so an
+erasure (both modes) handles it in two parts. The preview counts the affected rows.
+
+- **Approval sets of the erased tickets are deleted whole**, in the anonymize and in the delete mode:
+  the request (title, description), steps (with their approver snapshot), approvers, votes (with
+  comments), link tokens and the audit trail. Every row is backed up first. The ticket itself stays
+  in anonymize mode, but its approval history does not: request titles, descriptions and vote
+  comments are free text that can quote the customer. A feature that points at an approval by id (for
+  example a change record) then shows that the history is no longer available.
+- **Approvals on tickets that are not erased** keep their rows, but every reference to an erased
+  customer is rewritten, with a changed-column backup: the principal columns `requester`,
+  `approver.principal`, `approver.customer_login`, `approver.source_ref`, `vote.decided_by` and
+  `event.actor` and the `customer_user` entries in the step's stored definition take the login the
+  customer got (the anonymized login, or the token of the deleted customer). The **vote comments of the
+  erased customer, and the title and description of a request the customer made, become
+  `[anonymisiert]`**. Entries naming the customer in an **approval template** are dropped (a step
+  needs an approver, so an emptied customer entry becomes `[anonymisiert]` and the template editor
+  warns; `change_time` moves and a warning is logged). The link tokens of the rewritten approvers are
+  deleted. The audit trail itself holds only ids, keys and statuses, so it needs no rewrite. A
+  customer who is no longer valid is dropped from open steps by the approval sweeper, so nothing stays
+  pending on an erased customer.
+- **Rollback** restores the deleted sets (parents before children) and the rewritten columns. A row whose parent
+  was deleted by a later erasure in the meantime is skipped, and a request whose template was deleted
+  since comes back without its template.
 
 ### Caveats
 
