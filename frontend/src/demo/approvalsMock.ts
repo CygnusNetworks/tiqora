@@ -352,14 +352,14 @@ const ADMIN_TEMPLATES: ApprovalTemplate[] = [
     template_key: "cab_normal",
     name: "CAB (Mehrheit)",
     description: "Mehrheit der Freigabegruppe, danach Betriebsleitung.",
-    subject_types: [],
+    subject_types: ["ticket"],
     origin: "admin",
     valid: true,
     warnings: [],
     definition: {
       steps: [
         { name: "CAB", stage: 1, rule: "majority", approvers: [{ kind: "list", ref: "1" }], due_hours: 72, on_timeout: "escalate", on_no_approver: "reject", allow_delegation: true, allow_email: true, escalation: [{ kind: "list", ref: "1" }] },
-        { name: "Betriebsleitung", stage: 2, rule: "any", approvers: [{ kind: "group", ref: "Betriebsleitung" }], on_timeout: "notify", on_no_approver: "reject", allow_delegation: true, allow_email: true, escalation: [] },
+        { name: "Betriebsleitung", stage: 2, rule: "any", approvers: [{ kind: "group", ref: "5" }], on_timeout: "notify", on_no_approver: "reject", allow_delegation: true, allow_email: true, escalation: [] },
       ],
     },
   },

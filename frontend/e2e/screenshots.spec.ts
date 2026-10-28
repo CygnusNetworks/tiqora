@@ -421,6 +421,17 @@ test("approvals screenshots", async ({ page }) => {
       body: JSON.stringify([q(10, "Support", 7, [{ ...q(11, "Support::Netzwerk", 3), parent_name: "Support" }]), q(12, "Vertrieb", 2)]),
     }),
   );
+  // Group picker source (the stage-2 entry of cab_normal references group 5).
+  await page.route("**/api/v1/reference/share-groups", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: 1, name: "Service Desk" },
+        { id: 5, name: "Betriebsleitung" },
+        { id: 6, name: "Netzwerk" },
+      ]),
+    }),
+  );
   await loginAsAgent(page);
   await shot(page, "/agent/approvals?id=501", "agent-approvals");
   try {
