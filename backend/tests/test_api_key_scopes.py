@@ -330,6 +330,9 @@ def test_saved_report_routes_and_share_groups_scopes() -> None:
     ):
         assert path_to_area(path) == "stats", path
     assert path_to_area("/api/v1/reference/share-groups") == "tickets"
+    assert path_to_area("/api/v1/reference/roles") == "tickets"
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path="/api/v1/reference/roles")
+    assert not scopes_allow(frozenset({"kb:ro"}), method="GET", path="/api/v1/reference/roles")
     ro, rw = frozenset({"stats:ro"}), frozenset({"stats:rw"})
     assert scopes_allow(ro, method="GET", path="/api/v1/reports/12/file")
     for method, path in (

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import { ApprovalAuditList } from "./ApprovalAuditList";
-import { demoDetail, renderApproval, useGerman } from "./approvalsTestHarness";
+import { demoDetail, renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 

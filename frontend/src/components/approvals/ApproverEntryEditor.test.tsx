@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { ApproverEntryEditor, type ApproverEntry } from "./ApproverEntryEditor";
 import { ApiError } from "@/lib/api";
-import { mockApi, renderApproval, useGerman } from "./approvalsTestHarness";
+import { mockApi, renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 
@@ -82,16 +82,47 @@ describe("ApproverEntryEditor", () => {
     expect(screen.getByTestId("entry-ref-0")).toHaveTextContent("Kim Kunde (kunde@example.org)");
   });
 
-  it("falls back to a role number when the role list is not readable", async () => {
+  it("says so when the roles cannot be loaded", async () => {
     mockApi({
-      "GET /api/v1/admin/roles": () => {
-        throw new ApiError(403, { detail: { code: "forbidden" } }, "/x");
+      "GET /api/v1/reference/roles": () => {
+        throw new ApiError(500, { detail: "boom" }, "/x");
       },
     });
     renderApproval(<Harness initial={[{ kind: "role", ref: "" }]} />);
-    const input = await screen.findByPlaceholderText("Rollennummer");
-    fireEvent.change(input, { target: { value: "4x" } });
-    expect(latest).toEqual([{ kind: "role", ref: "4" }]);
+    expect(await screen.findByTestId("entry-ref-0-error")).toHaveTextContent(
+      "Die Rollen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    );
+  });
+
+  it("keeps a role that no longer exists visible", async () => {
+    mockApi();
+    renderApproval(<Harness initial={[{ kind: "role", ref: "99" }]} />);
+    await waitFor(() => expect(screen.getByTestId("entry-ref-0")).toHaveTextContent("Rolle #99 (nicht mehr vorhanden)"));
+  });
+
+  it("uses its own test id prefix", () => {
+    mockApi();
+    renderApproval(<ApproverEntryEditor value={[{ kind: "user", ref: "" }]} onChange={() => undefined} allowCustomers testIdPrefix="cab" />);
+    expect(screen.getByTestId("cab-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("cab-kind-0")).toBeInTheDocument();
+    expect(screen.getByTestId("cab-ref-0")).toBeInTheDocument();
+    expect(screen.getByTestId("cab-add")).toBeInTheDocument();
+    expect(screen.queryByTestId("entry-add")).toBeNull();
+  });
+
+  it("keeps a row's own search text when an earlier row is removed", async () => {
+    mockApi();
+    renderApproval(
+      <Harness
+        initial={[
+          { kind: "group", ref: "7" },
+          { kind: "customer_user", ref: "" },
+        ]}
+      />,
+    );
+    fireEvent.change(screen.getByTestId("entry-ref-1-search"), { target: { value: "kunde" } });
+    fireEvent.click(screen.getByTestId("entry-remove-0"));
+    expect(screen.getByTestId("entry-ref-0-search")).toHaveValue("kunde");
   });
 
   it("hides customers when they are not allowed", async () => {

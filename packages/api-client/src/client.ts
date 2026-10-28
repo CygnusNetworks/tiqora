@@ -813,6 +813,7 @@ export type TicketLinkOut = {
 export type PriorityRef = { id: number; name: string };
 export type StateRef = { id: number; name: string; type_name: string };
 export type AgentRef = { id: number; login: string; full_name: string };
+export type RoleRef = { id: number; name: string };
 export type CustomerRef = {
   login: string;
   email: string;
@@ -1817,6 +1818,11 @@ export class ApiClient {
 
   listReferenceAgents(signal?: AbortSignal) {
     return this.request<AgentRef[]>("GET", "/api/v1/reference/agents", { signal });
+  }
+
+  /** Valid roles (id, name) for approver pickers; readable by every agent. */
+  listReferenceRoles(signal?: AbortSignal) {
+    return this.request<RoleRef[]>("GET", "/api/v1/reference/roles", { signal });
   }
 
   searchReferenceCustomers(

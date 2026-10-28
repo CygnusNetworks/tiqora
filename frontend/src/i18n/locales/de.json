@@ -9310,11 +9310,12 @@
       "agent": "Agent wählen",
       "group": "Gruppe wählen",
       "role": "Rolle wählen",
-      "roleId": "Rollennummer",
       "list": "Freigabegruppe wählen",
       "customer": "Kunde wählen",
       "customerSearch": "Kunden suchen (ab 2 Buchstaben)",
-      "resolver": "Regel wählen"
+      "resolver": "Regel wählen",
+      "rolesFailed": "Die Rollen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "roleGone": "Rolle #{{id}} (nicht mehr vorhanden)"
     },
     "entry": {
       "kindLabel": "Art",
@@ -9348,7 +9349,8 @@
         "notify": "Nur erinnern",
         "escalate": "Eskalieren",
         "reject": "Ablehnen",
-        "approve": "Freigeben"
+        "approve": "Freigeben",
+        "approveTemplatesOnly": "Automatisch freigeben (nur in Vorlagen)"
       },
       "escalation": "Eskalation an",
       "allowForward": "Weiterleiten erlaubt",

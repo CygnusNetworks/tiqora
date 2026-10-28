@@ -27,7 +27,7 @@ export function mockApi(extra: Record<string, Handler> = {}) {
       ];
     }
     if (path === "/api/v1/reference/share-groups") return [{ id: 7, name: "Betriebsleitung" }];
-    if (path === "/api/v1/admin/roles") return { items: [{ id: 4, name: "Change Manager" }], total: 1 };
+    if (path === "/api/v1/reference/roles") return [{ id: 4, name: "Change Manager" }];
     if (path === "/api/v1/reference/customers") {
       return [{ login: "kunde@example.org", email: "kunde@example.org", customer_id: "example", full_name: "Kim Kunde" }];
     }

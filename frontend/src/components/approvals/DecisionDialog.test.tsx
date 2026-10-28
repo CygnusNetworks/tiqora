@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import { DecisionDialog } from "./DecisionDialog";
-import { demoDetail, mockApi, renderApproval, useGerman } from "./approvalsTestHarness";
+import { demoDetail, mockApi, renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 

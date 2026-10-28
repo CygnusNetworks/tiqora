@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { ApiError } from "@/lib/api";
 import { ForwardDialog } from "./ForwardDialog";
-import { demoDetail, mockApi, renderApproval, useGerman } from "./approvalsTestHarness";
+import { demoDetail, mockApi, renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 

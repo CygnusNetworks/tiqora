@@ -4,6 +4,7 @@ import type { Schemas } from "@tiqora/api-client";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { approvalsApi, approvalsKeys } from "@/lib/approvalsApi";
+import { useRowKeys, newRowKey } from "./rowKeys";
 import { AgentSelect, CustomerSelect, GroupSelect, RoleSelect } from "./pickers";
 
 export type ApproverEntry = Schemas["ApproverEntry"];
@@ -24,11 +25,14 @@ export function ApproverEntryEditor({
   onChange,
   subjectType,
   allowCustomers,
+  testIdPrefix = "entry",
 }: {
   value: ApproverEntry[];
   onChange: (next: ApproverEntry[]) => void;
   subjectType?: string | null;
   allowCustomers: boolean;
+  /** Prefix of every `data-testid`; give nested or repeated editors their own. */
+  testIdPrefix?: string;
 }) {
   const { t } = useTranslation();
   const listsQ = useQuery({
@@ -42,6 +46,7 @@ export function ApproverEntryEditor({
     staleTime: 60_000,
   });
 
+  const [keys, setKeys] = useRowKeys(value.length);
   const setRow = (i: number, entry: ApproverEntry) => onChange(value.map((e, idx) => (idx === i ? entry : e)));
   const kindItems = (current: ApproverKind) =>
     KINDS.filter((k) => k !== "customer_user" || allowCustomers || current === "customer_user").map((k) => ({
@@ -53,7 +58,7 @@ export function ApproverEntryEditor({
     .map((r) => ({ value: r.key, label: t(r.title_key, { defaultValue: r.key }) }));
 
   const picker = (entry: ApproverEntry, i: number) => {
-    const testId = `entry-ref-${i}`;
+    const testId = `${testIdPrefix}-ref-${i}`;
     const ariaLabel = t(`approvals.entry.kind.${entry.kind}`);
     const set = (ref: string) => setRow(i, { kind: entry.kind, ref });
     switch (entry.kind) {
@@ -102,15 +107,15 @@ export function ApproverEntryEditor({
   };
 
   return (
-    <div className="space-y-2" data-testid="entry-editor">
+    <div className="space-y-2" data-testid={`${testIdPrefix}-editor`}>
       {value.map((entry, i) => (
-        <div key={i} className="flex flex-col gap-2 sm:flex-row sm:items-start" data-testid="entry-row">
+        <div key={keys[i]} className="flex flex-col gap-2 sm:flex-row sm:items-start" data-testid={`${testIdPrefix}-row`}>
           <div className="sm:w-48 sm:shrink-0">
             <SelectField
               items={kindItems(entry.kind)}
               value={entry.kind}
               onChange={(kind) => kind !== entry.kind && setRow(i, { kind, ref: "" })}
-              testId={`entry-kind-${i}`}
+              testId={`${testIdPrefix}-kind-${i}`}
               aria-label={t("approvals.entry.kindLabel")}
             />
           </div>
@@ -118,9 +123,12 @@ export function ApproverEntryEditor({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+            onClick={() => {
+              setKeys(keys.filter((_, idx) => idx !== i));
+              onChange(value.filter((_, idx) => idx !== i));
+            }}
             aria-label={t("approvals.entry.remove")}
-            data-testid={`entry-remove-${i}`}
+            data-testid={`${testIdPrefix}-remove-${i}`}
           >
             ✕
           </Button>
@@ -128,9 +136,12 @@ export function ApproverEntryEditor({
       ))}
       <Button
         size="sm"
-        onClick={() => onChange([...value, { kind: "user", ref: "" }])}
+        onClick={() => {
+          setKeys([...keys, newRowKey()]);
+          onChange([...value, { kind: "user", ref: "" }]);
+        }}
         disabled={value.length >= MAX_APPROVER_ENTRIES}
-        data-testid="entry-add"
+        data-testid={`${testIdPrefix}-add`}
       >
         {t("approvals.entry.add")}
       </Button>

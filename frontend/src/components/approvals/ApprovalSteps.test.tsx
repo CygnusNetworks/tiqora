@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { screen, within } from "@testing-library/react";
 import { ApprovalSteps } from "./ApprovalSteps";
-import { demoDetail, renderApproval, useGerman } from "./approvalsTestHarness";
+import { demoDetail, renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 

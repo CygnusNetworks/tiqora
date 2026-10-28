@@ -8,13 +8,27 @@ export const MAX_APPROVAL_STEPS = 10;
 
 export type StepProblem = "name" | "approvers" | "quorum" | "escalation";
 
+/**
+ * Renumbers the stages to 1..k without gaps and orders the steps by stage (stable); `keys` (one per
+ * step, optional) are reordered the same way.
+ */
+export function normalizeStagesKeyed<K>(
+  steps: ApprovalStepSpec[],
+  keys: K[],
+): { steps: ApprovalStepSpec[]; keys: K[] } {
+  const stages = [...new Set(steps.map((s) => s.stage ?? 1))].sort((a, b) => a - b);
+  const order = steps
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => (a.s.stage ?? 1) - (b.s.stage ?? 1) || a.i - b.i);
+  return {
+    steps: order.map(({ s }) => ({ ...s, stage: stages.indexOf(s.stage ?? 1) + 1 })),
+    keys: order.map(({ i }) => keys[i]),
+  };
+}
+
 /** Renumbers the stages to 1..k without gaps, in ascending order of the stage numbers given. */
 export function normalizeStages(steps: ApprovalStepSpec[]): ApprovalStepSpec[] {
-  const order = [...new Set(steps.map((s) => s.stage ?? 1))].sort((a, b) => a - b);
-  return steps
-    .map((s, i) => ({ s, i }))
-    .sort((a, b) => (a.s.stage ?? 1) - (b.s.stage ?? 1) || a.i - b.i)
-    .map(({ s }) => ({ ...s, stage: order.indexOf(s.stage ?? 1) + 1 }));
+  return normalizeStagesKeyed(steps, steps.map(() => 0)).steps;
 }
 
 /** What is still missing in one step; an empty list means the step can be saved. */

@@ -40118,6 +40118,24 @@
         "title": "RoleOut",
         "type": "object"
       },
+      "RoleRefOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "RoleRefOut",
+        "type": "object"
+      },
       "RoleRule": {
         "properties": {
           "attribute": {
@@ -110269,6 +110287,76 @@
           }
         },
         "summary": "List Reference Queues",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/reference/roles": {
+      "get": {
+        "description": "Every valid role (id, name) for approver pickers; names only, no members.",
+        "operationId": "list_roles_api_v1_reference_roles_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleRefOut"
+                  },
+                  "title": "Response List Roles Api V1 Reference Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Roles",
         "tags": [
           "reference"
         ]

@@ -11023,6 +11023,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Roles
+         * @description Every valid role (id, name) for approver pickers; names only, no members.
+         */
+        get: operations["list_roles_api_v1_reference_roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/services": {
         parameters: {
             query?: never;
@@ -27396,6 +27416,13 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /** RoleRefOut */
+        RoleRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /** RoleRule */
         RoleRule: {
@@ -58881,6 +58908,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_roles_api_v1_reference_roles_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleRefOut"][];
                 };
             };
             /** @description Validation Error */

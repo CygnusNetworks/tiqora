@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import { ApprovalStatusBadge } from "./ApprovalStatusBadge";
-import { renderApproval, useGerman } from "./approvalsTestHarness";
+import { renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 

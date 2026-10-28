@@ -2,17 +2,19 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/SelectField";
+import type { SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Switch } from "@/components/ui/Switch";
 import { ApproverEntryEditor } from "./ApproverEntryEditor";
 import {
   MAX_APPROVAL_STEPS,
-  normalizeStages,
+  normalizeStagesKeyed,
   stepProblems,
   type ApprovalDefinition,
   type ApprovalStepSpec,
   type StepProblem,
 } from "./definitionLogic";
 import { inputCls } from "./pickers";
+import { newRowKey, useRowKeys } from "./rowKeys";
 
 type Rule = ApprovalStepSpec["rule"];
 type OnTimeout = ApprovalStepSpec["on_timeout"];
@@ -53,24 +55,40 @@ export function DefinitionEditor({
 }) {
   const { t } = useTranslation();
   const steps = value.steps;
-  const emit = (next: ApprovalStepSpec[]) => onChange({ ...value, steps: normalizeStages(next) });
+  const [keys, setKeys] = useRowKeys(steps.length);
+  const emit = (next: ApprovalStepSpec[], nextKeys: number[] = keys) => {
+    const normal = normalizeStagesKeyed(next, nextKeys);
+    setKeys(normal.keys);
+    onChange({ ...value, steps: normal.steps });
+  };
   const patch = (i: number, p: Partial<ApprovalStepSpec>) => emit(steps.map((s, idx) => (idx === i ? { ...s, ...p } : s)));
   const maxStage = steps.reduce((m, s) => Math.max(m, s.stage ?? 1), 0);
 
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= steps.length) return;
-    // Neighbours trade places and stage numbers; the stable sort in normalizeStages keeps the result ordered.
+    // Neighbours trade places and stage numbers; the stable sort in normalizeStagesKeyed keeps the result ordered.
     emit(
       steps.map((s, idx) =>
         idx === i ? { ...steps[j], stage: s.stage } : idx === j ? { ...steps[i], stage: s.stage } : s,
       ),
+      keys.map((k, idx) => (idx === i ? keys[j] : idx === j ? keys[i] : k)),
     );
   };
 
-  const timeoutItems: { value: OnTimeout; label: string }[] = (
-    ["notify", "escalate", "reject", ...(allowAutoApprove ? ["approve"] : [])] as OnTimeout[]
-  ).map((v) => ({ value: v, label: t(`approvals.definition.timeout.${v}`) }));
+  const timeoutItemsFor = (current: OnTimeout | undefined) => {
+    const items: SelectMenuItem<OnTimeout>[] = (["notify", "escalate", "reject"] as OnTimeout[]).map((v) => ({
+      value: v,
+      label: t(`approvals.definition.timeout.${v}`),
+    }));
+    if (allowAutoApprove) {
+      items.push({ value: "approve", label: t("approvals.definition.timeout.approve") });
+    } else if (current === "approve") {
+      // Kept (not blank) so a stored value stays visible; it cannot be picked again once left.
+      items.push({ value: "approve", label: t("approvals.definition.timeout.approveTemplatesOnly"), disabled: true });
+    }
+    return items;
+  };
 
   return (
     <div className="space-y-3" data-testid="definition-editor">
@@ -87,7 +105,7 @@ export function DefinitionEditor({
             </p>
           );
         return (
-          <section key={i} className="space-y-3 rounded-md border border-hairline bg-surface p-3" data-testid="definition-step" data-stage={step.stage}>
+          <section key={keys[i]} className="space-y-3 rounded-md border border-hairline bg-surface p-3" data-testid="definition-step" data-stage={step.stage}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-muted" data-testid={`step-${i}-stage-label`}>
                 {t("approvals.steps.stage", { stage: step.stage ?? 1 })}
@@ -99,7 +117,7 @@ export function DefinitionEditor({
                 <Button size="sm" variant="ghost" disabled={i === steps.length - 1} onClick={() => move(i, 1)} aria-label={t("approvals.definition.moveDown")} data-testid={`step-${i}-down`}>
                   ↓
                 </Button>
-                <Button size="sm" variant="ghost" disabled={steps.length <= 1} onClick={() => emit(steps.filter((_, idx) => idx !== i))} aria-label={t("approvals.definition.removeStep")} data-testid={`step-${i}-remove`}>
+                <Button size="sm" variant="ghost" disabled={steps.length <= 1} onClick={() => emit(steps.filter((_, idx) => idx !== i), keys.filter((_, idx) => idx !== i))} aria-label={t("approvals.definition.removeStep")} data-testid={`step-${i}-remove`}>
                   ✕
                 </Button>
               </div>
@@ -147,7 +165,7 @@ export function DefinitionEditor({
 
             <div>
               <div className="mb-1 text-xs font-medium text-muted">{t("approvals.definition.approvers")}</div>
-              <ApproverEntryEditor value={step.approvers} onChange={(approvers) => patch(i, { approvers })} subjectType={subjectType} allowCustomers={allowCustomers} />
+              <ApproverEntryEditor value={step.approvers} onChange={(approvers) => patch(i, { approvers })} subjectType={subjectType} allowCustomers={allowCustomers} testIdPrefix={`step-${i}-approvers`} />
               {err("approvers")}
             </div>
 
@@ -167,7 +185,7 @@ export function DefinitionEditor({
               <div className="text-xs font-medium text-muted">
                 {t("approvals.definition.onTimeout")}
                 <div className="mt-1">
-                  <SelectField items={timeoutItems} value={step.on_timeout ?? "notify"} onChange={(on_timeout) => patch(i, { on_timeout })} testId={`step-${i}-timeout`} aria-label={t("approvals.definition.onTimeout")} />
+                  <SelectField items={timeoutItemsFor(step.on_timeout)} value={step.on_timeout ?? "notify"} onChange={(on_timeout) => patch(i, { on_timeout })} testId={`step-${i}-timeout`} aria-label={t("approvals.definition.onTimeout")} />
                 </div>
               </div>
             </div>
@@ -175,7 +193,7 @@ export function DefinitionEditor({
             {step.on_timeout === "escalate" && (
               <div>
                 <div className="mb-1 text-xs font-medium text-muted">{t("approvals.definition.escalation")}</div>
-                <ApproverEntryEditor value={step.escalation ?? []} onChange={(escalation) => patch(i, { escalation })} subjectType={subjectType} allowCustomers={allowCustomers} />
+                <ApproverEntryEditor value={step.escalation ?? []} onChange={(escalation) => patch(i, { escalation })} subjectType={subjectType} allowCustomers={allowCustomers} testIdPrefix={`step-${i}-escalation`} />
                 {err("escalation")}
               </div>
             )}
@@ -193,7 +211,7 @@ export function DefinitionEditor({
           </section>
         );
       })}
-      <Button onClick={() => emit([...steps, blankStep(maxStage + 1)])} disabled={steps.length >= MAX_APPROVAL_STEPS} data-testid="definition-add-step">
+      <Button onClick={() => emit([...steps, blankStep(maxStage + 1)], [...keys, newRowKey()])} disabled={steps.length >= MAX_APPROVAL_STEPS} data-testid="definition-add-step">
         {t("approvals.definition.addStep")}
       </Button>
     </div>

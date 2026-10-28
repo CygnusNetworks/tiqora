@@ -9302,11 +9302,12 @@
       "agent": "Choose an agent",
       "group": "Choose a group",
       "role": "Choose a role",
-      "roleId": "Role number",
       "list": "Choose an approval group",
       "customer": "Choose a customer",
       "customerSearch": "Search customers (2 letters or more)",
-      "resolver": "Choose a rule"
+      "resolver": "Choose a rule",
+      "rolesFailed": "The roles could not be loaded. Please try again.",
+      "roleGone": "Role #{{id}} (no longer exists)"
     },
     "entry": {
       "kindLabel": "Kind",
@@ -9340,7 +9341,8 @@
         "notify": "Only remind",
         "escalate": "Escalate",
         "reject": "Reject",
-        "approve": "Approve"
+        "approve": "Approve",
+        "approveTemplatesOnly": "Approve automatically (templates only)"
       },
       "escalation": "Escalation to",
       "allowForward": "Forwarding allowed",

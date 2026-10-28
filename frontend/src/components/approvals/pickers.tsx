@@ -70,10 +70,7 @@ export function GroupSelect({
   );
 }
 
-/**
- * Roles come from the admin role list. Agents without admin rights get a 403 there; the picker
- * then falls back to the numeric role id so a stored entry stays editable.
- */
+/** Valid roles (`GET /reference/roles`); a stored role that no longer exists stays visible and says so. */
 export function RoleSelect({
   value,
   onChange,
@@ -87,25 +84,21 @@ export function RoleSelect({
 }) {
   const { t } = useTranslation();
   const q = useQuery({
-    queryKey: ["approvals", "picker-roles"],
-    queryFn: ({ signal }) => api.adminRoles.list({ pageSize: 200 }, signal),
+    queryKey: ["reference", "roles"],
+    queryFn: ({ signal }) => api.listReferenceRoles(signal),
     staleTime: 60_000,
-    retry: false,
   });
   if (q.isError) {
     return (
-      <input
-        className={inputCls}
-        inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
-        aria-label={ariaLabel}
-        placeholder={t("approvals.picker.roleId")}
-        data-testid={testId}
-      />
+      <p className="py-1.5 text-xs text-danger" role="alert" data-testid={`${testId}-error`}>
+        {t("approvals.picker.rolesFailed")}
+      </p>
     );
   }
-  const items = (q.data?.items ?? []).map((r) => ({ value: String(r.id), label: r.name }));
+  const items = (q.data ?? []).map((r) => ({ value: String(r.id), label: r.name }));
+  if (q.isSuccess && value && !items.some((i) => i.value === value)) {
+    items.unshift({ value, label: t("approvals.picker.roleGone", { id: value }) });
+  }
   return (
     <SelectField
       items={items}

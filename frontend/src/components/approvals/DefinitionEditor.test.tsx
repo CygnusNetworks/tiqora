@@ -9,7 +9,7 @@ import {
   type ApprovalDefinition,
   type ApprovalStepSpec,
 } from "./definitionLogic";
-import { mockApi, renderApproval, useGerman } from "./approvalsTestHarness";
+import { mockApi, renderApproval, useGerman } from "@/test/approvalsHarness";
 
 beforeAll(useGerman);
 
@@ -175,12 +175,10 @@ describe("DefinitionEditor", () => {
     expect(latest.steps[0].on_timeout).toBe("escalate");
     expect(screen.getByText("Eskalation an")).toBeInTheDocument();
     expect(screen.getByTestId("step-0-error-escalation")).toBeInTheDocument();
-    const escalation = screen.getByText("Eskalation an").parentElement!;
-    fireEvent.click(within(escalation).getByTestId("entry-add"));
+    fireEvent.click(screen.getByTestId("step-0-escalation-add"));
     expect(latest.steps[0].escalation).toEqual([{ kind: "user", ref: "" }]);
-    fireEvent.click(within(escalation).getByTestId("entry-ref-0"));
-    // The step's approver row also owns an "entry-ref-0": the trigger is scoped to its editor, the open menu is portalled.
-    fireEvent.click(await screen.findByTestId("entry-ref-0-menu-option-3"));
+    fireEvent.click(screen.getByTestId("step-0-escalation-ref-0"));
+    fireEvent.click(await screen.findByTestId("step-0-escalation-ref-0-menu-option-3"));
     expect(latest.steps[0].escalation).toEqual([{ kind: "user", ref: "3" }]);
     expect(screen.queryByTestId("step-0-error-escalation")).toBeNull();
   });
@@ -195,6 +193,21 @@ describe("DefinitionEditor", () => {
     renderApproval(<Harness initial={{ steps: [step("a", 1)] }} allowAutoApprove />);
     fireEvent.click(screen.getByTestId("step-0-timeout"));
     expect(await screen.findByTestId("step-0-timeout-menu-option-approve")).toBeInTheDocument();
+  });
+
+  it("shows a stored approve-on-timeout as a disabled, explained option", () => {
+    mockApi();
+    renderApproval(<Harness initial={{ steps: [step("a", 1, { on_timeout: "approve" })] }} />);
+    expect(screen.getByTestId("step-0-timeout")).toHaveTextContent("Automatisch freigeben (nur in Vorlagen)");
+    expect(latest.steps[0].on_timeout).toBe("approve");
+  });
+
+  it("keeps each step's own state when a step is removed", () => {
+    mockApi();
+    renderApproval(<Harness initial={{ steps: [step("a", 1), step("b", 2, { approvers: [{ kind: "customer_user", ref: "" }] })] }} />);
+    fireEvent.change(screen.getByTestId("step-1-approvers-ref-0-search"), { target: { value: "kunde" } });
+    fireEvent.click(screen.getByTestId("step-0-remove"));
+    expect(screen.getByTestId("step-0-approvers-ref-0-search")).toHaveValue("kunde");
   });
 
   it("switches forwarding and e-mail decisions and sets the deadline", () => {
