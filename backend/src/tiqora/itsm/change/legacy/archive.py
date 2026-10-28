@@ -756,3 +756,98 @@ async def erase_legacy_change_customers(
             counts["tiqora_itsm_legacy_change_ref"] += 1
     await session.flush()
     return counts
+
+
+#: ``add_backup_for(job_id, table, pk, original_row)``: a backup row for that erasure job
+JobBackupFn = Callable[[int, str, dict[str, Any], dict[str, Any]], Awaitable[None]]
+
+
+async def _tombstone_holders(session: AsyncSession) -> dict[str, set[int]]:
+    """Each erased hash -> the erasure jobs holding it (empty: only the CLI anonymisation)."""
+    holders: dict[str, set[int]] = {}
+    table = TiqoraItsmLegacyErased
+    for digest, job in await session.execute(select(table.identifier_hash, table.job_id)):
+        jobs = holders.setdefault(str(digest).strip(), set())
+        if job is not None:
+            jobs.add(int(job))
+    return holders
+
+
+async def redact_restored_changes(
+    session: AsyncSession,
+    change_ids: Collection[int],
+    *,
+    settings: Settings,
+    add_backup_for: JobBackupFn,
+) -> int:
+    """Redact archive rows a rollback restored against the tombstones that remain (flush only).
+
+    A rollback restores the rows as they were before its job, which may name a customer
+    another erasure (or the CLI anonymisation) still holds: those values become
+    :data:`REDACTED` and their ``customer_user`` lookup rows go again, in the rollback's
+    transaction. Each row changed here is backed up for every erasure job holding one of its
+    hits, so rolling that job back later restores the row as this rollback left it.
+    """
+    if not change_ids:
+        return 0
+    holders = await _tombstone_holders(session)
+    if not holders:
+        return 0
+    key = erased_key(settings)
+    changed = 0
+    table = TiqoraItsmLegacyChange
+    ref = TiqoraItsmLegacyChangeRef
+    for part in chunks(sorted(set(change_ids))):
+        rows = (
+            await session.execute(
+                select(table.id, table.data, table.title, table.fingerprint).where(
+                    table.id.in_(list(part))
+                )
+            )
+        ).all()
+        for row_id, raw, title, fp in rows:
+            redactor = TombstoneRedactor(key, holders)
+            old = json.loads(raw)
+            data = redact_data(old, redactor)
+            if not redactor.hits:
+                continue
+            data[REDACTED_KEY] = sorted(redacted_hashes(old) | redactor.hits)
+            new_title = data.get("title")
+            new_title = None if new_title is None else str(new_title)[:_TITLE_MAX]
+            original = {"data": raw, "title": title, "fingerprint": fp}
+            for job in sorted(set().union(*(holders[h] for h in redactor.hits))):
+                await add_backup_for(job, GDPR_TABLES[0], {"id": int(row_id)}, original)
+            await session.execute(
+                text("UPDATE tiqora_itsm_legacy_change SET data = :d, title = :t WHERE id = :i"),
+                {"d": _dump(data), "t": new_title, "i": int(row_id)},
+            )
+            changed += 1
+        found = (
+            await session.execute(
+                select(ref.legacy_change_id, ref.ref_kind, ref.ref_key, ref.workorder_number).where(
+                    ref.legacy_change_id.in_(list(part)), ref.ref_kind == REF_CUSTOMER
+                )
+            )
+        ).all()
+        for change_id, kind, login, wo in found:
+            jobs = holders.get(erased_hash(key, str(login)))
+            if jobs is None:
+                continue
+            pk = {
+                "legacy_change_id": int(change_id),
+                "ref_kind": str(kind),
+                "ref_key": str(login),
+                "workorder_number": int(wo),
+            }
+            for job in sorted(jobs):
+                await add_backup_for(job, GDPR_TABLES[1], pk, dict(pk))
+            await session.execute(
+                delete(ref).where(
+                    ref.legacy_change_id == pk["legacy_change_id"],
+                    ref.ref_kind == pk["ref_kind"],
+                    ref.ref_key == pk["ref_key"],
+                    ref.workorder_number == pk["workorder_number"],
+                )
+            )
+    await session.flush()
+    return changed

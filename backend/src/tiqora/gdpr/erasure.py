@@ -57,7 +57,7 @@ from tiqora.gdpr.saved_criteria import (
 )
 from tiqora.gi.debug_store import delete_debug_entries_for_tickets
 from tiqora.itsm.change.legacy.archive import GDPR_TABLES as LEGACY_CHANGE_GDPR_TABLES
-from tiqora.itsm.change.legacy.archive import erase_legacy_change_customers
+from tiqora.itsm.change.legacy.archive import erase_legacy_change_customers, redact_restored_changes
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -2324,6 +2324,8 @@ async def rollback_job(
         restored = 0
         ticket_ids: list[int] = []
         cmdb_ci_ids: list[int] = []
+        legacy_change_ids: set[int] = set()
+        legacy_rows_seen: set[int] = set()
         # A ticket hard-delete job (delete_tickets) backs up EVERY affected row
         # as a full row (tickets + all FK children + masters). Detect it via a
         # full-row "ticket" backup, then simply re-INSERT everything in id-DESC
@@ -2387,6 +2389,23 @@ async def rollback_job(
                         {"now": datetime.now(UTC).replace(tzinfo=None), "sid": pk["schedule_id"]},
                     )
                     restored += 1
+                continue
+
+            if table in LEGACY_CHANGE_GDPR_TABLES:
+                # archived Znuny changes: the newest backup of a row wins (a later one comes
+                # from an earlier rollback that restored an older state for this job, see
+                # redact_restored_changes); every restored change is redacted again below
+                change_id = int(pk["id"] if "id" in pk else pk["legacy_change_id"])
+                legacy_change_ids.add(change_id)
+                if table == LEGACY_CHANGE_GDPR_TABLES[0]:
+                    if change_id in legacy_rows_seen:
+                        continue
+                    legacy_rows_seen.add(change_id)
+                if await _fetch_full_row(session, table, pk) is None:
+                    await _insert_row(session, table, {**pk, **original})
+                else:
+                    await _update_row(session, table, pk, original)
+                restored += 1
                 continue
 
             if is_ticket_delete:
@@ -2453,7 +2472,6 @@ async def rollback_job(
                     "tiqora_chat_session",
                     *ITSM_TICKET_TABLES,
                     *CHANGE_TICKET_TABLES,
-                    *LEGACY_CHANGE_GDPR_TABLES,
                 ):
                     await _insert_row(session, table, {**pk, **original})
                 else:
@@ -2466,6 +2484,33 @@ async def rollback_job(
         if cmdb_ci_ids:
             # the restored current version is the old one: rebuild the search index from it
             await rebuild_index(session, sorted(set(cmdb_ci_ids)))
+
+        if legacy_change_ids:
+            # The restored archive rows are as they were before this job: whatever another
+            # erasure (or the CLI anonymisation) still holds is redacted again right here, and
+            # backed up for that job, so its own rollback brings the row back as it is now.
+            backup_now = datetime.now(UTC).replace(tzinfo=None)
+            applied: dict[int, bool] = {}
+
+            async def _backup_for(
+                other: int, table: str, pk: dict[str, Any], original: dict[str, Any]
+            ) -> None:
+                if other not in applied:
+                    other_job = await session.get(TiqoraGdprJob, other)
+                    applied[other] = other_job is not None and other_job.status == "applied"
+                if applied[other]:
+                    await _add_backup(
+                        session,
+                        job_id=other,
+                        table_name=table,
+                        row_pk=pk,
+                        original_row=original,
+                        created=backup_now,
+                    )
+
+            await redact_restored_changes(
+                session, legacy_change_ids, settings=settings, add_backup_for=_backup_for
+            )
 
         # Fix anonymize-mode login renames on related tables: after customer_user
         # is restored, rename related user_id from new→old using job.resolved_logins

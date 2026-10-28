@@ -1074,8 +1074,9 @@ async def test_rich_text_history_redacted_on_erasure_and_rearchive(
 async def test_rollback_keeps_a_shared_address_another_erasure_holds(
     dialect: str, profile: str, request: pytest.FixtureRequest
 ) -> None:
-    """Two customers share an address: rolling the first erasure back removes only its own
-    tombstones; the address stays erased for the second one."""
+    """Two customers share an address, so it is erased twice (jobs A, B): rolling A back
+    first removes only A's tombstones and redacts the restored row again for B in the same
+    transaction; rolling B back then leaves the row clear."""
     async with archive_world(request, dialect, profile) as w:
         async with w.factory() as s:
             first = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
@@ -1093,6 +1094,8 @@ async def test_rollback_keeps_a_shared_address_another_erasure_holds(
             )
             await s.commit()
         await _archive(w)
+        clear = (await _rows(w))[MAIL].data
+        assert CUSTOMER2 in clear and CUSTOMER3 in clear and CUSTOMER2_MAIL in clear
         key = erased_key(SETTINGS)
         shared = erased_hash(key, CUSTOMER2_MAIL)
 
@@ -1108,15 +1111,24 @@ async def test_rollback_keeps_a_shared_address_another_erasure_holds(
             [(erased_hash(key, CUSTOMER3), job_b), (shared, job_b)],
             key=lambda t: (t[0], t[1] or 0),
         )
-        # the rollback restored the row as it was before job A; the next run redacts it again
-        # against what is still erased: CUSTOMER2 is back, CUSTOMER3 and the address are not
-        assert _counts(await _archive(w)) == (0, 1, 2, 0)
+        # no archive run in between: the rollback itself redacted the restored row for B
         data = (await _rows(w))[MAIL].data
         assert CUSTOMER2 in data
         assert _absent(data, CUSTOMER3, CUSTOMER2_MAIL)
         refs = await _refs(w, MAIL)
         assert ("customer_user", CUSTOMER2, 0) in refs
         assert ("customer_user", CUSTOMER3, 0) not in refs
+        # and it is stored as an archive run would store it
+        assert _counts(await _archive(w)) == (0, 0, 3, 0)
+
+        await rollback_job(w.factory, SETTINGS, job_b, force_parallel=True, actor="test")
+
+        assert await _tombstone_jobs(w) == []
+        assert (await _rows(w))[MAIL].data == clear
+        refs = await _refs(w, MAIL)
+        assert ("customer_user", CUSTOMER2, 0) in refs
+        assert ("customer_user", CUSTOMER3, 0) in refs
+        assert _counts(await _archive(w)) == (0, 0, 3, 0)
 
 
 @pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
