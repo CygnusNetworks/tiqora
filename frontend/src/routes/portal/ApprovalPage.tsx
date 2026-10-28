@@ -47,6 +47,8 @@ export function PortalApprovalPage() {
   };
 
   const a = detail.data;
+  // The server data decides (survives a reload); `done` only adds the thank-you right after voting.
+  const mine = a ? (["approved", "rejected"].includes(a.my_decision ?? a.my_status) ? (a.my_decision ?? a.my_status) : null) : null;
   const missing = reasonAsked && comment.trim() === "";
   const unavailable = detail.error instanceof ApiError && detail.error.status === 404;
   return (
@@ -101,11 +103,19 @@ export function PortalApprovalPage() {
               </ul>
             )}
           </section>
-          {done ? (
-            <p className="text-sm font-medium text-green" role="status" data-testid="portal-approval-done">
-              {done === "approved" ? t("approvals.link.doneApproved") : t("approvals.link.doneRejected")}
-            </p>
-          ) : a.can_decide ? (
+          {mine && (
+            <div className="space-y-1" data-testid="portal-approval-mine-box">
+              {done && (
+                <p className="text-sm font-medium text-green" role="status" data-testid="portal-approval-done">
+                  {done === "approved" ? t("approvals.link.doneApproved") : t("approvals.link.doneRejected")}
+                </p>
+              )}
+              <p className="text-sm text-ink" data-testid="portal-approval-mine">
+                {t("approvals.agent.myDecision", { decision: t(`approvals.status.${mine}`, { defaultValue: mine }) })}
+              </p>
+            </div>
+          )}
+          {mine ? null : a.can_decide ? (
             <section className="space-y-3 rounded-lg border border-hairline bg-surface p-4" data-testid="portal-approval-form">
               <div>
                 <label htmlFor={fieldId} className="mb-1 block text-xs font-medium text-muted">
@@ -144,12 +154,6 @@ export function PortalApprovalPage() {
                 </Button>
               </div>
             </section>
-          ) : a.my_decision ? (
-            <p className="text-sm text-ink" data-testid="portal-approval-mine">
-              {t("approvals.agent.myDecision", {
-                decision: t(`approvals.status.${a.my_decision}`, { defaultValue: a.my_decision }),
-              })}
-            </p>
           ) : (
             <p className="text-sm text-muted" data-testid="portal-approval-cannot">
               {t("approvals.agent.cannotVote")}

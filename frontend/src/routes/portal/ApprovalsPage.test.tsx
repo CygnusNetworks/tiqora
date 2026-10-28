@@ -64,7 +64,7 @@ describe("PortalApprovalsPage", () => {
     wrap();
     await screen.findByTestId("portal-approval-601");
     list.mockResolvedValue({
-      items: [{ ...item, id: 602, status: "approved", my_status: "approved", decided_at: "2026-10-20T10:00:00Z" }],
+      items: [{ ...item, id: 602, status: "rejected", my_status: "approved", decided_at: "2026-10-20T10:00:00Z" }],
       total: 1,
       limit: 25,
       offset: 0,
@@ -72,7 +72,8 @@ describe("PortalApprovalsPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Erledigt" }));
     const card = await screen.findByTestId("portal-approval-602");
     expect(card).toHaveTextContent("entschieden");
-    expect(screen.getByTestId("approval-status-badge")).toHaveTextContent("Freigegeben");
+    expect(screen.getByTestId("portal-approval-mine")).toHaveTextContent("Sie haben freigegeben");
+    expect(screen.getByTestId("approval-status-badge")).toHaveTextContent("Abgelehnt");
     expect(list).toHaveBeenLastCalledWith({ state: "decided", limit: 25, offset: 0 }, expect.anything());
   });
 

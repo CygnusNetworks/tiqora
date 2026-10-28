@@ -9226,7 +9226,9 @@
       "empty": "No open approvals. You will be notified by email when an approval is waiting for you.",
       "emptyDone": "No decided approvals yet.",
       "back": "Back to approvals",
-      "decidedAt": "decided {{date}}"
+      "decidedAt": "decided {{date}}",
+      "myApproved": "You approved",
+      "myRejected": "You rejected"
     },
     "link": {
       "title": "Approval",

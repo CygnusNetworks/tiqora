@@ -11,6 +11,12 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Tabs } from "@/components/ui/Tabs";
 import { ApprovalStatusBadge } from "@/components/approvals/ApprovalStatusBadge";
 
+/** Own vote of the customer on the Erledigt tab. */
+const MINE_KEYS: Record<string, string> = {
+  approved: "approvals.portal.myApproved",
+  rejected: "approvals.portal.myRejected",
+};
+
 type PortalTab = "pending" | "decided";
 
 /** The customer's approvals: open ones and decided ones (paged in SQL); a 404 means the feature is off. */
@@ -90,6 +96,11 @@ export function PortalApprovalsPage() {
                           <> · {t("approvals.portal.decidedAt", { date: formatDateTime(item.decided_at, i18n.language) })}</>
                         )}
                       </p>
+                      {tab === "decided" && (item.my_decision ?? item.my_status) in MINE_KEYS && (
+                        <p className="mt-1 text-xs text-ink" data-testid="portal-approval-mine">
+                          {t(MINE_KEYS[item.my_decision ?? item.my_status])}
+                        </p>
+                      )}
                     </Link>
                   </li>
                 ))}

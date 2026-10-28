@@ -67,7 +67,11 @@ describe("PortalApprovalPage", () => {
 
   it("approves with an optional comment and shows the thank-you", async () => {
     get.mockResolvedValue(detail);
-    decide.mockResolvedValue({ ...detail, status: "approved", my_decision: "approved", can_decide: false });
+    const decided = { ...detail, status: "approved", my_decision: "approved", can_decide: false };
+    decide.mockImplementation(async () => {
+      get.mockResolvedValue(decided); // the refetch after voting sees the server-side result
+      return decided;
+    });
     wrap();
     fireEvent.change(await screen.findByTestId("portal-approval-comment"), { target: { value: " passt " } });
     fireEvent.click(screen.getByTestId("portal-approval-approve"));
@@ -78,7 +82,11 @@ describe("PortalApprovalPage", () => {
 
   it("requires a comment for a rejection and sends nothing without it", async () => {
     get.mockResolvedValue(detail);
-    decide.mockResolvedValue({ ...detail, status: "rejected", can_decide: false });
+    const decided = { ...detail, status: "rejected", my_decision: "rejected", my_status: "rejected", can_decide: false };
+    decide.mockImplementation(async () => {
+      get.mockResolvedValue(decided); // the refetch after voting sees the server-side result
+      return decided;
+    });
     wrap();
     fireEvent.click(await screen.findByTestId("portal-approval-reject"));
     expect(screen.getByTestId("portal-approval-comment-error")).toHaveTextContent("Begründung für die Ablehnung");
@@ -102,6 +110,14 @@ describe("PortalApprovalPage", () => {
     wrap();
     expect(await screen.findByTestId("portal-approval-mine")).toHaveTextContent("Ihre Entscheidung: Freigegeben");
     expect(screen.queryByTestId("portal-approval-form")).toBeNull();
+  });
+
+  it("shows the decided state from the server data after a reload, without a thank-you", async () => {
+    get.mockResolvedValue({ ...detail, status: "rejected", can_decide: false, my_decision: null, my_status: "rejected" });
+    wrap();
+    expect(await screen.findByTestId("portal-approval-mine")).toHaveTextContent("Ihre Entscheidung: Abgelehnt");
+    expect(screen.queryByTestId("portal-approval-done")).toBeNull();
+    expect(screen.queryByTestId("portal-approval-cannot")).toBeNull();
   });
 
   it("shows 'Nicht verfügbar' on a 404", async () => {
