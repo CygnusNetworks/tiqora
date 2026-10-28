@@ -50,7 +50,6 @@ from tiqora.approvals.notify import enqueue_notification
 from tiqora.approvals.resolve import (
     ResolvedApprover,
     canonical_principal,
-    customer_in_ticket_company,
 )
 from tiqora.approvals.settings import ApprovalSettings
 from tiqora.config import Settings
@@ -525,10 +524,9 @@ async def decide(
     assert principal is not None
     if principal.kind == "customer":
         assert principal.login is not None
-        if not _engine.allow_customers(approval, asettings, reg):
-            raise ApprovalError("forbidden", 403, "customer approvers are not enabled")
-        if not await customer_in_ticket_company(session, principal.login, approval.ticket_id):
-            raise ApprovalError("customer_approver_outside_company", 403)
+        await _engine.check_customer_approver(
+            session, approval, principal.login, settings=asettings, registry=reg
+        )
     if channel == "email" and not StepSpec.model_validate_json(step.spec).allow_email:
         raise ApprovalError("forbidden", 403, "this step does not accept decisions by e-mail")
 

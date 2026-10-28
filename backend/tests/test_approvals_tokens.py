@@ -17,7 +17,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -27,6 +27,7 @@ from tests._approvals_helpers import (
     AG3,
     AG4,
     AG5,
+    ANDERE,
     T1,
     approvals_session,
     delete_world,
@@ -266,6 +267,41 @@ async def test_issue_refuses_non_pending_row(
             with pytest.raises(ApprovalError) as excinfo:
                 await _issue(session, 987654321)
             assert excinfo.value.code == "not_an_approver"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_issue_refuses_customer_outside_company(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """B-I1: no link for a customer approver once the ticket left their company."""
+    async with approvals_session(request, url_fixture) as session:
+        await _set_settings(session, customer_approvers_enabled=True)
+        with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
+            aid = await _request(
+                session,
+                _defn(
+                    {"name": "Kunde", "approvers": [{"kind": "customer_user", "ref": "appr97-k1"}]}
+                ),
+            )
+            row = (
+                await session.execute(
+                    select(TiqoraApprovalApprover.id).where(
+                        TiqoraApprovalApprover.approval_id == aid
+                    )
+                )
+            ).scalar_one()
+            assert await _issue(session, row)  # in the company: a link
+            await session.execute(
+                text("UPDATE ticket SET customer_id = :c WHERE id = :t"), {"c": ANDERE, "t": T1}
+            )
+            with pytest.raises(ApprovalError) as excinfo:
+                await _issue(session, row)
+            assert (excinfo.value.code, excinfo.value.http_status) == (
+                "customer_approver_outside_company",
+                403,
+            )
+            assert len(await _tokens(session, row)) == 1
 
 
 # --- resolve -------------------------------------------------------------------------------------

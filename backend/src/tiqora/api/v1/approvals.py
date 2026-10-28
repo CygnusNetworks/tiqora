@@ -604,13 +604,13 @@ async def post_link_inspect(
 ) -> LinkInspectOut:
     """What a decision link stands for, without using it (the confirm page reads this).
 
-    A bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock.
+    A bad link is a normal answer (200, ``valid`` false) that counts towards the IP lock. A
+    customer approver who could not vote through the link (customer approvers off, the ticket
+    left their company) gets the vote's 403 instead, without anything about the request.
     """
     limiter, ip = await _link_gate(request, settings, redis, body.token)
     try:
-        if not (await load_approval_settings(session, settings)).email_links_enabled:
-            raise ApprovalError("link_invalid", 410)
-        target = await tokens.resolve_link(session, body.token)
+        target = await tokens.inspect_link(session, body.token, settings=settings)
         out = await _link_view(session, target)
     except ApprovalError as err:
         await session.rollback()

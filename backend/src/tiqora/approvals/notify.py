@@ -15,7 +15,8 @@ Rules the mails follow:
   Substitute copies (F4) and customers without a usable link point to the inbox instead.
 * A mail holds the request's title, description, rule, deadline and the subject type's
   ``describe`` lines; never ticket articles, the step name, comments or the ticket title.
-* A customer approver is only mailed while the customer-approver setting is on.
+* A customer approver is only mailed while the customer-approver setting is on and the ticket
+  still belongs to their company.
 * The mail language is the recipient's ``UserLanguage``, else Znuny's ``DefaultLanguage``
   (German when that is not de/en).
 * The link row is committed before SMTP, so no row lock is held while the relay is slow; a failed
@@ -54,6 +55,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalStep,
     TiqoraApprovalToken,
 )
+from tiqora.approvals.resolve import customer_in_ticket_company
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.channels.email.smtp import build_message, is_permanent_smtp_failure
 from tiqora.db.legacy.customer import CustomerPreferences, CustomerUser
@@ -484,13 +486,17 @@ async def _deliver(
             ).scalar_one_or_none()
 
     settings = plan.settings
-    # a customer approver is only mailed while customer approvers are enabled
-    if (
-        recipient.role == "approver"
-        and recipient.principal.kind == "customer"
-        and not settings.customer_approvers_enabled
-    ):
-        return "skipped"
+    # a customer approver is only mailed while customer approvers are enabled and while the
+    # ticket still belongs to their company (the sweeper takes such rows out)
+    if recipient.role == "approver" and recipient.principal.kind == "customer":
+        assert recipient.principal.login is not None  # noqa: S101 - Principal validates this
+        if not settings.customer_approvers_enabled:
+            return "skipped"
+        if not await customer_in_ticket_company(
+            session, recipient.principal.login, approval.ticket_id
+        ):
+            logger.info("approval_mail_outside_company", approval_id=approval.id)
+            return "skipped"
     address, locale = await _address_and_language(session, plan, recipient.principal)
     if address is None:
         logger.info("approval_mail_no_address", approval_id=approval.id, role=recipient.role)

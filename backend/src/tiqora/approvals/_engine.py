@@ -45,6 +45,8 @@ from tiqora.approvals.resolve import (
     Resolution,
     ResolvedApprover,
     canonical_principal,
+    customer_in_ticket_company,
+    customers_in_ticket_company,
     resolve_entries,
 )
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
@@ -125,6 +127,34 @@ def allow_customers(
         and subject is not None
         and subject.allow_customer_approvers
     )
+
+
+async def check_customer_approver(
+    session: AsyncSession,
+    approval: TiqoraApproval,
+    login: str,
+    *,
+    settings: ApprovalSettings,
+    registry: Registry,
+) -> None:
+    """Raises what :func:`~tiqora.approvals.service.decide` answers a customer approver who may
+    not act: ``forbidden`` (customer approvers off for the request) or
+    ``customer_approver_outside_company`` (the ticket left the customer's company)."""
+    if not allow_customers(approval, settings, registry):
+        raise ApprovalError("forbidden", 403, "customer approvers are not enabled")
+    if not await customer_in_ticket_company(session, login, approval.ticket_id):
+        raise ApprovalError("customer_approver_outside_company", 403)
+
+
+async def outside_company(
+    session: AsyncSession, rows: Sequence[TiqoraApprovalApprover]
+) -> set[int]:
+    """Ids of the customer approver rows whose customer is no longer in the ticket's company."""
+    customers = [a for a in rows if a.customer_login]
+    inside = await customers_in_ticket_company(
+        session, [(str(a.customer_login), a.ticket_id) for a in customers]
+    )
+    return {a.id for a in customers if (a.customer_login, a.ticket_id) not in inside}
 
 
 async def close_open_steps(

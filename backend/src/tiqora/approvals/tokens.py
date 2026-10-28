@@ -30,8 +30,10 @@ from tiqora.approvals.models import (
     TiqoraApprovalStep,
     TiqoraApprovalToken,
 )
+from tiqora.approvals.resolve import customer_in_ticket_company
 from tiqora.approvals.settings import ApprovalSettings
 from tiqora.config import Settings
+from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
 
 if TYPE_CHECKING:
@@ -75,7 +77,8 @@ async def issue_link(session: AsyncSession, approver_id: int, *, settings: Appro
     Expires after ``link_ttl_hours``, but not later than the step's deadline plus 24 hours. At
     most ``max_links_per_approver`` live links exist: the oldest live ones are revoked.
     ``not_an_approver`` for an unknown row, a row that is not ``pending``, a step that is not
-    active or a closed request (no row is inserted).
+    active or a closed request; ``customer_approver_outside_company`` for a customer whose ticket
+    left their company (no row is inserted).
     """
     from tiqora.approvals import _engine  # the engine imports this module for the revocations
 
@@ -112,6 +115,10 @@ async def issue_link(session: AsyncSession, approver_id: int, *, settings: Appro
         raise ApprovalError("not_an_approver", 403)
     if not settings.email_links_enabled or not StepSpec.model_validate_json(step.spec).allow_email:
         raise ApprovalError("forbidden", 403, "this step does not accept decisions by e-mail")
+    if row.customer_login and not await customer_in_ticket_company(
+        session, row.customer_login, approval.ticket_id
+    ):
+        raise ApprovalError("customer_approver_outside_company", 403)
 
     now = _now()
     expires_at = now + timedelta(hours=settings.link_ttl_hours)
@@ -217,6 +224,40 @@ async def resolve_link(
         approver_id=row.approver_id,
         principal=Principal.parse(approver.principal),
     )
+
+
+async def inspect_link(
+    session: AsyncSession, token: str, *, settings: Settings | None = None
+) -> LinkTarget:
+    """:func:`resolve_link` for the confirm page: it refuses what a vote through the link would
+    be refused for before anything about the request is shown.
+
+    ``link_invalid`` while links are switched off; for a customer approver the errors
+    ``decide`` raises (``forbidden`` with customer approvers off,
+    ``customer_approver_outside_company`` once the ticket left the customer's company). Reads
+    only; the caller ends the transaction.
+    """
+    from tiqora.approvals import _engine
+
+    asettings = await _engine.load_settings(session, settings)
+    if not asettings.email_links_enabled:
+        raise ApprovalError("link_invalid", 410)
+    target = await resolve_link(session, token)
+    if target.principal.kind == "customer":
+        assert target.principal.login is not None  # noqa: S101 - Principal validates this
+        approval = (
+            await session.execute(
+                select(TiqoraApproval).where(TiqoraApproval.id == target.approval_id)
+            )
+        ).scalar_one()
+        await _engine.check_customer_approver(
+            session,
+            approval,
+            target.principal.login,
+            settings=asettings,
+            registry=get_registry(),
+        )
+    return target
 
 
 async def redeem_link(

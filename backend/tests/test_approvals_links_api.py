@@ -24,6 +24,7 @@ from tests._approvals_helpers import (
     AG3,
     AG4,
     AG5,
+    ANDERE,
     T1,
     approvals_session,
     installed_registry,
@@ -40,11 +41,13 @@ from tiqora.approvals.models import (
     TiqoraApprovalToken,
     TiqoraApprovalVote,
 )
-from tiqora.approvals.settings import ApprovalSettings
+from tiqora.approvals.settings import APPROVALS_SECTION, ApprovalSettings
 from tiqora.config import Settings
+from tiqora.db.legacy.ticket import Ticket
 from tiqora.domain.api_key_scopes import path_to_area
 from tiqora.jobs.service import utc_now
 from tiqora.security.ratelimit import AuthRateLimiter
+from tiqora.settings_sections.store import save_section_values
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 SETTINGS = Settings(environment="test")
@@ -403,6 +406,64 @@ async def test_decide_refusal_commits_nothing(
             assert _detail(refused)["code"] == "already_decided"
             assert retry.status_code == 200, retry.text
             assert len(await _votes(session, aid)) == 1
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_inspect_customer_outside_company_answers_like_decide(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """B-I1: once the ticket left the customer's company, inspect refuses the way the vote is
+    refused (403 ``customer_approver_outside_company``) and shows nothing of the request."""
+    async with approvals_session(request, url_fixture) as session:
+        await save_section_values(
+            session,
+            APPROVALS_SECTION,
+            {"customer_approvers_enabled": True},
+            secret_key=SETTINGS.secret_key,
+        )
+        with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
+            info = await service.request_approval(
+                session,
+                ticket_id=T1,
+                subject_type=SUBJECT,
+                title="Freigabe appr97",
+                description="Beschreibung appr97",
+                actor=Actor.agent(AG1),
+                definition=_defn(
+                    {"name": "Kunde", "approvers": [{"kind": "customer_user", "ref": "appr97-k1"}]}
+                ),
+                settings=SETTINGS,
+            )
+            row = (
+                await session.execute(
+                    select(TiqoraApprovalApprover).where(
+                        TiqoraApprovalApprover.approval_id == info.approval_id
+                    )
+                )
+            ).scalar_one()
+            token = await tokens.issue_link(session, row.id, settings=ApprovalSettings())
+            await session.commit()
+            async with _client(session) as client:
+                before = await client.post(f"{BASE}/inspect", json={"token": token})
+            assert (before.status_code, before.json()["valid"]) == (200, True)
+
+            await session.execute(update(Ticket).where(Ticket.id == T1).values(customer_id=ANDERE))
+            await session.commit()
+            async with _client(session) as client:
+                inspect = await client.post(f"{BASE}/inspect", json={"token": token})
+                decide = await client.post(
+                    f"{BASE}/decide", json={"token": token, "decision": "approved"}
+                )
+            for response in (inspect, decide):
+                assert response.status_code == 403, response.text
+                assert _detail(response) == {
+                    "code": "customer_approver_outside_company",
+                    "detail": None,
+                }
+            assert "appr97" not in inspect.text  # neither title nor description
+            assert await _votes(session, info.approval_id) == []
+            assert (await _token_row(session, info.approval_id)).used_at is None
 
 
 @pytest.mark.db

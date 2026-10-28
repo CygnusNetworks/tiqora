@@ -1,4 +1,4 @@
-"""Approval sweeper (A12): deadlines, reminders, escalation, invalid approvers, link purge.
+"""Approval sweeper (A12): deadlines, reminders, escalation, unfit approvers, link purge.
 
 One tick runs five phases. Every item is handled in its own short transaction whose first
 statement is ``SELECT … FOR UPDATE`` on the request (lock order: request, then steps/approvers/
@@ -31,7 +31,7 @@ from tiqora.approvals.contract import (
 )
 from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalApprover, TiqoraApprovalStep
 from tiqora.approvals.notify import enqueue_notification
-from tiqora.approvals.resolve import customer_rows
+from tiqora.approvals.resolve import customer_rows, customers_in_ticket_company
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket
@@ -316,32 +316,41 @@ async def _remind(
 # --- 3. invalid approvers -------------------------------------------------------------------
 
 
-async def _invalid_principals(
-    session: AsyncSession, rows: Sequence[tuple[str, int | None, str | None]]
-) -> set[str]:
-    """Principal keys among ``(key, user_id, customer_login)`` that can no longer approve.
+#: one row of the invalid-approver scan: (principal key, user id, customer login, ticket id)
+type _ScanRow = tuple[str, int | None, str | None, int]
 
-    Agents whose ``users`` row is gone or not valid, customers whose ``customer_user`` row is
-    gone or not valid. Looked up with IN lists (no join with the ``tiqora_*`` tables).
+
+async def _unfit(session: AsyncSession, rows: Sequence[_ScanRow]) -> dict[tuple[str, int], str]:
+    """``{(principal key, ticket id): reason}`` for the rows that can no longer approve.
+
+    ``invalid``: the agent's ``users`` row or the customer's ``customer_user`` row is gone or not
+    valid. ``outside_company``: the customer no longer belongs to the ticket's company (the rule
+    :func:`~tiqora.approvals.resolve.customers_in_ticket_company`). Looked up with IN lists (no
+    join with the ``tiqora_*`` tables).
     """
-    agents = sorted({uid for _, uid, _ in rows if uid is not None})
+    agents = sorted({uid for _, uid, _, _ in rows if uid is not None})
     valid_agents: set[int] = set()
     for chunk in _chunks(agents):
         found = await session.execute(
             select(Users.id).where(Users.id.in_(chunk), Users.valid_id == 1)
         )
         valid_agents.update(int(i) for i in found.scalars())
-    logins = [login for _, _, login in rows if login is not None]
+    logins = [login for _, _, login, _ in rows if login is not None]
     customers = await customer_rows(session, logins) if logins else {}
-    invalid: set[str] = set()
-    for key, uid, login in rows:
+    inside = await customers_in_ticket_company(
+        session, [(login, ticket_id) for _, _, login, ticket_id in rows if login is not None]
+    )
+    unfit: dict[tuple[str, int], str] = {}
+    for key, uid, login, ticket_id in rows:
         if uid is not None and uid not in valid_agents:
-            invalid.add(key)
+            unfit[(key, ticket_id)] = "invalid"
         elif login is not None:
             found_row = customers.get(login.lower())
             if found_row is None or found_row[1] != 1:
-                invalid.add(key)
-    return invalid
+                unfit[(key, ticket_id)] = "invalid"
+            elif (login, ticket_id) not in inside:
+                unfit[(key, ticket_id)] = "outside_company"
+    return unfit
 
 
 async def _drop_invalid(
@@ -352,22 +361,31 @@ async def _drop_invalid(
     registry: Registry,
     now: datetime,
 ) -> int | None:
-    """Removes pending approvers that became invalid and re-evaluates their steps."""
+    """Takes pending approvers out that can no longer approve and re-evaluates their steps.
+
+    An invalid agent or customer user becomes ``removed``; a customer whose ticket left their
+    company ``not_needed`` (audit reason ``outside_company``), so an ``all`` step does not wait
+    for a vote that would be refused.
+    """
     steps = [s for s in await _engine.locked_steps(session, approval.id) if s.status == "active"]
     approvers = await _engine.locked_approvers(session, approval.id)
     active = {s.id for s in steps}
     candidates = [a for a in approvers if a.status == "pending" and a.step_id in active]
-    gone = await _invalid_principals(
-        session, [(a.principal, a.user_id, a.customer_login) for a in candidates]
+    unfit = await _unfit(
+        session, [(a.principal, a.user_id, a.customer_login, a.ticket_id) for a in candidates]
     )
-    dropped = [a for a in candidates if a.principal in gone]
+    dropped = [
+        (a, reason)
+        for a in candidates
+        if (reason := unfit.get((a.principal, a.ticket_id))) is not None
+    ]
     if not dropped:
         return None
-    for row in dropped:
-        row.status = "removed"
+    for row, reason in dropped:
+        row.status = "removed" if reason == "invalid" else "not_needed"
     await session.flush()
-    await tokens.revoke_links(session, approver_ids=[a.id for a in dropped])
-    for row in dropped:
+    await tokens.revoke_links(session, approver_ids=[a.id for a, _ in dropped])
+    for row, reason in dropped:
         await audit.record(
             session,
             approval=approval,
@@ -375,9 +393,9 @@ async def _drop_invalid(
             actor=_SYSTEM,
             step_id=row.step_id,
             approver_id=row.id,
-            detail={"reason": "invalid"},
+            detail={"reason": reason},
         )
-    touched = {a.step_id for a in dropped}
+    touched = {a.step_id for a, _ in dropped}
     await _engine.reevaluate_steps(
         session,
         approval,
@@ -445,7 +463,8 @@ async def _invalid_candidates(
 ) -> tuple[list[tuple[int, int]], int, bool]:
     """``(candidates, next cursor, table end reached)`` for the invalid-approver phase.
 
-    Approvals with a pending approver whose agent/customer user is gone or invalid. Scans the
+    Approvals with a pending approver whose agent/customer user is gone or invalid, or whose
+    customer left the ticket's company. Scans the
     pending approver rows ``_SCAN`` at a time (ordered by request id), at most ``_SCAN_PAGES``
     scans per call; the caller continues at the returned cursor.
     """
@@ -461,6 +480,7 @@ async def _invalid_candidates(
                         TiqoraApprovalApprover.principal,
                         TiqoraApprovalApprover.user_id,
                         TiqoraApprovalApprover.customer_login,
+                        TiqoraApprovalApprover.ticket_id,
                     )
                     .where(
                         TiqoraApprovalApprover.status == "pending",
@@ -480,8 +500,8 @@ async def _invalid_candidates(
                 rows, cursor = cut, last - 1  # the last request's rows may go on: rescan it
             else:
                 cursor = last
-            invalid = await _invalid_principals(session, [(p, u, c) for _, p, u, c in rows])
-            found |= {int(a) for a, p, _, _ in rows if p in invalid}
+            unfit = await _unfit(session, [(p, u, c, int(t)) for _, p, u, c, t in rows])
+            found |= {int(a) for a, p, _, _, t in rows if (p, int(t)) in unfit}
             if exhausted or len(found) >= _BATCH:
                 break
     ordered = sorted(found)

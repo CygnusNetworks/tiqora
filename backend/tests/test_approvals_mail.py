@@ -23,6 +23,7 @@ from tests._approvals_helpers import (
     AG3,
     AG4,
     AG5,
+    ANDERE,
     CUSTOMER_1,
     T1,
     CapturingMail,
@@ -427,6 +428,47 @@ async def test_customer_mail_points_to_portal_or_link(
             ids = await _approver_ids(session, with_link)
             result = await _run(session, with_link, "reminder", list(ids.values()), job_id=99)
             assert result["sent"] == 0 and len(mail.sent) == 2
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_customer_outside_company_gets_no_mail_and_no_link(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B-I1: once the ticket left the customer's company a reminder skips them, no link."""
+    mail = CapturingMail(monkeypatch)
+    customer = {"kind": "customer_user", "ref": "appr97-k1"}
+    async with approvals_session(request, url_fixture) as session:
+        await _prepare(session)
+        with installed_registry(make_fake_subject_type("test.cust", allow_customer_approvers=True)):
+            await _set(session, customer_approvers_enabled=True)
+            await session.commit()
+            approval_id = await _request(
+                session,
+                _defn(
+                    {"name": "Kunde", "approvers": [customer, {"kind": "user", "ref": str(AG3)}]}
+                ),
+                subject_type="test.cust",
+            )
+            await session.execute(
+                text("UPDATE ticket SET customer_id = :c WHERE id = :t"),
+                {"c": ANDERE, "t": T1},
+            )
+            await session.commit()
+            ids = await _approver_ids(session, approval_id)
+            result = await _run(session, approval_id, "reminder", list(ids.values()), job_id=98)
+            assert (result["sent"], result["skipped"]) == (1, 1)
+            (only,) = mail.sent
+            assert _to(only) != CUSTOMER_1
+            customer_row = ids["customer:appr97-k1"]
+            links = await session.execute(
+                select(TiqoraApprovalToken.id).where(
+                    TiqoraApprovalToken.approver_id == customer_row
+                )
+            )
+            assert links.all() == []
+            notified = [e.approver_id for e in await _notified(session, approval_id)]
+            assert customer_row not in notified
 
 
 @pytest.mark.db

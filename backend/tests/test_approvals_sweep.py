@@ -27,6 +27,7 @@ from tests._approvals_helpers import (
     AG3,
     AG4,
     AG5,
+    ANDERE,
     T1,
     CapturingMail,
     approvals_session,
@@ -876,6 +877,57 @@ async def test_invalid_customer_approver_removed(
             (gone,) = [a for a in await _approvers(session, aid) if a.customer_login]
             assert gone.status == "removed"
             assert (await _row(session, aid)).status == "pending"  # AG3 still has to decide
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_customer_outside_company_drops_out_and_the_all_step_completes(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """B-I1: the ticket moved to another company; the customer's row becomes ``not_needed``
+    (audit ``outside_company``) and the ``all`` step no longer waits for a refused vote."""
+    async with approvals_session(request, url_fixture) as session:
+        await _set(session, customer_approvers_enabled=True)
+        with installed_registry(make_fake_subject_type(allow_customer_approvers=True)):
+            definition = _defn(
+                {
+                    "name": "Kunde",
+                    "approvers": [
+                        {"kind": "customer_user", "ref": "appr97-k1"},
+                        {"kind": "user", "ref": str(AG3)},
+                    ],
+                    "rule": "all",
+                }
+            )
+            aid = await _request(session, definition)
+            await service.decide(
+                session,
+                aid,
+                actor=Actor.agent(AG3),
+                decision="approved",
+                channel="ui",
+                settings=SETTINGS,
+            )
+            await session.commit()
+            assert await _tick(session, _now()) == ZERO  # still in the company: nothing to do
+            await session.execute(
+                text("UPDATE ticket SET customer_id = :c WHERE id = :t"), {"c": ANDERE, "t": T1}
+            )
+            await session.commit()
+
+            assert await _tick(session, _now()) == {**ZERO, "removed": 1}
+
+            (gone,) = [a for a in await _approvers(session, aid) if a.customer_login]
+            assert gone.status == "not_needed"
+            (event,) = [
+                e
+                for e in await _events(session, aid, "approver_removed")
+                if e.approver_id == gone.id
+            ]
+            assert json.loads(event.detail or "{}") == {"reason": "outside_company"}
+            row = await _row(session, aid)
+            assert (row.status, row.reason) == ("approved", "votes")
+            assert await _tick(session, _now()) == ZERO
 
 
 # --- 4. deleted tickets -------------------------------------------------------------------------

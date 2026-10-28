@@ -111,19 +111,45 @@ async def _companies_of(
     return allowed
 
 
-async def customer_in_ticket_company(session: AsyncSession, login: str, ticket_id: int) -> bool:
-    """Whether customer user *login* (any letter case) belongs to the ticket's company.
+async def customers_in_ticket_company(
+    session: AsyncSession, pairs: Iterable[tuple[str, int]]
+) -> set[tuple[str, int]]:
+    """The ``(login, ticket_id)`` pairs whose customer user belongs to the ticket's company.
 
-    True when the login's own company or a ``customer_user_customer`` mapping equals
-    ``ticket.customer_id``; a ticket without a company or an unknown login admits nobody.
+    The one rule for "a customer approver may act on this ticket": the login's (any letter
+    case) own company or a ``customer_user_customer`` mapping equals ``ticket.customer_id``. A
+    ticket without a company or an unknown login admits nobody. Customer users and tickets are
+    looked up with IN lists (no join with the ``tiqora_*`` tables).
     """
-    company = await ticket_customer_id(session, ticket_id)
-    if company is None:
-        return False
-    rows = await customer_rows(session, [login])
-    if login.lower() not in rows:
-        return False
-    return (await _companies_of(session, rows, company))[rows[login.lower()][0]]
+    wanted = set(pairs)
+    if not wanted:
+        return set()
+    rows = await customer_rows(session, [login for login, _ in wanted])
+    companies: dict[str, set[str]] = {key: {cid} for key, (_, _, cid) in rows.items()}
+    for chunk in _chunks(sorted(rows)):
+        mapped = await session.execute(
+            select(CustomerUserCustomer.user_id, CustomerUserCustomer.customer_id).where(
+                func.lower(CustomerUserCustomer.user_id).in_(chunk)
+            )
+        )
+        for user_id, customer_id in mapped:
+            companies.setdefault(str(user_id).lower(), set()).add(str(customer_id))
+    ticket_company: dict[int, str] = {}
+    for ids in _chunks(sorted({ticket_id for _, ticket_id in wanted})):
+        got = await session.execute(select(Ticket.id, Ticket.customer_id).where(Ticket.id.in_(ids)))
+        ticket_company.update((int(i), str(c)) for i, c in got if c)
+    return {
+        (login, ticket_id)
+        for login, ticket_id in wanted
+        if (company := ticket_company.get(ticket_id)) is not None
+        and company in companies.get(login.lower(), set())
+    }
+
+
+async def customer_in_ticket_company(session: AsyncSession, login: str, ticket_id: int) -> bool:
+    """Whether customer user *login* belongs to the ticket's company
+    (:func:`customers_in_ticket_company` for one pair)."""
+    return (login, ticket_id) in await customers_in_ticket_company(session, [(login, ticket_id)])
 
 
 async def customer_tickets_in_company(
