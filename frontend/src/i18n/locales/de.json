@@ -9224,7 +9224,8 @@
         "planned": "geplant",
         "noEnd": "ohne Ende",
         "alreadyEnded": "Bereits beendet."
-      }
+      },
+      "cannotVote": "Sie können hier nicht (mehr) abstimmen."
     },
     "portal": {
       "title": "Freigaben"

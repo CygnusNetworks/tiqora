@@ -9216,7 +9216,8 @@
         "planned": "planned",
         "noEnd": "no end",
         "alreadyEnded": "Already ended."
-      }
+      },
+      "cannotVote": "You cannot vote on this request (any more)."
     },
     "portal": {
       "title": "Approvals"

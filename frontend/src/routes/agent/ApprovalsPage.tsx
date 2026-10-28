@@ -133,10 +133,13 @@ function DetailPanel({
 
   const cancel = useMutation({ mutationFn: () => approvalsApi.cancel(id), onSuccess: changed });
 
-  // The row to vote on: the one the inbox listed, else the first of my rows.
-  const row = detail?.my_rows.find((r) => r.approver_id === item?.approver_id) ?? detail?.my_rows[0];
-  const open = detail?.status === "pending" && row !== undefined;
-  const canVote = open && (item ? item.can_vote : true);
+  // The detail API lists only rows the caller can vote on right now (blocked ones are absent), so a
+  // blocked reason comes from the inbox row; a deep link without one gets a neutral note.
+  const mine = detail?.my_rows ?? [];
+  const row =
+    mine.find((r) => r.approver_id === item?.approver_id) ?? mine.find((r) => r.on_behalf_of_label == null) ?? mine[0];
+  const pending = detail?.status === "pending";
+  const canVote = pending && row !== undefined;
 
   const body = (
     <div className="space-y-4" data-testid="approval-detail" data-approval-id={id}>
@@ -182,9 +185,9 @@ function DetailPanel({
               ))}
             </ul>
           )}
-          {open && !canVote && (
+          {pending && !canVote && (
             <p className="text-sm text-muted" data-testid="approval-detail-blocked">
-              {t(blockedKey(item?.blocked_reason))}
+              {item && !item.can_vote ? t(blockedKey(item.blocked_reason)) : t("approvals.agent.cannotVote")}
             </p>
           )}
           {canVote && row && (

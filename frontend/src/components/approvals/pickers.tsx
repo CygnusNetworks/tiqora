@@ -14,9 +14,12 @@ export function AgentSelect({
   onChange,
   testId,
   ariaLabel,
+  excludeId,
 }: {
   value: number | null;
   onChange: (id: number) => void;
+  /** An agent left out of the list (e.g. the current user). */
+  excludeId?: number;
   testId: string;
   ariaLabel: string;
 }) {
@@ -26,7 +29,9 @@ export function AgentSelect({
     queryFn: ({ signal }) => api.listReferenceAgents(signal),
     staleTime: 60_000,
   });
-  const items = (q.data ?? []).map((a) => ({ value: a.id, label: a.full_name || a.login }));
+  const items = (q.data ?? [])
+    .filter((a) => a.id !== excludeId)
+    .map((a) => ({ value: a.id, label: a.full_name || a.login }));
   return (
     <SelectField
       items={items}

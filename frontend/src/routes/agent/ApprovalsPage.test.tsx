@@ -136,17 +136,32 @@ describe("ApprovalsPage", () => {
     expect(within(rows[1]).getByTestId("approval-row-on-behalf")).toHaveTextContent("in Vertretung für Max Beispiel");
   });
 
-  it("shows 'nicht möglich (bereits abgestimmt)' and offers no vote buttons for a blocked row", async () => {
+  it("shows 'nicht möglich (bereits abgestimmt)' in row and panel; the API detail has no my_rows then", async () => {
     const page = inbox();
     page.items[0].can_vote = false;
     page.items[0].blocked_reason = "already_voted";
+    const blocked = demoDetail(501);
+    blocked.my_rows = [];
     searchParams = { id: 501 };
-    api({ "GET /api/v1/approvals/inbox": () => page });
+    api({ "GET /api/v1/approvals/inbox": () => page, "GET /api/v1/approvals/501": () => blocked });
     renderApproval(<ApprovalsPage />);
     const rows = await screen.findAllByTestId("approval-row");
     expect(within(rows[1]).getByTestId("approval-row-blocked")).toHaveTextContent("nicht möglich (bereits abgestimmt)");
-    expect(await screen.findByTestId("approval-detail-blocked")).toHaveTextContent("nicht möglich (bereits abgestimmt)");
+    await waitFor(() =>
+      expect(screen.getByTestId("approval-detail-blocked")).toHaveTextContent("nicht möglich (bereits abgestimmt)"),
+    );
     expect(screen.queryByTestId("approval-approve")).toBeNull();
+  });
+
+  it("a deep link without voting rows shows a neutral note and no buttons", async () => {
+    const none = demoDetail(501);
+    none.my_rows = [];
+    searchParams = { id: 501 };
+    api({ "GET /api/v1/approvals/inbox": () => ({ items: [], total: 0, limit: 25, offset: 0 }), "GET /api/v1/approvals/501": () => none });
+    renderApproval(<ApprovalsPage />);
+    expect(await screen.findByTestId("approval-detail-blocked")).toHaveTextContent("Sie können hier nicht (mehr) abstimmen.");
+    expect(screen.queryByTestId("approval-approve")).toBeNull();
+    expect(screen.queryByTestId("approval-forward")).toBeNull();
   });
 
   it("shows 'nicht möglich (eigene Anfrage)' for an own request", async () => {

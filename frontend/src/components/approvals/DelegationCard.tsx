@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import { ApiError } from "@/lib/api";
+import { useOptionalAuth } from "@/auth/AuthContext";
 import { formatDateTime } from "@/lib/format";
 import {
   approvalErrorCode,
@@ -75,6 +75,7 @@ function DelegationRow({ d, now, onChanged }: { d: ApprovalDelegation; now: numb
 export function DelegationCard() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const me = useOptionalAuth()?.user?.id;
   const [substitute, setSubstitute] = useState<number | null>(null);
   const [from, setFrom] = useState("");
   const [until, setUntil] = useState("");
@@ -114,9 +115,10 @@ export function DelegationCard() {
   };
 
   const createError = create.error;
+  // A period that ended already is answered 422 `invalid_definition`; it can only come from valid_until.
   const createMessage = !createError
     ? null
-    : createError instanceof ApiError && createError.status === 422 && approvalErrorCode(createError) === null
+    : approvalErrorCode(createError) === "invalid_definition" && untilIso
       ? t("approvals.agent.delegation.untilPast")
       : approvalErrorMessage(createError, t);
 
@@ -158,6 +160,7 @@ export function DelegationCard() {
           <AgentSelect
             value={substitute}
             onChange={setSubstitute}
+            excludeId={me}
             testId="delegation-substitute-select"
             ariaLabel={t("approvals.agent.delegation.substitute")}
           />

@@ -4,6 +4,10 @@ import { ApiError } from "@/lib/api";
 import { DelegationCard } from "./DelegationCard";
 import { mockApi, renderApproval, useGerman } from "@/test/approvalsHarness";
 
+vi.mock("@/auth/AuthContext", () => ({
+  useOptionalAuth: () => ({ user: { id: 2 } }),
+}));
+
 beforeAll(useGerman);
 
 const DELEGATION = {
@@ -87,6 +91,43 @@ describe("DelegationCard", () => {
     fireEvent.click(screen.getByTestId("delegation-create"));
     expect(await screen.findByTestId("delegation-create-error")).toHaveTextContent(
       "Die gewählte Person ist nicht gültig oder nicht aktiv.",
+    );
+  });
+
+  it("does not offer the current user as substitute", async () => {
+    mockApi({ [LIST]: () => [] });
+    renderApproval(<DelegationCard />);
+    fireEvent.click(await screen.findByTestId("delegation-substitute-select"));
+    expect(await screen.findByTestId("delegation-substitute-select-menu-option-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("delegation-substitute-select-menu-option-2")).toBeNull();
+  });
+
+  it("maps invalid_definition to the end-in-the-past text when an end was sent", async () => {
+    mockApi({
+      [LIST]: () => [],
+      "POST /api/v1/approvals/delegations": () => {
+        throw new ApiError(422, { detail: { code: "invalid_definition", detail: "valid_until lies in the past" } }, "/x");
+      },
+    });
+    renderApproval(<DelegationCard />);
+    await pickSubstitute();
+    fireEvent.change(screen.getByTestId("delegation-until"), { target: { value: "2030-11-03T10:00" } });
+    fireEvent.click(screen.getByTestId("delegation-create"));
+    expect(await screen.findByTestId("delegation-create-error")).toHaveTextContent("Das Ende muss in der Zukunft liegen.");
+  });
+
+  it("shows the generic text for another 422 without a code", async () => {
+    mockApi({
+      [LIST]: () => [],
+      "POST /api/v1/approvals/delegations": () => {
+        throw new ApiError(422, { detail: [{ msg: "bad" }] }, "/x");
+      },
+    });
+    renderApproval(<DelegationCard />);
+    await pickSubstitute();
+    fireEvent.click(screen.getByTestId("delegation-create"));
+    expect(await screen.findByTestId("delegation-create-error")).toHaveTextContent(
+      "Die Freigabe konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
     );
   });
 
