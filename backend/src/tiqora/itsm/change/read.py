@@ -31,7 +31,7 @@ from sqlalchemy import ColumnElement, and_, bindparam, case, func, not_, or_, se
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.calendar.recurrence import to_utc_naive
-from tiqora.cmdb.impact import services_reached_from
+from tiqora.cmdb.impact import services_reached_per_ci
 from tiqora.config import get_settings
 from tiqora.domain.ticket_access import CHUNK, TicketFacts, readable_tickets
 from tiqora.itsm.change.conflicts import (
@@ -441,14 +441,11 @@ async def _visible_services(
     readable = await _readable_cis(
         session, {c for i in needs for c in sets[i].cis}, user_id=user_id
     )
-    reached: dict[frozenset[int], frozenset[int]] = {}
+    # one batched read; the reach of a CI set is the union of its CIs' reach, taken per change
+    per_ci = await services_reached_per_ci(session, readable)
     for i in needs:
-        seen = frozenset(sets[i].cis & readable)
-        if seen not in reached:
-            reached[seen] = (
-                await services_reached_from(session, sorted(seen)) if seen else frozenset()
-            )
-        out[i] = sets[i].direct_services | (sets[i].services & reached[seen])
+        reached = frozenset().union(*(per_ci.get(c, frozenset()) for c in sets[i].cis & readable))
+        out[i] = sets[i].direct_services | (sets[i].services & reached)
     return out
 
 
@@ -457,8 +454,10 @@ def _like_escape(value: str) -> str:
 
 
 async def _text_candidates(session: AsyncSession, needle: str) -> tuple[list[int], bool]:
-    """Change tickets whose number equals ``needle`` or whose title contains it (case-insensitive,
-    ``%``/``_`` literal), newest first, at most :data:`LIST_SCAN_CAP`; the flag says more exist.
+    """Change tickets whose number starts with ``needle`` or whose title contains it
+    (case-insensitive via ``LOWER``, ``%``/``_`` literal), an exact number first, then newest
+    first, at most :data:`LIST_SCAN_CAP`; the flag says more exist. A part inside a number does
+    not match, only its beginning.
 
     Resolved on the Znuny side first so an old change is found by its number whatever the scan
     cap; the ids then restrict the ``tiqora_itsm_change`` scan.
@@ -466,15 +465,17 @@ async def _text_candidates(session: AsyncSession, needle: str) -> tuple[list[int
     cfg = await load_itsm_settings(session, get_settings())
     stmt = text(
         "SELECT t.id FROM ticket t JOIN ticket_type tt ON tt.id = t.type_id"
-        " WHERE tt.name = :type AND (t.tn = :q OR LOWER(t.title) LIKE :pat ESCAPE '!')"
-        " ORDER BY t.id DESC LIMIT :lim"
+        " WHERE tt.name = :type AND (t.tn LIKE :tnpat ESCAPE '!'"
+        " OR LOWER(t.title) LIKE :pat ESCAPE '!')"
+        " ORDER BY CASE WHEN t.tn = :q THEN 0 ELSE 1 END, t.id DESC LIMIT :lim"
     )
     rows = await session.execute(
         stmt,
         {
             "type": cfg.change_type,
             "q": needle,
-            "pat": f"%{_like_escape(needle.casefold())}%",
+            "tnpat": f"{_like_escape(needle)}%",
+            "pat": f"%{_like_escape(needle.lower())}%",
             "lim": LIST_SCAN_CAP + 1,
         },
     )
@@ -822,6 +823,10 @@ async def calendar(
     Conflict flags equal what ``read_conflicts`` reports: they are computed against all changes
     and freeze occurrences over the union of the shown changes' own windows (at most
     :data:`MAX_RANGE` beyond the range), readable or not, in one batched pass.
+
+    ``truncated`` also covers the conflict pool and ``freezes_truncated`` the widened freeze
+    window: a flag may be incomplete although everything shown is complete. Tasks are listed when
+    their own window touches the range; under a service filter only those of the shown changes.
     """
     lo, hi = to_utc_naive(start), to_utc_naive(end)
     if not await _is_mode_b(session):
@@ -863,12 +868,13 @@ async def calendar(
             session,
             [
                 ch.phase.in_(sorted(OVERLAP_PHASES)),
-                ch.ticket_id.not_in([r.ticket_id for r in recs]) if recs else ch.ticket_id > 0,
                 *_window_cond(ch.planned_start, ch.planned_end, wide_lo, wide_hi),
             ],
             order_by_start=True,
         )
         truncated = truncated or more_truncated
+        have = {r.ticket_id for r in recs}
+        more = [r for r in more if r.ticket_id not in have]
         pool += more
         sets.update(await impact_sets(session, [r.ticket_id for r in more]))
     found = await occurrences(session, start=wide_lo, end=wide_hi)

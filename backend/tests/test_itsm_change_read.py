@@ -864,3 +864,18 @@ async def test_calendar_cap_keeps_dated_changes_before_open_start(
     monkeypatch.setattr(read_module, "LIST_SCAN_CAP", 2)
     cal = await calendar(w.session, user_id=U_FULL, start=RANGE[0], end=RANGE[1])
     assert [c.item.ticket_id for c in cal.changes] == [x, y] and cal.truncated is True
+
+
+async def test_text_search_umlauts_sharp_s_and_number_prefix(w: ChangeWorld) -> None:
+    mass = await _change(w, title="Maßnahme Straße Größe")
+    ae = await _change(w, title="Änderung der Zeitplanung")
+    items = (await list_changes(w.session, ChangeQuery(), user_id=U_FULL)).items
+    tn = next(i.tn for i in items if i.ticket_id == mass)
+    assert await _ids(w, ChangeQuery(text="maßnahme")) == [mass]
+    assert await _ids(w, ChangeQuery(text="Straße")) == [mass]
+    assert await _ids(w, ChangeQuery(text="größe")) == [mass]
+    assert await _ids(w, ChangeQuery(text="ÄNDERUNG")) == [ae]
+    # a number matches from its beginning, not from the middle
+    assert await _ids(w, ChangeQuery(text=tn)) == [mass]
+    assert mass in await _ids(w, ChangeQuery(text=tn[:-1]))
+    assert await _ids(w, ChangeQuery(text=tn[2:])) == []

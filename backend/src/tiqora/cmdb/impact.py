@@ -554,6 +554,23 @@ async def services_reached_from(session: AsyncSession, ci_ids: Iterable[int]) ->
     return frozenset(int(r.id) for r in found)
 
 
+async def services_reached_per_ci(
+    session: AsyncSession, ci_ids: Iterable[int]
+) -> dict[int, frozenset[int]]:
+    """Per CI the services an incident at it travels to (the rule of :func:`affected`, one hop),
+    in one batched read. The reach of a set of CIs is the union of these, so callers can answer
+    for many subsets without a query each. No permission filter."""
+    props = await LinkTypeService(session).propagating()
+    out: dict[int, set[int]] = {}
+    for ci, svc, name, ci_is_source in await _service_links(session, sorted(set(ci_ids))):
+        ltype = props.get(name)
+        if ltype is not None and counts_for_service(
+            ltype.propagation, ltype.pointed, service_is_source=not ci_is_source
+        ):
+            out.setdefault(ci, set()).add(svc)
+    return {ci: frozenset(v) for ci, v in out.items()}
+
+
 async def _linked_customers(session: AsyncSession, ci_ids: Sequence[int]) -> list[CmdbNamedRefOut]:
     users: set[str] = set()
     companies: set[str] = set()
