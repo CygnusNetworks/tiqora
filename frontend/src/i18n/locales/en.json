@@ -2250,7 +2250,7 @@
       "approvals": "Approvals",
       "approvalsTemplates": "Approval templates",
       "approvalsLists": "Approval groups",
-      "approvalsDelegations": "Delegations"
+      "approvalsDelegations": "Substitutes"
     },
     "table": {
       "id": "ID",
@@ -9189,9 +9189,8 @@
       "loadFailed": "The approvals could not be loaded. Please try again.",
       "detail": "Approval details",
       "back": "Back to list",
-      "cancel": "Withdraw request",
       "requestedBy": "Requested by {{name}}",
-      "ticket": "Ticket #{{number}}",
+      "ticket": "Ticket {{number}}",
       "onBehalfOf": "on behalf of {{name}}",
       "myDecision": "Your decision: {{decision}}",
       "prev": "Previous",
@@ -9246,7 +9245,6 @@
       "step": "Step: {{name}}",
       "due": "Due: {{date}}",
       "decidingAs": "You are deciding as {{name}}",
-      "counter": "{{count}} / {{max}}",
       "doneApproved": "Thank you, your approval has been saved.",
       "doneRejected": "Your rejection has been saved.",
       "requestStatus": "Status of the request: {{status}}",
@@ -9267,7 +9265,8 @@
       "any": "One approval is enough",
       "all": "All approvers must approve",
       "quorum": "{{required}} approvals needed",
-      "majority": "Majority needed ({{required}} approvals)"
+      "majority": "Majority needed ({{required}} approvals)",
+      "majorityOpen": "Majority required"
     },
     "errors": {
       "approval_not_found": "This approval does not exist or you may not see it.",
@@ -9278,16 +9277,16 @@
       "not_an_approver": "You are not an approver of this request.",
       "self_approval_forbidden": "You cannot approve a request you made yourself.",
       "customer_approver_outside_company": "This customer belongs to a different company than the ticket and cannot be an approver.",
-      "delegation_not_active": "This delegation is not active (any more).",
+      "delegation_not_active": "This substitute arrangement is not active (any more).",
       "comment_too_long": "The comment is too long.",
       "already_decided": "A decision has already been made here.",
       "approval_closed": "This request is already closed.",
       "step_not_active": "This step is not waiting for a decision at the moment.",
       "forward_not_allowed": "This request cannot be forwarded.",
       "forward_target_invalid": "The chosen person cannot take over this approval.",
-      "invalid_definition": "The template is not valid. Please check steps, approvers and deadlines.",
-      "unknown_subject_type": "This kind of request is not known.",
-      "subject_not_requestable": "This kind of request cannot be started by hand.",
+      "invalid_definition": "The details are not valid. Please check steps, approvers and deadlines.",
+      "unknown_subject_type": "This approval type is not known.",
+      "subject_not_requestable": "This approval type cannot be requested by hand.",
       "customer_approvers_not_allowed": "Customers cannot approve this kind of request.",
       "unknown_resolver": "An approver rule in the template does not exist.",
       "link_invalid": "This link is no longer valid. A decision may already have been made, or the request was withdrawn.",
@@ -9297,7 +9296,7 @@
       "list_name_taken": "An approval group with this name already exists.",
       "list_in_use": "This approval group is still used by a template or a running request.",
       "template_key_taken": "An approval template with this identifier already exists.",
-      "delegation_overlap": "There is already a delegation for this period.",
+      "delegation_overlap": "There is already a substitute for this period.",
       "rate_limited": "Too many attempts. Please wait a few minutes.",
       "unknown": "The approval could not be processed. Please try again.",
       "approver_invalid": "Your account is no longer active, so you cannot decide on this approval anymore.",
@@ -9323,14 +9322,21 @@
       "customer_user": "Customer",
       "resolver": "By rule",
       "escalation": "Escalation",
-      "forward": "Forwarded"
+      "forward": "Forwarded",
+      "via": {
+        "group": "via group {{name}}",
+        "role": "via role {{name}}",
+        "list": "via approval group {{name}}"
+      }
     },
     "steps": {
       "stage": "Stage {{stage}}",
       "progress": "{{approved}} of {{required}} approvals",
       "due": "Due {{date}}",
       "decisive": "Decides alone",
-      "onBehalf": "{{name}} voted as a substitute"
+      "onBehalf": "{{name}} voted as a substitute",
+      "startsAfter": "Starts after stage {{stage}}",
+      "approversLater": "The approvers are determined when this stage starts."
     },
     "audit": {
       "title": "History ({{count}})",
@@ -9364,7 +9370,9 @@
       "reject": "Reject",
       "comment": "Comment (optional)",
       "commentRequired": "Reason for the rejection",
-      "commentMissing": "Please give a reason for the rejection."
+      "commentMissing": "Please give a reason for the rejection.",
+      "commentUntilChosen": "Comment (required when rejecting)",
+      "counter": "{{count}} / {{max}}"
     },
     "forward": {
       "title": "Forward approval",
@@ -9409,7 +9417,7 @@
       },
       "quorum": "Approvals needed",
       "approvers": "Approvers",
-      "dueHours": "Deadline in hours (empty: none)",
+      "dueHours": "Deadline in hours",
       "onTimeout": "When the deadline passes",
       "timeout": {
         "notify": "Only remind",
@@ -9419,7 +9427,7 @@
         "approveTemplatesOnly": "Approve automatically (templates only)"
       },
       "escalation": "Escalation to",
-      "allowForward": "Forwarding allowed",
+      "allowForward": "Forwarding and substitutes allowed",
       "allowEmail": "Decision by e-mail link",
       "addStep": "Add step",
       "removeStep": "Remove step",
@@ -9430,7 +9438,10 @@
         "approvers": "Please name at least one approver and complete every row.",
         "quorum": "Please enter how many approvals are needed.",
         "escalation": "Please name who the step is escalated to."
-      }
+      },
+      "dueDefault": "Default",
+      "dueHint": "Empty: the default deadline from the settings. 0: no deadline.",
+      "allowForwardHint": "Switching this off also stops substitutes from deciding in place of the approver, not only forwarding."
     },
     "ticket": {
       "title": "Approvals",
@@ -9442,10 +9453,6 @@
       "noStage": "Finished",
       "requestedBy": "Requested by {{name}}",
       "refresh": "Re-determine approvers",
-      "cancel": "Withdraw",
-      "cancelTitle": "Withdraw request?",
-      "cancelMessage": "The approval \"{{title}}\" is withdrawn. Nobody can decide on it any more.",
-      "cancelConfirm": "Withdraw request",
       "loadFailed": "The approvals could not be loaded."
     },
     "request": {
@@ -9469,28 +9476,26 @@
         "filter": {
           "status": "Status",
           "statusAll": "All",
-          "ticketId": "Ticket ID",
-          "subjectType": "Subject type",
-          "overdue": "Overdue only"
+          "subjectType": "Approval type",
+          "overdue": "Overdue only",
+          "ticketNumber": "Ticket number"
         },
         "empty": "There are no approval requests yet.",
         "emptyFiltered": "No approval request matches these filters.",
-        "openApprovers": "{{count}} still to decide",
-        "cancelTitle": "Withdraw request?",
-        "cancelMessage": "The request “{{title}}” is closed without a decision. Approvers are no longer asked."
+        "openApprovers": "{{count}} still to decide"
       },
       "templates": {
         "new": "New template",
         "edit": "Edit template",
         "empty": "No templates yet.",
-        "key": "Key",
+        "key": "Identifier",
         "keyHint": "Used by features to find the template. Cannot be changed after saving.",
-        "keyLocked": "The key cannot be changed.",
+        "keyLocked": "The identifier cannot be changed.",
         "name": "Name",
         "description": "Description",
-        "subjectTypes": "Subject types",
-        "subjectTypesHint": "Choose where the template may be used. None selected means every subject type.",
-        "allSubjects": "All subject types",
+        "subjectTypes": "Approval types",
+        "subjectTypesHint": "Choose where the template may be used. None selected means every approval type.",
+        "allSubjects": "All approval types",
         "valid": "Valid",
         "invalid": "Not valid",
         "hasWarnings": "{{count}} notes",
@@ -9515,20 +9520,20 @@
           },
           "unknown_resolver": "The rule “{{arg}}” does not exist.",
           "invalid_ref": "An approver entry is invalid ({{arg}}).",
-          "customer_entry_not_allowed": "Customers cannot be approvers for these subject types.",
-          "unknown_subject_type": "The subject type “{{arg}}” does not exist.",
+          "customer_entry_not_allowed": "Customers cannot be approvers for these approval types.",
+          "unknown_subject_type": "The approval type “{{arg}}” does not exist.",
           "missing_user": "Agent #{{arg}} no longer exists or is invalid.",
           "missing_group": "Group #{{arg}} no longer exists or is invalid.",
           "missing_role": "Role #{{arg}} no longer exists or is invalid.",
-          "missing_list": "Approver group #{{arg}} no longer exists or is invalid.",
+          "missing_list": "Approval group #{{arg}} no longer exists or is invalid.",
           "missing_customer": "Customer {{arg}} no longer exists or is invalid."
         },
-        "keyMissing": "Please enter a key."
+        "keyMissing": "Please enter an identifier."
       },
       "lists": {
-        "new": "New approver group",
-        "edit": "Edit approver group",
-        "empty": "No approver groups yet.",
+        "new": "New approval group",
+        "edit": "Edit approval group",
+        "empty": "No approval groups yet.",
         "name": "Name",
         "nameMissing": "Please enter a name.",
         "description": "Description",
@@ -9538,8 +9543,8 @@
         "membersEmpty": "No members",
         "addMember": "Add member",
         "removeMember": "Remove {{name}}",
-        "deleteTitle": "Delete approver group?",
-        "deleteMessage": "The approver group “{{name}}” is removed."
+        "deleteTitle": "Delete approval group?",
+        "deleteMessage": "The approval group “{{name}}” is removed."
       },
       "delegations": {
         "filterUser": "Substituted person",
@@ -9559,6 +9564,11 @@
       "discardTitle": "Discard changes?",
       "discardMessage": "Your changes have not been saved and will be lost.",
       "discard": "Discard changes"
+    },
+    "withdraw": {
+      "action": "Withdraw request",
+      "title": "Withdraw request?",
+      "message": "The request “{{title}}” is closed without a decision. Nobody can decide on it any more."
     }
   }
 }

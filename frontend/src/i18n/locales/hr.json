@@ -9181,7 +9181,6 @@
       "loadFailed": "The approvals could not be loaded. Please try again.",
       "detail": "Approval details",
       "back": "Back to list",
-      "cancel": "Withdraw request",
       "requestedBy": "Requested by {{name}}",
       "ticket": "Ticket #{{number}}",
       "onBehalfOf": "on behalf of {{name}}",
@@ -9238,7 +9237,6 @@
       "step": "Step: {{name}}",
       "due": "Due: {{date}}",
       "decidingAs": "You are deciding as {{name}}",
-      "counter": "{{count}} / {{max}}",
       "doneApproved": "Thank you, your approval has been saved.",
       "doneRejected": "Your rejection has been saved.",
       "requestStatus": "Status of the request: {{status}}",
@@ -9259,7 +9257,8 @@
       "any": "One approval is enough",
       "all": "All approvers must approve",
       "quorum": "{{required}} approvals needed",
-      "majority": "Majority needed ({{required}} approvals)"
+      "majority": "Majority needed ({{required}} approvals)",
+      "majorityOpen": "Majority required"
     },
     "errors": {
       "approval_not_found": "This approval does not exist or you may not see it.",
@@ -9315,14 +9314,21 @@
       "customer_user": "Customer",
       "resolver": "By rule",
       "escalation": "Escalation",
-      "forward": "Forwarded"
+      "forward": "Forwarded",
+      "via": {
+        "group": "via group {{name}}",
+        "role": "via role {{name}}",
+        "list": "via approval group {{name}}"
+      }
     },
     "steps": {
       "stage": "Stage {{stage}}",
       "progress": "{{approved}} of {{required}} approvals",
       "due": "Due {{date}}",
       "decisive": "Decides alone",
-      "onBehalf": "{{name}} voted as a substitute"
+      "onBehalf": "{{name}} voted as a substitute",
+      "startsAfter": "Starts after stage {{stage}}",
+      "approversLater": "The approvers are determined when this stage starts."
     },
     "audit": {
       "title": "History ({{count}})",
@@ -9356,7 +9362,9 @@
       "reject": "Reject",
       "comment": "Comment (optional)",
       "commentRequired": "Reason for the rejection",
-      "commentMissing": "Please give a reason for the rejection."
+      "commentMissing": "Please give a reason for the rejection.",
+      "commentUntilChosen": "Comment (required when rejecting)",
+      "counter": "{{count}} / {{max}}"
     },
     "forward": {
       "title": "Forward approval",
@@ -9422,7 +9430,10 @@
         "approvers": "Please name at least one approver and complete every row.",
         "quorum": "Please enter how many approvals are needed.",
         "escalation": "Please name who the step is escalated to."
-      }
+      },
+      "dueDefault": "Default",
+      "dueHint": "Empty: the default deadline from the settings. 0: no deadline.",
+      "allowForwardHint": "Switching this off also stops substitutes from deciding in place of the approver, not only forwarding."
     },
     "ticket": {
       "title": "Approvals",
@@ -9434,10 +9445,6 @@
       "noStage": "Finished",
       "requestedBy": "Requested by {{name}}",
       "refresh": "Re-determine approvers",
-      "cancel": "Withdraw",
-      "cancelTitle": "Withdraw request?",
-      "cancelMessage": "The approval \"{{title}}\" is withdrawn. Nobody can decide on it any more.",
-      "cancelConfirm": "Withdraw request",
       "loadFailed": "The approvals could not be loaded."
     },
     "request": {
@@ -9461,15 +9468,13 @@
         "filter": {
           "status": "Status",
           "statusAll": "All",
-          "ticketId": "Ticket ID",
           "subjectType": "Subject type",
-          "overdue": "Overdue only"
+          "overdue": "Overdue only",
+          "ticketNumber": "Ticket number"
         },
         "empty": "There are no approval requests yet.",
         "emptyFiltered": "No approval request matches these filters.",
-        "openApprovers": "{{count}} still to decide",
-        "cancelTitle": "Withdraw request?",
-        "cancelMessage": "The request “{{title}}” is closed without a decision. Approvers are no longer asked."
+        "openApprovers": "{{count}} still to decide"
       },
       "templates": {
         "new": "New template",
@@ -9551,6 +9556,11 @@
       "discardTitle": "Discard changes?",
       "discardMessage": "Your changes have not been saved and will be lost.",
       "discard": "Discard changes"
+    },
+    "withdraw": {
+      "action": "Withdraw request",
+      "title": "Withdraw request?",
+      "message": "The request “{{title}}” is closed without a decision. Nobody can decide on it any more."
     }
   }
 }

@@ -213,12 +213,18 @@ describe("DefinitionEditor", () => {
   it("switches forwarding and e-mail decisions and sets the deadline", () => {
     mockApi();
     renderApproval(<Harness initial={{ steps: [step("a", 1)] }} />);
-    fireEvent.click(screen.getByRole("switch", { name: "Weiterleiten erlaubt" }));
+    // One flag covers forwarding and substitutes in the engine, so the label and the hint say both.
+    expect(screen.getByTestId("step-0-forward-hint")).toHaveTextContent("entscheidet auch keine Vertretung");
+    fireEvent.click(screen.getByRole("switch", { name: "Weiterleiten und Vertretung erlaubt" }));
     fireEvent.click(screen.getByRole("switch", { name: "Entscheidung per E-Mail-Link" }));
     expect(latest.steps[0]).toMatchObject({ allow_delegation: false, allow_email: false });
     fireEvent.change(screen.getByTestId("step-0-due"), { target: { value: "48" } });
     expect(latest.steps[0].due_hours).toBe(48);
     fireEvent.change(screen.getByTestId("step-0-due"), { target: { value: "" } });
     expect(latest.steps[0].due_hours).toBeNull();
+    // Empty means the default deadline, 0 means none; the field says so.
+    expect(screen.getByTestId("step-0-due-hint")).toHaveTextContent("Leer: Standardfrist aus den Einstellungen. 0: keine Frist.");
+    fireEvent.change(screen.getByTestId("step-0-due"), { target: { value: "0" } });
+    expect(latest.steps[0].due_hours).toBe(0);
   });
 });

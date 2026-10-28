@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -9,14 +9,12 @@ import { portalApprovalsApi, portalApprovalsKeys } from "@/lib/portalApprovalsAp
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApprovalStatusBadge } from "@/components/approvals/ApprovalStatusBadge";
-import { APPROVAL_COMMENT_MAX } from "@/components/approvals/DecisionDialog";
-import { inputCls } from "@/components/approvals/pickers";
+import { DecisionCommentField } from "@/components/approvals/DecisionCommentField";
 
 /** One approval of the customer with the decision form; shows no other approvers. */
 export function PortalApprovalPage() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
-  const fieldId = useId();
   const { approvalId } = useParams({ strict: false }) as { approvalId: string };
   const id = Number(approvalId);
   const [comment, setComment] = useState("");
@@ -49,7 +47,6 @@ export function PortalApprovalPage() {
   const a = detail.data;
   // The server data decides (survives a reload); `done` only adds the thank-you right after voting.
   const mine = a ? (["approved", "rejected"].includes(a.my_decision ?? a.my_status) ? (a.my_decision ?? a.my_status) : null) : null;
-  const missing = reasonAsked && comment.trim() === "";
   const unavailable = detail.error instanceof ApiError && detail.error.status === 404;
   return (
     <div className="space-y-4" data-testid="portal-approval-page">
@@ -117,29 +114,13 @@ export function PortalApprovalPage() {
           )}
           {mine ? null : a.can_decide ? (
             <section className="space-y-3 rounded-lg border border-hairline bg-surface p-4" data-testid="portal-approval-form">
-              <div>
-                <label htmlFor={fieldId} className="mb-1 block text-xs font-medium text-muted">
-                  {t("approvals.decision.comment")}
-                </label>
-                <textarea
-                  id={fieldId}
-                  className={`${inputCls} w-full`}
-                  rows={4}
-                  maxLength={APPROVAL_COMMENT_MAX}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  aria-invalid={missing}
-                  data-testid="portal-approval-comment"
-                />
-                <div className="mt-1 flex justify-between gap-2 text-xs">
-                  <span className="text-danger" role={missing ? "alert" : undefined} data-testid="portal-approval-comment-error">
-                    {missing ? t("approvals.decision.commentMissing") : ""}
-                  </span>
-                  <span className="text-muted">
-                    {comment.length} / {APPROVAL_COMMENT_MAX}
-                  </span>
-                </div>
-              </div>
+              <DecisionCommentField
+                value={comment}
+                onChange={setComment}
+                decision={reasonAsked ? "rejected" : null}
+                showError={reasonAsked}
+                testIdPrefix="portal-approval"
+              />
               {decide.isError && (
                 <p className="text-xs text-danger" role="alert" data-testid="portal-approval-decide-error">
                   {approvalErrorMessage(decide.error, t)}

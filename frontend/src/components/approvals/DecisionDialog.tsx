@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
@@ -10,10 +10,9 @@ import {
   type ApprovalDecision,
   type ApprovalDetail,
 } from "@/lib/approvalsApi";
-import { inputCls } from "./pickers";
+import { DecisionCommentField } from "./DecisionCommentField";
 
-/** Longest vote comment the API accepts. */
-export const APPROVAL_COMMENT_MAX = 2000;
+export { APPROVAL_COMMENT_MAX } from "./DecisionCommentField";
 
 /** Approve or reject a request; a rejection needs a comment. `approverId` votes on behalf of a delegator. */
 export function DecisionDialog({
@@ -33,7 +32,6 @@ export function DecisionDialog({
   onDone: (detail: ApprovalDetail) => void;
 }) {
   const { t } = useTranslation();
-  const fieldId = useId();
   const [decision, setDecision] = useState<ApprovalDecision>(initialDecision);
   const [comment, setComment] = useState("");
   const [touched, setTouched] = useState(false);
@@ -102,29 +100,7 @@ export function DecisionDialog({
           aria-label={t("approvals.decision.title")}
           fullWidth
         />
-        <div>
-          <label htmlFor={fieldId} className="mb-1 block text-xs font-medium text-muted">
-            {decision === "rejected" ? t("approvals.decision.commentRequired") : t("approvals.decision.comment")}
-          </label>
-          <textarea
-            id={fieldId}
-            className={`${inputCls} w-full`}
-            rows={4}
-            maxLength={APPROVAL_COMMENT_MAX}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            aria-invalid={touched && missing}
-            data-testid="decision-comment"
-          />
-          <div className="mt-1 flex justify-between gap-2 text-xs">
-            <span className="text-danger" role={touched && missing ? "alert" : undefined} data-testid="decision-comment-error">
-              {touched && missing ? t("approvals.decision.commentMissing") : ""}
-            </span>
-            <span className="text-muted" data-testid="decision-counter">
-              {comment.length} / {APPROVAL_COMMENT_MAX}
-            </span>
-          </div>
-        </div>
+        <DecisionCommentField value={comment} onChange={setComment} decision={decision} showError={touched} testIdPrefix="decision" />
         {mutation.isError && (
           <p className="text-xs text-danger" role="alert" data-testid="decision-error">
             {approvalErrorMessage(mutation.error, t)}

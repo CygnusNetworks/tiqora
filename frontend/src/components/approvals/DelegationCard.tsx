@@ -3,73 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { useOptionalAuth } from "@/auth/AuthContext";
-import { formatDateTime } from "@/lib/format";
-import {
-  approvalErrorCode,
-  approvalErrorMessage,
-  approvalsApi,
-  approvalsKeys,
-  type ApprovalDelegation,
-} from "@/lib/approvalsApi";
+import { approvalsApi, approvalsKeys } from "@/lib/approvalsApi";
+import { delegationCreateMessage, periodProblem, toIso } from "./delegationForm";
+import { DelegationRow } from "./DelegationRow";
 import { AgentSelect, inputCls } from "./pickers";
-
-/** `<input type="datetime-local">` value to an ISO instant, or null when empty/invalid. */
-function toIso(local: string): string | null {
-  if (!local) return null;
-  const d = new Date(local);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-type Problem = "untilPast" | "untilBeforeFrom";
-
-function DelegationRow({ d, now, onChanged }: { d: ApprovalDelegation; now: number; onChanged: () => void }) {
-  const { t, i18n } = useTranslation();
-  const [ended, setEnded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const revoke = useMutation({
-    mutationFn: () => approvalsApi.deleteDelegation(d.id),
-    onSuccess: () => onChanged(),
-    onError: (err) => {
-      if (approvalErrorCode(err) === "delegation_not_active") {
-        setEnded(true);
-        setError(null);
-        onChanged();
-      } else {
-        setError(approvalErrorMessage(err, t));
-      }
-    },
-  });
-  const running = new Date(d.valid_from).getTime() <= now;
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-2 py-2" data-testid="delegation-row" data-delegation-id={d.id}>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-ink" data-testid="delegation-substitute">
-          {d.substitute_label}
-        </p>
-        <p className="text-xs text-muted" data-testid="delegation-period">
-          {formatDateTime(d.valid_from, i18n.language)}
-          {" – "}
-          {d.valid_until ? formatDateTime(d.valid_until, i18n.language) : t("approvals.agent.delegation.noEnd")}
-          {" · "}
-          {running ? t("approvals.agent.delegation.running") : t("approvals.agent.delegation.planned")}
-        </p>
-        {ended && (
-          <p className="text-xs text-muted" role="status" data-testid="delegation-ended">
-            {t("approvals.agent.delegation.alreadyEnded")}
-          </p>
-        )}
-        {error && (
-          <p className="text-xs text-danger" role="alert" data-testid="delegation-row-error">
-            {error}
-          </p>
-        )}
-      </div>
-      <Button size="sm" disabled={revoke.isPending || ended} onClick={() => revoke.mutate()} data-testid="delegation-revoke">
-        {t("approvals.agent.delegation.revoke")}
-      </Button>
-    </li>
-  );
-}
 
 /** "Vertretung": the caller's running and planned substitutes, a form to name a new one and a button to end one. */
 export function DelegationCard() {
@@ -90,11 +27,7 @@ export function DelegationCard() {
 
   const fromIso = toIso(from);
   const untilIso = toIso(until);
-  let problem: Problem | null = null;
-  if (untilIso) {
-    if (new Date(untilIso).getTime() <= Date.now()) problem = "untilPast";
-    else if (fromIso && new Date(untilIso) <= new Date(fromIso)) problem = "untilBeforeFrom";
-  }
+  const problem = periodProblem(fromIso, untilIso);
 
   const create = useMutation({
     mutationFn: () =>
@@ -114,13 +47,7 @@ export function DelegationCard() {
     create.mutate();
   };
 
-  const createError = create.error;
-  // A period that ended already is answered 422 `invalid_definition`; it can only come from valid_until.
-  const createMessage = !createError
-    ? null
-    : approvalErrorCode(createError) === "invalid_definition" && untilIso
-      ? t("approvals.agent.delegation.untilPast")
-      : approvalErrorMessage(createError, t);
+  const createMessage = delegationCreateMessage(create.error, untilIso, t);
 
   const rows = list.data ?? [];
   return (
@@ -139,9 +66,18 @@ export function DelegationCard() {
           {list.isPending ? t("common.loading") : t("approvals.agent.delegation.empty")}
         </p>
       ) : (
-        <ul className="divide-y divide-hairline rounded-md border border-hairline bg-surface px-3" data-testid="delegation-list">
+        <ul className="divide-y divide-hairline rounded-md border border-hairline bg-surface" data-testid="delegation-list">
           {rows.map((d) => (
-            <DelegationRow key={d.id} d={d} now={now} onChanged={() => void refresh()} />
+            <DelegationRow
+              key={d.id}
+              d={d}
+              title={d.substitute_label}
+              titleTestId="delegation-substitute"
+              stateLabel={t(`approvals.agent.delegation.${new Date(d.valid_from).getTime() <= now ? "running" : "planned"}`)}
+              prefix="delegation"
+              revokeFn={(id) => approvalsApi.deleteDelegation(id)}
+              onChanged={() => void refresh()}
+            />
           ))}
         </ul>
       )}

@@ -76,12 +76,33 @@ test.describe("agent inbox and ticket panel", () => {
 
   test("a two-stage request moves on to the next stage after the vote that completes the first", async ({ page }) => {
     await page.goto("/agent/approvals?id=501");
+    // Stage 2 has not started: the engine has not resolved its approvers yet, so no count and no list.
+    const later = page.getByTestId("approval-step").nth(1);
+    await expect(later).toContainText("Betriebsleitung");
+    await expect(later.getByTestId("approval-step-starts-after")).toContainText("Startet nach Stufe 1");
+    await expect(later.getByTestId("approval-step-approvers-later")).toBeVisible();
+    await expect(later.getByTestId("approval-approver")).toHaveCount(0);
+    await expect(later).not.toContainText("0 Freigaben");
+    await expect(page.getByTestId("approval-approver-source").first()).toContainText("über Freigabegruppe CAB Netzwerk");
+
     await page.getByTestId("approval-approve").click();
     await page.getByTestId("decision-submit").click();
     // Majority of three reached (Erika Muster voted before): the Betriebsleitung stage is active, nothing left for us.
     await expect(page.getByTestId("approval-actions")).toHaveCount(0);
     await expect(page.getByTestId("approval-step").nth(1)).toContainText("Betriebsleitung");
+    await expect(page.getByTestId("approval-step").nth(1).getByTestId("approval-approver-source")).toContainText("über Gruppe Betriebsleitung");
     await expect(page.getByTestId("approval-detail").getByTestId("approval-status-badge").first()).toContainText("Offen");
+  });
+
+  test("withdrawing from the inbox asks first", async ({ page }) => {
+    await page.goto("/agent/approvals?id=503");
+    await page.getByTestId("approval-cancel").click();
+    await expect(page.getByText("Anfrage zurückziehen?")).toBeVisible();
+    await page.getByTestId("confirm-dialog-cancel").click();
+    await expect(page.getByTestId("approval-detail").getByTestId("approval-status-badge").first()).toContainText("Offen");
+    await page.getByTestId("approval-cancel").click();
+    await page.getByTestId("confirm-dialog-confirm").click();
+    await expect(page.getByTestId("approval-detail").getByTestId("approval-status-badge").first()).toContainText("Zurückgezogen");
   });
 
   test("requests an ad-hoc approval from a template on the ticket", async ({ page }) => {
@@ -105,7 +126,8 @@ test.describe("agent inbox and ticket panel", () => {
 
     // Withdrawing moves it under "Ältere Freigaben".
     await created.getByTestId("ticket-approval-cancel").click();
-    await page.getByRole("button", { name: "Anforderung zurückziehen" }).click();
+    await expect(page.getByText("Anfrage zurückziehen?")).toBeVisible();
+    await page.getByTestId("confirm-dialog-confirm").click();
     await expect(panel.getByTestId("ticket-approvals-older-toggle")).toBeVisible();
     await expect(panel.getByTestId("ticket-approval")).toHaveCount(1);
   });
@@ -167,6 +189,7 @@ test.describe("agent inbox on a phone", () => {
     await page.locator('[data-testid="approval-row"][data-approval-id="503"]').click();
     const sheet = page.getByTestId("approval-sheet");
     await expect(sheet).toBeVisible();
+    await expect(page.getByRole("dialog")).toBeVisible();
     await expect(sheet.getByTestId("approval-detail-title")).toContainText("Firewall-Regel freigeben");
     const box = await sheet.boundingBox();
     expect(box?.width).toBeLessThanOrEqual(390);
@@ -175,12 +198,30 @@ test.describe("agent inbox on a phone", () => {
     await page.getByTestId("decision-submit").click();
     await expect(sheet.getByTestId("approval-detail").getByTestId("approval-status-badge").first()).toContainText("Freigegeben");
 
-    await sheet.getByTestId("approval-sheet-close").click();
+    await page.keyboard.press("Escape");
     await expect(sheet).toHaveCount(0);
     await expect(page.getByTestId("approval-row")).toHaveCount(1);
     // The page's own content fits the phone (the shell header's account menu overflows on every page, not ours).
     const content = await page.getByTestId("approvals-page").boundingBox();
     expect(content?.width).toBeLessThanOrEqual(390);
+  });
+
+  test("the sheet is a real dialog: focus moves in, Escape closes it and focus returns to the row", async ({ page }) => {
+    await mockApi(page);
+    await useGermanUi(page);
+    await loginAsAgent(page);
+    await page.goto("/agent/approvals");
+    const row = page.locator('[data-testid="approval-row"][data-approval-id="501"]');
+    await row.focus();
+    await row.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
+    // Tab stays inside the sheet however often it is pressed.
+    for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(row).toBeFocused();
   });
 });
 

@@ -363,7 +363,7 @@ anderen Agenten. Die alte Zeile endet („weitergeleitet“, ihr Link wird ungü
 bekommt eine E-Mail mit eigenem Link und entscheidet an der Stelle des alten (ist der alte
 Freigeber allein entscheidend, ist es auch der neue). Weitergeleitet wird **einmal**: eine
 weitergeleitete Zeile kann nicht erneut weitergeleitet werden. Nicht möglich ist es für Kunden, für
-Vertretungen, bei Schritten ohne „Weiterleiten erlaubt“, an Personen, die im Schritt schon
+Vertretungen, bei Schritten ohne „Weiterleiten und Vertretung erlaubt“, an Personen, die im Schritt schon
 abgestimmt haben, und an den Antragsteller oder Ersteller der Anfrage. Einen Kommentar speichert
 Tiqora beim Weiterleiten nicht.
 
@@ -409,7 +409,7 @@ Alle Admin-Seiten liegen unter **Admin, Freigaben** und brauchen Administratorre
 ### Übersicht
 
 **Admin, Freigaben** listet jede Anfrage im System, die neueste zuerst, filterbar nach Status,
-Ticket, Gegenstandstyp und „nur überfällige“. Ein Administrator sieht jede Anfrage und kann sie
+Ticketnummer, Art der Freigabe und „nur überfällige“. Ein Administrator sieht jede Anfrage und kann sie
 zurückziehen.
 
 ### Freigabevorlagen

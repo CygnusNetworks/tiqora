@@ -65,11 +65,17 @@ class ApprovalsStore {
   nextTemplateId = 100;
   delegations: ApprovalDelegation[] = fromDemo<ApprovalDelegation[]>("/api/v1/approvals/delegations");
   nextDelegationId = 100;
+  /**
+   * Steps that have not started: the engine resolves their approvers (and the vote count) only when the
+   * stage begins, so they sit here until then and the detail shows no approvers for them.
+   */
+  late = new Map<number, { count: number; source_kind: string; source_label: string | null }>();
   /** A delegation that was ended elsewhere: ending it again answers 403 `delegation_not_active`. */
   delegationEndedElsewhere = false;
 
   constructor() {
     for (const id of [501, 502, 503]) this.details.set(id, fromDemo<ApprovalDetail>(`/api/v1/approvals/${id}`));
+    this.late.set(7002, { count: 1, source_kind: "group", source_label: "Betriebsleitung" });
   }
 
   /** Test hook: the substitution ended meanwhile (another tab, the end date passed). */
@@ -99,17 +105,38 @@ class ApprovalsStore {
     d.can_refresh = false;
     d.my_rows = [];
     for (const s of d.steps) {
-      if (s.status === "active" || s.status === "waiting") s.status = "not_needed";
+      if (s.status === "active" || s.status === "waiting") s.status = "cancelled";
       for (const a of s.approvers) if (a.status === "pending" || a.status === "waiting") a.status = "not_needed";
     }
     d.events.push({ at: NOW, action: status === "cancelled" ? "cancelled" : "decided", actor_label: status === "cancelled" ? ME : "System", channel: null, detail: { status } });
+  }
+
+  /** The stage begins: resolve the approvers and, with them, the number of votes the rule needs. */
+  private startStep(s: ApprovalDetail["steps"][number]) {
+    const spec = this.late.get(s.id);
+    if (spec) {
+      for (let k = 0; k < spec.count; k++) {
+        s.approvers.push({
+          id: s.id * 10 + k,
+          kind: "agent",
+          display_name: AGENTS[1 + (k % 2)].full_name,
+          source_kind: spec.source_kind,
+          source_label: spec.source_label,
+          decisive: false,
+          status: "pending",
+          vote: null,
+        });
+      }
+      s.required = s.rule === "all" ? spec.count : s.rule === "majority" ? Math.floor(spec.count / 2) + 1 : s.rule === "quorum" ? (s.quorum ?? 1) : 1;
+      this.late.delete(s.id);
+    }
+    for (const a of s.approvers) a.status = "pending";
   }
 
   private vote(d: ApprovalDetail, approverId: number | null, decision: "approved" | "rejected", comment: string | null) {
     const row = d.my_rows.find((r) => r.approver_id === approverId) ?? d.my_rows[0];
     if (d.status !== "pending") return fail(409, "approval_closed");
     if (!row) return fail(403, "not_an_approver");
-    if (decision === "rejected" && !comment) return fail(422, "invalid_definition");
     const step = d.steps.find((s) => s.id === row.step_id)!;
     const approver = step.approvers.find((a) => a.id === row.approver_id)!;
     approver.status = decision;
@@ -123,7 +150,7 @@ class ApprovalsStore {
       return ok(d);
     }
     step.approved_count += 1;
-    if (step.approved_count < step.required) return ok(d);
+    if (step.approved_count < (step.required ?? 1)) return ok(d);
     step.status = "approved";
     for (const a of step.approvers) if (a.status === "pending") a.status = "not_needed";
     const next = d.steps.filter((s) => s.status === "waiting").sort((a, b) => a.stage - b.stage)[0];
@@ -133,7 +160,7 @@ class ApprovalsStore {
     }
     for (const s of d.steps.filter((x) => x.stage === next.stage && x.status === "waiting")) {
       s.status = "active";
-      for (const a of s.approvers) a.status = "pending";
+      this.startStep(s);
     }
     d.current_stage = next.stage;
     return ok(d);
@@ -154,28 +181,30 @@ class ApprovalsStore {
     const steps = specs.map((s, i) => {
       const active = (s.stage ?? 1) === first;
       const people = s.approvers?.length ? s.approvers : [{}];
-      const required = s.rule === "all" ? people.length : s.rule === "majority" ? Math.floor(people.length / 2) + 1 : s.rule === "quorum" ? (s.quorum ?? 1) : 1;
+      const required0 = s.rule === "all" ? people.length : s.rule === "majority" ? Math.floor(people.length / 2) + 1 : s.rule === "quorum" ? (s.quorum ?? 1) : 1;
+      const stepId = seq++;
+      if (!active) this.late.set(stepId, { count: people.length, source_kind: "user", source_label: null });
       return {
-        id: seq++,
+        id: stepId,
         position: i + 1,
         stage: s.stage ?? 1,
         name: s.name || `Schritt ${i + 1}`,
         rule: s.rule ?? "any",
         quorum: s.quorum ?? null,
-        required,
+        required: active ? required0 : null,
         approved_count: 0,
         status: active ? "active" : "waiting",
         reason: null,
         due_at: null,
         overdue: false,
-        approvers: people.map((_, k) => ({
+        approvers: (active ? people : []).map((_, k) => ({
           id: seq++,
           kind: "agent",
           display_name: AGENTS[1 + (k % 2)].full_name,
           source_kind: "user",
           source_label: null,
           decisive: false,
-          status: active ? "pending" : "waiting",
+          status: "pending",
           vote: null,
         })),
       };

@@ -178,9 +178,13 @@ export function DefinitionEditor({
                   max={8760}
                   className={`${inputCls} mt-1 w-28`}
                   value={step.due_hours ?? ""}
+                  placeholder={t("approvals.definition.dueDefault")}
                   onChange={(e) => patch(i, { due_hours: e.target.value === "" ? null : Number(e.target.value) })}
                   data-testid={`step-${i}-due`}
                 />
+                <span className="mt-1 block font-normal" data-testid={`step-${i}-due-hint`}>
+                  {t("approvals.definition.dueHint")}
+                </span>
               </label>
               <div className="text-xs font-medium text-muted">
                 {t("approvals.definition.onTimeout")}
@@ -199,10 +203,15 @@ export function DefinitionEditor({
             )}
 
             <div className="flex flex-col gap-2 text-sm text-ink sm:flex-row sm:gap-6">
-              <label className="flex items-center gap-2">
-                <Switch checked={step.allow_delegation ?? true} onChange={(v) => patch(i, { allow_delegation: v })} testId={`step-${i}-forward`} aria-label={t("approvals.definition.allowForward")} />
-                {t("approvals.definition.allowForward")}
-              </label>
+              <div>
+                <label className="flex items-center gap-2">
+                  <Switch checked={step.allow_delegation ?? true} onChange={(v) => patch(i, { allow_delegation: v })} testId={`step-${i}-forward`} aria-label={t("approvals.definition.allowForward")} />
+                  {t("approvals.definition.allowForward")}
+                </label>
+                <p className="mt-1 text-xs text-muted" data-testid={`step-${i}-forward-hint`}>
+                  {t("approvals.definition.allowForwardHint")}
+                </p>
+              </div>
               <label className="flex items-center gap-2">
                 <Switch checked={step.allow_email ?? true} onChange={(v) => patch(i, { allow_email: v })} testId={`step-${i}-email`} aria-label={t("approvals.definition.allowEmail")} />
                 {t("approvals.definition.allowEmail")}

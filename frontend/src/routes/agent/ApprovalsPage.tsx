@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { Tabs } from "@/components/ui/Tabs";
 import { ApprovalAuditList } from "@/components/approvals/ApprovalAuditList";
 import { ApprovalStatusBadge } from "@/components/approvals/ApprovalStatusBadge";
@@ -11,6 +12,8 @@ import { ApprovalSteps } from "@/components/approvals/ApprovalSteps";
 import { DecisionDialog } from "@/components/approvals/DecisionDialog";
 import { DelegationCard } from "@/components/approvals/DelegationCard";
 import { ForwardDialog } from "@/components/approvals/ForwardDialog";
+import { pickMyRow } from "@/components/approvals/myRow";
+import { WithdrawConfirm } from "@/components/approvals/WithdrawConfirm";
 import { useApprovalsCount } from "@/components/approvals/useApprovalsCount";
 import { usePhoneWidth } from "@/components/process-designer/usePhoneWidth";
 import { cn } from "@/lib/cn";
@@ -69,7 +72,7 @@ function InboxRow({ item, selected, onSelect }: { item: ApprovalInboxItem; selec
           )}
         </div>
         <p className="mt-1 text-xs text-muted">
-          {item.ticket_number ? `#${item.ticket_number} · ` : ""}
+          {item.ticket_number ? `${item.ticket_number} · ` : ""}
           {item.step_name}
           {item.due_at && (
             <>
@@ -117,6 +120,7 @@ function DetailPanel({
   const qc = useQueryClient();
   const [decision, setDecision] = useState<ApprovalDecision | null>(null);
   const [forwarding, setForwarding] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const q = useQuery({
     queryKey: approvalsKeys.detail(id),
     queryFn: ({ signal }) => approvalsApi.get(id, signal),
@@ -127,17 +131,17 @@ function DetailPanel({
   const changed = (d: ApprovalDetail) => {
     setDecision(null);
     setForwarding(false);
+    setConfirmCancel(false);
     qc.setQueryData(approvalsKeys.detail(d.id), d);
     void qc.invalidateQueries({ queryKey: approvalsKeys.all() });
+    void qc.invalidateQueries({ queryKey: approvalsKeys.ticket(d.ticket_id) });
   };
 
   const cancel = useMutation({ mutationFn: () => approvalsApi.cancel(id), onSuccess: changed });
 
   // The detail API lists only rows the caller can vote on right now (blocked ones are absent), so a
   // blocked reason comes from the inbox row; a deep link without one gets a neutral note.
-  const mine = detail?.my_rows ?? [];
-  const row =
-    mine.find((r) => r.approver_id === item?.approver_id) ?? mine.find((r) => r.on_behalf_of_label == null) ?? mine[0];
+  const row = pickMyRow(detail?.my_rows, item?.approver_id);
   const pending = detail?.status === "pending";
   const canVote = pending && row !== undefined;
 
@@ -212,18 +216,24 @@ function DetailPanel({
           )}
           {detail.can_cancel && (
             <div>
-              <Button size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate()} data-testid="approval-cancel">
-                {t("approvals.agent.cancel")}
+              <Button size="sm" onClick={() => setConfirmCancel(true)} data-testid="approval-cancel">
+                {t("approvals.withdraw.action")}
               </Button>
-              {cancel.isError && (
-                <p className="mt-1 text-xs text-danger" role="alert">
-                  {approvalErrorMessage(cancel.error, t)}
-                </p>
-              )}
             </div>
           )}
           <ApprovalSteps detail={detail} />
           <ApprovalAuditList events={detail.events} />
+          <WithdrawConfirm
+            open={confirmCancel}
+            title={detail.title}
+            pending={cancel.isPending}
+            error={cancel.error}
+            onConfirm={() => cancel.mutate()}
+            onCancel={() => {
+              cancel.reset();
+              setConfirmCancel(false);
+            }}
+          />
           {row && (
             <>
               <DecisionDialog
@@ -249,19 +259,23 @@ function DetailPanel({
   );
 
   if (phone) {
+    // The shared dialog owns focus (moved in, Tab trapped, returned to the row on close) and Escape. While
+    // a decision/forward/withdraw dialog sits on top, Escape must only close that one.
     return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("approvals.agent.detail")}
-        className="fixed inset-0 z-40 overflow-y-auto bg-surface p-4"
-        data-testid="approval-sheet"
+      <Dialog
+        open
+        onClose={onClose}
+        title={t("approvals.agent.detail")}
+        closeLabel={t("approvals.agent.back")}
+        placement="right"
+        size="2xl"
+        dismissible={decision === null && !forwarding && !confirmCancel}
       >
-        <Button size="sm" onClick={onClose} data-testid="approval-sheet-close">
-          {t("approvals.agent.back")}
-        </Button>
-        <div className="mt-3">{body}</div>
-      </div>
+        {/* The detail loads after the sheet opens: until it has controls, focus rests on this wrapper (data-autofocus). */}
+        <div tabIndex={-1} data-autofocus className="outline-none" data-testid="approval-sheet">
+          {body}
+        </div>
+      </Dialog>
     );
   }
   return (

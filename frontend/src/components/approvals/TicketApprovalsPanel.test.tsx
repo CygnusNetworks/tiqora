@@ -84,7 +84,7 @@ describe("TicketApprovalsPanel", () => {
     renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
     fireEvent.click(await screen.findByTestId("ticket-approval-cancel"));
     expect(cancel).not.toHaveBeenCalled();
-    expect(screen.getByText("Anforderung zurückziehen?")).toBeInTheDocument();
+    expect(screen.getByText("Anfrage zurückziehen?")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
     expect((cancel.mock.calls[0] as unknown as [{ body?: unknown } | undefined])[0]?.body).toBeUndefined();
@@ -102,7 +102,77 @@ describe("TicketApprovalsPanel", () => {
     renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
     fireEvent.click(await screen.findByTestId("ticket-approval-cancel"));
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
-    expect(await screen.findByTestId("ticket-approval-error")).toHaveTextContent(/\S/);
+    expect(await screen.findByTestId("withdraw-error")).toHaveTextContent("Diese Freigabe ist bereits abgeschlossen.");
+  });
+
+  it("shows the latest refresh error only, and none from an earlier withdraw attempt", async () => {
+    mockApi({
+      [LIST]: summaries,
+      [TICKET_PATH]: rw,
+      "GET /api/v1/approvals/501": () => demoDetail(501),
+      "POST /api/v1/approvals/501/cancel": () => {
+        throw new ApiError(409, { detail: { code: "approval_closed", detail: null } }, "/x");
+      },
+      "POST /api/v1/approvals/501/refresh-approvers": () => {
+        throw new ApiError(403, { detail: { code: "forbidden", detail: null } }, "/x");
+      },
+    });
+    renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
+    fireEvent.click(await screen.findByTestId("ticket-approval-cancel"));
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await screen.findByTestId("withdraw-error");
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(screen.queryByTestId("ticket-approval-error")).toBeNull();
+    fireEvent.click(await screen.findByTestId("ticket-approval-refresh"));
+    expect(await screen.findByTestId("ticket-approval-error")).toHaveTextContent("Dazu haben Sie keine Berechtigung.");
+    expect(screen.queryByTestId("withdraw-error")).toBeNull();
+  });
+
+  it("votes with the caller's own row and says when a row is a substitution", async () => {
+    const decide = vi.fn(() => demoDetail(501));
+    const detail = () => {
+      const d = demoDetail(501);
+      d.my_rows = [
+        { approver_id: 9100, step_id: 7001, on_behalf_of_label: "Erika Muster", can_forward: false },
+        { approver_id: 9002, step_id: 7001, on_behalf_of_label: null, can_forward: true },
+      ];
+      return d;
+    };
+    mockApi({
+      [LIST]: summaries,
+      [TICKET_PATH]: rw,
+      "GET /api/v1/approvals/501": detail,
+      "POST /api/v1/approvals/501/decision": decide,
+    });
+    renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
+    fireEvent.click(await screen.findByTestId("ticket-approval-approve"));
+    fireEvent.click(screen.getByTestId("decision-submit"));
+    await waitFor(() => expect(decide).toHaveBeenCalledTimes(1));
+    expect((decide.mock.calls[0] as unknown as [{ body: { approver_id: number } }])[0].body.approver_id).toBe(9002);
+    expect(screen.queryByTestId("ticket-approval-on-behalf")).toBeNull();
+  });
+
+  it("names the person when only a substitute row is left", async () => {
+    const detail = () => {
+      const d = demoDetail(501);
+      d.my_rows = [{ approver_id: 9100, step_id: 7001, on_behalf_of_label: "Erika Muster", can_forward: false }];
+      return d;
+    };
+    mockApi({ [LIST]: summaries, [TICKET_PATH]: rw, "GET /api/v1/approvals/501": detail });
+    renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
+    expect(await screen.findByTestId("ticket-approval-on-behalf")).toHaveTextContent("in Vertretung für Erika Muster");
+  });
+
+  it("offers no request button on a filtered panel, even with rw", async () => {
+    const base = summaries()[0] as Record<string, unknown>;
+    mockApi({
+      [LIST]: () => [{ ...base, id: 7, subject_type: "itsm.change", approval_key: "change_cab", title: "CAB", my_pending: false }],
+      [TICKET_PATH]: rw,
+    });
+    renderApproval(<TicketApprovalsPanel ticketId={TICKET} filter={{ subjectType: "itsm.change", approvalKey: "change_cab" }} />);
+    await screen.findByTestId("ticket-approvals-list");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("ticket-approvals-request")).toBeNull();
   });
 
   it("re-determines approvers and expands steps and history under Details", async () => {

@@ -87,7 +87,7 @@ export function PortalApprovalsPage() {
                         <ApprovalStatusBadge status={tab === "pending" ? item.my_status : item.status} />
                       </div>
                       <p className="mt-1 text-xs text-muted">
-                        {item.ticket_number ? `#${item.ticket_number} · ` : ""}
+                        {item.ticket_number ? `${item.ticket_number} · ` : ""}
                         {item.step_name}
                         {tab === "pending" && item.due_at && (
                           <> · {t("approvals.steps.due", { date: formatDateTime(item.due_at, i18n.language) })}</>

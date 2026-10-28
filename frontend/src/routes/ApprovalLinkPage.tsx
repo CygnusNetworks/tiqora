@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
 import { logoUrl } from "@/lib/assets";
@@ -7,8 +7,7 @@ import { approvalLinkApi, type ApprovalLinkDecision, type ApprovalLinkInspect } 
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { APPROVAL_COMMENT_MAX } from "@/components/approvals/DecisionDialog";
-import { inputCls } from "@/components/approvals/pickers";
+import { DecisionCommentField } from "@/components/approvals/DecisionCommentField";
 
 type Phase =
   | { kind: "loading" }
@@ -17,7 +16,14 @@ type Phase =
   | { kind: "error"; message: string; retryable: boolean }
   | { kind: "done"; result: ApprovalLinkDecision };
 
-const LINK_CODES = new Set(["link_invalid", "link_expired", "link_used"]);
+/** Codes that end the page: a dead link, or an approver who may not decide any more. Retrying cannot change them. */
+const LINK_CODES = new Set([
+  "link_invalid",
+  "link_expired",
+  "link_used",
+  "approver_invalid",
+  "customer_approver_outside_company",
+]);
 
 /**
  * Public confirm page for the decision links of approval e-mails (`/approve#t=<token>`).
@@ -29,7 +35,6 @@ const LINK_CODES = new Set(["link_invalid", "link_expired", "link_used"]);
  */
 export function ApprovalLinkPage() {
   const { t, i18n } = useTranslation();
-  const fieldId = useId();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const token = useRef<string | null>(null);
   // StrictMode runs the effect twice with refs kept: the second pass must neither re-read the
@@ -187,7 +192,6 @@ export function ApprovalLinkPage() {
   }
 
   const { info } = phase;
-  const missing = reasonAsked && comment.trim() === "";
   const locked = pending !== null || waitSeconds > 0;
   const ruleText = info.rule
     ? t(approvalRuleKey(info.rule), { required: info.required ?? undefined })
@@ -236,29 +240,13 @@ export function ApprovalLinkPage() {
           {t("approvals.link.decidingAs", { name: info.approver_name })}
         </p>
       )}
-      <div>
-        <label htmlFor={fieldId} className="mb-1 block text-xs font-medium text-muted">
-          {t("approvals.decision.comment")}
-        </label>
-        <textarea
-          id={fieldId}
-          className={inputCls}
-          rows={4}
-          maxLength={APPROVAL_COMMENT_MAX}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          aria-invalid={missing}
-          data-testid="approval-link-comment"
-        />
-        <div className="mt-1 flex justify-between gap-2 text-xs">
-          <span className="text-danger" role={missing ? "alert" : undefined} data-testid="approval-link-comment-error">
-            {missing ? t("approvals.decision.commentMissing") : ""}
-          </span>
-          <span className="text-muted" data-testid="approval-link-counter">
-            {t("approvals.link.counter", { count: comment.length, max: APPROVAL_COMMENT_MAX })}
-          </span>
-        </div>
-      </div>
+      <DecisionCommentField
+        value={comment}
+        onChange={setComment}
+        decision={reasonAsked ? "rejected" : null}
+        showError={reasonAsked}
+        testIdPrefix="approval-link"
+      />
       {formError && (
         <div className="space-y-1" role="alert" data-testid="approval-link-form-error">
           <p className="text-xs text-danger">{formError}</p>

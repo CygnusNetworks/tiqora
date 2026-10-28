@@ -9189,9 +9189,8 @@
       "loadFailed": "Die Freigaben konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
       "detail": "Details der Freigabe",
       "back": "Zurück zur Liste",
-      "cancel": "Anfrage zurückziehen",
       "requestedBy": "Angefordert von {{name}}",
-      "ticket": "Ticket #{{number}}",
+      "ticket": "Ticket {{number}}",
       "onBehalfOf": "in Vertretung für {{name}}",
       "myDecision": "Ihre Entscheidung: {{decision}}",
       "prev": "Zurück",
@@ -9246,7 +9245,6 @@
       "step": "Schritt: {{name}}",
       "due": "Frist: {{date}}",
       "decidingAs": "Sie entscheiden als {{name}}",
-      "counter": "{{count}} / {{max}}",
       "doneApproved": "Danke, Ihre Freigabe wurde gespeichert.",
       "doneRejected": "Ihre Ablehnung wurde gespeichert.",
       "requestStatus": "Status der Anfrage: {{status}}",
@@ -9267,7 +9265,8 @@
       "any": "Eine Freigabe genügt",
       "all": "Alle Freigeber müssen zustimmen",
       "quorum": "{{required}} Freigaben nötig",
-      "majority": "Mehrheit nötig ({{required}} Freigaben)"
+      "majority": "Mehrheit nötig ({{required}} Freigaben)",
+      "majorityOpen": "Mehrheit nötig"
     },
     "errors": {
       "approval_not_found": "Diese Freigabe gibt es nicht, oder Sie dürfen sie nicht sehen.",
@@ -9285,9 +9284,9 @@
       "step_not_active": "Dieser Schritt wartet gerade nicht auf eine Entscheidung.",
       "forward_not_allowed": "Diese Freigabe kann nicht weitergeleitet werden.",
       "forward_target_invalid": "Die gewählte Person kann diese Freigabe nicht übernehmen.",
-      "invalid_definition": "Die Vorlage ist nicht gültig. Bitte prüfen Sie Schritte, Freigeber und Fristen.",
-      "unknown_subject_type": "Diese Art von Freigabe ist nicht bekannt.",
-      "subject_not_requestable": "Diese Art von Freigabe kann nicht von Hand angefordert werden.",
+      "invalid_definition": "Die Angaben sind nicht gültig. Bitte prüfen Sie Schritte, Freigeber und Fristen.",
+      "unknown_subject_type": "Diese Art der Freigabe ist nicht bekannt.",
+      "subject_not_requestable": "Diese Art der Freigabe kann nicht von Hand angefordert werden.",
       "customer_approvers_not_allowed": "Kunden können diese Art von Freigabe nicht erteilen.",
       "unknown_resolver": "Eine Regel für Freigeber in der Vorlage gibt es nicht.",
       "link_invalid": "Dieser Link ist nicht mehr gültig. Möglicherweise wurde bereits entschieden oder die Freigabe zurückgezogen.",
@@ -9323,14 +9322,21 @@
       "customer_user": "Kunde",
       "resolver": "Nach Regel",
       "escalation": "Eskalation",
-      "forward": "Weitergeleitet"
+      "forward": "Weitergeleitet",
+      "via": {
+        "group": "über Gruppe {{name}}",
+        "role": "über Rolle {{name}}",
+        "list": "über Freigabegruppe {{name}}"
+      }
     },
     "steps": {
       "stage": "Stufe {{stage}}",
       "progress": "{{approved}} von {{required}} Freigaben",
       "due": "Fällig am {{date}}",
       "decisive": "Entscheidet allein",
-      "onBehalf": "{{name}} hat in Vertretung abgestimmt"
+      "onBehalf": "{{name}} hat in Vertretung abgestimmt",
+      "startsAfter": "Startet nach Stufe {{stage}}",
+      "approversLater": "Die Freigeber werden bestimmt, sobald diese Stufe beginnt."
     },
     "audit": {
       "title": "Verlauf ({{count}})",
@@ -9364,7 +9370,9 @@
       "reject": "Ablehnen",
       "comment": "Kommentar (optional)",
       "commentRequired": "Begründung der Ablehnung",
-      "commentMissing": "Bitte geben Sie eine Begründung für die Ablehnung an."
+      "commentMissing": "Bitte geben Sie eine Begründung für die Ablehnung an.",
+      "commentUntilChosen": "Kommentar (bei Ablehnung erforderlich)",
+      "counter": "{{count}} / {{max}}"
     },
     "forward": {
       "title": "Freigabe weiterleiten",
@@ -9409,7 +9417,7 @@
       },
       "quorum": "Nötige Freigaben",
       "approvers": "Freigeber",
-      "dueHours": "Frist in Stunden (leer: keine)",
+      "dueHours": "Frist in Stunden",
       "onTimeout": "Wenn die Frist abläuft",
       "timeout": {
         "notify": "Nur erinnern",
@@ -9419,7 +9427,7 @@
         "approveTemplatesOnly": "Automatisch freigeben (nur in Vorlagen)"
       },
       "escalation": "Eskalation an",
-      "allowForward": "Weiterleiten erlaubt",
+      "allowForward": "Weiterleiten und Vertretung erlaubt",
       "allowEmail": "Entscheidung per E-Mail-Link",
       "addStep": "Schritt hinzufügen",
       "removeStep": "Schritt entfernen",
@@ -9430,7 +9438,10 @@
         "approvers": "Bitte nennen Sie mindestens einen Freigeber und füllen Sie jede Zeile aus.",
         "quorum": "Bitte geben Sie an, wie viele Freigaben nötig sind.",
         "escalation": "Bitte nennen Sie, an wen der Schritt eskaliert wird."
-      }
+      },
+      "dueDefault": "Standard",
+      "dueHint": "Leer: Standardfrist aus den Einstellungen. 0: keine Frist.",
+      "allowForwardHint": "Wenn Sie das ausschalten, entscheidet auch keine Vertretung an Stelle des Freigebers, nicht nur das Weiterleiten fällt weg."
     },
     "ticket": {
       "title": "Freigaben",
@@ -9442,10 +9453,6 @@
       "noStage": "Abgeschlossen",
       "requestedBy": "Angefordert von {{name}}",
       "refresh": "Freigeber neu ermitteln",
-      "cancel": "Zurückziehen",
-      "cancelTitle": "Anforderung zurückziehen?",
-      "cancelMessage": "Die Freigabe „{{title}}“ wird zurückgezogen. Niemand kann sie mehr entscheiden.",
-      "cancelConfirm": "Anforderung zurückziehen",
       "loadFailed": "Die Freigaben konnten nicht geladen werden."
     },
     "request": {
@@ -9469,28 +9476,26 @@
         "filter": {
           "status": "Status",
           "statusAll": "Alle",
-          "ticketId": "Ticket-ID",
-          "subjectType": "Gegenstandstyp",
-          "overdue": "Nur überfällige"
+          "subjectType": "Art der Freigabe",
+          "overdue": "Nur überfällige",
+          "ticketNumber": "Ticketnummer"
         },
-        "empty": "Es gibt noch keine Freigabeanfragen.",
-        "emptyFiltered": "Keine Freigabeanfrage passt zu diesen Filtern.",
-        "openApprovers": "{{count}} Entscheidung(en) offen",
-        "cancelTitle": "Anfrage zurückziehen?",
-        "cancelMessage": "Die Anfrage „{{title}}“ wird ohne Entscheidung geschlossen. Die Freigebenden werden nicht mehr gefragt."
+        "empty": "Es gibt noch keine Anfragen.",
+        "emptyFiltered": "Keine Anfrage passt zu diesen Filtern.",
+        "openApprovers": "{{count}} Entscheidung(en) offen"
       },
       "templates": {
         "new": "Neue Vorlage",
         "edit": "Vorlage bearbeiten",
         "empty": "Noch keine Vorlagen.",
-        "key": "Schlüssel",
+        "key": "Kennung",
         "keyHint": "Daran finden Funktionen die Vorlage. Nach dem Speichern nicht mehr änderbar.",
-        "keyLocked": "Der Schlüssel kann nicht geändert werden.",
+        "keyLocked": "Die Kennung kann nicht geändert werden.",
         "name": "Name",
         "description": "Beschreibung",
-        "subjectTypes": "Gegenstandstypen",
-        "subjectTypesHint": "Wählen Sie, wofür die Vorlage verwendet werden darf. Ohne Auswahl gilt sie für alle Gegenstandstypen.",
-        "allSubjects": "Alle Gegenstandstypen",
+        "subjectTypes": "Arten der Freigabe",
+        "subjectTypesHint": "Wählen Sie, wofür die Vorlage verwendet werden darf. Ohne Auswahl gilt sie für alle Arten der Freigabe.",
+        "allSubjects": "Alle Arten der Freigabe",
         "valid": "Gültig",
         "invalid": "Ungültig",
         "hasWarnings": "{{count}} Hinweise",
@@ -9508,22 +9513,22 @@
             "stage": "Die Stufe ist ungültig.",
             "rule": "Die Regel ist ungültig.",
             "quorum": "Die Zahl der nötigen Freigaben ist ungültig.",
-            "approvers": "Die Freigebenden sind unvollständig oder ungültig.",
+            "approvers": "Die Freigeber sind unvollständig oder ungültig.",
             "due_hours": "Die Frist ist ungültig.",
             "on_timeout": "Die Aktion bei Fristablauf ist ungültig.",
             "escalation": "Die Eskalation ist unvollständig oder ungültig."
           },
           "unknown_resolver": "Die Regel „{{arg}}“ gibt es nicht.",
-          "invalid_ref": "Ein Eintrag bei den Freigebenden ist ungültig ({{arg}}).",
-          "customer_entry_not_allowed": "Kunden dürfen für diese Gegenstandstypen nicht freigeben.",
-          "unknown_subject_type": "Den Gegenstandstyp „{{arg}}“ gibt es nicht.",
+          "invalid_ref": "Ein Eintrag bei den Freigebern ist ungültig ({{arg}}).",
+          "customer_entry_not_allowed": "Kunden dürfen für diese Arten der Freigabe nicht freigeben.",
+          "unknown_subject_type": "Die Art der Freigabe „{{arg}}“ gibt es nicht.",
           "missing_user": "Agent #{{arg}} existiert nicht mehr oder ist ungültig.",
           "missing_group": "Gruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
           "missing_role": "Rolle #{{arg}} existiert nicht mehr oder ist ungültig.",
           "missing_list": "Freigabegruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
           "missing_customer": "Kunde {{arg}} existiert nicht mehr oder ist ungültig."
         },
-        "keyMissing": "Bitte geben Sie einen Schlüssel ein."
+        "keyMissing": "Bitte geben Sie eine Kennung ein."
       },
       "lists": {
         "new": "Neue Freigabegruppe",
@@ -9559,6 +9564,11 @@
       "discardTitle": "Änderungen verwerfen?",
       "discardMessage": "Ihre Änderungen sind nicht gespeichert und gehen verloren.",
       "discard": "Änderungen verwerfen"
+    },
+    "withdraw": {
+      "action": "Anfrage zurückziehen",
+      "title": "Anfrage zurückziehen?",
+      "message": "Die Anfrage „{{title}}“ wird ohne Entscheidung geschlossen. Niemand kann sie mehr entscheiden."
     }
   }
 }

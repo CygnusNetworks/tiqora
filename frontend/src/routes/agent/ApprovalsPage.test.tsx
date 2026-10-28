@@ -174,17 +174,61 @@ describe("ApprovalsPage", () => {
     expect(within(rows[0]).getByTestId("approval-row-blocked")).toHaveTextContent("nicht möglich (eigene Anfrage)");
   });
 
-  it("renders the detail as a full-screen sheet on a phone", async () => {
+  it("renders the detail as a modal sheet on a phone: focus moves in, Escape closes, focus returns", async () => {
+    setMatchMedia(true);
+    searchParams = { id: 501 };
+    api();
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+    const { unmount } = renderApproval(<ApprovalsPage />);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    const sheet = await screen.findByTestId("approval-sheet");
+    expect(dialog).toContainElement(sheet);
+    expect(screen.queryByTestId("approval-panel")).toBeNull();
+    await within(sheet).findByTestId("approval-approve");
+    // Focus moved into the sheet (not left on the list underneath).
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    // Tab from the last control wraps inside the sheet.
+    const focusables = Array.from(dialog.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"));
+    focusables[focusables.length - 1].focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(navigate).toHaveBeenCalledWith({ to: "/agent/approvals", search: { tab: undefined } });
+    navigate.mockReset();
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zur Liste" }));
+    expect(navigate).toHaveBeenCalledWith({ to: "/agent/approvals", search: { tab: undefined } });
+    unmount();
+    opener.remove();
+  });
+
+  it("Escape closes only the decision dialog on top of the phone sheet", async () => {
     setMatchMedia(true);
     searchParams = { id: 501 };
     api();
     renderApproval(<ApprovalsPage />);
-    const sheet = await screen.findByTestId("approval-sheet");
-    expect(sheet).toHaveAttribute("role", "dialog");
-    expect(screen.queryByTestId("approval-panel")).toBeNull();
-    await within(sheet).findByTestId("approval-approve");
-    fireEvent.click(screen.getByTestId("approval-sheet-close"));
-    expect(navigate).toHaveBeenCalledWith({ to: "/agent/approvals", search: { tab: undefined } });
+    fireEvent.click(await screen.findByTestId("approval-approve"));
+    expect(screen.getByTestId("decision-submit")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("decision-submit")).toBeNull());
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("asks before withdrawing a request and only then posts the cancel", async () => {
+    searchParams = { id: 501 };
+    const cancel = vi.fn(() => ({ ...demoDetail(501), status: "cancelled", can_cancel: false }));
+    api({ "POST /api/v1/approvals/501/cancel": cancel });
+    renderApproval(<ApprovalsPage />);
+    fireEvent.click(await screen.findByTestId("approval-cancel"));
+    expect(cancel).not.toHaveBeenCalled();
+    expect(screen.getByText("Anfrage zurückziehen?")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(cancel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("approval-cancel"));
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
   });
 
   it("the Erledigt tab asks for decided requests", async () => {

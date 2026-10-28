@@ -165,6 +165,47 @@ describe("ApprovalLinkPage", () => {
     expect(screen.queryByRole("button", { name: "Freigeben" })).toBeNull();
   });
 
+  it.each([
+    ["approver_invalid", "Ihr Zugang ist nicht mehr aktiv"],
+    ["customer_approver_outside_company", "gehört zu einer anderen Firma"],
+  ])("inspect answering %s is final: the message and no retry button", async (code, text) => {
+    inspect.mockRejectedValue(apiError(403, code));
+    show();
+    expect(await screen.findByTestId("approval-link-error")).toHaveTextContent(text);
+    expect(screen.queryByTestId("approval-link-retry")).toBeNull();
+    expect(screen.queryByText("Öffnen Sie den Link aus der E-Mail erneut.")).toBeNull();
+    expect(inspect).toHaveBeenCalledTimes(1);
+  });
+
+  it("inspect reporting valid:false with approver_invalid shows the same final state", async () => {
+    inspect.mockResolvedValue({ ...INFO, valid: false, code: "approver_invalid" });
+    show();
+    expect(await screen.findByTestId("approval-link-error")).toHaveTextContent("Ihr Zugang ist nicht mehr aktiv");
+    expect(screen.queryByTestId("approval-link-retry")).toBeNull();
+  });
+
+  it.each(["approver_invalid", "customer_approver_outside_company"])(
+    "decide answering %s replaces the card with a final error",
+    async (code) => {
+      inspect.mockResolvedValue(INFO);
+      decide.mockRejectedValue(apiError(403, code));
+      show();
+      fireEvent.click(await screen.findByRole("button", { name: "Freigeben" }));
+      expect(await screen.findByTestId("approval-link-error")).toBeInTheDocument();
+      expect(screen.queryByTestId("approval-link-retry")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Freigeben" })).toBeNull();
+    },
+  );
+
+  it("labels the comment as required for a rejection until a choice is made", async () => {
+    inspect.mockResolvedValue(INFO);
+    show();
+    await screen.findByTestId("approval-link-comment");
+    expect(screen.getByLabelText("Kommentar (bei Ablehnung erforderlich)")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ablehnen" }));
+    expect(screen.getByLabelText("Begründung der Ablehnung")).toBeInTheDocument();
+  });
+
   it("an inspect server error says so, asks to reopen the link and retries with the held token", async () => {
     inspect.mockRejectedValueOnce(new ApiError(500, "boom", "/api/v1/approval-links/inspect"));
     inspect.mockResolvedValueOnce(INFO);

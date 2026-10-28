@@ -10,7 +10,7 @@ import { DefinitionEditor } from "@/components/approvals/DefinitionEditor";
 import { definitionComplete, type ApprovalDefinition } from "@/components/approvals/definitionLogic";
 import { inputCls } from "@/components/approvals/pickers";
 import { useDebounced } from "@/components/fields/useDebounced";
-import { approvalErrorMessage } from "@/lib/approvalsApi";
+import { approvalErrorCode, approvalErrorMessage } from "@/lib/approvalsApi";
 import {
   approvalsAdminApi,
   approvalsAdminKeys,
@@ -48,6 +48,7 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
   const [description, setDescription] = useState(template?.description ?? "");
   const [subjectTypes, setSubjectTypes] = useState<string[]>(template?.subject_types ?? []);
   const [touched, setTouched] = useState(false);
+  const [keyLeft, setKeyLeft] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const subjects = useSubjectTypes();
   const [valid, setValid] = useState(template?.valid ?? true);
@@ -102,6 +103,8 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
         subject_types: subjectTypes,
         definition,
         valid,
+        // The version the editor was loaded with: a template saved by someone else meanwhile answers 409.
+        change_time: template?.change_time ?? null,
       };
       return template ? approvalsAdminApi.updateTemplate(template.id, body) : approvalsAdminApi.createTemplate(body);
     },
@@ -109,6 +112,13 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
       void qc.invalidateQueries({ queryKey: approvalsAdminKeys.templates() });
       void qc.invalidateQueries({ queryKey: ["approvals", "templates"] });
       onClose();
+    },
+    onError: (err) => {
+      // Someone saved this template since it was loaded: keep the input (nothing is overwritten) and
+      // refresh the list so that reopening shows the other version.
+      if (approvalErrorCode(err) === "template_changed") {
+        void qc.invalidateQueries({ queryKey: approvalsAdminKeys.templates() });
+      }
     },
   });
 
@@ -153,10 +163,11 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
               maxLength={100}
               readOnly={editing}
               onChange={(e) => setKey(e.target.value)}
-              aria-invalid={!editing && touched && !keyOk}
+              onBlur={() => setKeyLeft(true)}
+              aria-invalid={!editing && (touched || keyLeft) && !keyOk}
               data-testid="template-key"
             />
-            {!editing && !keyOk && (
+            {!editing && (touched || keyLeft) && !keyOk && (
               <span className="mt-1 block text-danger" role="alert" data-testid="template-key-error">
                 {t("approvals.admin.templates.keyMissing")}
               </span>
@@ -202,7 +213,7 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
               {check.isError ? approvalErrorMessage(check.error, t) : t("approvals.admin.templates.check.running")}
             </p>
           ) : errors.length === 0 ? (
-            <p className="text-xs text-success" data-testid="template-check-ok">
+            <p className="text-xs text-green" data-testid="template-check-ok">
               {t("approvals.admin.templates.check.ok")}
             </p>
           ) : (
@@ -262,6 +273,7 @@ export function ApprovalTemplatesPage() {
     onSuccess: () => {
       setDeleting(null);
       void qc.invalidateQueries({ queryKey: approvalsAdminKeys.templates() });
+      void qc.invalidateQueries({ queryKey: ["approvals", "templates"] });
     },
   });
   const rows = q.data ?? [];

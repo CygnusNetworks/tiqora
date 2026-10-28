@@ -26,11 +26,11 @@ describe("ApprovalsOverviewPage", () => {
     mockApi({ [OVERVIEW]: overview });
     renderApproval(<ApprovalsOverviewPage />);
     await screen.findAllByTestId("admin-approval-row");
-    fireEvent.change(screen.getByTestId("admin-approvals-filter-ticket"), { target: { value: "42" } });
+    fireEvent.change(screen.getByTestId("admin-approvals-filter-ticket"), { target: { value: " 20261012130 " } });
     fireEvent.click(screen.getByTestId("admin-approvals-filter-overdue"));
     await waitFor(() => {
       const q = (overview.mock.calls.at(-1) as unknown as [{ query: Record<string, unknown> }])[0].query;
-      expect(q).toMatchObject({ ticket_id: 42, overdue: true, limit: 25, offset: 0 });
+      expect(q).toMatchObject({ ticket_number: "20261012130", overdue: true, limit: 25, offset: 0 });
       expect(q.status).toBeUndefined();
     });
   });

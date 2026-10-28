@@ -8,7 +8,7 @@ beforeAll(useGerman);
 
 const TEMPLATES = "GET /api/v1/admin/approvals/templates";
 const VALIDATE = "POST /api/v1/admin/approvals/templates/validate";
-type Tpl = { id: number; template_key: string; origin: string; description: string | null };
+type Tpl = { id: number; template_key: string; origin: string; description: string | null; change_time: string };
 const templates = () => resolveApprovalsData("/api/v1/admin/approvals/templates", "GET") as Tpl[];
 
 describe("ApprovalTemplatesPage", () => {
@@ -44,7 +44,33 @@ describe("ApprovalTemplatesPage", () => {
     await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
     const body = (put.mock.calls[0] as unknown as [{ body: Record<string, unknown> }])[0].body;
     expect(body).toMatchObject({ template_key: "standard_einzel", description: null, subject_types: ["ticket"], valid: true });
+    // The version the editor loaded travels back unchanged.
+    expect(body.change_time).toBe(templates()[0].change_time);
     expect((body.definition as { steps: { on_timeout: string }[] }).steps[0].on_timeout).toBe("approve");
+  });
+
+  it("keeps the input and shows the reload hint when the template changed meanwhile (409)", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const put = vi.fn(() => {
+      throw new ApiError(409, { detail: { code: "template_changed", detail: null } }, "/x");
+    });
+    mockApi({
+      [TEMPLATES]: templates,
+      [VALIDATE]: () => ({ errors: [], warnings: [] }),
+      "PUT /api/v1/admin/approvals/templates/1": put,
+    });
+    renderApproval(<ApprovalTemplatesPage />);
+    fireEvent.click((await screen.findAllByTestId("template-edit"))[0]);
+    fireEvent.change(await screen.findByTestId("template-name"), { target: { value: "Mein Name" } });
+    await screen.findByTestId("template-check-ok");
+    fireEvent.click(screen.getByTestId("template-save"));
+    expect(await screen.findByTestId("template-save-error")).toHaveTextContent(
+      "Die Vorlage wurde inzwischen geändert. Bitte laden Sie sie neu.",
+    );
+    // Nothing was overwritten and nothing the user typed is lost; the dialog stays open.
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("template-name")).toHaveValue("Mein Name");
+    expect(screen.getByTestId("template-dialog")).toBeInTheDocument();
   });
 
   it("blocks saving while the check reports errors and names the step", async () => {
@@ -60,7 +86,7 @@ describe("ApprovalTemplatesPage", () => {
     fireEvent.change(screen.getByTestId("template-name"), { target: { value: "Neu" } });
     fireEvent.change(screen.getByTestId("step-0-name"), { target: { value: "Prüfung" } });
     const errors = await screen.findAllByTestId("template-error", undefined, { timeout: 3000 });
-    expect(errors[0]).toHaveTextContent("Schritt 1 (Prüfung): Die Freigebenden sind unvollständig oder ungültig.");
+    expect(errors[0]).toHaveTextContent("Schritt 1 (Prüfung): Die Freigeber sind unvollständig oder ungültig.");
     expect(errors[1]).toHaveTextContent("Die Regel „foo.bar“ gibt es nicht.");
     expect(screen.getByTestId("template-warnings")).toHaveTextContent("Agent #99 existiert nicht mehr");
     expect(screen.getByTestId("template-save")).toBeDisabled();
@@ -104,7 +130,11 @@ describe("ApprovalTemplatesPage", () => {
     expect(screen.queryByTestId("template-dialog")).toBeNull();
 
     fireEvent.click(screen.getByTestId("template-new"));
-    expect(await screen.findByTestId("template-key-error")).toHaveTextContent("Bitte geben Sie einen Schlüssel ein.");
+    // No red error on a fresh form; it appears once the field was left empty.
+    await screen.findByTestId("template-dialog");
+    expect(screen.queryByTestId("template-key-error")).toBeNull();
+    fireEvent.blur(screen.getByTestId("template-key"));
+    expect(await screen.findByTestId("template-key-error")).toHaveTextContent("Bitte geben Sie eine Kennung ein.");
     fireEvent.change(screen.getByTestId("template-name"), { target: { value: "Neu" } });
     fireEvent.click(screen.getByTestId("template-cancel"));
     expect(await screen.findByText("Änderungen verwerfen?")).toBeInTheDocument();

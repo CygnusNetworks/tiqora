@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { ticketPerms } from "@/lib/ticket";
@@ -19,7 +18,9 @@ import { ApprovalStatusBadge } from "./ApprovalStatusBadge";
 import { ApprovalSteps } from "./ApprovalSteps";
 import { DecisionDialog } from "./DecisionDialog";
 import { ForwardDialog } from "./ForwardDialog";
+import { pickMyRow } from "./myRow";
 import { RequestApprovalDialog } from "./RequestApprovalDialog";
+import { WithdrawConfirm } from "./WithdrawConfirm";
 
 export type TicketApprovalsFilter = { subjectType?: string; approvalKey?: string };
 
@@ -40,7 +41,7 @@ function ApprovalItem({ summary, onChanged }: { summary: ApprovalSummary; onChan
     retry: false,
   });
   const detail = detailQ.data;
-  const row = detail?.my_rows[0];
+  const row = pickMyRow(detail?.my_rows);
 
   const changed = (d: ApprovalDetail) => {
     setDecision(null);
@@ -69,6 +70,11 @@ function ApprovalItem({ summary, onChanged }: { summary: ApprovalSummary; onChan
           ? t("approvals.ticket.stage", { stage: summary.current_stage })
           : t("approvals.ticket.noStage")}
       </p>
+      {pending && summary.my_pending && row?.on_behalf_of_label && (
+        <p className="mt-1 text-xs text-muted" data-testid="ticket-approval-on-behalf">
+          {t("approvals.agent.onBehalfOf", { name: row.on_behalf_of_label })}
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap gap-2">
         {pending && summary.my_pending && row && (
           <>
@@ -90,7 +96,7 @@ function ApprovalItem({ summary, onChanged }: { summary: ApprovalSummary; onChan
         </Button>
         {pending && summary.can_cancel && (
           <Button size="sm" onClick={() => setConfirmCancel(true)} data-testid="ticket-approval-cancel">
-            {t("approvals.ticket.cancel")}
+            {t("approvals.withdraw.action")}
           </Button>
         )}
         {pending && detail?.can_refresh && (
@@ -104,9 +110,9 @@ function ApprovalItem({ summary, onChanged }: { summary: ApprovalSummary; onChan
           </Button>
         )}
       </div>
-      {(cancel.isError || refresh.isError) && (
+      {refresh.isError && (
         <p className="mt-1 text-xs text-danger" role="alert" data-testid="ticket-approval-error">
-          {approvalErrorMessage(cancel.error ?? refresh.error, t)}
+          {approvalErrorMessage(refresh.error, t)}
         </p>
       )}
       {open && (
@@ -147,15 +153,16 @@ function ApprovalItem({ summary, onChanged }: { summary: ApprovalSummary; onChan
           />
         </>
       )}
-      <ConfirmDialog
+      <WithdrawConfirm
         open={confirmCancel}
-        title={t("approvals.ticket.cancelTitle")}
-        message={t("approvals.ticket.cancelMessage", { title: summary.title })}
-        confirmLabel={t("approvals.ticket.cancelConfirm")}
-        variant="danger"
+        title={summary.title}
         pending={cancel.isPending}
+        error={cancel.error}
         onConfirm={() => cancel.mutate()}
-        onCancel={() => setConfirmCancel(false)}
+        onCancel={() => {
+          cancel.reset();
+          setConfirmCancel(false);
+        }}
       />
     </li>
   );
@@ -181,7 +188,9 @@ export function TicketApprovalsPanel({
 
   // Same key as the zoom page's ticket query, so this shares its cache entry.
   const ticketQ = useQuery({ queryKey: ["tickets", ticketId], queryFn: () => api.getTicket(ticketId) });
-  const canRequest = ticketQ.data ? ticketPerms(ticketQ.data).rw : false;
+  // A filtered panel is embedded by a feature that owns requesting (e.g. the change page's CAB approval): the
+  // request dialog here creates a plain ticket approval the filter would hide, so it offers no request button.
+  const canRequest = ticketQ.data && !filter ? ticketPerms(ticketQ.data).rw : false;
   const q = useQuery({
     queryKey: approvalsKeys.ticket(ticketId),
     queryFn: ({ signal }) => approvalsApi.ticketApprovals(ticketId, {}, signal),

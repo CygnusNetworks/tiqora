@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Switch } from "@/components/ui/Switch";
 import { SelectField } from "@/components/ui/SelectField";
 import { ApprovalStatusBadge } from "@/components/approvals/ApprovalStatusBadge";
 import { ApprovalSteps } from "@/components/approvals/ApprovalSteps";
+import { useDebounced } from "@/components/fields/useDebounced";
 import { inputCls } from "@/components/approvals/pickers";
+import { WithdrawConfirm } from "@/components/approvals/WithdrawConfirm";
 import { approvalErrorMessage, approvalsApi, approvalsKeys } from "@/lib/approvalsApi";
 import { approvalsAdminApi, approvalsAdminKeys, type ApprovalAdminItem } from "@/lib/approvalsAdminApi";
 import { formatDateTime } from "@/lib/format";
@@ -45,26 +46,15 @@ function ItemDetail({ item, onCancelled }: { item: ApprovalAdminItem; onCancelle
       {item.can_cancel && (
         <div className="flex justify-end">
           <Button variant="danger" size="sm" onClick={() => setConfirm(true)} data-testid="admin-approval-cancel">
-            {t("approvals.agent.cancel")}
+            {t("approvals.withdraw.action")}
           </Button>
         </div>
       )}
-      <ConfirmDialog
+      <WithdrawConfirm
         open={confirm}
-        title={t("approvals.admin.overview.cancelTitle")}
-        message={
-          <>
-            <p>{t("approvals.admin.overview.cancelMessage", { title: item.title })}</p>
-            {cancel.isError && (
-              <p className="mt-2 text-danger" role="alert" data-testid="admin-approval-cancel-error">
-                {approvalErrorMessage(cancel.error, t)}
-              </p>
-            )}
-          </>
-        }
-        variant="danger"
-        confirmLabel={t("approvals.agent.cancel")}
+        title={item.title}
         pending={cancel.isPending}
+        error={cancel.error}
         onConfirm={() => cancel.mutate()}
         onCancel={() => {
           cancel.reset();
@@ -87,10 +77,11 @@ export function ApprovalsOverviewPage() {
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
 
-  const ticketId = /^\d+$/.test(ticket.trim()) ? Number(ticket.trim()) : undefined;
+  // The exact ticket number; typing refetches only after a pause.
+  const ticketNumber = useDebounced(ticket.trim(), 300);
   const query = {
     status: status === "all" ? undefined : status,
-    ticket_id: ticketId,
+    ticket_number: ticketNumber || undefined,
     subject_type: subjectType === "all" ? undefined : subjectType,
     overdue: overdue || undefined,
     limit: PAGE_SIZE,
@@ -135,10 +126,9 @@ export function ApprovalsOverviewPage() {
           </div>
         </div>
         <label className="block text-xs font-medium text-muted">
-          {t("approvals.admin.overview.filter.ticketId")}
+          {t("approvals.admin.overview.filter.ticketNumber")}
           <input
             className={`${inputCls} mt-1`}
-            inputMode="numeric"
             value={ticket}
             onChange={(e) => changed(() => setTicket(e.target.value))}
             data-testid="admin-approvals-filter-ticket"

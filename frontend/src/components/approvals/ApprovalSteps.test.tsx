@@ -22,9 +22,49 @@ describe("ApprovalSteps", () => {
     renderApproval(<ApprovalSteps detail={demoDetail(501)} />);
     const first = screen.getAllByTestId("approval-approver")[0];
     expect(within(first).getByText("Erika Muster")).toBeInTheDocument();
-    expect(within(first).getByTestId("approval-approver-source")).toHaveTextContent("über CAB Netzwerk");
+    expect(within(first).getByTestId("approval-approver-source")).toHaveTextContent("über Freigabegruppe CAB Netzwerk");
     expect(within(first).getByTestId("approval-status-badge")).toHaveTextContent("Freigegeben");
     expect(within(first).getByTestId("approval-vote-comment")).toHaveTextContent("Rückfallplan ist ausreichend.");
+  });
+
+  it("words the source of a group, a role and an unnamed kind", () => {
+    const detail = demoDetail(501);
+    const [a, b, c] = detail.steps[0].approvers;
+    a.source_kind = "group";
+    a.source_label = "Betriebsleitung";
+    b.source_kind = "role";
+    b.source_label = "Netzwerk";
+    c.source_kind = "user";
+    c.source_label = null;
+    renderApproval(<ApprovalSteps detail={detail} />);
+    const texts = screen.getAllByTestId("approval-approver-source").map((e) => e.textContent);
+    expect(texts).toEqual(["über Gruppe Betriebsleitung", "über Rolle Netzwerk", "Direkt benannt"]);
+  });
+
+  it("shows a stage that has not started without a count and without approvers", () => {
+    renderApproval(<ApprovalSteps detail={demoDetail(501)} />);
+    const [, waiting] = screen.getAllByTestId("approval-step");
+    expect(within(waiting).getByTestId("approval-step-rule")).toHaveTextContent("Eine Freigabe genügt");
+    expect(within(waiting).getByTestId("approval-step-starts-after")).toHaveTextContent("Startet nach Stufe 1");
+    expect(within(waiting).getByTestId("approval-step-approvers-later")).toHaveTextContent(
+      "Die Freigeber werden bestimmt, sobald diese Stufe beginnt.",
+    );
+    expect(within(waiting).queryByTestId("approval-approver")).toBeNull();
+    expect(within(waiting).queryByTestId("approval-step-progress")).toBeNull();
+    expect(waiting.textContent).not.toMatch(/\b0 Freigaben|\(0/);
+  });
+
+  it.each([
+    ["majority", null, "Mehrheit nötig"],
+    ["quorum", 2, "2 Freigaben nötig"],
+    ["all", null, "Alle Freigeber müssen zustimmen"],
+  ])("a waiting %s step names no voter count it cannot know", (rule, quorum, text) => {
+    const detail = demoDetail(501);
+    Object.assign(detail.steps[1], { rule, quorum, required: null });
+    renderApproval(<ApprovalSteps detail={detail} />);
+    const line = within(screen.getAllByTestId("approval-step")[1]).getByTestId("approval-step-rule");
+    expect(line).toHaveTextContent(text);
+    expect(line.textContent).not.toContain("(");
   });
 
   it("stacks on phones and goes side by side from md up", () => {

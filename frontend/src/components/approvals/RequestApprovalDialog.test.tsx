@@ -10,9 +10,9 @@ const POST = "POST /api/v1/tickets/130/approvals";
 const TEMPLATES = "GET /api/v1/approvals/templates";
 const templates = () => resolveApprovalsData("/api/v1/approvals/templates", "GET");
 
-function open(onDone = vi.fn(), extra: Record<string, never> = {}) {
+function open(onDone = vi.fn()) {
   renderApproval(
-    <RequestApprovalDialog open onClose={vi.fn()} ticketId={130} ticketTitle="Switch-Firmware" onDone={onDone} {...extra} />,
+    <RequestApprovalDialog open onClose={vi.fn()} ticketId={130} ticketTitle="Switch-Firmware" onDone={onDone} />,
   );
   return onDone;
 }

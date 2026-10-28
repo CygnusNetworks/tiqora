@@ -1,80 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { Schemas } from "@tiqora/api-client";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/Switch";
+import { delegationCreateMessage, periodProblem, toIso } from "@/components/approvals/delegationForm";
+import { DelegationRow } from "@/components/approvals/DelegationRow";
 import { AgentSelect, inputCls } from "@/components/approvals/pickers";
-import { approvalErrorCode, approvalErrorMessage } from "@/lib/approvalsApi";
 import { approvalsAdminApi, approvalsAdminKeys } from "@/lib/approvalsAdminApi";
-import { formatDateTime } from "@/lib/format";
 import { AdminApprovalsHeader } from "./AdminApprovalsHeader";
 
-type Delegation = Schemas["DelegationOut"];
-
 const PAGE_SIZE = 50;
-
-/** `<input type="datetime-local">` value to an ISO instant, or null when empty/invalid. */
-function toIso(local: string): string | null {
-  if (!local) return null;
-  const d = new Date(local);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function Row({ d, now, onChanged }: { d: Delegation; now: number; onChanged: () => void }) {
-  const { t, i18n } = useTranslation();
-  const [ended, setEnded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const revoke = useMutation({
-    mutationFn: () => approvalsAdminApi.deleteDelegation(d.id),
-    onSuccess: () => onChanged(),
-    onError: (err) => {
-      // An ended one answers 403 `delegation_not_active`: say so and reload instead of showing a failure.
-      if (approvalErrorCode(err) === "delegation_not_active") {
-        setEnded(true);
-        setError(null);
-        onChanged();
-      } else {
-        setError(approvalErrorMessage(err, t));
-      }
-    },
-  });
-  const state =
-    d.valid_until && new Date(d.valid_until).getTime() <= now
-      ? "ended"
-      : new Date(d.valid_from).getTime() <= now
-        ? "running"
-        : "planned";
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="admin-delegation-row" data-delegation-id={d.id}>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-ink" data-testid="admin-delegation-people">
-          {t("approvals.admin.delegations.person", { from: d.user_label, to: d.substitute_label })}
-        </p>
-        <p className="text-xs text-muted" data-testid="admin-delegation-period">
-          {formatDateTime(d.valid_from, i18n.language)}
-          {" – "}
-          {d.valid_until ? formatDateTime(d.valid_until, i18n.language) : t("approvals.agent.delegation.noEnd")}
-          {" · "}
-          {t(`approvals.admin.delegations.state.${state}`)}
-        </p>
-        {ended && (
-          <p className="text-xs text-muted" role="status" data-testid="admin-delegation-ended">
-            {t("approvals.agent.delegation.alreadyEnded")}
-          </p>
-        )}
-        {error && (
-          <p className="text-xs text-danger" role="alert" data-testid="admin-delegation-row-error">
-            {error}
-          </p>
-        )}
-      </div>
-      <Button size="sm" disabled={revoke.isPending || ended || state === "ended"} onClick={() => revoke.mutate()} data-testid="admin-delegation-revoke">
-        {t("approvals.agent.delegation.revoke")}
-      </Button>
-    </li>
-  );
-}
 
 /** Every substitute arrangement of the system; an admin can name one for someone else and end any. */
 export function ApprovalDelegationsPage() {
@@ -104,11 +39,7 @@ export function ApprovalDelegationsPage() {
 
   const fromIso = toIso(from);
   const untilIso = toIso(until);
-  let problem: "untilPast" | "untilBeforeFrom" | null = null;
-  if (untilIso) {
-    if (new Date(untilIso).getTime() <= Date.now()) problem = "untilPast";
-    else if (fromIso && new Date(untilIso) <= new Date(fromIso)) problem = "untilBeforeFrom";
-  }
+  const problem = periodProblem(fromIso, untilIso);
 
   const create = useMutation({
     mutationFn: () =>
@@ -132,11 +63,7 @@ export function ApprovalDelegationsPage() {
     if (user === null || substitute === null || problem || create.isPending) return;
     create.mutate();
   };
-  const createMessage = !create.error
-    ? null
-    : approvalErrorCode(create.error) === "invalid_definition" && untilIso
-      ? t("approvals.agent.delegation.untilPast")
-      : approvalErrorMessage(create.error, t);
+  const createMessage = delegationCreateMessage(create.error, untilIso, t);
 
   return (
     <div className="space-y-4 p-4" data-testid="admin-approval-delegations-page">
@@ -194,9 +121,27 @@ export function ApprovalDelegationsPage() {
         </p>
       ) : (
         <ul className="divide-y divide-hairline rounded-md border border-hairline bg-surface" data-testid="admin-delegations-list">
-          {rows.map((d) => (
-            <Row key={d.id} d={d} now={now} onChanged={refresh} />
-          ))}
+          {rows.map((d) => {
+            const state =
+              d.valid_until && new Date(d.valid_until).getTime() <= now
+                ? "ended"
+                : new Date(d.valid_from).getTime() <= now
+                  ? "running"
+                  : "planned";
+            return (
+              <DelegationRow
+                key={d.id}
+                d={d}
+                title={t("approvals.admin.delegations.person", { from: d.user_label, to: d.substitute_label })}
+                titleTestId="admin-delegation-people"
+                stateLabel={t(`approvals.admin.delegations.state.${state}`)}
+                prefix="admin-delegation"
+                revokeFn={(id) => approvalsAdminApi.deleteDelegation(id)}
+                disabled={state === "ended"}
+                onChanged={refresh}
+              />
+            );
+          })}
         </ul>
       )}
 

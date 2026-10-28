@@ -101,11 +101,11 @@ const cabChange: ApprovalDetail = {
       approvers: [
         approver(9001, "Erika Muster", "approved", {
           source_kind: "list",
-          source_label: "über CAB Netzwerk",
+          source_label: "CAB Netzwerk",
           vote: approvedVote("Erika Muster", "Rückfallplan ist ausreichend.", T1),
         }),
-        approver(9002, "Alex Turner", "pending", { source_kind: "list", source_label: "über CAB Netzwerk" }),
-        approver(9003, "Max Beispiel", "pending", { source_kind: "list", source_label: "über CAB Netzwerk" }),
+        approver(9002, "Alex Turner", "pending", { source_kind: "list", source_label: "CAB Netzwerk" }),
+        approver(9003, "Max Beispiel", "pending", { source_kind: "list", source_label: "CAB Netzwerk" }),
       ],
     },
     {
@@ -115,13 +115,14 @@ const cabChange: ApprovalDetail = {
       name: "Betriebsleitung",
       rule: "any",
       quorum: null,
-      required: 1,
+      // Not started: the engine resolves approvers (and so the count) when the stage begins.
+      required: null,
       approved_count: 0,
       status: "waiting",
       reason: null,
       due_at: null,
       overdue: false,
-      approvers: [approver(9004, "Erika Muster", "waiting", { source_kind: "group", source_label: "Gruppe Betriebsleitung" })],
+      approvers: [],
     },
   ],
   events: [
@@ -215,7 +216,7 @@ const overdueEscalated: ApprovalDetail = {
       overdue: true,
       approvers: [
         approver(9006, "Erika Muster", "pending"),
-        approver(9007, "Alex Turner", "pending", { decisive: true, source_kind: "escalation", source_label: "Eskalation" }),
+        approver(9007, "Alex Turner", "pending", { decisive: true, source_kind: "escalation" }),
       ],
     },
   ],
@@ -458,10 +459,6 @@ const idOf = (m: RegExpMatchArray | null) => (m ? Number(m[1]) : null);
 /** Agent routes `/api/v1/approvals/*`, ticket panel, public link, portal and admin; `undefined` for any other path. */
 export function resolveApprovalsData(path: string, method: string, search = ""): unknown | undefined {
   const get = method === "GET";
-  // Public link (no auth)
-  if (path.endsWith("/api/v1/approval-links/inspect") && method === "POST") return LINK_INSPECT;
-  if (path.endsWith("/api/v1/approval-links/decide") && method === "POST") return { status: "approved", decision: "approved" };
-
   // Ticket panel
   const onTicket = path.match(/\/api\/v1\/tickets\/(\d+)\/approvals$/);
   if (onTicket) {

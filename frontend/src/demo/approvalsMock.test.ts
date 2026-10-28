@@ -45,8 +45,6 @@ describe("demo approvals", () => {
       ["/api/v1/approvals/501/refresh-approvers", "POST"],
       ["/api/v1/approvals/delegations", "POST"],
       [`/api/v1/tickets/${DEMO_APPROVAL_CHANGE_TICKET_ID}/approvals`, "POST"],
-      ["/api/v1/approval-links/inspect", "POST"],
-      ["/api/v1/approval-links/decide", "POST"],
       ["/api/portal/approvals/601/decision", "POST"],
       ["/api/v1/admin/approvals/templates/validate", "POST"],
     ] as const) {

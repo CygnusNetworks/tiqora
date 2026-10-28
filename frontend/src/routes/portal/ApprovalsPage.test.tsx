@@ -53,7 +53,7 @@ describe("PortalApprovalsPage", () => {
     wrap();
     const card = await screen.findByTestId("portal-approval-601");
     expect(card).toHaveTextContent("Zugang freigeben");
-    expect(card).toHaveTextContent("#2026101 · Kundenfreigabe");
+    expect(card).toHaveTextContent("2026101 · Kundenfreigabe");
     expect(card.closest("a")).toHaveAttribute("href", "/portal/approvals/601");
     expect(screen.getByTestId("approval-status-badge")).toHaveTextContent("Offen");
     expect(list).toHaveBeenCalledWith({ state: "pending", limit: 25, offset: 0 }, expect.anything());

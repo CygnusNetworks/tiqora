@@ -15,7 +15,8 @@ export type AdminDelegationIn = Schemas["AdminDelegationIn"];
 
 export type ApprovalAdminQuery = {
   status?: string;
-  ticket_id?: number;
+  /** Exact ticket number (the one the rows show). */
+  ticket_number?: string;
   subject_type?: string;
   overdue?: boolean;
   limit?: number;
