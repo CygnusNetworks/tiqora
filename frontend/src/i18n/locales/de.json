@@ -9407,6 +9407,37 @@
         "quorum": "Bitte geben Sie an, wie viele Freigaben nötig sind.",
         "escalation": "Bitte nennen Sie, an wen der Schritt eskaliert wird."
       }
+    },
+    "ticket": {
+      "title": "Freigaben",
+      "request": "Freigabe anfordern",
+      "older": "Ältere Freigaben ({{count}})",
+      "details": "Details",
+      "hideDetails": "Details ausblenden",
+      "stage": "Stufe {{stage}}",
+      "noStage": "Abgeschlossen",
+      "requestedBy": "Angefordert von {{name}}",
+      "refresh": "Freigeber neu ermitteln",
+      "cancel": "Zurückziehen",
+      "cancelTitle": "Anforderung zurückziehen?",
+      "cancelMessage": "Die Freigabe „{{title}}“ wird zurückgezogen. Niemand kann sie mehr entscheiden.",
+      "cancelConfirm": "Anforderung zurückziehen",
+      "loadFailed": "Die Freigaben konnten nicht geladen werden."
+    },
+    "request": {
+      "title": "Freigabe anfordern",
+      "mode": "Art",
+      "modeTemplate": "Vorlage",
+      "modeCustom": "Eigene Freigeber",
+      "template": "Vorlage",
+      "templatePlaceholder": "Vorlage wählen",
+      "templateMissing": "Bitte wählen Sie eine Vorlage.",
+      "noTemplates": "Es sind keine Vorlagen verfügbar. Nennen Sie die Freigeber selbst.",
+      "name": "Titel",
+      "nameMissing": "Bitte geben Sie einen Titel ein.",
+      "description": "Beschreibung (optional)",
+      "definitionIncomplete": "Bitte vervollständigen Sie zuerst jeden Schritt.",
+      "submit": "Anfordern"
     }
   }
 }

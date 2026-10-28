@@ -9407,6 +9407,37 @@
         "quorum": "Please enter how many approvals are needed.",
         "escalation": "Please name who the step is escalated to."
       }
+    },
+    "ticket": {
+      "title": "Approvals",
+      "request": "Request approval",
+      "older": "Older approvals ({{count}})",
+      "details": "Details",
+      "hideDetails": "Hide details",
+      "stage": "Stage {{stage}}",
+      "noStage": "Finished",
+      "requestedBy": "Requested by {{name}}",
+      "refresh": "Re-determine approvers",
+      "cancel": "Withdraw",
+      "cancelTitle": "Withdraw request?",
+      "cancelMessage": "The approval \"{{title}}\" is withdrawn. Nobody can decide on it any more.",
+      "cancelConfirm": "Withdraw request",
+      "loadFailed": "The approvals could not be loaded."
+    },
+    "request": {
+      "title": "Request approval",
+      "mode": "Kind",
+      "modeTemplate": "Template",
+      "modeCustom": "Own approvers",
+      "template": "Template",
+      "templatePlaceholder": "Choose a template",
+      "templateMissing": "Please choose a template.",
+      "noTemplates": "No templates are available. Name the approvers yourself.",
+      "name": "Title",
+      "nameMissing": "Please enter a title.",
+      "description": "Description (optional)",
+      "definitionIncomplete": "Please complete every step first.",
+      "submit": "Request"
     }
   }
 }
