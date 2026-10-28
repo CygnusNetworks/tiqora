@@ -47,7 +47,7 @@ import os
 import re
 from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -343,9 +343,6 @@ class ModuleState:
     snapshot: dict[str, tuple[list[str], list[tuple[Any, ...]]]] = field(default_factory=dict)
     #: Znuny tickets created by the module (removed with ``TicketDelete``)
     tickets: list[int] = field(default_factory=list)
-    #: setup rows that existed before the module ran (never deleted)
-    had_types: set[str] = field(default_factory=set)
-    had_fields: set[str] = field(default_factory=set)
 
     def connect(self) -> pymysql.Connection:
         return pymysql.connect(**self.dsn)
@@ -408,24 +405,20 @@ def _delete_tickets(ids: list[int]) -> int:
 
 
 def _remove_setup_rows(state: ModuleState) -> None:
-    """Delete the change setup rows the module created (never rows that existed before)."""
-    fields = [n for n in CHANGE_FIELDS if n not in state.had_fields]
-    if fields:
-        znuny_json(
-            "my $DFObject = $Kernel::OM->Get('Kernel::System::DynamicField');"
-            "for my $Name ("
-            + ",".join(f"'{n}'" for n in fields)
-            + r""") {
+    """Delete the change setup rows (the module refuses to start when they already exist)."""
+    znuny_json(
+        "my $DFObject = $Kernel::OM->Get('Kernel::System::DynamicField');"
+        "for my $Name ("
+        + ",".join(f"'{n}'" for n in CHANGE_FIELDS)
+        + r""") {
     my $DF = $DFObject->DynamicFieldGet( Name => $Name );
     next if !$DF || !$DF->{ID};
     $DFObject->DynamicFieldDelete( ID => $DF->{ID}, UserID => 1 ) or die "DynamicFieldDelete $Name failed";
 }
 Emit({});"""
-        )
-    types = [t for t in CHANGE_TYPES if t not in state.had_types]
-    if types:
-        with state.connect() as conn, conn.cursor() as cur:
-            cur.execute("DELETE FROM ticket_type WHERE name IN %s", (tuple(types),))
+    )
+    with state.connect() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM ticket_type WHERE name IN %s", (CHANGE_TYPES,))
 
 
 @pytest.fixture(scope="module")
@@ -451,24 +444,24 @@ def module_state(
             state.snapshot[table] = _rows(conn, table)
         with conn.cursor() as cur:
             cur.execute("SELECT name FROM ticket_type WHERE name IN %s", (CHANGE_TYPES,))
-            state.had_types = {str(r[0]) for r in cur.fetchall()}
+            leftovers = {str(r[0]) for r in cur.fetchall()}
             cur.execute("SELECT name FROM dynamic_field WHERE name IN %s", (CHANGE_FIELDS,))
-            state.had_fields = {str(r[0]) for r in cur.fetchall()}
+            leftovers |= {str(r[0]) for r in cur.fetchall()}
     # The ITSM packages create none of these rows: present means an aborted run of this module,
     # which would also turn test_itsm_mode_a::test_setup_on_itsm_peer_is_noop red.
-    assert not state.had_types and not state.had_fields, (
-        f"change setup rows left by an aborted run: {sorted(state.had_types | state.had_fields)};"
+    assert not leftovers, (
+        f"change setup rows left by an aborted run: {sorted(leftovers)};"
         " remove them (DynamicFieldDelete, DELETE FROM ticket_type) before running the module"
     )
-    znuny_copy_in(TIQORASYNC_MODULE, TIQORASYNC_PEER_PATH)
-    # TiqoraSync starts at the current end of the signal table (older signals are not ours)
-    with state.connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT COALESCE(MAX(id), 0) FROM tiqora_cache_invalidation")
-        fetched = cur.fetchone()
-        start = int(fetched[0]) if fetched else 0
-    state.set_setting("tiqorasync.watermark", str(start))
-    clear_detect_cache()
     try:
+        znuny_copy_in(TIQORASYNC_MODULE, TIQORASYNC_PEER_PATH)
+        # TiqoraSync starts at the current end of the signal table (older signals are not ours)
+        with state.connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT COALESCE(MAX(id), 0) FROM tiqora_cache_invalidation")
+            fetched = cur.fetchone()
+            start = int(fetched[0]) if fetched else 0
+        state.set_setting("tiqorasync.watermark", str(start))
+        clear_detect_cache()
         yield state
     finally:
         # each step runs even when an earlier one fails
@@ -692,6 +685,24 @@ def _actual_change(c: LegacyChange) -> dict[str, Any]:
     }
 
 
+def _listed(value: Any) -> Any:
+    """Tuples as lists (so :func:`_differences` descends into them instead of printing them)."""
+    if isinstance(value, dict):
+        return {k: _listed(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_listed(v) for v in value]
+    return value
+
+
+def _redacted(change: LegacyChange) -> dict[str, Any]:
+    """Every field of a change, ``*NotificationSent`` history content hashed (S5)."""
+    data: dict[str, Any] = _listed(asdict(change))
+    for entry in data["history"]:
+        for key in ("old", "new", "old_display", "new_display"):
+            entry[key] = _hidden(entry["history_type"], entry[key])
+    return data
+
+
 def _differences(got: Any, want: Any, path: str = "") -> list[str]:
     """Where two normalised structures differ (``path: got != want``), for readable failures."""
     if isinstance(got, dict) and isinstance(want, dict):
@@ -738,11 +749,14 @@ Emit({ map { $_->{Name}->{Content} => $_->{Version}->{Content} }
         assert await reader.iter_change_ids(session, after_id=0, limit=10_000) == ids
         source = ZnunyLiveSource()
         batch = {c.znuny_change_id: c for c in await reader.read_changes(session, ids[:100])}
+        assert sorted(batch) == ids[:100]  # one read of up to 100 changes finds every one
         for change_id in ids:
             want = znuny["changes"][str(change_id)]
             got = await source.get(session, change_id)
             assert got is not None, change_id
-            assert batch.get(change_id, got) == got  # one batch read == one read per change
+            if change_id in batch:  # one batch read == one read per change, every field
+                diffs = _differences(_redacted(batch[change_id]), _redacted(got))
+                assert not diffs, (change_id, diffs[:10])
             diffs = _differences(_actual_change(got), _expected_change(want))
             assert not diffs, (change_id, diffs[:10])
             assert _tiqora_links(got.links, pointed) == _znuny_links(want, pointed), change_id
@@ -765,7 +779,10 @@ Emit({ map { $_->{Name}->{Content} => $_->{Version}->{Content} }
             session, text=None, ticket_id=None, ci_znuny_id=None, limit=100, offset=0
         )
         assert total == len(ids)
-        assert sorted(s.znuny_change_id for s in page) == ids[:100]
+        newest_first = sorted(
+            ((_time(znuny["changes"][str(i)]["changed"]) or "", i) for i in ids), reverse=True
+        )
+        assert [s.znuny_change_id for s in page] == [i for _, i in newest_first][:100]
         for summary in page:
             want = znuny["changes"][str(summary.znuny_change_id)]
             assert (
@@ -968,7 +985,8 @@ async def test_archive_equals_reader(
                     li = replace(li, key=f"tiqora:{targets[li.key]}")
                     ci_keys += 1
                 links.append(li)
-            assert got == replace(want, links=tuple(links)), change_id
+            diffs = _differences(_redacted(got), _redacted(replace(want, links=tuple(links))))
+            assert not diffs, (change_id, diffs[:10])
         assert ci_keys >= 2  # the seed links two work orders to CIs
         page, total = await archive.search(
             session, text="chg94", ticket_id=None, ci_ref=None, limit=100, offset=0
