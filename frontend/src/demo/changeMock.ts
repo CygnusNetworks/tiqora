@@ -99,7 +99,7 @@ const archiveJob = (dryRun: boolean): Job => ({
 });
 
 // ---- services (ids and names as in `reference/services` of mockData.ts: the list and the create dialog read those) ----------------------------------------------------
-const SERVICES: Record<number, string> = { 1: "E-Mail", 2: "VPN", 3: "Arbeitsplatz" };
+export const SERVICES: Record<number, string> = { 1: "E-Mail", 2: "VPN", 3: "Arbeitsplatz" };
 
 // ---- changes ---------------------------------------------------------------------------------
 type ChangeRow = {
@@ -345,7 +345,7 @@ const FREEZE_WARN_OCCURRENCE: FreezeOccurrence = {
   service_ids: [],
 };
 
-const FREEZES = [FREEZE_OCCURRENCE, FREEZE_WARN_OCCURRENCE];
+export const FREEZES = [FREEZE_OCCURRENCE, FREEZE_WARN_OCCURRENCE];
 
 function conflictsOf(id: number): ChangeConflict[] {
   if (id === 132) {

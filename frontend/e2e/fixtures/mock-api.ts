@@ -17,6 +17,7 @@ import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
 import { resolveChangeReply } from "../../src/demo/changeMock";
 import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
+import { SERVICES as DEMO_CHANGE_SERVICES } from "../../src/demo/changeMock";
 import { changeStore } from "./change-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
@@ -694,7 +695,7 @@ export async function mockApi(page: Page) {
 
     // Approvals (inbox, detail, ticket panel, delegations, public link): stateful per test, see approvals-store.ts.
     if (/\/api\/v1\/(approvals|approval-links)(\/|$)|\/api\/v1\/reference\/(roles|agents)$|\/api\/v1\/tickets\/\d+\/approvals$/.test(path)) {
-      const out = approvalsStore().handle(path, method, url.search, bodyOf(req));
+      const out = changeStore().approvalsOf(path, method) ?? approvalsStore().handle(path, method, url.search, bodyOf(req));
       if (out) {
         await fulfillAnswer(route, out);
         return;
@@ -1060,11 +1061,11 @@ export async function mockApi(page: Page) {
     }
     // Service pickers (change dialogs, freeze windows, calendar filter): ids and names of the ITSM demo.
     if (path.endsWith("/api/v1/reference/services") && method === "GET") {
-      await json(route, 200, [
-        { id: 1, name: "E-Mail" },
-        { id: 2, name: "VPN" },
-        { id: 3, name: "Arbeitsplatz" },
-      ]);
+      await json(
+        route,
+        200,
+        Object.entries(DEMO_CHANGE_SERVICES).map(([id, name]) => ({ id: Number(id), name })),
+      );
       return;
     }
     if (path.endsWith("/api/v1/reference/share-groups") && method === "GET") {

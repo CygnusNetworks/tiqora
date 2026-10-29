@@ -1,6 +1,9 @@
 import { test } from "@playwright/test";
+import { resolveApprovalsData, summaryOf } from "../../src/demo/approvalsMock";
 import {
   DEMO_CHANGE_JOB_ID,
+  FREEZES as DEMO_FREEZES,
+  SERVICES,
   demoAllowedTargets,
   resetDemoChanges,
   resolveChangeData,
@@ -18,7 +21,9 @@ import type {
   ChangeTask,
   ChangeType,
 } from "../../src/lib/changeApi";
-import { fulfillAnswer, type StoreAnswer } from "./approvals-store";
+import type { ApprovalDetail } from "../../src/lib/approvalsApi";
+import type { StoreAnswer } from "./approvals-store";
+import transitions from "./change-transitions.json" with { type: "json" };
 
 /**
  * Stateful change management for the e2e mocks. The demo resolver (`src/demo/changeMock.ts`) moves
@@ -56,14 +61,20 @@ type Freeze = {
   services: number[];
 };
 
-/** Block freezes the flows run into: the demo's, plus a year-end freeze that lets no emergency change through. */
+/** The demo's freeze windows, plus a year-end freeze that lets no emergency change through (store only). */
 const FREEZES: Freeze[] = [
-  { id: 1, name: "Quartalsabschluss", start: "2026-10-13T00:00:00Z", end: "2026-10-16T00:00:00Z", enforcement: "block", allow_emergency: true, services: [1] },
-  { id: 2, name: "Wochenend-Bereitschaft", start: "2026-10-24T00:00:00Z", end: "2026-10-26T00:00:00Z", enforcement: "warn", allow_emergency: true, services: [] },
+  ...DEMO_FREEZES.map((f) => ({
+    id: f.freeze_id,
+    name: f.name,
+    start: f.start,
+    end: f.end,
+    enforcement: f.enforcement as Freeze["enforcement"],
+    allow_emergency: f.allow_emergency,
+    services: f.scope === "all" ? [] : f.service_ids,
+  })),
   { id: 3, name: "Jahresabschluss", start: "2026-12-28T00:00:00Z", end: "2027-01-02T00:00:00Z", enforcement: "block", allow_emergency: false, services: [] },
 ];
 
-const SERVICES: Record<number, string> = { 1: "E-Mail", 2: "VPN", 3: "Arbeitsplatz" };
 const THRESHOLDS = { medium_from: 10, high_from: 20, very_high_from: 35 };
 
 type Rec = {
@@ -100,31 +111,10 @@ type Rec = {
 
 type Failure = { code: string; overridable: boolean };
 
-const PAIRS: Record<string, ChangeType[]> = {
-  "draft>submitted": ["normal"],
-  "draft>scheduled": ["standard"],
-  "draft>approval": ["emergency"],
-  "submitted>assessment": ["normal"],
-  "submitted>draft": ["normal"],
-  "assessment>approval": ["normal"],
-  "approval>scheduled": ["normal", "emergency"],
-  "approval>rejected": ["normal", "emergency"],
-  "approval>assessment": ["normal"],
-  "approval>draft": ["emergency"],
-  "rejected>draft": ["normal", "emergency"],
-  "scheduled>implementing": ["standard", "normal", "emergency"],
-  "scheduled>draft": ["standard", "normal", "emergency"],
-  "implementing>review": ["normal", "emergency"],
-  "implementing>closed": ["standard"],
-  "review>closed": ["standard", "normal", "emergency"],
-  "draft>cancelled": ["standard", "normal", "emergency"],
-  "submitted>cancelled": ["standard", "normal", "emergency"],
-  "assessment>cancelled": ["standard", "normal", "emergency"],
-  "approval>cancelled": ["standard", "normal", "emergency"],
-  "scheduled>cancelled": ["standard", "normal", "emergency"],
-};
+/** `from>to` to the change types that may take it: the snapshot of `phases.py` (pinned by a backend test). */
+const PAIRS: Record<string, ChangeType[]> = transitions.transitions as Record<string, ChangeType[]>;
 /** Taken only by the approval outcome. */
-const SYSTEM_ONLY = new Set(["approval>scheduled", "approval>rejected", "approval>assessment", "approval>draft"]);
+const SYSTEM_ONLY = new Set<string>(transitions.system_only);
 const FINAL = new Set<ChangePhase>(["closed", "cancelled"]);
 
 /** `ticket_state` and its type per phase (the states the backend writes). */
@@ -166,18 +156,6 @@ class ChangeStore {
   /** The task tickets were closed in the zoom. */
   finishTasks(id: number) {
     for (const t of this.must(id).tasks) this.finish(t);
-  }
-
-  /** A task ticket of the change by title. */
-  taskId(id: number, title: string): number {
-    const t = this.must(id).tasks.find((x) => x.title === title);
-    if (!t) throw new Error(`no task "${title}" on change ${id}`);
-    return t.ticket_id;
-  }
-
-  /** Ids of the changes this test created, oldest first. */
-  ids(): number[] {
-    return [...this.changes.keys()];
   }
 
   // ---- helpers -------------------------------------------------------------------------------
@@ -619,6 +597,31 @@ class ChangeStore {
     return ok(this.changeOut(r));
   }
 
+  /**
+   * `GET /tickets/{id}/approvals` for a change this store owns: the CAB request of its current round,
+   * so the approvals panel embedded on the change page has something to list. Other tickets stay with
+   * the approvals store.
+   */
+  approvalsOf(path: string, method: string): StoreAnswer | undefined {
+    const m = path.match(/\/api\/v1\/tickets\/(\d+)\/approvals$/);
+    const r = m ? this.changes.get(Number(m[1])) : undefined;
+    if (!r || method !== "GET") return undefined;
+    if (r.approvalId === null || r.approvalStatus === null) return ok([]);
+    const detail = structuredClone(resolveApprovalsData("/api/v1/approvals/501", "GET") as ApprovalDetail);
+    detail.id = r.approvalId;
+    detail.ticket_id = r.id;
+    detail.ticket_title = r.title;
+    detail.subject_ref = String(r.round);
+    detail.title = `Change freigeben: ${r.title}`;
+    detail.status = r.approvalStatus;
+    if (r.approvalStatus !== "pending") {
+      detail.my_rows = [];
+      detail.can_cancel = false;
+      detail.current_stage = null;
+    }
+    return ok([summaryOf(detail)]);
+  }
+
   // ---- routes --------------------------------------------------------------------------------
   /** Answers like the backend for the changes this store owns; `undefined` leaves the route to the demo resolver. */
   handle(path: string, method: string, search: string, body: unknown, mode: DemoItsmMode): StoreAnswer | undefined {
@@ -758,5 +761,4 @@ export function changeStore(): ChangeStore {
   return current.store;
 }
 
-export { fulfillAnswer };
 export type { ChangeStore };

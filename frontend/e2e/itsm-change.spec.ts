@@ -100,6 +100,10 @@ test.describe("normal change from request to closure", () => {
     const snapshot = page.getByTestId("change-approval-snapshot");
     await expect(snapshot).toHaveAttribute("data-status", "pending");
     await expect(snapshot).toContainText("Runde 1");
+    // the approvals panel embedded on the page lists the request of this round
+    const request = page.getByTestId("ticket-approvals-panel").getByTestId("ticket-approval");
+    await expect(request).toHaveCount(1);
+    await expect(request.getByTestId("ticket-approval-title")).toContainText("Mail-Server Wartung im November");
     // while the CAB decides, window and plans are frozen
     await page.getByTestId("change-plans-edit").click();
     await expect(page.getByTestId("change-plans-locked")).toBeVisible();
@@ -140,7 +144,7 @@ test.describe("normal change from request to closure", () => {
     // the history holds every step
     const events = page.getByTestId("change-event");
     await expect(events.first()).toContainText("Phase");
-    expect(await events.count()).toBeGreaterThanOrEqual(10);
+    await expect.poll(() => events.count()).toBeGreaterThanOrEqual(10);
     await expect(page.getByTestId("change-events")).toContainText("Freigabe angefordert");
     await expect(page.getByTestId("change-events")).toContainText("Ergebnis der Freigabe");
 
@@ -241,8 +245,12 @@ test.describe("emergency change in a block freeze window", () => {
     await page.getByTestId("change-transition-submit").click();
     await expect(failureCodes(page)).toHaveCount(1);
     await expect(failureCodes(page)).toHaveAttribute("data-code", "block_conflict");
-    await page.getByTestId("change-transition-submit").click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/transition")),
+      page.getByTestId("change-transition-submit").click(),
+    ]);
     await expect(failureCodes(page)).toHaveCount(1);
+    await expect(page.getByTestId("change-transition-override-reason")).toBeVisible();
 
     // third try: with the reason the CAB request goes out and the history names it
     await page.getByTestId("change-transition-override-reason").fill("Aktiver Angriff, Schutz geht dem Sperrzeitraum vor.");
@@ -343,8 +351,18 @@ test.describe("change calendar", () => {
     await expect(page.getByTestId("change-service-row-1")).toContainText("E-Mail");
     await expect(page.getByTestId("change-service-row-2")).toContainText("VPN");
 
-    // one cell per day of the range
-    await expect(page.locator('[data-testid^="change-service-cell-1-"]').first()).toBeVisible();
+    // E-Mail on the 14th: the emergency firewall rule (services 1-3) inside the blocking Quartalsabschluss freeze
+    const mail = page.getByTestId("change-service-cell-1-2026-10-14");
+    await expect(mail).toHaveAttribute("data-changes", "1");
+    await expect(mail.locator("xpath=..")).toHaveAttribute("data-freeze", "block");
+    // the same service the next day: frozen, nothing planned
+    const next = page.getByTestId("change-service-cell-1-2026-10-15");
+    await expect(next).toHaveAttribute("data-changes", "0");
+    await expect(next.locator("xpath=..")).toHaveAttribute("data-freeze", "block");
+    // a day of the VPN row carries the same change
+    await expect(page.getByTestId("change-service-cell-2-2026-10-14")).toHaveAttribute("data-changes", "1");
+    await mail.click();
+    await expect(page.getByTestId("change-service-detail")).toContainText("Notfall: Firewall-Regel");
   });
 });
 

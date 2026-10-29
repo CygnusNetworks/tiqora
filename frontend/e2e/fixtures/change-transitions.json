@@ -1,0 +1,100 @@
+{
+  "transitions": {
+    "approval>assessment": [
+      "normal"
+    ],
+    "approval>cancelled": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "approval>draft": [
+      "emergency"
+    ],
+    "approval>rejected": [
+      "emergency",
+      "normal"
+    ],
+    "approval>scheduled": [
+      "emergency",
+      "normal"
+    ],
+    "assessment>approval": [
+      "normal"
+    ],
+    "assessment>cancelled": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "assessment>scheduled": [
+      "normal"
+    ],
+    "draft>approval": [
+      "emergency"
+    ],
+    "draft>cancelled": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "draft>implementing": [
+      "emergency"
+    ],
+    "draft>scheduled": [
+      "standard"
+    ],
+    "draft>submitted": [
+      "normal"
+    ],
+    "implementing>closed": [
+      "standard"
+    ],
+    "implementing>review": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "rejected>draft": [
+      "emergency",
+      "normal"
+    ],
+    "review>closed": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "scheduled>cancelled": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "scheduled>draft": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "scheduled>implementing": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "submitted>assessment": [
+      "normal"
+    ],
+    "submitted>cancelled": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
+    "submitted>draft": [
+      "normal"
+    ]
+  },
+  "system_only": [
+    "approval>assessment",
+    "approval>draft",
+    "approval>rejected",
+    "approval>scheduled"
+  ]
+}
