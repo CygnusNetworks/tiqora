@@ -121,6 +121,13 @@ describe("LegacyChangeDetailPage", () => {
     expect(screen.getByTestId("legacy-detail-archive-hint")).toBeInTheDocument();
   });
 
+  it("does not link a Znuny address that is not http(s)", async () => {
+    legacy.mockResolvedValue(makeLegacy({ znuny_url: "javascript:alert(1)" }));
+    renderWithClient(<LegacyChangeDetailPage />);
+    await screen.findByTestId("legacy-detail-header");
+    expect(screen.queryByTestId("legacy-detail-znuny-link")).toBeNull();
+  });
+
   it("does not offer 'In Znuny bearbeiten' for a live change without a Znuny address", async () => {
     legacy.mockResolvedValue(makeLegacy({ znuny_url: null }));
     renderWithClient(<LegacyChangeDetailPage />);

@@ -10146,7 +10146,7 @@
         "statusLabel": "Status",
         "agenda": "Tagesordnung",
         "agendaEmpty": "Die Tagesordnung ist leer.",
-        "hiddenHint": "Punkte, für die Sie kein Leserecht haben, bleiben auf der Tagesordnung erhalten und werden nie entfernt.",
+        "hiddenHint": "Punkte, für die Sie kein Leserecht haben, bleiben auf der Tagesordnung erhalten und werden nie entfernt. Sie stehen am Ende; ihre Reihenfolge lässt sich nicht ändern.",
         "hiddenItem": "Change ohne Leserecht",
         "noApproval": "Noch keine Freigabe angefordert.",
         "note": "Notiz zum Punkt",
@@ -10161,7 +10161,11 @@
         "minutes": "Protokoll",
         "minutesHint": "Das Protokoll ist für alle Agenten sichtbar.",
         "minutesEmpty": "Es gibt noch kein Protokoll.",
-        "saveMinutes": "Protokoll und Status speichern"
+        "saveMinutes": "Protokoll und Status speichern",
+        "unsaved": "Freigabestand nach dem Speichern sichtbar",
+        "position": "Position {{pos}} von {{count}}: {{title}}",
+        "dragHandle": "Zum Verschieben ziehen: {{title}}",
+        "blockedLine": "Betroffen ist der Change {{tn}}."
       },
       "legacy": {
         "sourceLive": "Live aus Znuny",

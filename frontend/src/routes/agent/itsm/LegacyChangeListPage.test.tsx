@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { I18nextProvider } from "react-i18next";
+import { QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { changeError, renderWithClient } from "@/components/itsm/change/changeTestSupport";
 import type { LegacyChangePage, LegacyChangeSummary } from "@/lib/changeApi";
+import { parseLegacyListSearch } from "@/components/itsm/change/changeUi";
 import { LegacyChangeListPage } from "./LegacyChangeListPage";
 
 const { legacyList, navigate, search } = vi.hoisted(() => ({ legacyList: vi.fn(), navigate: vi.fn(), search: { ticket_id: undefined as number | undefined } }));
@@ -96,5 +99,40 @@ describe("LegacyChangeListPage", () => {
     legacyList.mockRejectedValue(changeError(404, { code: "change_unavailable" }));
     renderWithClient(<LegacyChangeListPage />);
     expect(await screen.findByTestId("legacy-list-error")).toHaveTextContent("nicht eingeschaltet");
+  });
+
+  it("goes back to the first page when the ticket filter changes", async () => {
+    legacyList.mockImplementation(async () => page("live", [summary(11)], 60));
+    search.ticket_id = 130;
+    const { rerender, qc } = renderWithClient(<LegacyChangeListPage />);
+    await screen.findByTestId("legacy-row-11");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("legacy-list-next"));
+    });
+    await waitFor(() => expect(legacyList).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 25, ticket_id: 130 }), expect.anything()));
+    search.ticket_id = undefined;
+    rerender(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <LegacyChangeListPage />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(legacyList).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0, ticket_id: undefined }), expect.anything()));
+  });
+});
+
+describe("parseLegacyListSearch", () => {
+  it.each([
+    [{ ticket_id: 12 }, { ticket_id: 12 }],
+    [{ ticket_id: "12" }, { ticket_id: 12 }],
+    [{ ticket_id: "abc" }, {}],
+    [{ ticket_id: 0 }, {}],
+    [{ ticket_id: -1 }, {}],
+    [{ ticket_id: 1.5 }, {}],
+    [{ ticket_id: "" }, {}],
+    [{}, {}],
+  ])("%j -> %j", (input, expected) => {
+    expect(parseLegacyListSearch(input)).toEqual(expected);
   });
 });

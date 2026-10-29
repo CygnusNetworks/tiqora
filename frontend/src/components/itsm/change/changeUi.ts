@@ -49,6 +49,12 @@ export const fromLocalInput = (local: string): string | null => (local ? `${loca
 /** The Znuny change list filtered by a ticket (Mode A: changes live in Znuny and are read only). */
 export const legacyChangesHref = (ticketId: number) => `/agent/itsm/legacy-changes?ticket_id=${ticketId}`;
 
+/** Search of `/agent/itsm/legacy-changes`: `ticket_id` only counts as a positive integer (number or numeric string). */
+export function parseLegacyListSearch(s: Record<string, unknown>): { ticket_id?: number } {
+  const n = typeof s.ticket_id === "number" ? s.ticket_id : typeof s.ticket_id === "string" && s.ticket_id !== "" ? Number(s.ticket_id) : NaN;
+  return Number.isInteger(n) && n > 0 ? { ticket_id: n } : {};
+}
+
 /** Outcomes after which a follow-up incident is offered ("Incident aus diesem Change erstellen", plan I13). */
 export const FAILED_OUTCOMES: ReadonlySet<string> = new Set(["failed", "backed_out"]);
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
-import { changeApi, changeErrorCode, changeKeys, type CabChangeItem, type CabMeeting } from "@/lib/changeApi";
+import { changeApi, changeErrorCode, changeErrorDetail, changeKeys, type CabChangeItem, type CabMeeting } from "@/lib/changeApi";
 import { changeDetailHref } from "@/lib/itsmRoutes";
 
 const STATUSES: CabMeeting["status"][] = ["planned", "held", "cancelled"];
@@ -81,9 +81,39 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
   const qc = useQueryClient();
   const [draft, setDraft] = useState<AgendaDraftItem[] | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  // After a move: which row and arrow keeps the focus, and what the live region announces.
+  const [moved, setMoved] = useState<{ id: number; btn: "up" | "down"; pos: number; title: string } | null>(null);
   const items = draft ?? visibleAgenda(meeting);
+  const save = useMutation({
+    mutationFn: () => changeApi.saveAgenda(meeting.id, { items: items.map((i) => ({ change_ticket_id: i.ticket_id, note: i.note.trim() || null })) }),
+    onSuccess: (saved) => {
+      qc.setQueryData(changeKeys.meeting(meeting.id), saved);
+      void qc.invalidateQueries({ queryKey: [...changeKeys.all(), "meetings"] });
+      setDraft(null);
+    },
+  });
   const hidden = meeting.agenda.filter((e) => e.hidden);
-  const edit = (next: AgendaDraftItem[]) => setDraft(next);
+  const edit = (next: AgendaDraftItem[]) => {
+    save.reset();
+    setDraft(next);
+  };
+  const move = (from: number, to: number, btn: "up" | "down") => {
+    edit(moveItem(items, from, to));
+    setMoved({ id: items[from].ticket_id, btn, pos: to + 1, title: items[from].title });
+  };
+  useEffect(() => {
+    if (!moved) return;
+    // A button that became disabled (end of the list) loses focus: use the other arrow, else the row.
+    const get = (b: string) => document.querySelector<HTMLButtonElement>(`[data-testid="cab-agenda-${b}-${moved.id}"]`);
+    const target = [get(moved.btn), get(moved.btn === "up" ? "down" : "up")].find((b) => b && !b.disabled);
+    target?.focus();
+  }, [moved, draft]);
+
+  // `change_not_open` / `change_not_found` name the blocking line.
+  const blockedRaw = save.isError ? changeErrorDetail(save.error)?.ticket_id : undefined;
+  const blockedId = typeof blockedRaw === "number" ? blockedRaw : null;
+  const blocked = items.find((i) => i.ticket_id === blockedId);
 
   const suggestionsQ = useQuery({
     queryKey: changeKeys.meetingSuggestions(meeting.id),
@@ -94,19 +124,11 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
   const onAgenda = new Set(items.map((i) => i.ticket_id));
   const suggestions = (suggestionsQ.data ?? []).filter((s) => !onAgenda.has(s.ticket_id));
 
-  const save = useMutation({
-    mutationFn: () => changeApi.saveAgenda(meeting.id, { items: items.map((i) => ({ change_ticket_id: i.ticket_id, note: i.note.trim() || null })) }),
-    onSuccess: (saved) => {
-      qc.setQueryData(changeKeys.meeting(meeting.id), saved);
-      void qc.invalidateQueries({ queryKey: [...changeKeys.all(), "meetings"] });
-      setDraft(null);
-    },
-  });
 
   const add = (s: CabChangeItem) =>
     edit([
       ...items,
-      { ticket_id: s.ticket_id, tn: s.tn, title: s.title, change_type: s.change_type, phase: s.phase, planned_start: s.planned_start, planned_end: s.planned_end, note: "", approval: null },
+      { ticket_id: s.ticket_id, tn: s.tn, title: s.title, change_type: s.change_type, phase: s.phase, planned_start: s.planned_start, planned_end: s.planned_end, note: "", approval: null, unsaved: true },
     ]);
 
   return (
@@ -117,6 +139,9 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
           {t("itsm.change.cab.hiddenHint")}
         </p>
       )}
+      <p className="sr-only" role="status" aria-live="polite" data-testid="cab-agenda-live">
+        {moved ? t("itsm.change.cab.position", { pos: moved.pos, count: items.length, title: moved.title }) : ""}
+      </p>
       {items.length === 0 && hidden.length === 0 ? (
         <p className="text-sm text-muted" data-testid="cab-agenda-empty">
           {t("itsm.change.cab.agendaEmpty")}
@@ -126,23 +151,44 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
           {items.map((item, index) => (
             <li
               key={item.ticket_id}
-              className="min-w-0 rounded-md border border-hairline bg-surface-subtle p-2"
+              className={`min-w-0 rounded-md border bg-surface-subtle p-2 ${blockedId === item.ticket_id ? "border-danger" : dragOver === index && dragFrom !== null && dragFrom !== index ? "border-accent" : "border-hairline"}`}
               data-testid={`cab-agenda-item-${item.ticket_id}`}
-              draggable={canEdit}
-              onDragStart={(e) => {
-                setDragFrom(index);
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", String(item.ticket_id));
+              data-blocked={blockedId === item.ticket_id || undefined}
+              onDragOver={(e) => {
+                if (!canEdit || dragFrom === null) return;
+                e.preventDefault();
+                setDragOver(index);
               }}
-              onDragOver={(e) => canEdit && dragFrom !== null && e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                if (dragFrom !== null) edit(moveItem(items, dragFrom, index));
+                if (dragFrom !== null && dragFrom !== index) move(dragFrom, index, dragFrom < index ? "down" : "up");
                 setDragFrom(null);
+                setDragOver(null);
               }}
-              onDragEnd={() => setDragFrom(null)}
             >
               <div className="flex min-w-0 items-start gap-2">
+                {canEdit && (
+                  <button
+                    type="button"
+                    draggable
+                    className="mt-0.5 shrink-0 cursor-grab text-muted hover:text-ink"
+                    aria-label={t("itsm.change.cab.dragHandle", { title: item.title })}
+                    data-testid={`cab-agenda-handle-${item.ticket_id}`}
+                    onDragStart={(e) => {
+                      setDragFrom(index);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(item.ticket_id));
+                      const row = e.currentTarget.closest("li");
+                      if (row && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(row, 0, 0);
+                    }}
+                    onDragEnd={() => {
+                      setDragFrom(null);
+                      setDragOver(null);
+                    }}
+                  >
+                    ⠿
+                  </button>
+                )}
                 <span className="mt-0.5 w-5 shrink-0 text-right text-xs text-muted">{index + 1}.</span>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -159,8 +205,8 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
                   {item.approval ? (
                     <Snapshot snapshot={item.approval} />
                   ) : (
-                    <p className="text-xs text-muted" data-testid="cab-agenda-no-approval">
-                      {t("itsm.change.cab.noApproval")}
+                    <p className="text-xs text-muted" data-testid={item.unsaved ? "cab-agenda-unsaved" : "cab-agenda-no-approval"}>
+                      {t(item.unsaved ? "itsm.change.cab.unsaved" : "itsm.change.cab.noApproval")}
                     </p>
                   )}
                   {canEdit ? (
@@ -183,10 +229,10 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
                 </div>
                 {canEdit && (
                   <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-                    <Button size="sm" variant="ghost" disabled={index === 0} onClick={() => edit(moveItem(items, index, index - 1))} aria-label={t("itsm.change.cab.moveUp")} data-testid={`cab-agenda-up-${item.ticket_id}`}>
+                    <Button size="sm" variant="ghost" disabled={index === 0} onClick={() => move(index, index - 1, "up")} aria-label={t("itsm.change.cab.moveUp")} data-testid={`cab-agenda-up-${item.ticket_id}`}>
                       ↑
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={index === items.length - 1} onClick={() => edit(moveItem(items, index, index + 1))} aria-label={t("itsm.change.cab.moveDown")} data-testid={`cab-agenda-down-${item.ticket_id}`}>
+                    <Button size="sm" variant="ghost" disabled={index === items.length - 1} onClick={() => move(index, index + 1, "down")} aria-label={t("itsm.change.cab.moveDown")} data-testid={`cab-agenda-down-${item.ticket_id}`}>
                       ↓
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => edit(items.filter((i) => i.ticket_id !== item.ticket_id))} aria-label={t("itsm.change.cab.remove")} data-testid={`cab-agenda-remove-${item.ticket_id}`}>
@@ -199,7 +245,7 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
           ))}
           {hidden.map((e) => (
             <li key={`hidden-${e.position}`} className="rounded-md border border-dashed border-hairline p-2 text-sm text-muted" data-testid="cab-agenda-hidden" data-position={e.position}>
-              <span className="mr-2 text-xs">{e.position}.</span>
+              <span className="mr-2 text-xs">{items.length + hidden.indexOf(e) + 1}.</span>
               {t("itsm.change.cab.hiddenItem")}
             </li>
           ))}
@@ -219,6 +265,7 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
           {save.isError && (
             <span className="text-xs text-danger" role="alert" data-testid="cab-agenda-error">
               {changeErrorText(save.error, t)}
+              {blocked && ` ${t("itsm.change.cab.blockedLine", { tn: blocked.tn })}`}
             </span>
           )}
         </div>

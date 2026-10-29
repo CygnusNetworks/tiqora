@@ -92,7 +92,7 @@ function Body({ change: c }: { change: LegacyChange }) {
           <LegacySourceBadge source={c.source} />
         </p>
         <h1 className="break-words text-lg font-semibold text-ink">{c.title || c.number}</h1>
-        {live && c.znuny_url && (
+        {live && c.znuny_url && /^https?:\/\//i.test(c.znuny_url) && (
           <a href={c.znuny_url} target="_blank" rel="noreferrer noopener" className="inline-block text-sm text-accent hover:underline" data-testid="legacy-detail-znuny-link">
             {t("itsm.change.legacy.editInZnuny")}
           </a>

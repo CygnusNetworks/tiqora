@@ -26,6 +26,9 @@ export function LegacyChangeListPage() {
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
 
+  // Another filter starts at the first page (clearing the ticket filter on page 2 must not leave the list).
+  useEffect(() => setOffset(0), [ticketId]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setQ(text.trim());

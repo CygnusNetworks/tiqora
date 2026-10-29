@@ -893,7 +893,7 @@ const MEETINGS: CabMeeting[] = [
     location: "Besprechungsraum 2",
     status: "planned",
     minutes: null,
-    agenda_count: 2,
+    agenda_count: 3,
     agenda: [
       {
         position: 1,
@@ -919,6 +919,20 @@ const MEETINGS: CabMeeting[] = [
         planned_end: "2026-11-07T22:00:00Z",
         note: null,
         hidden: false,
+        approval: null,
+      },
+      // A change the demo agent may not read: only its position is known.
+      {
+        position: 3,
+        change_ticket_id: null,
+        tn: null,
+        title: null,
+        change_type: null,
+        phase: null,
+        planned_start: null,
+        planned_end: null,
+        note: null,
+        hidden: true,
         approval: null,
       },
     ],

@@ -29,6 +29,8 @@ export type AgendaDraftItem = {
   planned_end: string | null;
   note: string;
   approval: CabMeeting["agenda"][number]["approval"];
+  /** Added in this session and not saved yet: the approval status only comes with the saved meeting. */
+  unsaved?: boolean;
 };
 
 /** The agenda lines the caller may read, in order; lines without read access are not editable and stay on the server. */

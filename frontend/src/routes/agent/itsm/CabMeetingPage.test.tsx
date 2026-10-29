@@ -125,6 +125,41 @@ describe("CabMeetingPage", () => {
     expect(screen.getByTestId("cab-agenda-item-133")).toHaveTextContent("Noch keine Freigabe angefordert.");
   });
 
+  it("numbers the hidden lines after the visible ones and says their order is fixed", async () => {
+    renderWithClient(<CabMeetingPage />);
+    const hidden = await screen.findByTestId("cab-agenda-hidden");
+    expect(hidden).toHaveTextContent("3.");
+    expect(screen.getByTestId("cab-agenda-hidden-hint")).toHaveTextContent("ihre Reihenfolge lässt sich nicht ändern");
+  });
+
+  it("announces the new position and keeps the focus on a usable arrow", async () => {
+    renderWithClient(<CabMeetingPage />);
+    await screen.findByTestId("cab-agenda-item-130");
+    screen.getByTestId("cab-agenda-down-130").focus();
+    fireEvent.click(screen.getByTestId("cab-agenda-down-130"));
+    expect(screen.getByTestId("cab-agenda-live")).toHaveTextContent("Position 2 von 2: Change 130");
+    // 130 is last now: its down arrow is disabled, focus moves to the up arrow
+    await waitFor(() => expect(screen.getByTestId("cab-agenda-up-130")).toHaveFocus());
+  });
+
+  it("marks rows added from the suggestions as not yet saved instead of claiming no approval", async () => {
+    renderWithClient(<CabMeetingPage />);
+    fireEvent.click(await screen.findByTestId("cab-suggestion-add-140"));
+    const row = screen.getByTestId("cab-agenda-item-140");
+    expect(within(row).getByTestId("cab-agenda-unsaved")).toHaveTextContent("Freigabestand nach dem Speichern sichtbar");
+    expect(row).not.toHaveTextContent("Noch keine Freigabe angefordert.");
+  });
+
+  it("names the blocking line when a save is refused", async () => {
+    renderWithClient(<CabMeetingPage />);
+    fireEvent.click(await screen.findByTestId("cab-suggestion-add-140"));
+    saveAgenda.mockRejectedValue(changeError(422, { code: "change_not_open", ticket_id: 140 }));
+    fireEvent.click(screen.getByTestId("cab-agenda-save"));
+    expect(await screen.findByTestId("cab-agenda-error")).toHaveTextContent("Betroffen ist der Change 2026101140.");
+    expect(screen.getByTestId("cab-agenda-item-140")).toHaveAttribute("data-blocked", "true");
+    expect(screen.getByTestId("cab-agenda-item-130")).not.toHaveAttribute("data-blocked");
+  });
+
   it("keeps lines without read access as 'Change ohne Leserecht' and says they are kept", async () => {
     renderWithClient(<CabMeetingPage />);
     const hidden = await screen.findByTestId("cab-agenda-hidden");
@@ -158,8 +193,11 @@ describe("CabMeetingPage", () => {
     // drag 130 (now second) back above 133
     const dt = { setData: vi.fn(), effectAllowed: "" };
     const second = screen.getByTestId("cab-agenda-item-130");
-    expect(second).toHaveAttribute("draggable", "true");
-    fireEvent(second, Object.assign(createEvent.dragStart(second), { dataTransfer: dt }));
+    // only the handle drags, so text in the note field stays selectable
+    expect(second).not.toHaveAttribute("draggable");
+    const handle = screen.getByTestId("cab-agenda-handle-130");
+    expect(handle).toHaveAttribute("draggable", "true");
+    fireEvent(handle, Object.assign(createEvent.dragStart(handle), { dataTransfer: dt }));
     const target = screen.getByTestId("cab-agenda-item-133");
     fireEvent(target, Object.assign(createEvent.drop(target), { dataTransfer: dt }));
     expect(order()).toEqual(["130", "133"]);

@@ -149,6 +149,7 @@ import { ChangeCalendarPage } from "@/routes/agent/itsm/ChangeCalendarPage";
 import { CabMeetingsPage } from "@/routes/agent/itsm/CabMeetingsPage";
 import { CabMeetingPage } from "@/routes/agent/itsm/CabMeetingPage";
 import { LegacyChangeListPage } from "@/routes/agent/itsm/LegacyChangeListPage";
+import { parseLegacyListSearch } from "@/components/itsm/change/changeUi";
 import { LegacyChangeDetailPage } from "@/routes/agent/itsm/LegacyChangeDetailPage";
 import { CiDetailPage } from "@/routes/agent/CiDetailPage";
 import { WebserviceDetailPage } from "@/routes/admin/WebserviceDetailPage";
@@ -704,10 +705,7 @@ const agentLegacyChangesRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/itsm/legacy-changes",
   // `?ticket_id=` comes from the ticket zoom in Mode A (changes linked to that ticket).
-  validateSearch: (s: Record<string, unknown>): { ticket_id?: number } => {
-    const n = typeof s.ticket_id === "number" ? s.ticket_id : typeof s.ticket_id === "string" && s.ticket_id !== "" ? Number(s.ticket_id) : NaN;
-    return Number.isInteger(n) && n > 0 ? { ticket_id: n } : {};
-  },
+  validateSearch: parseLegacyListSearch,
   component: LegacyChangeListPage,
 });
 

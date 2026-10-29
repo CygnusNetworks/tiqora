@@ -10146,7 +10146,7 @@
         "statusLabel": "Status",
         "agenda": "Agenda",
         "agendaEmpty": "The agenda is empty.",
-        "hiddenHint": "Items you may not read stay on the agenda and are never removed.",
+        "hiddenHint": "Items you may not read stay on the agenda and are never removed. They are listed last; their order cannot be changed.",
         "hiddenItem": "Change without read access",
         "noApproval": "No approval requested yet.",
         "note": "Note for this item",
@@ -10161,7 +10161,11 @@
         "minutes": "Minutes",
         "minutesHint": "The minutes are visible to all agents.",
         "minutesEmpty": "There are no minutes yet.",
-        "saveMinutes": "Save minutes and status"
+        "saveMinutes": "Save minutes and status",
+        "unsaved": "Approval status visible after saving",
+        "position": "Position {{pos}} of {{count}}: {{title}}",
+        "dragHandle": "Drag to reorder: {{title}}",
+        "blockedLine": "The change {{tn}} is affected."
       },
       "legacy": {
         "sourceLive": "Live from Znuny",
