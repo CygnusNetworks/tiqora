@@ -356,9 +356,10 @@ def approval_out(view: ChangeApprovalView) -> ChangeApprovalOut:
 class ResolvedMemberOut(BaseModel):
     member_kind: MemberKind
     member_ref: str
-    #: a name for users, groups and roles; "Freigabegruppe #<id>" for a list; the login or key
+    #: a name for users, groups, roles and Freigabegruppen ("Freigabegruppe #<id>" when gone);
+    #: the login or key
     label: str
-    #: voters a group or role stands for (``None`` for single entries, lists and resolvers)
+    #: voters a group, role or Freigabegruppe stands for (``None`` for single entries, resolvers)
     count: int | None
     missing: bool
 
@@ -376,6 +377,8 @@ class CabOut(BaseModel):
     created_by: int
     updated_at: UtcDateTime
     updated_by: int
+    #: customer users may be members (the approvals setting "Kunden als Freigeber")
+    customer_members_allowed: bool
 
 
 def cab_out(view: CabView) -> CabOut:

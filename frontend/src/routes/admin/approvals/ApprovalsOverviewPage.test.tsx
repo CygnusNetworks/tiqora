@@ -67,9 +67,9 @@ describe("ApprovalsOverviewPage", () => {
     mockApi({ [OVERVIEW]: overview });
     renderApproval(<ApprovalsOverviewPage />);
     const rows = await screen.findAllByTestId("admin-approval-row");
-    // `ticket` is translated; `itsm.change` has no title text and stays as the raw key.
+    // both subject types show their translated title (`itsm.change` -> "Change")
     expect(rows[1]).toHaveTextContent("· Ticket ·");
-    expect(rows[0]).toHaveTextContent("· itsm.change ·");
+    expect(rows[0]).toHaveTextContent("· Change ·");
     fireEvent.click(screen.getByTestId("admin-approvals-filter-subject"));
     fireEvent.click(await screen.findByTestId("admin-approvals-filter-subject-menu-option-ticket"));
     await waitFor(() => {

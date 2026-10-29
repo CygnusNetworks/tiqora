@@ -9406,12 +9406,14 @@
       "retry": "Erneut versuchen"
     },
     "subject": {
-      "ticket": "Ticket"
+      "ticket": "Ticket",
+      "itsm_change": "Change"
     },
     "resolver": {
       "ticket_customer_user": "Kunde des Tickets",
       "ticket_owner": "Besitzer des Tickets",
-      "ticket_responsible": "Verantwortlicher des Tickets"
+      "ticket_responsible": "Verantwortlicher des Tickets",
+      "itsm_service_owner": "Verantwortliche der betroffenen Services"
     },
     "rule": {
       "any": "Eine Freigabe genügt",

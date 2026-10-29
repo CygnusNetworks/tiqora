@@ -191,11 +191,19 @@ async def put_cab(cab_id: int, body: CabIn, admin: AdminUser, session: DbSession
 
 @router.put("/cabs/{cab_id}/members", response_model=CabOut)
 async def put_cab_members(
-    cab_id: int, body: list[CabMemberIn], admin: AdminUser, session: DbSession
+    cab_id: int,
+    body: list[CabMemberIn],
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
 ) -> CabOut:
     """Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),
-    customer_user (login), resolver (key); users, groups and roles must exist."""
-    out = cab_out(await set_members(session, cab_id=cab_id, members=body, user_id=admin.id))
+    customer_user (login; only while customers may approve, else 422
+    ``cab_customer_members_disabled``), resolver (key); users, groups, roles, lists and
+    resolvers must exist."""
+    out = cab_out(
+        await set_members(session, cab_id=cab_id, members=body, user_id=admin.id, settings=settings)
+    )
     await session.commit()
     return out
 

@@ -4502,7 +4502,9 @@ export interface paths {
         /**
          * Put Cab Members
          * @description Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),
-         *     customer_user (login), resolver (key); users, groups and roles must exist.
+         *     customer_user (login; only while customers may approve, else 422
+         *     ``cab_customer_members_disabled``), resolver (key); users, groups, roles, lists and
+         *     resolvers must exist.
          */
         put: operations["put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put"];
         post?: never;
@@ -18212,6 +18214,8 @@ export interface components {
             created_at: string;
             /** Created By */
             created_by: number;
+            /** Customer Members Allowed */
+            customer_members_allowed: boolean;
             /** Description */
             description: string | null;
             /** Id */

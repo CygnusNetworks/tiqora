@@ -9,11 +9,14 @@ CAB is no second membership model: only the engine resolves the entries into vot
 groups it counts with ``PermissionEngine.users_for_group_permission(group_id, "rw")``, the engine's
 own rule, so the counts agree.
 
-Before the approvals service lands (ruling N4) member validation uses only the engine's pure
-contract: ``ApproverEntry`` shapes, ``rules.validate_definition`` on the definition the CAB would
-request, and the existence of user / group / role ids in the Znuny tables (``IN`` lists). ``list``
-and ``customer_user`` entries are shape-checked only and shown as "Freigabegruppe #<id>" / login.
-Customer users take part only when the engine has customer approvers switched on.
+Member validation (rulings N4, CX21): ``ApproverEntry`` shapes, ``rules.validate_definition`` on
+the definition the CAB would request, the existence of user / group / role ids in the Znuny tables
+(``IN`` lists) and the engine's own reference check ``templates.validate_definition_refs`` for the
+subject type ``itsm.change``: an unknown resolver or Freigabegruppe is refused, a customer login
+the customer table does not know is only flagged ``missing`` (customer backends may live outside
+it). Customer users are refused (422 ``cab_customer_members_disabled``) while the engine's setting
+``approvals.customer_approvers_enabled`` is off: the request would fail at the transition.
+Freigabegruppen are shown with their name and size (``lists.list_lists``).
 
 Meetings are organisational: agenda, minutes, status. Votes are not stored here; the meeting page
 shows each agenda change's approval snapshot. Reading is open to every agent, writing is the change
@@ -42,13 +45,16 @@ from sqlalchemy import and_, delete, func, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.approvals import lists as approval_lists
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError, ApproverEntry
 from tiqora.approvals.rules import validate_definition
+from tiqora.approvals.settings import load_approval_settings
+from tiqora.approvals.templates import validate_definition_refs
 from tiqora.calendar.recurrence import to_utc_naive
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.user import PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain.ticket_access import readable_tickets
-from tiqora.itsm.change.approval_port import ApprovalSnapshot, get_approval_port
+from tiqora.itsm.change.approval_port import SUBJECT_TYPE, ApprovalSnapshot, get_approval_port
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.gate import is_change_manager
 from tiqora.itsm.change.models import (
@@ -79,6 +85,10 @@ MeetingStatus = Literal["planned", "held", "cancelled"]
 
 _ID = re.compile(r"^[1-9][0-9]{0,9}$")
 _ID_KINDS: Final = ("user", "group", "role", "list")
+CUSTOMERS_DISABLED_TEXT: Final = (
+    "Kundenbenutzer als CAB-Mitglieder erst nach Aktivieren von Kunden als Freigeber in den"
+    " Freigabe-Einstellungen."
+)
 _Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
@@ -114,14 +124,16 @@ class CabMemberIn(BaseModel):
 
 
 class ResolvedMember(BaseModel):
-    """One CAB entry for display. ``count`` is the number of voters a group or role stands for
-    (``None`` for single entries and for lists / resolvers, which only the engine expands)."""
+    """One CAB entry for display. ``count`` is the number of voters a group, role or
+    Freigabegruppe stands for (``None`` for single entries and for resolvers, which only the
+    engine expands at request time)."""
 
     member_kind: MemberKind
     member_ref: str
     label: str
     count: int | None = None
-    #: the user / group / role no longer exists or is invalid
+    #: the user / group / role / Freigabegruppe no longer exists or is invalid, or the customer
+    #: table does not know the login
     missing: bool = False
 
 
@@ -138,10 +150,31 @@ class CabView(BaseModel):
     created_by: int
     updated_at: datetime
     updated_by: int
+    #: the engine accepts customer users as approvers (``approvals.customer_approvers_enabled``)
+    customer_members_allowed: bool = False
 
 
 def _rule_error(exc: ApprovalError) -> ChangeError:
     return ChangeError("cab_invalid", 422, message=exc.detail or exc.code)
+
+
+def _members_definition(
+    name: str, rule: str, quorum: int | None, members: Sequence[tuple[str, str]]
+) -> ApprovalDefinition:
+    return ApprovalDefinition.model_validate(
+        {
+            "steps": [
+                {
+                    "name": name,
+                    "rule": rule,
+                    "quorum": quorum if rule == "quorum" else None,
+                    "approvers": [
+                        ApproverEntry.model_validate({"kind": k, "ref": r}) for k, r in members
+                    ],
+                }
+            ]
+        }
+    )
 
 
 def check_definition(
@@ -152,21 +185,7 @@ def check_definition(
     if not members:
         return
     try:
-        definition = ApprovalDefinition.model_validate(
-            {
-                "steps": [
-                    {
-                        "name": name,
-                        "rule": rule,
-                        "quorum": quorum if rule == "quorum" else None,
-                        "approvers": [
-                            ApproverEntry.model_validate({"kind": k, "ref": r}) for k, r in members
-                        ],
-                    }
-                ]
-            }
-        )
-        validate_definition(definition)
+        validate_definition(_members_definition(name, rule, quorum, members))
     except ValidationError as exc:
         raise ChangeError("cab_invalid", 422, message=str(exc.errors()[0]["msg"])) from exc
     except ApprovalError as exc:
@@ -210,9 +229,55 @@ async def _check_members(session: AsyncSession, members: Sequence[CabMemberIn]) 
             raise ChangeError(f"{kind}_not_found", 422)
 
 
+async def customer_members_allowed(session: AsyncSession, settings: Settings | None = None) -> bool:
+    """The engine's setting: customer users may approve at all (CX21)."""
+    loaded = await load_approval_settings(session, settings or get_settings())
+    return loaded.customer_approvers_enabled
+
+
+async def _check_engine_refs(
+    session: AsyncSession, members: Sequence[CabMemberIn], settings: Settings | None
+) -> None:
+    """CX21 and the engine's reference check (N4); call after :func:`_check_members`."""
+    if not members:
+        return
+    if any(m.member_kind == "customer_user" for m in members) and not (
+        await customer_members_allowed(session, settings)
+    ):
+        raise ChangeError("cab_customer_members_disabled", 422, message=CUSTOMERS_DISABLED_TEXT)
+    pairs = [(m.member_kind, m.member_ref) for m in members]
+    check = await validate_definition_refs(
+        session, _members_definition("CAB", "any", None, pairs), subject_types=[SUBJECT_TYPE]
+    )
+    for error in check.errors:
+        if error.startswith("unknown_resolver:"):
+            raise ChangeError("resolver_not_found", 422)
+        raise ChangeError("cab_member_invalid", 422, message=error)
+    if any(w.startswith("missing_list:") for w in check.warnings):
+        raise ChangeError("list_not_found", 422)
+
+
+async def _engine_warnings(session: AsyncSession, members: Sequence[tuple[str, str]]) -> set[str]:
+    """``missing_*`` warnings of the engine's reference check for list and customer entries."""
+    wanted = [(k, r) for k, r in members if k in ("list", "customer_user")]
+    if not wanted:
+        return set()
+    try:
+        definition = _members_definition("CAB", "any", None, wanted)
+    except ValidationError:  # a row the editor would refuse: shown as it is
+        return set()
+    return set((await validate_definition_refs(session, definition)).warnings)
+
+
 async def _display(
     session: AsyncSession, members: Sequence[tuple[str, str]]
 ) -> list[ResolvedMember]:
+    warnings = await _engine_warnings(session, members)
+    lists = (
+        {r.id: r for r in await approval_lists.list_lists(session, include_invalid=True)}
+        if any(k == "list" for k, _ in members)
+        else {}
+    )
     users: dict[int, str] = {}
     ids: dict[str, set[int]] = {"user": set(), "group": set(), "role": set()}
     for kind, ref in members:
@@ -285,10 +350,27 @@ async def _display(
                 )
             )
         elif kind == "list":
+            found = lists.get(num)
+            gone = found is None or not found.valid or f"missing_list:{ref}" in warnings
             out.append(
-                ResolvedMember(member_kind=k, member_ref=ref, label=f"Freigabegruppe #{ref}")
+                ResolvedMember(
+                    member_kind=k,
+                    member_ref=ref,
+                    label=found.name if found is not None else f"Freigabegruppe #{ref}",
+                    count=0 if found is None or gone else len(found.member_ids),
+                    missing=gone,
+                )
             )
-        else:  # customer_user: the login; resolver: its key
+        elif kind == "customer_user":
+            out.append(
+                ResolvedMember(
+                    member_kind=k,
+                    member_ref=ref,
+                    label=ref,
+                    missing=f"missing_customer:{ref}" in warnings,
+                )
+            )
+        else:  # resolver: its key (the engine expands it at request time)
             out.append(ResolvedMember(member_kind=k, member_ref=ref, label=ref))
     return out
 
@@ -298,7 +380,11 @@ async def resolved_members(session: AsyncSession, cab_id: int) -> list[ResolvedM
     return await _display(session, await _stored_members(session, cab_id))
 
 
-async def _view(session: AsyncSession, cab: TiqoraItsmCab) -> CabView:
+async def _view(
+    session: AsyncSession, cab: TiqoraItsmCab, *, customers: bool | None = None
+) -> CabView:
+    if customers is None:
+        customers = await customer_members_allowed(session)
     return CabView(
         id=cab.id,
         name=cab.name,
@@ -312,6 +398,7 @@ async def _view(session: AsyncSession, cab: TiqoraItsmCab) -> CabView:
         created_by=cab.created_by,
         updated_at=cab.updated_at,
         updated_by=cab.updated_by,
+        customer_members_allowed=customers,
     )
 
 
@@ -326,7 +413,11 @@ async def list_cabs(session: AsyncSession, *, include_invalid: bool = True) -> l
     stmt = select(TiqoraItsmCab).order_by(TiqoraItsmCab.name, TiqoraItsmCab.id)
     if not include_invalid:
         stmt = stmt.where(TiqoraItsmCab.valid.is_(True))
-    return [await _view(session, c) for c in (await session.execute(stmt)).scalars()]
+    customers = await customer_members_allowed(session)
+    return [
+        await _view(session, c, customers=customers)
+        for c in (await session.execute(stmt)).scalars()
+    ]
 
 
 async def get_cab(session: AsyncSession, cab_id: int) -> CabView:
@@ -399,12 +490,18 @@ async def delete_cab(session: AsyncSession, *, cab_id: int) -> None:
 
 
 async def set_members(
-    session: AsyncSession, *, cab_id: int, members: Sequence[CabMemberIn], user_id: int
+    session: AsyncSession,
+    *,
+    cab_id: int,
+    members: Sequence[CabMemberIn],
+    user_id: int,
+    settings: Settings | None = None,
 ) -> CabView:
     """Admin. Replaces the member list (order kept). The result must be a definition the
-    engine accepts with the CAB's rule and quorum."""
+    engine accepts with the CAB's rule and quorum, pointing at things that exist."""
     cab = await _cab(session, cab_id, lock=True)  # concurrent replaces take turns
     await _check_members(session, members)
+    await _check_engine_refs(session, members, settings)
     check_definition(
         cab.name, cab.rule, cab.quorum, [(m.member_kind, m.member_ref) for m in members]
     )

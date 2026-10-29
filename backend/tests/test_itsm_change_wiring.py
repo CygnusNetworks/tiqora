@@ -23,12 +23,14 @@ from tests._change_fixtures import (
     change_world,
 )
 from tiqora.api.app import create_app
+from tiqora.approvals.contract import APPROVAL_SUBJECT_TYPES, APPROVER_RESOLVERS
 from tiqora.db.legacy.calendar import CalendarAppointment
 from tiqora.db.tiqora.models import TiqoraJob
 from tiqora.domain.api_key_scopes import path_to_area
 from tiqora.domain.ticket_write_service import change_service, change_title
 from tiqora.extensions import Registry
 from tiqora.extensions.core import register_core
+from tiqora.itsm.change.approval_port import SUBJECT_TYPE, describe_change
 from tiqora.itsm.change.impact import ITSM_CHANGE_IMPACT_KIND
 from tiqora.itsm.change.legacy.archive import ARCHIVE_JOB_KIND
 from tiqora.itsm.change.models import TiqoraItsmChange
@@ -36,6 +38,7 @@ from tiqora.itsm.change.risk import CHANGE_RISK_CHECKS
 from tiqora.itsm.change.service import CHANGE_LISTENERS, ChangeCreateIn, create_change
 from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
 from tiqora.itsm.change.tasks import ITSM_CHANGE_TASKS_KIND
+from tiqora.itsm.change.transitions import on_cab_decided
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 from tiqora.settings_sections.store import save_section_values
@@ -231,12 +234,25 @@ def test_registry_contains_change_items() -> None:
     assert registry.items(CHANGE_LISTENERS) == []
 
 
-@pytest.mark.skip(
-    reason="Task 17 (approvals G1): the itsm.change subject type and itsm.service_owner resolver "
-    "are registered once the approvals engine is merged; enable there"
-)
 def test_registry_contains_change_subject_type() -> None:
-    pytest.fail("enabled with Task 17")
+    """F28 / CX7 / F14: subject type ``itsm.change`` with its outcome listener and describer,
+    and the resolver ``itsm.service_owner``, each in core's own block."""
+    registry = _core()
+    subject = registry.get(APPROVAL_SUBJECT_TYPES, SUBJECT_TYPE)
+    assert subject is not None
+    assert (subject.title_key, subject.allow_customer_approvers, subject.agent_requestable) == (
+        "approvals.subject.itsm_change",
+        True,
+        False,
+    )
+    assert subject.on_decided is on_cab_decided  # -> transitions.on_approval_outcome
+    assert subject.describe is describe_change
+    resolver = registry.get(APPROVER_RESOLVERS, "itsm.service_owner")
+    assert resolver is not None
+    assert (resolver.title_key, resolver.yields_customers) == (
+        "approvals.resolver.itsm_service_owner",
+        False,
+    )
 
 
 _CHANGE_PREFIXES = (

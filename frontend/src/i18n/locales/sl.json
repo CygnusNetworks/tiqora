@@ -9398,12 +9398,14 @@
       "retry": "Try again"
     },
     "subject": {
-      "ticket": "Ticket"
+      "ticket": "Ticket",
+      "itsm_change": "Change"
     },
     "resolver": {
       "ticket_customer_user": "Customer of the ticket",
       "ticket_owner": "Owner of the ticket",
-      "ticket_responsible": "Responsible agent of the ticket"
+      "ticket_responsible": "Responsible agent of the ticket",
+      "itsm_service_owner": "Owner of the affected services"
     },
     "rule": {
       "any": "One approval is enough",

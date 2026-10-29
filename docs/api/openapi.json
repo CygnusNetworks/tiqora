@@ -9808,6 +9808,10 @@
             "title": "Created By",
             "type": "integer"
           },
+          "customer_members_allowed": {
+            "title": "Customer Members Allowed",
+            "type": "boolean"
+          },
           "description": {
             "anyOf": [
               {
@@ -9885,7 +9889,8 @@
           "created_at",
           "created_by",
           "updated_at",
-          "updated_by"
+          "updated_by",
+          "customer_members_allowed"
         ],
         "title": "CabOut",
         "type": "object"
@@ -80191,7 +80196,7 @@
     },
     "/api/v1/admin/itsm/change/cabs/{cab_id}/members": {
       "put": {
-        "description": "Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),\ncustomer_user (login), resolver (key); users, groups and roles must exist.",
+        "description": "Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),\ncustomer_user (login; only while customers may approve, else 422\n``cab_customer_members_disabled``), resolver (key); users, groups, roles, lists and\nresolvers must exist.",
         "operationId": "put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put",
         "parameters": [
           {

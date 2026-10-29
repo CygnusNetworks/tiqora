@@ -8,15 +8,20 @@ conflict with ``override_reason`` (event ``conflict_override``) and open tasks o
 post-approval with ``force``, which needs a ``reason`` (event ``forced``).
 
 The side effects run in this order inside one savepoint, so a plugin veto or a failing approval
-call leaves nothing behind: phase and its fields -> events -> ticket state -> dynamic-field
-mirror -> approval port -> listeners. The ticket state changes only on leaving Entwurf (``new``
--> ``state_open``) and on entering Abgeschlossen / Abgebrochen; Abgelehnt leaves it alone (F11).
-Agents write through ``TicketWriteService.change_state`` (``rw``, plugin veto, the Znuny lock and
-owner on close); the system path never changes the ticket state.
+call leaves nothing behind: phase and its fields -> events -> approval port -> ticket state ->
+dynamic-field mirror -> calendar mirror -> listeners. The approval call comes before every write
+of the Znuny ticket row (state, owner, lock, history): the engine locks ``tiqora_approval`` and
+then writes ticket history, so a ticket written first deadlocks with a concurrent vote on MariaDB
+(lock order of the approvals contract: change row -> approval -> ticket). The ticket state changes
+only on leaving Entwurf (``new`` -> ``state_open``) and on entering Abgeschlossen / Abgebrochen;
+Abgelehnt leaves it alone (F11). Agents write through ``TicketWriteService.change_state`` (``rw``,
+plugin veto, the Znuny lock and owner on close); the system path never changes the ticket state.
 
 :func:`on_approval_outcome` is the system path, called once per final status by the approval
-engine's hook job (Task 17), possibly more than once: it re-reads the change row ``FOR UPDATE``
-and acts only when phase, ``approval_round`` and ``approval_id`` still match (ruling CX8).
+engine's hook job ``core.approval_hook`` through :func:`on_cab_decided`, the ``on_decided`` of the
+subject type ``itsm.change`` (:func:`change_subject_type`), possibly more than once (the job is
+retried): it re-reads the change row ``FOR UPDATE`` and acts only when phase, ``approval_round``
+and ``approval_id`` still match (ruling CX8).
 
 Every phase change on every path writes exactly one ``event="phase"`` row (X-1). Services never
 commit; the route or the hook job does.
@@ -34,13 +39,26 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.approvals.contract import Actor, ApprovalDefinition, ApproverEntry, Principal
-from tiqora.config import Settings
+from tiqora.approvals.contract import (
+    Actor,
+    ApprovalDefinition,
+    ApprovalOutcome,
+    ApprovalSubjectType,
+    ApproverEntry,
+    Principal,
+)
+from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.ticket_access import TicketFacts
 from tiqora.domain.ticket_write_service import InvalidInput, TicketWriteService
 from tiqora.domain.ticket_write_service import TicketAccessDenied as WriteAccessDenied
-from tiqora.itsm.change.approval_port import ApprovalSnapshot, get_approval_port
+from tiqora.itsm.change.approval_port import (
+    APPROVAL_KEY,
+    SUBJECT_TYPE,
+    ApprovalSnapshot,
+    describe_change,
+    get_approval_port,
+)
 from tiqora.itsm.change.calendar_mirror import sync_appointment
 from tiqora.itsm.change.conflicts import load_conflicts
 from tiqora.itsm.change.errors import ChangeError
@@ -427,24 +445,7 @@ async def transition(
             to_phase=to,
             detail=None if reason is None else {"reason": reason},
         )
-        if state_id is not None:
-            writer = TicketWriteService(
-                session, session_factory or get_session_factory(), sysconfig
-            )
-            try:
-                await writer.change_state(user_id, ticket_id, state_id)
-            except WriteAccessDenied as exc:
-                raise ChangeError("forbidden", 403) from exc
-            except OperationVetoed as exc:
-                raise ChangeError("vetoed", 409, message=str(exc)) from exc
-            except InvalidInput as exc:
-                raise ChangeError("invalid_input", 422, message=str(exc)) from exc
-        await mirror_dynamic_fields(
-            session, ticket_id=ticket_id, change_type=change_type, phase=to, user_id=user_id
-        )
-        await sync_appointment(
-            session, cfg, ticket_id=ticket_id, user_id=user_id, base_url=settings.public_base_url
-        )
+        # the approval engine before any write of the Znuny ticket row (contract lock order)
         actor = Actor.agent(user_id)
         if requests_cab:
             assert cab is not None  # noqa: S101 - guarded above (cab_missing)
@@ -471,6 +472,24 @@ async def transition(
                 actor=actor,
                 reason=reason or CANCEL_REASON,
             )
+        if state_id is not None:
+            writer = TicketWriteService(
+                session, session_factory or get_session_factory(), sysconfig
+            )
+            try:
+                await writer.change_state(user_id, ticket_id, state_id)
+            except WriteAccessDenied as exc:
+                raise ChangeError("forbidden", 403) from exc
+            except OperationVetoed as exc:
+                raise ChangeError("vetoed", 409, message=str(exc)) from exc
+            except InvalidInput as exc:
+                raise ChangeError("invalid_input", 422, message=str(exc)) from exc
+        await mirror_dynamic_fields(
+            session, ticket_id=ticket_id, change_type=change_type, phase=to, user_id=user_id
+        )
+        await sync_appointment(
+            session, cfg, ticket_id=ticket_id, user_id=user_id, base_url=settings.public_base_url
+        )
         await notify_listeners(
             session, ChangeEvent(ticket_id, "phase", from_phase, to, user_id, now)
         )
@@ -740,6 +759,40 @@ async def on_approval_outcome(
             session, ChangeEvent(ticket_id, "phase", from_phase, to, SYSTEM_USER_ID, now)
         )
     return True
+
+
+async def on_cab_decided(session: AsyncSession, outcome: ApprovalOutcome) -> None:
+    """``on_decided`` of the subject type ``itsm.change``: runs in job ``core.approval_hook``
+    after the deciding commit, possibly more than once (retried up to 5 times) - idempotent
+    through :func:`on_approval_outcome`. Never commits or rolls back (the job does). Sets of
+    another key, or without a round in ``subject_ref``, are not CAB approvals of a change."""
+    ref = outcome.subject_ref
+    if outcome.approval_key != APPROVAL_KEY or ref is None or not (ref.isascii() and ref.isdigit()):
+        return
+    if outcome.status == "pending":  # never delivered; the contract says final statuses only
+        return
+    await on_approval_outcome(
+        session,
+        get_settings(),
+        SysConfig(session),
+        ticket_id=outcome.ticket_id,
+        approval_id=outcome.approval_id,
+        round=int(ref),
+        status=outcome.status,
+        reason=outcome.reason,
+    )
+
+
+def change_subject_type() -> ApprovalSubjectType:
+    """The approval subject type of change CAB approvals (ruling CX7), registered by core."""
+    return ApprovalSubjectType(
+        key=SUBJECT_TYPE,
+        title_key="approvals.subject.itsm_change",
+        allow_customer_approvers=True,
+        agent_requestable=False,
+        describe=describe_change,
+        on_decided=on_cab_decided,
+    )
 
 
 # --- approval read ---------------------------------------------------------------------------

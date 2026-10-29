@@ -139,6 +139,13 @@ def register_core(registry: Registry) -> None:
     for resolver in core_resolvers():
         registry.add(APPROVER_RESOLVERS, resolver)
 
+    # change management: CAB decisions through the approval engine (itsm-change Task 17)
+    from tiqora.itsm.change.approval_port import service_owner_resolver
+    from tiqora.itsm.change.transitions import change_subject_type
+
+    registry.add(APPROVAL_SUBJECT_TYPES, change_subject_type())
+    registry.add(APPROVER_RESOLVERS, service_owner_resolver())
+
 
 def get_registry() -> Registry:
     global _REGISTRY

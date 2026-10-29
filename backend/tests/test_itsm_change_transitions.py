@@ -34,9 +34,12 @@ from tests._change_fixtures import (
     URL_FIXTURES,
     ChangeWorld,
     FakeApprovalPort,
+    approval_port_for,
     change_world,
     make_cab,
     make_change,
+    require_fake,
+    settle,
 )
 from tests._itsm_mode_helpers import make_factory, plain_url, store, stored
 from tests._plugin_points import boot_points_plugin, points_behaviour
@@ -48,7 +51,7 @@ from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.change import risk as risk_module
 from tiqora.itsm.change import transitions as transitions_module
-from tiqora.itsm.change.approval_port import get_approval_port, set_approval_port_for_tests
+from tiqora.itsm.change.approval_port import get_approval_port
 from tiqora.itsm.change.conflicts import Conflict
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import FreezeIn, create_freeze
@@ -86,12 +89,9 @@ async def w(request: pytest.FixtureRequest) -> AsyncIterator[ChangeWorld]:
 
 @pytest.fixture
 def port() -> Iterator[FakeApprovalPort]:
-    fake = FakeApprovalPort()
-    set_approval_port_for_tests(fake)
-    try:
-        yield fake
-    finally:
-        set_approval_port_for_tests(None)
+    """The fake, or the real engine under ``TIQORA_TEST_REAL_APPROVALS=1`` (_change_fixtures)."""
+    with approval_port_for() as test_port:
+        yield test_port
 
 
 # --- helpers ---------------------------------------------------------------------------------
@@ -194,16 +194,11 @@ async def _outcome(
     approval_id: int | None = None,
     round: int | None = None,
 ) -> bool:
-    """The engine decides (the fake port's set, when it is the current one and still pending),
-    then its hook delivers the outcome."""
+    """The engine decides (the current set, while still pending: the fake's ``decide`` or, under
+    the real-engine switch, votes / a cancel), then its hook delivers the outcome."""
     row = await _row(w, tid)
-    fake = get_approval_port()
-    if (
-        approval_id is None
-        and isinstance(fake, FakeApprovalPort)
-        and row.approval_id in fake.snapshots
-    ):
-        fake.decide(int(row.approval_id), status, reason)  # type: ignore[arg-type]
+    if approval_id is None and row.approval_id is not None:
+        await settle(w.session, get_approval_port(), int(row.approval_id), status, reason)
     return await on_approval_outcome(
         w.session,
         APP_SETTINGS,
@@ -389,7 +384,7 @@ async def test_normal_happy_path(w: ChangeWorld, port: FakeApprovalPort) -> None
     assert req.actor == Actor.agent(U_FULL)
     assert req.requester == Principal.agent(U_FULL)  # the change ticket's owner
     assert req.allow_self_approval is False
-    assert rec.approval_id == port.snapshots[rec.approval_id].approval_id
+    assert rec.approval_id == require_fake(port).snapshots[rec.approval_id].approval_id
     (requested,) = await _events(w, tid, "approval_requested")
     assert _detail(requested) == {
         "approval_id": rec.approval_id,
@@ -442,7 +437,7 @@ async def test_standard_path_pre_approved(w: ChangeWorld, port: FakeApprovalPort
     assert port.auto_decisions == [(tid, 1)]
     assert (rec.approval_via, rec.approval_round) == ("template", 1)
     assert rec.approved_at is not None and rec.approval_id is not None
-    assert port.snapshots[rec.approval_id].reason == "auto"
+    assert require_fake(port).snapshots[rec.approval_id].reason == "auto"
     (trail,) = await _events(w, tid, "approval_outcome")
     assert _detail(trail)["status"] == "approved" and _detail(trail)["via"] == "template"
 
@@ -783,7 +778,7 @@ async def test_erased_post_approval_counts_by_approved_at(
     await _go(w, approved, "review")
     assert await _outcome(w, approved, "approved") is True
     erased = (await _row(w, approved)).approval_id
-    port.snapshots.pop(int(erased or 0))
+    require_fake(port).snapshots.pop(int(erased or 0))
     await _go(w, approved, "closed", **close)
 
     # never decided: counts as cancelled (fail closed), a manager forces it with a reason
@@ -791,7 +786,7 @@ async def test_erased_post_approval_counts_by_approved_at(
     await _ready(w, undecided, cab_id=None)
     await _go(w, undecided, "implementing")
     await _go(w, undecided, "review")
-    port.snapshots.pop(int((await _row(w, undecided)).approval_id or 0))
+    require_fake(port).snapshots.pop(int((await _row(w, undecided)).approval_id or 0))
     assert await _refused(w, undecided, "closed", **close) == {"approval_pending": True}
     await _go(w, undecided, "closed", U_MANAGER, **close, force=True, reason="Gelöscht")
     (forced,) = await _events(w, undecided, "forced")
@@ -822,7 +817,7 @@ async def test_cancel_cancels_pending_approval(w: ChangeWorld, port: FakeApprova
     view = await _go(w, tid, "cancelled", reason="Nicht mehr nötig")
     assert view.record.phase == "cancelled"
     assert port.cancels == [(rec.approval_id, "Nicht mehr nötig")]
-    assert port.snapshots[rec.approval_id].status == "cancelled"
+    assert require_fake(port).snapshots[rec.approval_id].status == "cancelled"
     assert await _ticket_state(w, tid) == "closed unsuccessful"
     # the engine reports the cancel this change asked for: ignored
     events = len(await _events(w, tid))
@@ -1086,7 +1081,7 @@ async def test_every_phase_change_writes_one_phase_event(
         tid = await _create(w, "emergency" if emergency else "normal")
     await _ready(w, tid, cab_id=None if emergency or path == "auto_template" else CAB)
     if path == "no_approvers":
-        port.reject_at_once = "no_approvers"
+        require_fake(port).reject_at_once = "no_approvers"
     if path in (
         "approved",
         "rejected",
@@ -1214,7 +1209,7 @@ async def test_approval_read_and_erased_snapshot(w: ChangeWorld, port: FakeAppro
         assert (snap["status"], snap["round"], snap["approval_key"]) == ("pending", 1, "change_cab")
 
         # CX14/N6: the approval set was erased (GDPR); the read still answers
-        port.snapshots.clear()
+        require_fake(port).snapshots.clear()
         got = await api.client.get(url)
         assert got.status_code == 200
         assert got.json()["snapshot"] is None and got.json()["history_missing"] is True

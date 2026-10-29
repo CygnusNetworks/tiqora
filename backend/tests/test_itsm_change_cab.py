@@ -28,14 +28,23 @@ from tests._change_fixtures import (
     URL_FIXTURES,
     ChangeWorld,
     FakeApprovalPort,
+    approval_port_for,
     change_world,
     make_cab,
 )
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
+from tiqora.approvals import lists as approval_lists
+from tiqora.approvals.contract import (
+    Actor,
+    ApprovalDefinition,
+    ApproverEntry,
+    Principal,
+    StepSpec,
+)
+from tiqora.approvals.settings import APPROVALS_SECTION
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
-from tiqora.itsm.change.approval_port import set_approval_port_for_tests
 from tiqora.itsm.change.cab import (
     AgendaItemIn,
     CabIn,
@@ -84,12 +93,9 @@ async def w(request: pytest.FixtureRequest) -> AsyncIterator[ChangeWorld]:
 
 @pytest.fixture
 def port() -> Iterator[FakeApprovalPort]:
-    fake = FakeApprovalPort()
-    set_approval_port_for_tests(fake)
-    try:
-        yield fake
-    finally:
-        set_approval_port_for_tests(None)
+    """The fake, or the real engine under ``TIQORA_TEST_REAL_APPROVALS=1`` (_change_fixtures)."""
+    with approval_port_for() as test_port:
+        yield test_port
 
 
 # --- helpers ---------------------------------------------------------------------------------
@@ -97,6 +103,20 @@ def port() -> Iterator[FakeApprovalPort]:
 
 def _members(*pairs: tuple[str, str]) -> list[CabMemberIn]:
     return [CabMemberIn(member_kind=k, member_ref=r) for k, r in pairs]  # type: ignore[arg-type]
+
+
+async def _engine_members(w: ChangeWorld) -> int:
+    """Customer approvers on (CX21) and one Freigabegruppe (N4); returns the list id."""
+    await save_section_values(
+        w.session,
+        APPROVALS_SECTION,
+        {"customer_approvers_enabled": True},
+        secret_key=APP_SETTINGS.secret_key,
+    )
+    found = await approval_lists.create_list(
+        w.session, name="chg94 Freigabegruppe", member_ids=[U_MANAGER], actor_id=1
+    )
+    return found.id
 
 
 async def _role(w: ChangeWorld, *, user_id: int = U_FULL) -> None:
@@ -273,13 +293,14 @@ async def test_cab_crud_and_members(w: ChangeWorld) -> None:
     assert (_code(unreachable), unreachable.value.http_status) == ("cab_invalid", 422)
 
     await _role(w)
+    list_id = await _engine_members(w)
     members = _members(
         ("user", str(U_FULL)),
         ("group", str(G_A)),
         ("role", str(ROLE)),
-        ("list", "7"),
+        ("list", str(list_id)),
         ("customer_user", "chg94-cust@example.org"),
-        ("resolver", "ticket_owner"),
+        ("resolver", "ticket.owner"),
     )
     done = await set_members(w.session, cab_id=cab.id, members=members, user_id=1)
     assert [(m.member_kind, m.member_ref) for m in done.members] == [
@@ -415,8 +436,10 @@ async def test_resolved_members_display(w: ChangeWorld) -> None:
 
     role = shown[("role", str(ROLE))]
     assert (role.label, role.count) == ("chg94-role", 1)
-    assert shown[("list", "42")].label == "Freigabegruppe #42"
-    assert shown[("customer_user", "chg94-cust@example.org")].label == "chg94-cust@example.org"
+    gone_list = shown[("list", "42")]  # no such Freigabegruppe (any more)
+    assert (gone_list.label, gone_list.count, gone_list.missing) == ("Freigabegruppe #42", 0, True)
+    customer = shown[("customer_user", "chg94-cust@example.org")]
+    assert (customer.label, customer.missing) == ("chg94-cust@example.org", True)
     assert shown[("resolver", "ticket_owner")].label == "ticket_owner"
     gone = shown[("user", "947198")]
     assert (gone.label, gone.missing) == ("#947198", True)
@@ -695,15 +718,17 @@ async def test_agenda_shows_approval_snapshot(w: ChangeWorld, port: FakeApproval
     await make_cab(w.session, cab_id=CAB_A, members=[("user", str(U_FULL))])
     mid = await _meeting(w)
     tid = await _create(w)
-    snap = await port.request(  # the fake engine knows the set the change points at
+    snap = await port.request(  # the engine (fake or real) knows the set the change points at
         w.session,
         ticket_id=tid,
         round=1,
         title="t",
         description="",
-        definition=None,  # type: ignore[arg-type]
-        actor=None,  # type: ignore[arg-type]
-        requester=None,  # type: ignore[arg-type]
+        definition=ApprovalDefinition(
+            steps=[StepSpec(name="CAB", approvers=[ApproverEntry(kind="user", ref=str(U_MANAGER))])]
+        ),
+        actor=Actor.agent(U_FULL),
+        requester=Principal.agent(U_FULL),
         allow_self_approval=False,
     )
     await _at(w, tid, "approval", approval_id=snap.approval_id, approval_round=1)
@@ -757,6 +782,7 @@ async def test_approval_request_uses_cab_rule_and_members(
     cab = await create_cab(
         w.session, data=CabIn(name="chg94 CAB Freigabe", rule="quorum", quorum=2), user_id=1
     )
+    list_id = await _engine_members(w)
     await set_members(
         w.session,
         cab_id=cab.id,
@@ -764,7 +790,7 @@ async def test_approval_request_uses_cab_rule_and_members(
             ("user", str(U_MANAGER)),
             ("group", str(G_A)),
             ("user", str(U_FULL)),
-            ("list", "42"),
+            ("list", str(list_id)),
             ("customer_user", "chg94-cust@example.org"),
         ),
         user_id=1,
@@ -799,7 +825,7 @@ async def test_approval_request_uses_cab_rule_and_members(
         ("user", str(U_MANAGER)),
         ("group", str(G_A)),
         ("user", str(U_FULL)),
-        ("list", "42"),
+        ("list", str(list_id)),
         ("customer_user", "chg94-cust@example.org"),
     ]
 

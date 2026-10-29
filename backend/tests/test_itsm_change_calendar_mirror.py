@@ -22,12 +22,12 @@ from tests._change_fixtures import (
     URL_FIXTURES,
     ChangeWorld,
     FakeApprovalPort,
+    approval_port_for,
     change_world,
 )
 from tiqora.calendar.service import CalendarService
 from tiqora.db.legacy.calendar import CalendarAppointment
 from tiqora.db.legacy.ticket import Ticket
-from tiqora.itsm.change.approval_port import set_approval_port_for_tests
 from tiqora.itsm.change.calendar_mirror import sync_appointment
 from tiqora.itsm.change.models import TiqoraItsmChange
 from tiqora.itsm.change.service import ChangeCreateIn, ChangeUpdateIn, create_change, update_change
@@ -47,12 +47,9 @@ _T = datetime(2026, 10, 1)
 
 @pytest.fixture
 def port() -> Iterator[FakeApprovalPort]:
-    fake = FakeApprovalPort()
-    set_approval_port_for_tests(fake)
-    try:
-        yield fake
-    finally:
-        set_approval_port_for_tests(None)
+    """The fake, or the real engine under ``TIQORA_TEST_REAL_APPROVALS=1`` (_change_fixtures)."""
+    with approval_port_for() as test_port:
+        yield test_port
 
 
 @pytest.fixture(params=URL_FIXTURES)

@@ -772,8 +772,14 @@ async def test_templates_lists_resolvers_options(
             assert [(item["name"], item["member_count"]) for item in lists_out] == [
                 ("appr97 CAB", 3)
             ]
-            assert [r["key"] for r in resolvers_off] == ["ticket.owner", "ticket.responsible"]
+            # itsm.service_owner: registered by change management in core (itsm-change Task 17)
+            assert [r["key"] for r in resolvers_off] == [
+                "itsm.service_owner",
+                "ticket.owner",
+                "ticket.responsible",
+            ]
             assert [(r["key"], r["yields_customers"]) for r in resolvers_on] == [
+                ("itsm.service_owner", False),
                 ("ticket.customer_user", True),
                 ("ticket.owner", False),
                 ("ticket.responsible", False),

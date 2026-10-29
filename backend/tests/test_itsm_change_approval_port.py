@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests import approval_port_contract
@@ -12,11 +11,10 @@ from tiqora.itsm.change import approval_port
 from tiqora.itsm.change.approval_port import (
     APPROVAL_KEY,
     SUBJECT_TYPE,
-    UnavailableApprovalPort,
+    EngineApprovalPort,
     get_approval_port,
     set_approval_port_for_tests,
 )
-from tiqora.itsm.change.errors import ChangeError
 
 SESSION = cast(AsyncSession, cast(Any, None))
 DEFINITION = ApprovalDefinition(
@@ -55,31 +53,10 @@ def test_constants() -> None:
     assert (APPROVAL_KEY, SUBJECT_TYPE) == ("change_cab", "itsm.change")
 
 
-async def test_unavailable_port_raises() -> None:
+def test_default_port_is_the_engine() -> None:
+    """CX5: without a test port the real engine adapter answers (no "unavailable" port)."""
     set_approval_port_for_tests(None)
-    port = get_approval_port()
-    assert isinstance(port, UnavailableApprovalPort)
-    with pytest.raises(ChangeError) as exc:
-        await port.request(
-            SESSION,
-            ticket_id=1,
-            round=1,
-            title="t",
-            description="d",
-            definition=DEFINITION,
-            actor=Actor.system(),
-            requester=Principal.agent(7),
-            allow_self_approval=False,
-        )
-    assert exc.value.error_code == "approvals_unavailable"
-    assert exc.value.http_status == 409
-    for call in (
-        port.auto_decision(SESSION, ticket_id=1, round=1, title="t", actor=Actor.system()),
-        port.cancel(SESSION, approval_id=1, actor=Actor.system(), reason="x"),
-        port.snapshot(SESSION, approval_id=1),
-    ):
-        with pytest.raises(ChangeError):
-            await call
+    assert isinstance(get_approval_port(), EngineApprovalPort)
 
 
 def test_registered_port_is_returned_and_reset() -> None:
@@ -89,7 +66,7 @@ def test_registered_port_is_returned_and_reset() -> None:
         assert get_approval_port() is fake
     finally:
         set_approval_port_for_tests(None)
-    assert isinstance(get_approval_port(), UnavailableApprovalPort)
+    assert isinstance(get_approval_port(), EngineApprovalPort)
     assert approval_port._port is None
 
 

@@ -109,8 +109,7 @@ describe("ApprovalTemplatesPage", () => {
     fireEvent.click(await screen.findByTestId("template-new"));
     const ticket = await screen.findByTestId("template-subject-ticket");
     expect(ticket.closest("label")).toHaveTextContent("Ticket");
-    // A type whose title has no translation shows its raw key.
-    expect(screen.getByTestId("template-subject-itsm.change").closest("label")).toHaveTextContent("itsm.change");
+    expect(screen.getByTestId("template-subject-itsm.change").closest("label")).toHaveTextContent("Change");
     fireEvent.click(ticket);
     fireEvent.click(screen.getByTestId("template-subject-itsm.change"));
     await waitFor(() => {
