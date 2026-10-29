@@ -359,3 +359,15 @@ def test_merge_moved_row_with_article_id_zero_is_moved_too() -> None:
         "state",
         "close",
     ]
+
+
+def test_approval_misc_lines_emit_no_event() -> None:
+    """The approval engine writes plain-text ``Misc`` lines; reporting derives nothing from them."""
+    hist = [
+        h(1, "NewTicket", 0),
+        h(2, "Misc", 1, name="Approval #7 (default): requested"),
+        h(3, "Misc", 2, name="Approval #7: voted approved"),
+        h(4, "Misc", 3, name="Approval #7: decided rejected (timeout)"),
+        h(5, "Misc", 4, name="Approval #7: cancelled"),
+    ]
+    assert kinds(derive_events(t(), hist, [], STATE_TYPES)) == ["create"]

@@ -17,6 +17,7 @@ import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
 import { resolveGiData } from "./giMock";
 import { resolveItsmData } from "./itsmMock";
+import { resolveApprovalsData } from "./approvalsMock";
 import { resolveItsmImport } from "./itsmImportMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
@@ -2434,6 +2435,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   const giData = resolveGiData(p, method); if (giData !== undefined) return giData;
   const importData = resolveItsmImport(p, method); if (importData !== undefined) return importData;
   const itsmData = resolveItsmData(p, method); if (itsmData !== undefined) return itsmData;
+  const approvalsData = resolveApprovalsData(p, method); if (approvalsData !== undefined) return approvalsData;
   // Auth
   if (p.endsWith("/auth/methods")) return {
     password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,
@@ -2546,7 +2548,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
       { id: 1, name: "Standard (8x5)" },
       { id: 2, name: "Premium (24x7)" },
     ];
-  if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, name: o.owner_name }));
+  if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, full_name: o.owner_name, name: o.owner_name }));
   if (p.endsWith("/api/v1/tickets/dashboard-summary")) return { my_open: 9, my_new: 3, unowned_new: 5, escalated: 6 };
   if (p.endsWith("/api/v1/tickets") && method === "GET") return ticketListPage();
   if (p.endsWith("/api/v1/tickets/facets")) return ticketFacets();

@@ -17,6 +17,7 @@ from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.deployed.watcher import run_deploy_watch_tick
 from tiqora.domain.settings_store import (
+    KEY_APPROVALS_INTERVAL_SECONDS,
     KEY_GI_REQUESTER_INTERVAL_SECONDS,
     KEY_ITSM_CHANGE_INTERVAL_SECONDS,
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
@@ -31,6 +32,7 @@ from tiqora.identity.scim.role_sync import run_scim_role_sync_tick
 from tiqora.jobs.runner import JobRunner
 from tiqora.logging_setup import configure_logging
 from tiqora.worker.ai_audit_cleanup import run_ai_audit_cleanup_tick
+from tiqora.worker.approvals_sweep import run_approvals_sweep_worker_tick
 from tiqora.worker.cmdb_version_archive import run_cmdb_version_archive_tick
 from tiqora.worker.escalation import run_escalation_tick
 from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
@@ -202,6 +204,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def itsm_change_tick() -> dict[str, int]:
         return await run_itsm_change_tick(settings)
 
+    async def approvals_tick() -> dict[str, int]:
+        return await run_approvals_sweep_worker_tick(settings)
+
     from tiqora.extensions import get_registry
     from tiqora.gi.follower import make_gap_tracker, run_gi_requester_tick
     from tiqora.gi.loader import GiWebservices
@@ -349,6 +354,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             itsm_change_tick,
             settings.itsm_change_interval_seconds,
             KEY_ITSM_CHANGE_INTERVAL_SECONDS,
+            stop,
+        ),
+        _interval_loop(
+            "approvals",
+            approvals_tick,
+            settings.approvals_sweep_interval_seconds,
+            KEY_APPROVALS_INTERVAL_SECONDS,
             stop,
         ),
         _interval_loop(

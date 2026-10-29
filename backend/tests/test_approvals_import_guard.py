@@ -102,3 +102,15 @@ def test_import_scanner_detects_forbidden(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert ("sqlalchemy.ext.asyncio", True) in _imports(ok)
+
+
+def test_shared_mail_helpers_stay_in_the_domain_layer() -> None:
+    """The domain modules the approval mails use never import a feature layer (worker,
+    reporting); those import the domain instead."""
+    import tiqora.domain as domain_pkg
+
+    domain_dir = Path(domain_pkg.__file__).parent
+    for name in ("notification_sender.py", "subject_hook.py", "mail_address.py"):
+        modules = [m for m, _ in _imports(domain_dir / name)]
+        bad = [m for m in modules if m.startswith(("tiqora.worker", "tiqora.reporting"))]
+        assert bad == [], f"{name} imports {bad}"

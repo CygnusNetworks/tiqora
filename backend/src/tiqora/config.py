@@ -349,6 +349,19 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_API_KEY_RATE_LIMIT_WINDOW"
     )
 
+    # Public approval decision links (/api/v1/approval-links): per-IP lockout after bad links
+    # (own counters, not shared with agent login) and a per-link request budget in the same
+    # window. Switched on/off with auth_rate_limit_enabled.
+    approval_link_fail_max: int = Field(
+        default=20, validation_alias="TIQORA_APPROVAL_LINK_FAIL_MAX"
+    )
+    approval_link_fail_window_seconds: int = Field(
+        default=600, validation_alias="TIQORA_APPROVAL_LINK_FAIL_WINDOW"
+    )
+    approval_link_lockout_seconds: int = Field(
+        default=900, validation_alias="TIQORA_APPROVAL_LINK_LOCKOUT"
+    )
+
     # SCIM provisioning (/scim/v2): per-token request throttle, per-IP failed-auth
     # lockout (only bad tokens are counted; a valid token is never IP-locked) and limits.
     scim_rate_limit_enabled: bool = Field(
@@ -612,6 +625,12 @@ class Settings(BaseSettings):
     # switches it off; this is only the poll interval).
     itsm_change_interval_seconds: int = Field(
         default=3600, ge=60, le=86400, validation_alias="TIQORA_ITSM_CHANGE_INTERVAL"
+    )
+
+    # Approval sweeper (deadlines, reminders, escalation, invalid approvers, link purge).
+    # ``daemon.approvals.enabled`` (default ON) switches it off; this is only the poll interval.
+    approvals_sweep_interval_seconds: int = Field(
+        default=60, ge=15, le=3600, validation_alias="TIQORA_APPROVALS_SWEEP_INTERVAL"
     )
 
     # AI worker (tiqora-ai-worker, separate process/compose service — see

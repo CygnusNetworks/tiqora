@@ -1,3 +1,4 @@
+import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
 import type { Page, Route } from "@playwright/test";
 
 const customer = {
@@ -272,6 +273,14 @@ export async function mockPortalApi(page: Page) {
         ],
       });
       return;
+    }
+
+    if (path.includes("/api/portal/approvals")) {
+      const out = approvalsStore().handle(path, method, url.search, bodyOf(req));
+      if (out) {
+        await fulfillAnswer(route, out);
+        return;
+      }
     }
 
     await json(route, 404, { detail: `No mock for ${method} ${path}` });

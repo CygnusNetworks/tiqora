@@ -101,7 +101,6 @@ from tiqora.crypto.notification import (
 )
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.mail_outbound import build_outbound_sender
-from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.settings_store import (
     KEY_NOTIFICATIONS_ENABLED,
     get_setting_bool,
@@ -109,6 +108,7 @@ from tiqora.domain.settings_store import (
     set_setting,
 )
 from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
+from tiqora.domain.subject_hook import hooked_subject as _hooked_subject
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.domain.timezones import USER_TIME_ZONE_KEY, default_time_zone, valid_time_zone
 from tiqora.permissions.engine import PermissionEngine
@@ -625,28 +625,6 @@ async def _recipient_maps(
     if not maps.get("userfullname"):
         maps["userfullname"] = recipient.email
     return maps
-
-
-def _hooked_subject(subject: str, *, hook_cfg: SubjectHookConfig | None, tn: str) -> str:
-    """Prepend the ticket-number hook, as Znuny's notification subjects carry it.
-
-    ``TemplateGenerator::NotificationEvent`` runs the rendered subject through
-    ``TicketSubjectBuild(Type => 'New')``, so an agent sees
-    ``[Cygnus#2026…] Ticket unlocked`` and mail filters keyed on the hook match
-    notifications too. Same helper (and same idempotence) as agent replies.
-
-    *hook_cfg* is resolved once per event, not per recipient: a notification to
-    30-odd queue subscribers must not replay the same settings lookup 30 times.
-    """
-    if hook_cfg is None or not hook_cfg.enabled or not tn:
-        return subject
-    return build_ticket_subject(
-        subject,
-        hook=hook_cfg.hook,
-        divider=hook_cfg.divider,
-        tn=tn,
-        subject_format=hook_cfg.subject_format,
-    )
 
 
 async def _render_message(

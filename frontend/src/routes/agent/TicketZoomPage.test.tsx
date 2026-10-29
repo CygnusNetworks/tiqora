@@ -44,6 +44,7 @@ vi.mock("@/components/agent/TicketZoomOverflowMenu", () => ({
     return null;
   },
 }));
+vi.mock("@/components/approvals/TicketApprovalsPanel", () => ({ TicketApprovalsPanel: () => null }));
 vi.mock("@/components/agent/process/ProcessWidget", () => ({
   ProcessWidget: (props: { allowedActions: ReadonlySet<string> | null }) => (
     <div data-testid="process-widget-stub" data-allowed={props.allowedActions ? "set" : "null"} />

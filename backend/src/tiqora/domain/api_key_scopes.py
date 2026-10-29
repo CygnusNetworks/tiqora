@@ -61,6 +61,9 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/templates", "tickets"),
     ("/api/v1/search", "tickets"),
     ("/api/v1/integrations", "tickets"),
+    # Approvals (inbox, decisions, ticket approvals): deciding is a ticket workflow step.
+    # /api/v1/approval-links (e-mail decision links) is public and always open, see below.
+    ("/api/v1/approvals", "tickets"),
     # Background jobs are started by ticket features (CSV export) and by reports; polling,
     # downloading and cancelling them must work with the same key that enqueued them, so
     # ``tickets`` OR ``stats`` suffices (see ``_SHARED_AREAS``). Every job stays private
@@ -117,6 +120,8 @@ _SHARED_AREAS: tuple[tuple[str, tuple[str, ...]], ...] = (("/api/v1/jobs", ("tic
 _ALWAYS_ALLOWED_PREFIXES: tuple[str, ...] = (
     "/api/v1/auth",
     "/api/v1/health",
+    # Public e-mail decision links: no login, the link token is the credential.
+    "/api/v1/approval-links",
     "/health",
     "/metrics",
 )

@@ -322,6 +322,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Approvals
+         * @description The customer's open ("pending") or already decided requests, inside their company.
+         */
+        get: operations["list_approvals_api_portal_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/approvals/{approval_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Approval
+         * @description One request the customer approves. 404 for any other, also outside their company.
+         */
+        get: operations["get_approval_api_portal_approvals__approval_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/approvals/{approval_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Decision
+         * @description Votes "Freigeben" / "Ablehnen" on the customer's own row (channel ``portal``).
+         *
+         *     A request the customer holds no row on is 404. Once the ticket left the customer's company
+         *     the engine refuses with 403 ``customer_approver_outside_company``; with customer approvers
+         *     switched off in the meantime, 403 ``forbidden``.
+         */
+        post: operations["post_decision_api_portal_approvals__approval_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/auth/login": {
         parameters: {
             query?: never;
@@ -1992,6 +2056,219 @@ export interface paths {
         head?: never;
         /** Update Api Key */
         patch: operations["update_api_key_api_v1_admin_api_keys__key_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overview
+         * @description Every approval request, newest first. ``ticket_number`` is the ticket's number as
+         *     shown (exact match; an unknown one gives an empty page). ``overdue`` = an active step is
+         *     past its deadline (``true``) or none is (``false``).
+         */
+        get: operations["get_overview_api_v1_admin_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Delegations
+         * @description Delegations of any agent (optionally of one delegator), running and future ones; with
+         *     ``include_ended`` the whole history. Oldest first, paged.
+         */
+        get: operations["get_delegations_api_v1_admin_approvals_delegations_get"];
+        put?: never;
+        /**
+         * Post Delegation
+         * @description Names a substitute for *another* agent (``user_id``), e.g. for sick leave. 422
+         *     ``invalid_member`` for an unknown or invalid delegator, ``forward_target_invalid`` for a bad
+         *     substitute, ``invalid_definition`` for an empty or already ended period; 403 ``forbidden``
+         *     when the admin names themselves the substitute of someone else (an admin never gains the
+         *     power to decide in another agent's place - the agent does that on their own page).
+         */
+        post: operations["post_delegation_api_v1_admin_approvals_delegations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/delegations/{delegation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Delegation
+         * @description Ends any delegation now (404 ``delegation_not_found`` for an unknown id).
+         */
+        delete: operations["delete_delegation_api_v1_admin_approvals_delegations__delegation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lists
+         * @description All approver lists ("Freigabegruppen"), valid or not.
+         */
+        get: operations["get_lists_api_v1_admin_approvals_lists_get"];
+        put?: never;
+        /**
+         * Post List
+         * @description ``invalid_member`` 422 for an unknown or invalid agent, ``list_name_taken`` 409.
+         */
+        post: operations["post_list_api_v1_admin_approvals_lists_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/lists/{list_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get List */
+        get: operations["get_list_api_v1_admin_approvals_lists__list_id__get"];
+        /**
+         * Put List
+         * @description Replaces name, description, members and validity.
+         */
+        put: operations["put_list_api_v1_admin_approvals_lists__list_id__put"];
+        post?: never;
+        /**
+         * Delete List
+         * @description ``list_in_use`` 409 while a template still names the list.
+         */
+        delete: operations["delete_list_api_v1_admin_approvals_lists__list_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/subject-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subject Types
+         * @description The registered subject types (what an approval can be about), sorted by key.
+         */
+        get: operations["get_subject_types_api_v1_admin_approvals_subject_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Templates
+         * @description All templates, valid or not.
+         */
+        get: operations["get_templates_api_v1_admin_approvals_templates_get"];
+        put?: never;
+        /**
+         * Post Template
+         * @description Creates an admin template. ``unknown_subject_type`` / ``invalid_definition`` 422,
+         *     ``template_key_taken`` 409.
+         */
+        post: operations["post_template_api_v1_admin_approvals_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/templates/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Validate Template
+         * @description Checks a definition without saving it: structure, resolver keys and references
+         *     (``errors`` block saving) and approvers that no longer exist (``warnings``).
+         */
+        post: operations["post_validate_template_api_v1_admin_approvals_templates_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/approvals/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template */
+        get: operations["get_template_api_v1_admin_approvals_templates__template_id__get"];
+        /**
+         * Put Template
+         * @description Replaces name, description, subject types, definition and validity. The key is
+         *     immutable (consumers address templates by it): another one is 422 ``invalid_definition``.
+         *     With ``change_time`` (as loaded) a template changed meanwhile is 409 ``template_changed``.
+         */
+        put: operations["put_template_api_v1_admin_approvals_templates__template_id__put"];
+        post?: never;
+        /**
+         * Delete Template
+         * @description Running requests keep their snapshot.
+         */
+        delete: operations["delete_template_api_v1_admin_approvals_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/attachments": {
@@ -6983,6 +7260,303 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/approval-links/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Link Decide
+         * @description Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``
+         *     for a link that was already used, ``link_expired`` for one past its expiry, ``link_invalid``
+         *     for any other dead or unknown link.
+         */
+        post: operations["post_link_decide_api_v1_approval_links_decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approval-links/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Link Inspect
+         * @description What a decision link stands for, without using it (the confirm page reads this).
+         *
+         *     A bad link is a normal answer (200, ``valid`` false); only an unknown one counts towards the
+         *     IP lock (a revoked, used or expired link is no guess). A
+         *     customer approver who could not vote through the link (customer approvers off, the ticket
+         *     left their company) gets the vote's 403 instead, without anything about the request.
+         */
+        post: operations["post_link_inspect_api_v1_approval_links_inspect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Delegations
+         * @description The caller's own delegations ("Vertretung"), running and future ones.
+         */
+        get: operations["get_delegations_api_v1_approvals_delegations_get"];
+        put?: never;
+        /**
+         * Post Delegation
+         * @description The caller names a substitute for a period; the substitute may then decide in their
+         *     place (one vote per person and step, never on the caller's own requests).
+         */
+        post: operations["post_delegation_api_v1_approvals_delegations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/delegations/{delegation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Delegation
+         * @description Ends one of the caller's delegations now. A foreign one is 404 (an admin may end any).
+         */
+        delete: operations["delete_delegation_api_v1_approvals_delegations__delegation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Inbox
+         * @description "Meine Freigaben": open rows of the caller (and of agents who delegated to them), or
+         *     the rows they decided.
+         */
+        get: operations["get_inbox_api_v1_approvals_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/inbox/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Inbox Count
+         * @description Open rows the caller can still vote on - the sidebar badge.
+         */
+        get: operations["get_inbox_count_api_v1_approvals_inbox_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lists
+         * @description Valid approval groups ("Freigabegruppe, z. B. CAB") for the approver picker.
+         */
+        get: operations["get_lists_api_v1_approvals_lists_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/resolvers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Resolvers
+         * @description Dynamic approver sources. Those that name customers only appear where customers may
+         *     approve (the setting is on and the subject type allows them).
+         */
+        get: operations["get_resolvers_api_v1_approvals_resolvers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Templates
+         * @description Valid approval templates (for "Freigabe anfordern"), optionally for one subject type.
+         */
+        get: operations["get_templates_api_v1_approvals_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/{approval_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Approval
+         * @description Steps, approvers, votes, audit trail and what the caller may do. 404 unless the caller
+         *     may see the request (admin, ``ro`` on the ticket, requester, approver or their delegate).
+         *     No ticket articles are part of it.
+         */
+        get: operations["get_approval_api_v1_approvals__approval_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/{approval_id}/approvers/{approver_id}/forward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Forward
+         * @description Hands the caller's own open row to another agent.
+         */
+        post: operations["post_forward_api_v1_approvals__approval_id__approvers__approver_id__forward_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/{approval_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Cancel
+         * @description Withdraws an open request ("Zurückziehen"): requester, creator, ``rw`` on the ticket
+         *     or an admin. There is no note: the audit trail never stores free text.
+         */
+        post: operations["post_cancel_api_v1_approvals__approval_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/{approval_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Decision
+         * @description Votes "Freigeben" / "Ablehnen". The first decision of a step with rule "einer" counts.
+         */
+        post: operations["post_decision_api_v1_approvals__approval_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/approvals/{approval_id}/refresh-approvers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Refresh Approvers
+         * @description "Freigeber neu ermitteln": re-resolves the approvers of the open steps.
+         */
+        post: operations["post_refresh_approvers_api_v1_approvals__approval_id__refresh_approvers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -11405,6 +11979,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Roles
+         * @description Every valid role (id, name) for approver pickers; names only, no members.
+         */
+        get: operations["list_roles_api_v1_reference_roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/services": {
         parameters: {
             query?: never;
@@ -12905,6 +13499,33 @@ export interface paths {
          * @description Lift the per-ticket AI pause. Idempotent.
          */
         post: operations["unpause_ai_route_api_v1_tickets__ticket_id__ai_unpause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ticket Approvals
+         * @description Approval requests of the ticket, newest first, paged. Needs ``ro`` on the ticket (or
+         *     admin).
+         */
+        get: operations["list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get"];
+        put?: never;
+        /**
+         * Request Ticket Approval
+         * @description "Freigabe anfordern" on the ticket (subject ``ticket``): a template or an own
+         *     definition. Needs ``rw`` on the ticket (or admin). An own definition may not approve when
+         *     nobody can decide or when the deadline passes: those outcomes are for admin templates (F9).
+         */
+        post: operations["request_ticket_approval_api_v1_tickets__ticket_id__approvals_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14677,6 +15298,20 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * AdminDelegationIn
+         * @description An admin names the delegator as well (``user_id`` = whose decisions are delegated).
+         */
+        AdminDelegationIn: {
+            /** Substitute User Id */
+            substitute_user_id: number;
+            /** User Id */
+            user_id: number;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+        };
         /** AdminProcessOut */
         AdminProcessOut: {
             /** Activity Count */
@@ -16124,6 +16759,209 @@ export interface components {
             title?: string | null;
         };
         /**
+         * ApprovalAdminItemOut
+         * @description One row of the admin overview: any request, whoever may see it.
+         */
+        ApprovalAdminItemOut: {
+            /** Approval Key */
+            approval_key: string;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Stage */
+            current_stage?: number | null;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Id */
+            id: number;
+            /** Open Approvers */
+            open_approvers: number;
+            /** Overdue */
+            overdue: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Requester Label */
+            requester_label: string;
+            /** Status */
+            status: string;
+            /** Step Name */
+            step_name?: string | null;
+            /** Subject Ref */
+            subject_ref?: string | null;
+            /** Subject Type */
+            subject_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** ApprovalAdminPage */
+        ApprovalAdminPage: {
+            /** Items */
+            items: components["schemas"]["ApprovalAdminItemOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** ApprovalDefinition */
+        ApprovalDefinition: {
+            /** Steps */
+            steps: components["schemas"]["StepSpec"][];
+        };
+        /** ApprovalDetailOut */
+        ApprovalDetailOut: {
+            /** Approval Key */
+            approval_key: string;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /** Can Refresh */
+            can_refresh: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Stage */
+            current_stage?: number | null;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Describe Lines */
+            describe_lines: string[];
+            /** Description */
+            description?: string | null;
+            /** Events */
+            events: components["schemas"]["ApprovalEventOut"][];
+            /** Id */
+            id: number;
+            /** My Rows */
+            my_rows: components["schemas"]["MyApproverRowOut"][];
+            /** Reason */
+            reason?: string | null;
+            /** Requester Label */
+            requester_label: string;
+            /** Status */
+            status: string;
+            /** Steps */
+            steps: components["schemas"]["ApprovalStepOut"][];
+            /** Subject Ref */
+            subject_ref?: string | null;
+            /** Subject Type */
+            subject_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Link */
+            ticket_link: boolean;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** ApprovalEventOut */
+        ApprovalEventOut: {
+            /** Action */
+            action: string;
+            /** Actor Label */
+            actor_label: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Channel */
+            channel?: string | null;
+            /** Detail */
+            detail?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ApprovalInboxPage */
+        ApprovalInboxPage: {
+            /** Items */
+            items: components["schemas"]["InboxItemOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** ApprovalListIn */
+        ApprovalListIn: {
+            /** Description */
+            description?: string | null;
+            /** Member Ids */
+            member_ids?: number[];
+            /** Name */
+            name: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** ApprovalListMemberOut */
+        ApprovalListMemberOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+        };
+        /** ApprovalListOptionOut */
+        ApprovalListOptionOut: {
+            /** Id */
+            id: number;
+            /** Member Count */
+            member_count: number;
+            /** Name */
+            name: string;
+        };
+        /** ApprovalListOut */
+        ApprovalListOut: {
+            /** Description */
+            description?: string | null;
+            /** Id */
+            id: number;
+            /** Member Ids */
+            member_ids: number[];
+            /** Members */
+            members: components["schemas"]["ApprovalListMemberOut"][];
+            /** Name */
+            name: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /**
+         * ApprovalRequestIn
+         * @description Ad-hoc approval on a ticket (subject ``ticket``): a template or a definition.
+         */
+        ApprovalRequestIn: {
+            /**
+             * Approval Key
+             * @default default
+             */
+            approval_key: string;
+            definition?: components["schemas"]["ApprovalDefinition"] | null;
+            /** Description */
+            description?: string | null;
+            /** Template Key */
+            template_key?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
          * ApprovalSnapshotOut
          * @description The engine's view of one CAB approval round (vote counts ``None`` until it exposes them).
          */
@@ -16156,6 +16994,155 @@ export interface components {
             votes_rejected: number | null;
             /** Votes Total */
             votes_total: number | null;
+        };
+        /** ApprovalStepOut */
+        ApprovalStepOut: {
+            /** Approved Count */
+            approved_count: number;
+            /** Approvers */
+            approvers: components["schemas"]["ApproverOut"][];
+            /** Due At */
+            due_at?: string | null;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Overdue */
+            overdue: boolean;
+            /** Position */
+            position: number;
+            /** Quorum */
+            quorum?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Required */
+            required?: number | null;
+            /** Rule */
+            rule: string;
+            /** Stage */
+            stage: number;
+            /** Status */
+            status: string;
+        };
+        /** ApprovalSummaryOut */
+        ApprovalSummaryOut: {
+            /** Approval Key */
+            approval_key: string;
+            /** Can Cancel */
+            can_cancel: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Stage */
+            current_stage?: number | null;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Id */
+            id: number;
+            /** My Pending */
+            my_pending: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Requester Label */
+            requester_label: string;
+            /** Status */
+            status: string;
+            /** Subject Ref */
+            subject_ref?: string | null;
+            /** Subject Type */
+            subject_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+        };
+        /** ApprovalTemplateIn */
+        ApprovalTemplateIn: {
+            /** Change Time */
+            change_time?: string | null;
+            definition: components["schemas"]["ApprovalDefinition"];
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /** Subject Types */
+            subject_types?: string[];
+            /** Template Key */
+            template_key: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** ApprovalTemplateOptionOut */
+        ApprovalTemplateOptionOut: {
+            /** Description */
+            description?: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Subject Types */
+            subject_types: string[];
+        };
+        /** ApprovalTemplateOut */
+        ApprovalTemplateOut: {
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            definition: components["schemas"]["ApprovalDefinition"];
+            /** Description */
+            description?: string | null;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Origin */
+            origin: string;
+            /** Subject Types */
+            subject_types: string[];
+            /** Template Key */
+            template_key: string;
+            /** Valid */
+            valid: boolean;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** ApproverEntry */
+        ApproverEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "group" | "role" | "list" | "customer_user" | "resolver";
+            /** Ref */
+            ref: string;
+        };
+        /** ApproverOut */
+        ApproverOut: {
+            /** Decisive */
+            decisive: boolean;
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "agent" | "customer";
+            /** Source Kind */
+            source_kind: string;
+            /** Source Label */
+            source_label?: string | null;
+            /** Status */
+            status: string;
+            vote?: components["schemas"]["VoteOut"] | null;
         };
         /** ArticleAttachmentIn */
         ArticleAttachmentIn: {
@@ -20861,6 +21848,21 @@ export interface components {
             /** Ticket Id */
             ticket_id: number | null;
         };
+        /** DecisionIn */
+        DecisionIn: {
+            /** Approver Id */
+            approver_id?: number | null;
+            /**
+             * Comment
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).
+             */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+        };
         /** DefinitionChangeOut */
         DefinitionChangeOut: {
             /** Detail */
@@ -20872,6 +21874,25 @@ export interface components {
             kind: "added" | "removed" | "type_changed" | "count_changed" | "renamed_label" | "flags_changed";
             /** Path */
             path: string;
+        };
+        /**
+         * DefinitionCheckIn
+         * @description The definition is a plain object here: a broken one is answered in ``errors``, not 422.
+         */
+        DefinitionCheckIn: {
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Subject Type */
+            subject_type?: string | null;
+        };
+        /** DefinitionCheckOut */
+        DefinitionCheckOut: {
+            /** Errors */
+            errors: string[];
+            /** Warnings */
+            warnings: string[];
         };
         /** DefinitionImportIn */
         DefinitionImportIn: {
@@ -20907,6 +21928,40 @@ export interface components {
             attributes: components["schemas"]["AttributeDef-Input"][];
             /** Class Id */
             class_id?: number | null;
+        };
+        /** DelegationIn */
+        DelegationIn: {
+            /** Substitute User Id */
+            substitute_user_id: number;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+        };
+        /** DelegationOut */
+        DelegationOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Substitute Label */
+            substitute_label: string;
+            /** Substitute User Id */
+            substitute_user_id: number;
+            /** User Id */
+            user_id: number;
+            /** User Label */
+            user_label: string;
+            /**
+             * Valid From
+             * Format: date-time
+             */
+            valid_from: string;
+            /** Valid Until */
+            valid_until?: string | null;
         };
         /** DeployIn */
         DeployIn: {
@@ -21683,6 +22738,14 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /**
+         * ForwardIn
+         * @description Forwarding takes no comment: audit rows never carry free text.
+         */
+        ForwardIn: {
+            /** User Id */
+            user_id: number;
         };
         /** ForwardRequest */
         ForwardRequest: {
@@ -22818,6 +23881,52 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** InboxCountOut */
+        InboxCountOut: {
+            /** Pending */
+            pending: number;
+        };
+        /** InboxItemOut */
+        InboxItemOut: {
+            /** Approval Id */
+            approval_id: number;
+            /** Approved Count */
+            approved_count: number;
+            /** Approver Id */
+            approver_id: number;
+            /** Blocked Reason */
+            blocked_reason?: string | null;
+            /** Can Vote */
+            can_vote: boolean;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** My Decision */
+            my_decision?: string | null;
+            /** On Behalf Of Label */
+            on_behalf_of_label?: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Required */
+            required?: number | null;
+            /** Rule */
+            rule: string;
+            /** Status */
+            status: string;
+            /** Step Name */
+            step_name: string;
+            /** Subject Type */
+            subject_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
         /** InvokerEventOut */
         InvokerEventOut: {
             /** Asynchronous */
@@ -23724,6 +24833,31 @@ export interface components {
             /** Work Order Type */
             work_order_type: string | null;
         };
+        /** LinkDecideIn */
+        LinkDecideIn: {
+            /**
+             * Comment
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).
+             */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Token */
+            token: string;
+        };
+        /** LinkDecisionOut */
+        LinkDecisionOut: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Status */
+            status: string;
+        };
         /** LinkGraphEdgeOut */
         LinkGraphEdgeOut: {
             /**
@@ -23796,6 +24930,47 @@ export interface components {
              * @enum {string}
              */
             target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+        };
+        /**
+         * LinkInspectIn
+         * @description The link's secret travels in the body, never in a URL (no access-log or referrer leak).
+         */
+        LinkInspectIn: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * LinkInspectOut
+         * @description What the confirm page shows. Only the link holder's own view: no requester, no other
+         *     approvers, no comments (F25). ``code``: ``link_used`` (already used), ``link_expired`` (live
+         *     link past its expiry) or ``link_invalid`` (unknown, revoked, closed or not yours any more:
+         *     deliberately one answer).
+         */
+        LinkInspectOut: {
+            /** Approver Name */
+            approver_name?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Describe Lines */
+            describe_lines?: string[];
+            /** Description */
+            description?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Required */
+            required?: number | null;
+            /** Rule */
+            rule?: string | null;
+            /** Step Name */
+            step_name?: string | null;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Valid */
+            valid: boolean;
         };
         /** LinkOut */
         LinkOut: {
@@ -25142,6 +26317,17 @@ export interface components {
             /** Watcher User Id */
             watcher_user_id?: number | null;
         };
+        /** MyApproverRowOut */
+        MyApproverRowOut: {
+            /** Approver Id */
+            approver_id: number;
+            /** Can Forward */
+            can_forward: boolean;
+            /** On Behalf Of Label */
+            on_behalf_of_label?: string | null;
+            /** Step Id */
+            step_id: number;
+        };
         /**
          * MyTicketCounts
          * @description Owned-ticket counts for the "My tickets" sidebar badges.
@@ -26456,6 +27642,78 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** PortalApprovalItemOut */
+        PortalApprovalItemOut: {
+            /** Can Decide */
+            can_decide: boolean;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Id */
+            id: number;
+            /** My Decision */
+            my_decision?: string | null;
+            /** My Status */
+            my_status: string;
+            /** Status */
+            status: string;
+            /** Step Name */
+            step_name: string;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * PortalApprovalOut
+         * @description One request as its customer approver sees it: no other approvers, no other comments.
+         */
+        PortalApprovalOut: {
+            /** Approved Count */
+            approved_count: number;
+            /** Can Decide */
+            can_decide: boolean;
+            /** Describe Lines */
+            describe_lines?: string[];
+            /** Description */
+            description?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Id */
+            id: number;
+            /** My Decision */
+            my_decision?: string | null;
+            /** My Status */
+            my_status: string;
+            /** Required */
+            required?: number | null;
+            /** Rule Text Key */
+            rule_text_key: string;
+            /** Status */
+            status: string;
+            /** Step Name */
+            step_name: string;
+            /** Ticket Number */
+            ticket_number?: string | null;
+            /** Ticket Title */
+            ticket_title?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** PortalApprovalPage */
+        PortalApprovalPage: {
+            /** Items */
+            items: components["schemas"]["PortalApprovalItemOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
         /** PortalArticleOut */
         PortalArticleOut: {
             /** Content Md */
@@ -26567,6 +27825,22 @@ export interface components {
             items: components["schemas"]["PortalCiOut"][];
             /** Total */
             total: number;
+        };
+        /**
+         * PortalDecisionIn
+         * @description A customer approver's vote. No ``approver_id``: a customer decides only their own row.
+         */
+        PortalDecisionIn: {
+            /**
+             * Comment
+             * @description Optional reason, at most 2000 characters after trimming (longer: 422 comment_too_long; over 10000 characters the request is invalid).
+             */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
         };
         /** PortalLanguageIn */
         PortalLanguageIn: {
@@ -28402,6 +29676,15 @@ export interface components {
             /** Missing */
             missing: boolean;
         };
+        /** ResolverOptionOut */
+        ResolverOptionOut: {
+            /** Key */
+            key: string;
+            /** Title Key */
+            title_key: string;
+            /** Yields Customers */
+            yields_customers: boolean;
+        };
         /** RestartIn */
         RestartIn: {
             /** Reason */
@@ -28532,6 +29815,13 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /** RoleRefOut */
+        RoleRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /** RoleRule */
         RoleRule: {
@@ -30084,6 +31374,52 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** StepSpec */
+        StepSpec: {
+            /**
+             * Allow Delegation
+             * @default true
+             */
+            allow_delegation: boolean;
+            /**
+             * Allow Email
+             * @default true
+             */
+            allow_email: boolean;
+            /** Approvers */
+            approvers: components["schemas"]["ApproverEntry"][];
+            /** Due Hours */
+            due_hours?: number | null;
+            /** Escalation */
+            escalation?: components["schemas"]["ApproverEntry"][];
+            /** Name */
+            name: string;
+            /**
+             * On No Approver
+             * @default reject
+             * @enum {string}
+             */
+            on_no_approver: "reject" | "approve";
+            /**
+             * On Timeout
+             * @default notify
+             * @enum {string}
+             */
+            on_timeout: "notify" | "escalate" | "reject" | "approve";
+            /** Quorum */
+            quorum?: number | null;
+            /**
+             * Rule
+             * @default any
+             * @enum {string}
+             */
+            rule: "any" | "all" | "quorum" | "majority";
+            /**
+             * Stage
+             * @default 1
+             */
+            stage: number;
+        };
         /**
          * SubjectConfigOut
          * @description Effective subject-hook config plus Znuny baseline and raw overrides.
@@ -30142,6 +31478,13 @@ export interface components {
             hook: string;
             /** Subject Format */
             subject_format: string;
+        };
+        /** SubjectTypeOut */
+        SubjectTypeOut: {
+            /** Key */
+            key: string;
+            /** Title Key */
+            title_key: string;
         };
         /** SystemAddressCreate */
         SystemAddressCreate: {
@@ -32071,6 +33414,24 @@ export interface components {
             /** Created */
             created: number;
         };
+        /** VoteOut */
+        VoteOut: {
+            /** Channel */
+            channel: string;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Decided At
+             * Format: date-time
+             */
+            decided_at: string;
+            /** Decided By Label */
+            decided_by_label: string;
+            /** Decision */
+            decision: string;
+            /** On Behalf */
+            on_behalf: boolean;
+        };
         /** WebhookCreate */
         WebhookCreate: {
             /** Events */
@@ -33394,6 +34755,111 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_approvals_api_portal_approvals_get: {
+        parameters: {
+            query?: {
+                state?: "pending" | "decided";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalApprovalPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_approval_api_portal_approvals__approval_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_decision_api_portal_approvals__approval_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
@@ -37273,6 +38739,579 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiKeyOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overview_api_v1_admin_approvals_get: {
+        parameters: {
+            query?: {
+                status?: ("pending" | "approved" | "rejected" | "cancelled") | null;
+                ticket_id?: number | null;
+                ticket_number?: string | null;
+                subject_type?: string | null;
+                overdue?: boolean | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalAdminPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_delegations_api_v1_admin_approvals_delegations_get: {
+        parameters: {
+            query?: {
+                user_id?: number | null;
+                include_ended?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_delegation_api_v1_admin_approvals_delegations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminDelegationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_delegation_api_v1_admin_approvals_delegations__delegation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                delegation_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lists_api_v1_admin_approvals_lists_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalListOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_list_api_v1_admin_approvals_lists_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalListIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_list_api_v1_admin_approvals_lists__list_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                list_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_list_api_v1_admin_approvals_lists__list_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                list_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalListIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_list_api_v1_admin_approvals_lists__list_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                list_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subject_types_api_v1_admin_approvals_subject_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_templates_api_v1_admin_approvals_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_template_api_v1_admin_approvals_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_validate_template_api_v1_admin_approvals_templates_validate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinitionCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_v1_admin_approvals_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_template_api_v1_admin_approvals_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_v1_admin_approvals_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -51839,6 +53878,532 @@ export interface operations {
             };
         };
     };
+    post_link_decide_api_v1_approval_links_decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDecideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkDecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_link_inspect_api_v1_approval_links_inspect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkInspectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkInspectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_delegations_api_v1_approvals_delegations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_delegation_api_v1_approvals_delegations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DelegationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_delegation_api_v1_approvals_delegations__delegation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                delegation_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_inbox_api_v1_approvals_inbox_get: {
+        parameters: {
+            query?: {
+                state?: "pending" | "decided";
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalInboxPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_inbox_count_api_v1_approvals_inbox_count_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxCountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lists_api_v1_approvals_lists_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalListOptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resolvers_api_v1_approvals_resolvers_get: {
+        parameters: {
+            query?: {
+                subject_type?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolverOptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_templates_api_v1_approvals_templates_get: {
+        parameters: {
+            query?: {
+                subject_type?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalTemplateOptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_approval_api_v1_approvals__approval_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_forward_api_v1_approvals__approval_id__approvers__approver_id__forward_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                approval_id: number;
+                approver_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForwardIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_cancel_api_v1_approvals__approval_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_decision_api_v1_approvals__approval_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_refresh_approvers_api_v1_approvals__approval_id__refresh_approvers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                approval_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -61296,6 +63861,39 @@ export interface operations {
             };
         };
     };
+    list_roles_api_v1_reference_roles_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_services_api_v1_reference_services_get: {
         parameters: {
             query?: never;
@@ -64438,6 +67036,83 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ticket_approvals_api_v1_tickets__ticket_id__approvals_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_ticket_approval_api_v1_tickets__ticket_id__approvals_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDetailOut"];
+                };
             };
             /** @description Validation Error */
             422: {

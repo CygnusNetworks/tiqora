@@ -80,7 +80,8 @@
     "templates": "Templates",
     "escalatedCount": "{{count}} eskaliert",
     "customers": "Kunden",
-    "searches": "Gespeicherte Suchen"
+    "searches": "Gespeicherte Suchen",
+    "approvals": "Meine Freigaben"
   },
   "views": {
     "mine": "Meine Tickets",
@@ -1376,7 +1377,8 @@
       "newTicket": "Neues Ticket",
       "kb": "Hilfeartikel",
       "preferences": "Einstellungen",
-      "cmdb": "Meine Geräte und Systeme"
+      "cmdb": "Meine Geräte und Systeme",
+      "approvals": "Freigaben"
     },
     "login": {
       "stepUp": {
@@ -2244,7 +2246,11 @@
       "cmdbCatalog": "CMDB-Auswahllisten",
       "itsm": "ITSM",
       "itsmLinkTypes": "Verknüpfungstypen",
-      "itsmImport": "ITSM-Import"
+      "itsmImport": "ITSM-Import",
+      "approvals": "Freigaben",
+      "approvalsTemplates": "Freigabevorlagen",
+      "approvalsLists": "Freigabegruppen",
+      "approvalsDelegations": "Vertretungen"
     },
     "table": {
       "id": "ID",
@@ -3476,6 +3482,10 @@
           "name": "Berichtsläufe aufräumen",
           "description": "Löscht den Verlauf der geplanten Berichte samt erzeugter Dateien nach Ablauf der Aufbewahrungsfrist."
         },
+        "approvals": {
+          "name": "Freigaben",
+          "description": "Überwacht Freigabefristen: versendet Erinnerungen, eskaliert oder beendet Stufen nach Fristablauf, entfernt Freigeber, die nicht mehr gültig sind, zieht Freigaben gelöschter Tickets zurück und räumt alte Entscheidungslinks auf."
+        },
         "webchat_sweep": {
           "name": "Web-Chat aufräumen",
           "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."
@@ -3910,7 +3920,12 @@
       "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
       "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
       "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM",
-      "itsmImport": "ITSM-Daten aus Znuny in die CMDB von Tiqora übernehmen und auf Tiqora umstellen."
+      "itsmImport": "ITSM-Daten aus Znuny in die CMDB von Tiqora übernehmen und auf Tiqora umstellen.",
+      "approvals": "Alle Freigaben mit Status und Frist; Freigaben zurückziehen",
+      "approvalsTemplates": "Wiederverwendbare Freigabe-Abläufe mit Schritten, Regeln und Fristen",
+      "approvalsLists": "Gruppen von Freigebern, zum Beispiel ein CAB, für den Einsatz in Vorlagen",
+      "approvalsDelegations": "Wer wen bei Abwesenheit vertritt",
+      "settingsApprovals": "Fristen, Erinnerungen, Entscheidungslinks, Kunden als Freigeber und Abstimmen über MCP"
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4625,6 +4640,59 @@
           "legacy_change_group": {
             "label": "Gruppe für frühere Znuny-Changes",
             "help": "Mitglieder (ro) dürfen die Changes des Znuny-ITSM-Change-Moduls lesen. Existiert die Gruppe nicht, dürfen es Change-Manager und Administratoren."
+          }
+        }
+      },
+      "approvals": {
+        "title": "Freigaben",
+        "fields": {
+          "default_due_hours": {
+            "label": "Standardfrist (Stunden)",
+            "help": "Frist für Schritte ohne eigene Frist. 0 bedeutet keine Frist."
+          },
+          "reminder_interval_hours": {
+            "label": "Erinnerung alle (Stunden)",
+            "help": "Wie oft offene Freigeber erinnert werden. 0 schaltet Erinnerungen aus."
+          },
+          "reminder_max": {
+            "label": "Höchstzahl der Erinnerungen",
+            "help": "Wie viele Erinnerungen ein Schritt höchstens verschickt."
+          },
+          "email_links_enabled": {
+            "label": "Entscheidungslinks in E-Mails",
+            "help": "Freigeber können direkt aus der E-Mail entscheiden. Ohne Links verweist die E-Mail nur auf den Eingang."
+          },
+          "link_ttl_hours": {
+            "label": "Gültigkeit der Links (Stunden)",
+            "help": "Wie lange ein Entscheidungslink funktioniert."
+          },
+          "max_links_per_approver": {
+            "label": "Aktive Links je Freigeber",
+            "help": "Ältere Links desselben Freigebers werden ungültig, wenn diese Zahl überschritten wird."
+          },
+          "customer_approvers_enabled": {
+            "label": "Kunden als Freigeber",
+            "help": "Erlaubt Kunden als Freigeber. Sie entscheiden im Portal oder über den Link."
+          },
+          "portal_approvals_enabled": {
+            "label": "Freigaben im Portal",
+            "help": "Zeigt Kunden ihre offenen Freigaben im Portal. Wirkt nur, wenn Kunden Freigeber sein dürfen und das Portal aktiv ist."
+          },
+          "history_entries": {
+            "label": "Einträge im Ticketverlauf",
+            "help": "Schreibt für jede Anforderung, Stimme und Entscheidung eine kurze Zeile in den Ticketverlauf."
+          },
+          "decision_note": {
+            "label": "Interne Notiz bei Entscheidung",
+            "help": "Fügt dem Ticket eine interne Notiz hinzu, wenn endgültig entschieden ist."
+          },
+          "mail_requester_on_decision": {
+            "label": "Antragsteller informieren",
+            "help": "Schickt dem Antragsteller eine E-Mail, wenn endgültig entschieden ist."
+          },
+          "mcp_decide_enabled": {
+            "label": "Abstimmen über MCP erlauben",
+            "help": "Achtung: Erlaubt einem MCP-Client mit der ausdrücklichen Tool-Berechtigung „approval_decide“, verbindliche Stimmen im Namen seines Benutzers abzugeben. Lassen Sie das ausgeschaltet, solange Sie dem Client und seinen Eingaben nicht vertrauen."
           }
         }
       }
@@ -6745,7 +6813,9 @@
         "itsm_change_tasks": "Change-Aufgaben anlegen",
         "itsm_change_impact": "Auswirkung eines Changes berechnen",
         "itsm_legacy_change_archive": "Znuny-Changes archivieren",
-        "itsm_switch": "ITSM auf Tiqora umstellen"
+        "itsm_switch": "ITSM auf Tiqora umstellen",
+        "approval_hook": "Freigabe-Nachbearbeitung",
+        "approval_mail": "Freigabe-Benachrichtigungen"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },
@@ -9261,6 +9331,396 @@
     "newTicket": {
       "recentIncident": "Für diesen Service gab es bereits vor {{minutes}} Minuten einen Vorfall: #{{tn}} {{title}}. Handelt es sich um dasselbe Problem?",
       "openTicket": "Ticket öffnen"
+    }
+  },
+  "approvals": {
+    "agent": {
+      "title": "Meine Freigaben",
+      "empty": "Keine offenen Freigaben. Sie werden per E-Mail benachrichtigt, wenn eine Freigabe auf Sie wartet.",
+      "emptyDone": "Noch keine entschiedenen Freigaben.",
+      "loadFailed": "Die Freigaben konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "detail": "Details der Freigabe",
+      "back": "Zurück zur Liste",
+      "requestedBy": "Angefordert von {{name}}",
+      "ticket": "Ticket {{number}}",
+      "onBehalfOf": "in Vertretung für {{name}}",
+      "myDecision": "Ihre Entscheidung: {{decision}}",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "pageOf": "Seite {{page}} von {{pages}}",
+      "tabs": {
+        "open": "Offen",
+        "done": "Erledigt",
+        "delegation": "Vertretung"
+      },
+      "blocked": {
+        "already_voted": "nicht möglich (bereits abgestimmt)",
+        "own_request": "nicht möglich (eigene Anfrage)"
+      },
+      "delegation": {
+        "title": "Vertretung",
+        "hint": "Solange eine Vertretung gilt, kann diese Person an Ihrer Stelle über Freigaben entscheiden. Pro Schritt zählt nur eine Stimme je Person.",
+        "empty": "Sie haben keine Vertretung benannt.",
+        "new": "Vertretung benennen",
+        "substitute": "Vertretung",
+        "from": "Von (optional, sonst ab jetzt)",
+        "until": "Bis (optional)",
+        "periodHint": "Ohne Enddatum bleibt die Vertretung aktiv, bis Sie sie beenden.",
+        "substituteMissing": "Bitte wählen Sie eine Vertretung.",
+        "untilPast": "Das Ende muss in der Zukunft liegen.",
+        "untilBeforeFrom": "Das Ende muss nach dem Beginn liegen.",
+        "create": "Vertretung speichern",
+        "revoke": "Jetzt beenden",
+        "running": "aktiv",
+        "planned": "geplant",
+        "noEnd": "ohne Ende",
+        "alreadyEnded": "Bereits beendet."
+      },
+      "cannotVote": "Sie können hier nicht (mehr) abstimmen."
+    },
+    "portal": {
+      "title": "Freigaben",
+      "unavailable": "Nicht verfügbar",
+      "loadError": "Die Freigaben konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "empty": "Keine offenen Freigaben. Sie werden per E-Mail benachrichtigt, sobald eine Freigabe auf Sie wartet.",
+      "emptyDone": "Noch keine erledigten Freigaben.",
+      "back": "Zurück zu den Freigaben",
+      "decidedAt": "entschieden {{date}}",
+      "myApproved": "Sie haben freigegeben",
+      "myRejected": "Sie haben abgelehnt"
+    },
+    "link": {
+      "title": "Freigabe",
+      "incomplete": "Der Link ist unvollständig.",
+      "loading": "Freigabe wird geladen",
+      "ticket": "Ticket {{number}}",
+      "step": "Schritt: {{name}}",
+      "due": "Frist: {{date}}",
+      "decidingAs": "Sie entscheiden als {{name}}",
+      "doneApproved": "Danke, Ihre Freigabe wurde gespeichert.",
+      "doneRejected": "Ihre Ablehnung wurde gespeichert.",
+      "requestStatus": "Status der Anfrage: {{status}}",
+      "closeHint": "Sie können dieses Fenster jetzt schließen.",
+      "retryIn": "Bitte versuchen Sie es in {{seconds}} Sekunden erneut.",
+      "reopen": "Öffnen Sie den Link aus der E-Mail erneut.",
+      "retry": "Erneut versuchen"
+    },
+    "subject": {
+      "ticket": "Ticket"
+    },
+    "resolver": {
+      "ticket_customer_user": "Kunde des Tickets",
+      "ticket_owner": "Besitzer des Tickets",
+      "ticket_responsible": "Verantwortlicher des Tickets"
+    },
+    "rule": {
+      "any": "Eine Freigabe genügt",
+      "all": "Alle Freigeber müssen zustimmen",
+      "quorum": "{{required}} Freigaben nötig",
+      "majority": "Mehrheit nötig ({{required}} Freigaben)",
+      "majorityOpen": "Mehrheit nötig"
+    },
+    "errors": {
+      "approval_not_found": "Diese Freigabe gibt es nicht, oder Sie dürfen sie nicht sehen.",
+      "ticket_not_found": "Dieses Ticket gibt es nicht, oder Sie dürfen es nicht sehen.",
+      "template_not_found": "Diese Freigabevorlage gibt es nicht.",
+      "list_not_found": "Diese Freigabegruppe gibt es nicht.",
+      "forbidden": "Dazu haben Sie keine Berechtigung.",
+      "not_an_approver": "Sie sind für diese Freigabe nicht als Freigeber vorgesehen.",
+      "self_approval_forbidden": "Eine selbst beantragte Freigabe können Sie nicht selbst erteilen.",
+      "customer_approver_outside_company": "Dieser Kunde gehört zu einer anderen Firma als das Ticket und kann nicht freigeben.",
+      "delegation_not_active": "Diese Vertretung ist nicht (mehr) aktiv.",
+      "comment_too_long": "Der Kommentar ist zu lang.",
+      "already_decided": "Hier wurde bereits entschieden.",
+      "approval_closed": "Diese Freigabe ist bereits abgeschlossen.",
+      "step_not_active": "Dieser Schritt wartet gerade nicht auf eine Entscheidung.",
+      "forward_not_allowed": "Diese Freigabe kann nicht weitergeleitet werden.",
+      "forward_target_invalid": "Die gewählte Person kann diese Freigabe nicht übernehmen.",
+      "invalid_definition": "Die Angaben sind nicht gültig. Bitte prüfen Sie Schritte, Freigeber und Fristen.",
+      "unknown_subject_type": "Diese Art der Freigabe ist nicht bekannt.",
+      "subject_not_requestable": "Diese Art der Freigabe kann nicht von Hand angefordert werden.",
+      "customer_approvers_not_allowed": "Kunden können diese Art der Freigabe nicht erteilen.",
+      "unknown_resolver": "Eine Regel für Freigeber in der Vorlage gibt es nicht.",
+      "link_invalid": "Dieser Link ist nicht mehr gültig. Möglicherweise wurde bereits entschieden oder die Freigabe zurückgezogen.",
+      "link_expired": "Dieser Link ist abgelaufen. Bitte melden Sie sich an und entscheiden Sie unter „Meine Freigaben“.",
+      "link_used": "Über diese Freigabe wurde mit diesem Link bereits entschieden.",
+      "invalid_member": "Die gewählte Person ist nicht gültig oder nicht aktiv.",
+      "list_name_taken": "Eine Freigabegruppe mit diesem Namen gibt es schon.",
+      "list_in_use": "Diese Freigabegruppe wird noch von einer Vorlage oder einer laufenden Freigabe verwendet.",
+      "template_key_taken": "Eine Freigabevorlage mit dieser Kennung gibt es schon.",
+      "delegation_overlap": "Für diesen Zeitraum gibt es schon eine Vertretung.",
+      "rate_limited": "Zu viele Versuche. Bitte warten Sie einige Minuten.",
+      "unknown": "Die Freigabe konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
+      "approver_invalid": "Ihr Zugang ist nicht mehr aktiv; Sie können über diese Freigabe nicht mehr entscheiden.",
+      "template_changed": "Die Vorlage wurde inzwischen geändert. Bitte laden Sie sie neu."
+    },
+    "overdue": "überfällig",
+    "status": {
+      "pending": "Offen",
+      "approved": "Freigegeben",
+      "rejected": "Abgelehnt",
+      "cancelled": "Zurückgezogen",
+      "waiting": "Wartet",
+      "active": "In Bearbeitung",
+      "forwarded": "Weitergeleitet",
+      "removed": "Entfernt",
+      "not_needed": "Nicht nötig"
+    },
+    "source": {
+      "user": "Direkt benannt",
+      "group": "Über Gruppe",
+      "role": "Über Rolle",
+      "list": "Über Freigabegruppe",
+      "customer_user": "Kunde",
+      "resolver": "Nach Regel",
+      "escalation": "Eskalation",
+      "forward": "Weitergeleitet",
+      "via": {
+        "group": "über Gruppe {{name}}",
+        "role": "über Rolle {{name}}",
+        "list": "über Freigabegruppe {{name}}"
+      }
+    },
+    "steps": {
+      "stage": "Stufe {{stage}}",
+      "progress": "{{approved}} von {{required}} Freigaben",
+      "due": "Fällig am {{date}}",
+      "decisive": "Entscheidet allein",
+      "onBehalf": "{{name}} hat in Vertretung abgestimmt",
+      "startsAfter": "Startet nach Stufe {{stage}}",
+      "approversLater": "Die Freigeber werden bestimmt, sobald diese Stufe beginnt."
+    },
+    "audit": {
+      "title": "Verlauf ({{count}})",
+      "empty": "Noch keine Einträge.",
+      "requested": "Angefordert",
+      "step_activated": "Schritt gestartet",
+      "approver_added": "Freigeber hinzugefügt",
+      "approver_excluded": "Freigeber ausgeschlossen",
+      "approver_removed": "Freigeber entfernt",
+      "notified": "Benachrichtigt",
+      "reminded": "Erinnerung gesendet",
+      "link_issued": "Entscheidungslink erstellt",
+      "voted": "Abgestimmt",
+      "forwarded": "Weitergeleitet",
+      "step_decided": "Schritt entschieden",
+      "overdue": "Frist überschritten",
+      "escalated": "Eskaliert",
+      "timeout_decided": "Wegen Frist entschieden",
+      "refreshed": "Freigeber aktualisiert",
+      "decided": "Entschieden",
+      "auto_decided": "Automatisch entschieden",
+      "cancelled": "Zurückgezogen",
+      "superseded": "Durch neuere Anfrage ersetzt",
+      "hook_done": "Ergebnis übergeben",
+      "hook_failed": "Übergabe des Ergebnisses fehlgeschlagen",
+      "note_skipped": "Ticketnotiz übersprungen"
+    },
+    "decision": {
+      "title": "Ihre Entscheidung",
+      "approve": "Freigeben",
+      "reject": "Ablehnen",
+      "comment": "Kommentar (optional)",
+      "commentRequired": "Begründung der Ablehnung",
+      "commentMissing": "Bitte geben Sie eine Begründung für die Ablehnung an.",
+      "commentUntilChosen": "Kommentar (bei Ablehnung erforderlich)",
+      "counter": "{{count}} / {{max}}"
+    },
+    "forward": {
+      "title": "Freigabe weiterleiten",
+      "description": "Ein anderer Agent entscheidet an Ihrer Stelle.",
+      "agent": "Agent",
+      "submit": "Weiterleiten"
+    },
+    "picker": {
+      "agent": "Agent wählen",
+      "group": "Gruppe wählen",
+      "role": "Rolle wählen",
+      "list": "Freigabegruppe wählen",
+      "customer": "Kunde wählen",
+      "customerSearch": "Kunden suchen (ab 2 Buchstaben)",
+      "resolver": "Regel wählen",
+      "rolesFailed": "Die Rollen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+      "roleGone": "Rolle #{{id}} (nicht mehr vorhanden)"
+    },
+    "entry": {
+      "kindLabel": "Art",
+      "kind": {
+        "user": "Agent",
+        "group": "Gruppe",
+        "role": "Rolle",
+        "list": "Freigabegruppe",
+        "customer_user": "Kunde",
+        "resolver": "Regel"
+      },
+      "members": "{{count}} Mitglieder",
+      "add": "Freigeber hinzufügen",
+      "remove": "Freigeber entfernen"
+    },
+    "definition": {
+      "name": "Name des Schritts",
+      "stage": "Stufe",
+      "rule": "Regel",
+      "ruleOption": {
+        "any": "Einer",
+        "all": "Alle",
+        "quorum": "Mindestanzahl",
+        "majority": "Mehrheit"
+      },
+      "quorum": "Nötige Freigaben",
+      "approvers": "Freigeber",
+      "dueHours": "Frist in Stunden",
+      "onTimeout": "Wenn die Frist abläuft",
+      "timeout": {
+        "notify": "Nur erinnern",
+        "escalate": "Eskalieren",
+        "reject": "Ablehnen",
+        "approve": "Freigeben",
+        "approveTemplatesOnly": "Automatisch freigeben (nur in Vorlagen)"
+      },
+      "escalation": "Eskalation an",
+      "allowForward": "Weiterleiten und Vertretung erlaubt",
+      "allowEmail": "Entscheidung per E-Mail-Link",
+      "addStep": "Schritt hinzufügen",
+      "removeStep": "Schritt entfernen",
+      "moveUp": "Schritt nach oben",
+      "moveDown": "Schritt nach unten",
+      "problem": {
+        "name": "Bitte geben Sie dem Schritt einen Namen.",
+        "approvers": "Bitte nennen Sie mindestens einen Freigeber und füllen Sie jede Zeile aus.",
+        "quorum": "Bitte geben Sie an, wie viele Freigaben nötig sind.",
+        "escalation": "Bitte nennen Sie, an wen der Schritt eskaliert wird."
+      },
+      "dueDefault": "Standard",
+      "dueHint": "Leer: Standardfrist aus den Einstellungen. 0: keine Frist.",
+      "allowForwardHint": "Wenn Sie das ausschalten, entscheidet auch keine Vertretung an Stelle des Freigebers, nicht nur das Weiterleiten fällt weg."
+    },
+    "ticket": {
+      "title": "Freigaben",
+      "request": "Freigabe anfordern",
+      "older": "Ältere Freigaben ({{count}})",
+      "details": "Details",
+      "hideDetails": "Details ausblenden",
+      "stage": "Stufe {{stage}}",
+      "noStage": "Abgeschlossen",
+      "requestedBy": "Angefordert von {{name}}",
+      "refresh": "Freigeber neu ermitteln",
+      "loadFailed": "Die Freigaben konnten nicht geladen werden."
+    },
+    "request": {
+      "title": "Freigabe anfordern",
+      "mode": "Art",
+      "modeTemplate": "Vorlage",
+      "modeCustom": "Eigene Freigeber",
+      "template": "Vorlage",
+      "templatePlaceholder": "Vorlage wählen",
+      "templateMissing": "Bitte wählen Sie eine Vorlage.",
+      "noTemplates": "Es sind keine Vorlagen verfügbar. Nennen Sie die Freigeber selbst.",
+      "name": "Titel",
+      "nameMissing": "Bitte geben Sie einen Titel ein.",
+      "description": "Beschreibung (optional)",
+      "definitionIncomplete": "Bitte vervollständigen Sie zuerst jeden Schritt.",
+      "submit": "Anfordern"
+    },
+    "admin": {
+      "settings": "Einstellungen",
+      "overview": {
+        "filter": {
+          "status": "Status",
+          "statusAll": "Alle",
+          "subjectType": "Art der Freigabe",
+          "overdue": "Nur überfällige",
+          "ticketNumber": "Ticketnummer"
+        },
+        "empty": "Es gibt noch keine Anfragen.",
+        "emptyFiltered": "Keine Anfrage passt zu diesen Filtern.",
+        "openApprovers": "{{count}} Entscheidung(en) offen"
+      },
+      "templates": {
+        "new": "Neue Vorlage",
+        "edit": "Vorlage bearbeiten",
+        "empty": "Noch keine Vorlagen.",
+        "key": "Kennung",
+        "keyHint": "Daran finden Funktionen die Vorlage. Nach dem Speichern nicht mehr änderbar.",
+        "keyLocked": "Die Kennung kann nicht geändert werden.",
+        "name": "Name",
+        "description": "Beschreibung",
+        "subjectTypes": "Arten der Freigabe",
+        "subjectTypesHint": "Wählen Sie, wofür die Vorlage verwendet werden darf. Ohne Auswahl gilt sie für alle Arten der Freigabe.",
+        "allSubjects": "Alle Arten der Freigabe",
+        "valid": "Gültig",
+        "invalid": "Ungültig",
+        "hasWarnings": "{{count}} Hinweise",
+        "originHint": "Von {{feature}} angelegt",
+        "definition": "Schritte",
+        "deleteTitle": "Vorlage löschen?",
+        "deleteMessage": "Die Vorlage „{{name}}“ wird entfernt. Laufende Anfragen bleiben unberührt.",
+        "check": {
+          "running": "Wird geprüft …",
+          "ok": "Die Definition ist gültig.",
+          "stepPrefix": "Schritt {{n}} ({{name}}):",
+          "invalid_definition": "Eine Angabe ist ungültig ({{path}}).",
+          "field": {
+            "name": "Der Name fehlt oder ist zu lang.",
+            "stage": "Die Stufe ist ungültig.",
+            "rule": "Die Regel ist ungültig.",
+            "quorum": "Die Zahl der nötigen Freigaben ist ungültig.",
+            "approvers": "Die Freigeber sind unvollständig oder ungültig.",
+            "due_hours": "Die Frist ist ungültig.",
+            "on_timeout": "Die Aktion bei Fristablauf ist ungültig.",
+            "escalation": "Die Eskalation ist unvollständig oder ungültig."
+          },
+          "unknown_resolver": "Die Regel „{{arg}}“ gibt es nicht.",
+          "invalid_ref": "Ein Eintrag bei den Freigebern ist ungültig ({{arg}}).",
+          "customer_entry_not_allowed": "Kunden dürfen für diese Arten der Freigabe nicht freigeben.",
+          "unknown_subject_type": "Die Art der Freigabe „{{arg}}“ gibt es nicht.",
+          "missing_user": "Agent #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_group": "Gruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_role": "Rolle #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_list": "Freigabegruppe #{{arg}} existiert nicht mehr oder ist ungültig.",
+          "missing_customer": "Kunde {{arg}} existiert nicht mehr oder ist ungültig."
+        },
+        "keyMissing": "Bitte geben Sie eine Kennung ein."
+      },
+      "lists": {
+        "new": "Neue Freigabegruppe",
+        "edit": "Freigabegruppe bearbeiten",
+        "empty": "Noch keine Freigabegruppen.",
+        "name": "Name",
+        "nameMissing": "Bitte geben Sie einen Namen ein.",
+        "description": "Beschreibung",
+        "valid": "Gültig",
+        "invalid": "Ungültig",
+        "members": "Mitglieder",
+        "membersEmpty": "Keine Mitglieder",
+        "addMember": "Mitglied hinzufügen",
+        "removeMember": "{{name}} entfernen",
+        "deleteTitle": "Freigabegruppe löschen?",
+        "deleteMessage": "Die Freigabegruppe „{{name}}“ wird entfernt."
+      },
+      "delegations": {
+        "filterUser": "Vertretene Person",
+        "filterClear": "Alle",
+        "includeEnded": "Beendete anzeigen",
+        "empty": "Es gibt keine Vertretungen.",
+        "person": "{{to}} vertritt {{from}}",
+        "state": {
+          "running": "aktiv",
+          "planned": "geplant",
+          "ended": "beendet"
+        },
+        "new": "Vertretung für eine Person eintragen",
+        "user": "Vertretene Person",
+        "peopleMissing": "Bitte wählen Sie beide Personen aus."
+      },
+      "discardTitle": "Änderungen verwerfen?",
+      "discardMessage": "Ihre Änderungen sind nicht gespeichert und gehen verloren.",
+      "discard": "Änderungen verwerfen"
+    },
+    "withdraw": {
+      "action": "Anforderung zurückziehen",
+      "title": "Anforderung zurückziehen?",
+      "message": "Die Anforderung „{{title}}“ wird ohne Entscheidung geschlossen. Niemand kann sie mehr entscheiden."
     }
   }
 }

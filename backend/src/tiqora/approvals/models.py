@@ -255,6 +255,8 @@ class TiqoraApprovalApprover(TiqoraBase):
         Index("ix_tiqora_approval_approver_inbox", "principal", "status"),
         Index("ix_tiqora_approval_approver_user", "user_id", "status"),
         Index("ix_tiqora_approval_approver_ticket", "ticket_id"),
+        #: the sweeper's invalid-approver scan (pending rows by request id)
+        Index("ix_tiqora_approval_approver_status", "status", "approval_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -326,7 +328,7 @@ class TiqoraApprovalVote(TiqoraBase):
     )
     ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     decision: Mapped[str] = mapped_column(String(10), nullable=False)
-    #: at most 2000 characters (API validation)
+    #: at most contract.COMMENT_MAX characters (checked by the engine)
     comment: Mapped[str | None] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=True)
     #: principal who clicked (approver or delegate)
     decided_by: Mapped[str] = mapped_column(String(250), nullable=False)

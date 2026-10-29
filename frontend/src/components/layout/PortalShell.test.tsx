@@ -28,6 +28,12 @@ vi.mock("@/lib/portalApi", () => ({ portalApi: { portalSetLanguage } }));
 const { listCis } = vi.hoisted(() => ({ listCis: vi.fn() }));
 vi.mock("@/lib/portalCmdbApi", () => ({ portalCmdbApi: { list: listCis } }));
 
+const { listApprovals } = vi.hoisted(() => ({ listApprovals: vi.fn() }));
+vi.mock("@/lib/portalApprovalsApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/portalApprovalsApi")>("@/lib/portalApprovalsApi");
+  return { ...actual, portalApprovalsApi: { ...actual.portalApprovalsApi, list: listApprovals } };
+});
+
 const { toggleTheme } = vi.hoisted(() => ({ toggleTheme: vi.fn() }));
 vi.mock("@/themes/theme", () => ({
   useTheme: () => ({ theme: "dark", resolvedTheme: "dark", toggleTheme }),
@@ -49,6 +55,7 @@ async function renderShell() {
     "/portal/preferences",
     "/portal/security",
     "/portal/config-items",
+    "/portal/approvals",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
@@ -76,6 +83,7 @@ describe("PortalShell", () => {
     portalSetLanguage.mockReset().mockResolvedValue({});
     toggleTheme.mockReset();
     listCis.mockReset().mockResolvedValue({ items: [], total: 0 });
+    listApprovals.mockReset().mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
     void i18n.changeLanguage("en");
   });
 
@@ -158,5 +166,19 @@ describe("PortalShell", () => {
     await renderShell();
     await waitFor(() => expect(listCis).toHaveBeenCalled());
     expect(screen.queryByTestId("portal-nav-cmdb")).not.toBeInTheDocument();
+  });
+
+  it("shows Approvals in the nav when the list endpoint answers 200", async () => {
+    await renderShell();
+    const link = await screen.findByTestId("portal-nav-approvals");
+    expect(link).toHaveAttribute("href", "/portal/approvals");
+    expect(link).toHaveTextContent("Approvals");
+  });
+
+  it("hides Approvals when the list endpoint fails (feature off)", async () => {
+    listApprovals.mockRejectedValue(new Error("404"));
+    await renderShell();
+    await waitFor(() => expect(listApprovals).toHaveBeenCalled());
+    expect(screen.queryByTestId("portal-nav-approvals")).toBeNull();
   });
 });

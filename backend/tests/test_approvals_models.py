@@ -219,6 +219,7 @@ def test_migration_creates_approval_tables(migrated: str) -> None:
                 "ix_tiqora_approval_approver_inbox": ["principal", "status"],
                 "ix_tiqora_approval_approver_user": ["user_id", "status"],
                 "ix_tiqora_approval_approver_ticket": ["ticket_id"],
+                "ix_tiqora_approval_approver_status": ["status", "approval_id"],
             },
             "tiqora_approval_vote": {"ix_tiqora_approval_vote_ticket": ["ticket_id"]},
             "tiqora_approval_token": {

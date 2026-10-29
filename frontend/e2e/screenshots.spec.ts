@@ -1,6 +1,7 @@
 import { test, type Page } from "@playwright/test";
 import { mockRich, loginAsAgentRich } from "./fixtures/rich-mock";
 import { mockApi, loginAsAgent } from "./fixtures/mock-api";
+import { mockAdminApi } from "./fixtures/mock-admin-api";
 import { seedMajorIncident, seedTicketCi } from "./fixtures/itsm-store";
 import { DEMO_ITSM_MODE_KEY } from "../src/demo/itsmMode";
 
@@ -404,4 +405,57 @@ test("cmdb screenshots", async ({ page }) => {
   await shot(page, "/agent/cmdb/1", "agent-cmdb-ci");
   await shot(page, "/agent/cmdb/1?tab=dependencies", "agent-cmdb-graph");
   await shot(page, "/admin/cmdb/classes/1", "admin-cmdb-class-editor");
+});
+
+// Approvals on the stateful e2e store (fixtures/approvals-store.ts): inbox, ticket panel, the public confirm page and the admin template editor.
+test("approvals screenshots", async ({ page }) => {
+  await prep(page);
+  await mockAdminApi(page);
+  // The default fixture has system queues only (hidden in the sidebar): show a few real ones.
+  const q = (id: number, name: string, open: number, children: unknown[] = []) => ({
+    id, name, group_id: 1, valid: true, counts: { open, locked: 0, unlocked: open, total: open }, children,
+  });
+  await page.route("**/api/v1/queues", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([q(10, "Support", 7, [{ ...q(11, "Support::Netzwerk", 3), parent_name: "Support" }]), q(12, "Vertrieb", 2)]),
+    }),
+  );
+  // Group picker source (the stage-2 entry of cab_normal references group 5).
+  await page.route("**/api/v1/reference/share-groups", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: 1, name: "Service Desk" },
+        { id: 5, name: "Betriebsleitung" },
+        { id: 6, name: "Netzwerk" },
+      ]),
+    }),
+  );
+  await loginAsAgent(page);
+  await shot(page, "/agent/approvals?id=501", "agent-approvals");
+  try {
+    await page.goto("/agent/tickets/130", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    const panel = page.getByTestId("ticket-approvals-panel");
+    await panel.getByTestId("ticket-approval-details").first().click({ timeout: 5000 });
+    await panel.getByTestId("approval-steps").waitFor({ state: "visible", timeout: 5000 });
+    await panel.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/agent-approvals-ticket${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'agent-approvals-ticket' failed:", err);
+  }
+  await shot(page, "/approve#t=demo", "approval-confirm-page");
+  try {
+    // Tall enough for the whole first step, so the dialog is not cut off at the top.
+    await page.setViewportSize({ width: 1440, height: 1500 });
+    await page.goto("/admin/approvals/templates", { waitUntil: "domcontentloaded" });
+    await page.locator('[data-testid="template-row"][data-template-key="cab_normal"]').getByTestId("template-edit").click({ timeout: 5000 });
+    await page.getByTestId("template-check-ok").waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/admin-approval-template${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'admin-approval-template' failed:", err);
+  }
 });

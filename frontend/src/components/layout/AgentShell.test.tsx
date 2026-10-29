@@ -108,6 +108,12 @@ const statusOf = (mode: string, ciSource: "znuny" | "tiqora" | null) => ({
   znuny: { core_installed: true, cmdb_installed: true, profile: null, packages: {} },
 });
 
+const { approvalsInboxCount } = vi.hoisted(() => ({ approvalsInboxCount: vi.fn() }));
+vi.mock("@/lib/approvalsApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/approvalsApi")>("@/lib/approvalsApi");
+  return { ...actual, approvalsApi: { ...actual.approvalsApi, inboxCount: approvalsInboxCount } };
+});
+
 const { cmdbStatus } = vi.hoisted(() => ({ cmdbStatus: vi.fn() }));
 vi.mock("@/lib/cmdbApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/cmdbApi")>("@/lib/cmdbApi");
@@ -139,6 +145,7 @@ async function renderShell(initialEntry = "/agent") {
     "/agent/customers",
     "/agent/itsm/cis",
     "/agent/cmdb",
+    "/agent/approvals",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({
@@ -181,6 +188,7 @@ describe("AgentShell sidebar", () => {
     searchCounts.mockReset().mockResolvedValue({ counts: {} });
     chatTopics.mockReset().mockResolvedValue([]);
     itsmStatus.mockReset().mockResolvedValue(statusOf("off", null));
+    approvalsInboxCount.mockReset().mockResolvedValue({ pending: 0 });
     cmdbStatus.mockReset().mockResolvedValue({ mode: "off", readable_class_count: 0, can_admin: false, views_present: true });
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
@@ -457,5 +465,30 @@ describe("AgentShell sidebar", () => {
     cmdbStatus.mockResolvedValue({ mode: "tiqora", readable_class_count: 0, can_admin: true, views_present: true });
     await renderShell();
     expect(await screen.findByTestId("agent-nav-cmdb")).toBeInTheDocument();
+  });
+
+  it("shows Meine Freigaben with a badge for pending approvals", async () => {
+    approvalsInboxCount.mockResolvedValue({ pending: 2 });
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-approvals");
+    expect(link).toHaveAttribute("href", "/agent/approvals");
+    expect(link).toHaveTextContent("Meine Freigaben");
+    await waitFor(() => expect(link).toHaveTextContent("Meine Freigaben2"));
+  });
+
+  it("shows Meine Freigaben without a badge when nothing is pending", async () => {
+    approvalsInboxCount.mockResolvedValue({ pending: 0 });
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-approvals");
+    await waitFor(() => expect(approvalsInboxCount).toHaveBeenCalled());
+    expect(link.textContent).toBe("Meine Freigaben");
+  });
+
+  it("keeps the entry, without a badge, when the count call fails", async () => {
+    approvalsInboxCount.mockRejectedValue(new Error("boom"));
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-approvals");
+    await waitFor(() => expect(approvalsInboxCount).toHaveBeenCalled());
+    expect(link.textContent).toBe("Meine Freigaben");
   });
 });

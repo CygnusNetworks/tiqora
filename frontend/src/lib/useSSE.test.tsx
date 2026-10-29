@@ -99,6 +99,16 @@ describe("handleSSEMessage", () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: presenceQueryKey(7) });
   });
 
+  it("invalidates the approvals cache prefix for approval_changed", () => {
+    const queryClient = new QueryClient();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+
+    handleSSEMessage(queryClient, JSON.stringify({ type: "approval_changed", user_ids: [1] }));
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["approvals"] });
+  });
+
   it("feeds call_event into the call popup store without touching the cache", () => {
     resetCalls();
     const queryClient = new QueryClient();

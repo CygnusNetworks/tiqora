@@ -1,6 +1,8 @@
 import pytest
 
+from tiqora.approvals._engine import last_closed_step, result_reason
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError, StepSpec
+from tiqora.approvals.models import TiqoraApprovalStep
 from tiqora.approvals.rules import (
     VoterState,
     evaluate_step,
@@ -38,6 +40,22 @@ P, A, R = VoterState("pending"), VoterState("approved"), VoterState("rejected")
 )
 def test_evaluate_step(rule, quorum, voters, expected) -> None:  # type: ignore[no-untyped-def]
     assert evaluate_step(rule, quorum, voters) == expected
+
+
+def test_regular_decisive_voter_stays_in_the_rule() -> None:
+    """An approver an escalation made decisive counts in the rule AND can decide alone."""
+    up = {"decisive": True, "regular": True}
+    # rule all: the other regular voter alone does not approve while the upgraded one is pending
+    assert evaluate_step("all", None, [A, VoterState("pending", **up)]) == "pending"
+    assert evaluate_step("all", None, [VoterState("approved", **up), P]) == "approved"
+    assert evaluate_step("all", None, [VoterState("rejected", **up), A]) == "rejected"
+    # quorum 2 of 2: one approval plus the pending upgraded voter must not flip to rejected
+    assert evaluate_step("quorum", 2, [A, VoterState("pending", **up)]) == "pending"
+    # an escalation-only voter (regular=False) stays outside the rule
+    assert (
+        evaluate_step("all", None, [A, VoterState("pending", decisive=True, regular=False)])
+        == "approved"
+    )
 
 
 def test_decisive_voter_decides_alone() -> None:
@@ -119,3 +137,39 @@ def test_validate_definition_semantics() -> None:
     validate_definition(
         ApprovalDefinition(steps=[StepSpec(name=f"s{i}", approvers=users) for i in range(10)])
     )
+
+
+def _closed(stage: int, position: int, status: str, reason: str | None) -> TiqoraApprovalStep:
+    return TiqoraApprovalStep(stage=stage, position=position, status=status, reason=reason)
+
+
+@pytest.mark.parametrize(
+    ("steps", "result", "expected"),
+    [
+        ([("approved", "votes"), ("approved", "votes")], "approved", "votes"),
+        # A-I2: a silent approval behind a voted stage stays visible
+        ([("approved", "votes"), ("approved", "timeout")], "approved", "timeout"),
+        ([("approved", "no_approvers"), ("approved", "votes")], "approved", "no_approvers"),
+        ([("approved", "no_approvers"), ("approved", "timeout")], "approved", "timeout"),
+        ([("approved", None), ("approved", "votes")], "approved", "votes"),
+        ([("approved", "votes"), ("rejected", "timeout")], "rejected", "timeout"),
+        ([("approved", "timeout"), ("rejected", "votes")], "rejected", "votes"),
+        # waiting / cancelled steps do not count
+        ([("approved", "votes"), ("cancelled", "no_approvers")], "approved", "votes"),
+    ],
+)
+def test_result_reason_weakest_closed_step_wins(
+    steps: list[tuple[str, str | None]], result: str, expected: str
+) -> None:
+    rows = [_closed(i, i, status, reason) for i, (status, reason) in enumerate(steps, start=1)]
+    assert result_reason(rows, result) == expected  # type: ignore[arg-type]
+
+
+def test_last_closed_step() -> None:
+    first = _closed(1, 1, "approved", "votes")
+    second_a = _closed(2, 2, "approved", "votes")
+    second_b = _closed(2, 3, "approved", "votes")
+    assert last_closed_step([first, second_a, second_b]) is second_b
+    rejected = _closed(1, 2, "rejected", "votes")
+    assert last_closed_step([first, rejected, _closed(2, 3, "cancelled", None)]) is rejected
+    assert last_closed_step([_closed(1, 1, "waiting", None)]) is None

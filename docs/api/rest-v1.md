@@ -1012,6 +1012,96 @@ state catalogues), `classes` (CRUD) with `definitions` (versions, diff),
 Tiqora JSON definition, writes nothing) and `class-templates` with `…/{key}/apply`.
 Customers see their own CIs through `/api/portal/config-items`.
 
+## Approvals
+
+The shared approval engine ("Freigaben", product guide [`../approvals.md`](../approvals.md), German):
+requests on a ticket that people approve or reject, in stages and steps, with deadlines, substitutes
+and e-mail decision links. Four route families, listed below. An API key needs the area `tickets` for
+`/api/v1/approvals`, `/api/v1/reference/roles` and the ticket routes, and `admin` for
+`/api/v1/admin/approvals`; `/api/v1/approval-links` is public and takes no key. Deciding with an API
+key records the channel `api`. Errors have the usual shape `{"detail": {"code": "...", "detail": ...}}`;
+the codes are `approval_not_found`, `ticket_not_found`, `template_not_found`, `list_not_found`, `delegation_not_found` (404), `forbidden`, `not_an_approver`, `self_approval_forbidden`,
+`customer_approver_outside_company`, `delegation_not_active`, `approver_invalid` (403),
+`already_decided`, `approval_closed`, `step_not_active`, `forward_not_allowed`, `list_name_taken`,
+`list_in_use`, `template_key_taken`, `delegation_overlap`, `template_changed` (409), `invalid_definition`, `unknown_subject_type`,
+`subject_not_requestable`, `customer_approvers_not_allowed`, `unknown_resolver`, `comment_too_long`,
+`forward_target_invalid`, `invalid_member` (422) and `link_invalid`, `link_expired`, `link_used` (410).
+
+```sh
+# Ask for an approval on ticket 4711 with a template, then read it
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/approvals" \
+  -H 'Content-Type: application/json' \
+  -d '{"title": "Open firewall port 8443", "template_key": "firewall_rule"}'
+# -> 201 {"id": 42, "status": "pending", "steps": [...], "my_rows": [], ...}
+
+# Decide as an approver
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/approvals/42/decision" \
+  -H 'Content-Type: application/json' \
+  -d '{"decision": "approved", "comment": "Rollback plan is fine."}'
+```
+
+**Agents (`/api/v1`, API-key area `tickets`)**
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/v1/approvals/inbox` | "Meine Freigaben": `state=pending` (default, with the rows of agents who named you substitute) or `decided`; `limit`, `offset`. Rows carry `can_vote` and `blocked_reason`. |
+| `GET /api/v1/approvals/inbox/count` | `{"pending": n}`, only rows you can still vote on (the sidebar badge). |
+| `GET /api/v1/approvals/templates` | Valid templates for "Freigabe anfordern", optionally `?subject_type=`. |
+| `GET /api/v1/approvals/lists` | Valid approval groups (name, member count) for the approver picker. |
+| `GET /api/v1/approvals/resolvers` | Dynamic approver sources; customer ones only where customers may approve. |
+| `GET /api/v1/reference/roles` | Every valid Znuny role `{id, name}` for approver pickers (any agent, names only). |
+| `GET /api/v1/approvals/{approval_id}` | One request: steps, approvers, votes, audit trail, and what you may do. 404 unless you may see it. No ticket articles. |
+| `POST /api/v1/approvals/{approval_id}/decision` | Vote `{"decision": "approved"|"rejected", "comment": "...", "approver_id": n}` (comment up to 2000 characters after trimming, else 422 `comment_too_long` - the same on every surface; over 10000 characters the body is refused as invalid before that check; `approver_id` only to decide on behalf of a delegator). Channel `api`. |
+| `POST /api/v1/approvals/{approval_id}/approvers/{approver_id}/forward` | Hand your own open row to another agent `{"user_id": n}`; a target that cannot take it (yourself, invalid, already an approver or already voted in the step) is 422 `forward_target_invalid`. |
+| `POST /api/v1/approvals/{approval_id}/cancel` | Withdraw an open request (requester, creator, `rw` on the ticket, admin). No body. |
+| `POST /api/v1/approvals/{approval_id}/refresh-approvers` | "Freigeber neu ermitteln": re-resolve the open steps (`rw` on the ticket or admin). |
+| `GET /api/v1/approvals/delegations` | Your own standing substitutes (running and future). |
+| `POST /api/v1/approvals/delegations` | Name a substitute `{"substitute_user_id": n, "valid_from": ..., "valid_until": ...}`; 409 `delegation_overlap`. |
+| `DELETE /api/v1/approvals/delegations/{delegation_id}` | End one of your delegations now. |
+| `GET /api/v1/tickets/{ticket_id}/approvals` | Requests of the ticket, newest first, paged (needs `ro`, or admin). |
+| `POST /api/v1/tickets/{ticket_id}/approvals` | "Freigabe anfordern": `{"title", "description", "approval_key", "template_key" | "definition"}` (exactly one of the last two; needs `rw`, or admin). A definition of your own may not approve automatically (`invalid_definition`). |
+
+**Decision links (public: no login, no API key; the token travels in the body)**
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/v1/approval-links/inspect` | Public. `{"token"}`: what a mail link stands for, without using it. A bad link is a normal answer (`valid: false`, `code`); a holder who could not vote through it gets the vote's 403 (`approver_invalid`, `customer_approver_outside_company`, `forbidden`) without request data. Only unknown tokens count towards the per-IP lock. |
+| `POST /api/v1/approval-links/decide` | Public. `{"token", "decision", "comment"}`: casts the vote of the link's row, once (channel `email`). 410 `link_used` / `link_expired` / `link_invalid`; 429 with `Retry-After`. |
+
+**Customer portal (portal session)**
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/portal/approvals` | Customer: open or decided requests the customer approves (`state`). |
+| `GET /api/portal/approvals/{approval_id}` | Customer: one request; 404 for any other. |
+| `POST /api/portal/approvals/{approval_id}/decision` | Customer vote `{"decision", "comment"}` (channel `portal`). |
+
+**Admin (`/api/v1/admin/approvals`, API-key area `admin`)**
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/v1/admin/approvals` | Every request, newest first (`status`, `ticket_id`, `ticket_number` (exact), `subject_type`, `overdue`; paged). |
+| `GET /api/v1/admin/approvals/subject-types` | Registered subject types `{key, title_key}`. |
+| `GET /api/v1/admin/approvals/templates` | All templates, valid or not. |
+| `POST /api/v1/admin/approvals/templates` | Create a template (`template_key`, `name`, `subject_types`, `definition`). |
+| `POST /api/v1/admin/approvals/templates/validate` | Check a definition without saving it (errors and warnings). |
+| `GET /api/v1/admin/approvals/templates/{template_id}` | One template. |
+| `PUT /api/v1/admin/approvals/templates/{template_id}` | Replace name, description, subject types, definition, validity (the key is fixed). Send the loaded `change_time` back: a template changed since (another admin, a GDPR erasure) is 409 `template_changed` (whole seconds: a change within the same second as the load goes unnoticed). |
+| `DELETE /api/v1/admin/approvals/templates/{template_id}` | Delete a template; running requests keep their copy. |
+| `GET /api/v1/admin/approvals/lists` | All approval groups, valid or not. |
+| `POST /api/v1/admin/approvals/lists` | Create a group (`name`, `description`, `member_ids`, `valid`); 409 `list_name_taken`. |
+| `GET /api/v1/admin/approvals/lists/{list_id}` | One group with members. |
+| `PUT /api/v1/admin/approvals/lists/{list_id}` | Replace name, description, `member_ids`, `valid`. |
+| `DELETE /api/v1/admin/approvals/lists/{list_id}` | Delete a group; 409 `list_in_use` while a template names it. |
+| `GET /api/v1/admin/approvals/delegations` | Delegations of any agent (`user_id`, `include_ended`). |
+| `POST /api/v1/admin/approvals/delegations` | Name a substitute for another agent (`user_id`, `substitute_user_id`, period). |
+| `DELETE /api/v1/admin/approvals/delegations/{delegation_id}` | End any delegation now. |
+
+Each state change also writes an outbox event (`TiqoraApprovalRequested`, `TiqoraApprovalVoted`,
+`TiqoraApprovalDecided`, `TiqoraApprovalCancelled`, `TiqoraApprovalEscalated`) that webhooks can
+subscribe to ([`../ai-integration.md`](../ai-integration.md#webhook-events-of-approvals)), and an
+`approval_changed` message on the SSE stream, sent only to the agents whose inbox changed.
+
 ## Plugin channels
 
 Plugins can add communication channels (see

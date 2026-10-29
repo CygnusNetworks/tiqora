@@ -69,6 +69,7 @@ def test_path_to_area_mapping() -> None:
     assert path_to_area("/api/v1/kb/articles") == "kb"
     assert path_to_area("/api/v1/admin/api-keys") == "admin"
     assert path_to_area("/api/v1/auth/me") is None
+    assert path_to_area("/api/v1/approval-links/inspect") is None
     assert path_to_area("/znuny-compat/TicketGet") == "compat"
     assert path_to_area("/api/v1/unknown-thing") == "_unknown"
     assert path_to_area("/api/plugins/org.example.hello/hello") == "plugins"
@@ -329,6 +330,9 @@ def test_saved_report_routes_and_share_groups_scopes() -> None:
     ):
         assert path_to_area(path) == "stats", path
     assert path_to_area("/api/v1/reference/share-groups") == "tickets"
+    assert path_to_area("/api/v1/reference/roles") == "tickets"
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path="/api/v1/reference/roles")
+    assert not scopes_allow(frozenset({"kb:ro"}), method="GET", path="/api/v1/reference/roles")
     ro, rw = frozenset({"stats:ro"}), frozenset({"stats:rw"})
     assert scopes_allow(ro, method="GET", path="/api/v1/reports/12/file")
     for method, path in (

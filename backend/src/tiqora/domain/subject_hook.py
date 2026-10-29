@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.settings_store import get_setting
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -102,3 +103,25 @@ __all__ = [
     "load_subject_config",
     "load_znuny_subject_baseline",
 ]
+
+
+def hooked_subject(subject: str, *, hook_cfg: SubjectHookConfig | None, tn: str) -> str:
+    """Prepend the ticket-number hook, as Znuny's notification subjects carry it.
+
+    ``TemplateGenerator::NotificationEvent`` runs the rendered subject through
+    ``TicketSubjectBuild(Type => 'New')``, so an agent sees
+    ``[Cygnus#2026…] Ticket unlocked`` and mail filters keyed on the hook match
+    notifications too. Same helper (and same idempotence) as agent replies.
+
+    *hook_cfg* is resolved once per event, not per recipient: a notification to
+    30-odd queue subscribers must not replay the same settings lookup 30 times.
+    """
+    if hook_cfg is None or not hook_cfg.enabled or not tn:
+        return subject
+    return build_ticket_subject(
+        subject,
+        hook=hook_cfg.hook,
+        divider=hook_cfg.divider,
+        tn=tn,
+        subject_format=hook_cfg.subject_format,
+    )

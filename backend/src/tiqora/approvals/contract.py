@@ -4,6 +4,15 @@ Consumers (ITSM change, catalogue, process) import names from here and from ``se
 Changes after the first consumer forked are additive only (new keyword arguments / fields with
 defaults, new ``ERROR_STATUS`` codes).
 
+Lock order (consumers lock in the order approval -> ticket): a consumer locks its own row first,
+then calls the approval service (``request_approval``, ``cancel_approval``,
+``record_auto_decision``) **before** it writes the Znuny ticket row (state, owner, lock, queue,
+articles, history) in the same transaction. The engine locks ``tiqora_approval`` and then touches
+the ticket (its history lines are child rows of ``ticket``; InnoDB guards them with a shared lock
+on the ticket row), so a consumer that writes the ticket first deadlocks with a concurrent vote
+on MariaDB (1213). Full order: consumer row -> ``tiqora_approval`` -> approver/token rows ->
+``ticket``. ``tests/approvals_consumer_kit.race_consumer_and_vote`` checks a consumer against it.
+
 Pure module: no database, network, file system or settings access. It imports only the standard
 library, pydantic, ``sqlalchemy.ext.asyncio`` (type checking only) and
 ``tiqora.extensions.registry``.
@@ -224,7 +233,8 @@ class ApprovalSubjectType:
     # deciding transaction, max_attempts=5), once per final status approved/rejected/cancelled.
     # Never inside the deciding transaction: a consumer bug cannot roll back a vote. Must be
     # idempotent (the job is retried). A timeout arrives as status rejected/approved with
-    # outcome.reason == "timeout" - there is no status "expired".
+    # outcome.reason == "timeout" - there is no status "expired". The job commits the hook's
+    # work together with its audit row: the hook must NOT commit or roll back the session itself.
     on_decided: DecidedHook | None = None
 
 
@@ -240,6 +250,11 @@ class ApprovalInfo:  # what the service returns to consumers
     current_stage: int | None
     created_at: datetime
     decided_at: datetime | None
+
+
+#: longest vote comment after ``strip()``; every surface (agent, MCP, portal, link) answers a
+#: longer one with ``comment_too_long`` (422) from the engine, never with a transport error
+COMMENT_MAX: Final = 2000
 
 
 class ApprovalError(Exception):
@@ -261,6 +276,7 @@ ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
         "self_approval_forbidden": 403,
         "customer_approver_outside_company": 403,
         "delegation_not_active": 403,
+        "comment_too_long": 422,
         "already_decided": 409,
         "approval_closed": 409,
         "step_not_active": 409,
@@ -274,6 +290,13 @@ ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
         "link_invalid": 410,
         "link_expired": 410,
         "link_used": 410,
+        "invalid_member": 422,
+        "list_name_taken": 409,
+        "list_in_use": 409,
+        "template_key_taken": 409,
+        "delegation_overlap": 409,
+        "approver_invalid": 403,
+        "template_changed": 409,
     }
 )
 

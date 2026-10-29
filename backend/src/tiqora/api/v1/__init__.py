@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from tiqora.api.v1 import (
     agents,
     ai,
+    approvals,
     auth,
     auth_sso,
     avatars,
@@ -60,6 +61,9 @@ api_v1_router.include_router(tickets_crypto.router)
 api_v1_router.include_router(ticket_filters.router)
 api_v1_router.include_router(tickets.router)
 api_v1_router.include_router(tickets_telegram.router)
+api_v1_router.include_router(approvals.router)
+api_v1_router.include_router(approvals.ticket_router)
+api_v1_router.include_router(approvals.links_router)
 api_v1_router.include_router(phone_calls.router)
 api_v1_router.include_router(phone_cti.router)
 api_v1_router.include_router(ai.router)
