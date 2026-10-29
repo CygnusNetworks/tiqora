@@ -209,6 +209,37 @@ ITSM-import plans. Deviations from this spec (plan section "Deviations"; user vi
 - Major-incident customer reply is off by default (`itsm.major_incident_customer_reply`) and always uses
   e-mail, also for plugin channels.
 
+### 5. Wave-5 change management: status and deviations (2026-10-29)
+
+Phase 3 (change part) is implemented by the wave-5 plan `2026-10-15-wave5-itsm-change` (change record,
+types, phase machine, templates, tasks, rule-based risk, CMDB impact, freeze windows and conflicts,
+change calendar and PSA, CAB through the shared approval engine of decision 3, portal schedule, Znuny
+calendar mirror, legacy change view and archive). Mode B only; Znuny's `change_*` data stays
+read-only. Deviations from this spec (user view in `docs/itsm.md` chapter 8, parity rows in
+`docs/compatibility.md`):
+
+- D1 the lifecycle is a fixed Tiqora phase machine (`tiqora_itsm_change.phase`), not a change process
+  template; process tickets cannot become changes; the Znuny-compatible change process template stays
+  with process management.
+- D2 Mode A shows Znuny's changes and work orders live and read-only; Tiqora changes need Mode B (this
+  closes wave-4 D2).
+- D3 change type and phase are mirrored into the ticket dynamic fields `ITSMChangeType` /
+  `ITSMChangePhase`; the Tiqora record is authoritative, edits in Znuny are shown as drift.
+- D4 the PIR is the phase "Nachbetrachtung" with notes on the change, not a separate activity dialog.
+- D5 the change calendar is a Tiqora view; the Znuny calendar is an optional mirror, not the store.
+- D6 Znuny change conditions / actions and change notification rules are not rebuilt; guards are
+  fixed, notifications come from ticket events and the approval engine.
+- D7 the AI risk summary belongs to a later ITSM plan; this one provides `risk_input()` and the
+  `itsm.change_listeners` point.
+- D8 "my changes / my tasks" are list tabs, not saved searches.
+- D9 work-order kinds are `workorder|backout|decision|pir`; Znuny's `approval` work order is replaced by
+  the approval engine.
+- D10 Znuny change templates are counted, not archived (serialized Perl data, never evaluated).
+- Further rulings of the plan: CAB members are approval-engine entries on named boards (no per-change
+  CAB list); owner and submitter do not vote unless `itsm_change.cab_allow_self_approval`; a CAB
+  deadline only reminds by default (`approval_timeout = notify`); all change routes belong to the
+  API-key area `tickets`.
+
 ## Scope
 
 ### A. ITSM core + incident/problem

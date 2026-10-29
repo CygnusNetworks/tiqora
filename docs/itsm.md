@@ -14,16 +14,22 @@
 > Mode B, when off and on a plugin veto the action is reported in `skipped_actions`; in Mode A a link
 > that Znuny's rules refuse is only logged, as in Znuny. API-key area: `cmdb` for `/api/v1/itsm`, `tickets` for the
 > ticket sub-routes, `admin` for `/api/v1/admin/itsm`. UI labels below are the German defaults.
+> Chapter 8 covers change management (Mode B only): a change is a ticket of type `Change` plus
+> Tiqora's change record (type, fixed phase machine, plans, window, rule-based risk, CMDB impact,
+> freeze windows, tasks as `Change::Task` child tickets, change calendar, CAB decisions through the
+> shared approval engine, opt-in portal schedule); every change route is API-key area `tickets`, not
+> `cmdb`. Znuny's ITSMChangeManagement data is never written: Mode A shows it live and read-only,
+> Mode B keeps a read-only change archive filled by the ITSM import or the archive job.
 
 Dieses Dokument beschreibt die ITSM-Funktionen von Tiqora: Incident und Problem, Services und
 Prioritätsmatrix, Verknüpfungen, die CMDB und den Betrieb neben Znuny.
 
 ## 1 Überblick und Modi
 
-Das ITSM von Tiqora besteht aus vier Teilen: Incident- und Problem-Management im Ticket,
-Services mit Prioritätsmatrix, Verknüpfungen (Tickets, Konfigurationselemente, Services) und der
-CMDB. Welche Teile sichtbar sind, bestimmt der **ITSM-Modus** (Admin, Seite „ITSM“, Abschnitt
-„ITSM-Modus“, Einstellung `itsm.mode`).
+Das ITSM von Tiqora besteht aus fünf Teilen: Incident- und Problem-Management im Ticket,
+Services mit Prioritätsmatrix, Verknüpfungen (Tickets, Konfigurationselemente, Services), der
+CMDB und dem Change-Management (Kapitel 8). Welche Teile sichtbar sind, bestimmt der
+**ITSM-Modus** (Admin, Seite „ITSM“, Abschnitt „ITSM-Modus“, Einstellung `itsm.mode`).
 
 | Modus | Oberfläche | Wer führt die Konfigurationselemente (CIs)? |
 |---|---|---|
@@ -68,7 +74,7 @@ gespeichert als `itsm.<Schlüssel>`). Die Vorgaben entsprechen den Namen, die Zn
 | `major_incident_type` | `Incident::Major` | Ticket-Typ Großstörung (Major Incident) |
 | `service_request_type` | `ServiceRequest` | Ticket-Typ Serviceanfrage |
 | `problem_type` | `Problem` | Ticket-Typ Problem |
-| `change_type`, `change_task_type` | `Change`, `Change::Task` | Ticket-Typen Änderung und Änderungsaufgabe (nur als Rolle erkannt, kein Change-Management) |
+| `change_type`, `change_task_type` | `Change`, `Change::Task` | Ticket-Typen Change und Change-Aufgabe (Change-Management in Modus B, Kapitel 8; die eigenen Einstellungen stehen dort) |
 | `workaround_state` | `closed with workaround` | Status „Geschlossen mit Workaround“ |
 | `criticality_field`, `impact_field` | `ITSMCriticality`, `ITSMImpact` | Dynamische Felder für Kritikalität und Auswirkung |
 | `priority_matrix_enabled` | an | Prioritätsmatrix anwenden |
@@ -93,8 +99,9 @@ Znuny installiert“) und die Quelle der Entscheidung („automatisch erkannt“
 Die ITSM-Routen unter `/api/v1/itsm` gehören zum API-Schlüsselbereich **cmdb**, die Verwaltung unter
 `/api/v1/admin/itsm` und `/api/v1/admin/itsm/import` zum Bereich **admin**. Die ticketbezogenen
 Routen (`/api/v1/tickets/{id}/cis`, `/itsm`, `/problem`, `/major-incident`, `/link-graph`) gehören
-zum Bereich **tickets**. Ein Ticket ist für eine Rolle nur sichtbar, wenn der Agent mindestens
-`ro` darauf hat: Ohne `ro` antworten alle diese Routen 404, und verknüpfte Tickets ohne
+zum Bereich **tickets**, ebenso alle Routen des Change-Managements, auch die unter `/api/v1/itsm`
+(Kapitel 8, „Change-Rechte und API“). Ein Ticket ist für eine Rolle nur sichtbar, wenn der Agent
+mindestens `ro` darauf hat: Ohne `ro` antworten alle diese Routen 404, und verknüpfte Tickets ohne
 Leserecht erscheinen weder in der Verknüpfungsgrafik noch in Banner oder Listen.
 
 ## 2 Incident und Problem
@@ -106,7 +113,8 @@ fehlt, und legt es mit „Einrichten“ so an, wie Znuny es anlegen würde: die 
 `Incident::Major`, `ServiceRequest` und `Problem`, den Status „closed with workaround“ und die acht
 Dynamischen Felder `ITSMCriticality`, `ITSMImpact`, `ITSMReviewRequired`, `ITSMDecisionResult`,
 `ITSMDecisionDate`, `ITSMRepairStartTime`, `ITSMRecoveryStartTime` und `ITSMDueDate`. Die Typen
-`Change` und `Change::Task` bilden eine eigene, vorab nicht angehakte Gruppe. Es wird nie
+`Change` und `Change::Task` und die Felder `ITSMChangeType` und `ITSMChangePhase` bilden eine
+eigene, vorab nicht angehakte Gruppe „Change-Management (optional)“ (Kapitel 8). Es wird nie
 automatisch angelegt; ein Standort mit Znuny ITSM findet alles vor und behält seine Daten, beide
 Oberflächen zeigen dieselben Felder.
 
@@ -291,7 +299,8 @@ den Hinweis „Nur-Lese-Ansicht der Znuny-CMDB“ und den Verweis „In Znuny be
 | Service: Typ, Kritikalität | aus Znuny, schreibgeschützt | bearbeitbar | nein |
 | Vorfallstatus des Services | aus Znunys CIs berechnet | aus der Tiqora-CMDB | nein |
 | Problem, bekannter Fehler, Großstörung | ja (Daten in `tiqora_*`) | ja | nein |
-| Znuny-Changes und Arbeitsaufträge | nicht gezeigt ([Welle 5](cmdb.md#nicht-enthalten-welle-5)), Verweis nach Znuny | nicht gezeigt (Welle 5) | nein |
+| Znuny-Changes und Arbeitsaufträge | live aus Znuny, nur lesen („Changes (Znuny)“, „In Znuny bearbeiten“) | aus dem Change-Archiv, nur lesen | nein |
+| Tiqora-Change-Management (Kapitel 8) | nein (Changes werden in Znuny geführt) | ja | nein |
 | Notiz an verknüpfte Tickets, Verknüpfung löschen, Grafik | ja | ja | ja |
 
 ### Wer welche CIs sieht
@@ -330,6 +339,10 @@ Znuny sieht Verknüpfungen aus Tiqora erst, wenn das TiqoraSync-Add-on den Cache
 Ticket-Typ `RfC` legt Tiqora nicht an (stattdessen `Change` / `Change::Task`); die Gruppen `itsm-*`
 und die Historientypen legen nur die Znuny-Pakete an. Zum Mindestabstand zwischen Störungen (D5) gilt
 Abschnitt 2.
+
+**Changes in Modus A.** Tiqora zeigt Znunys Changes und Arbeitsaufträge live und schreibgeschützt
+unter „Changes (Znuny)“; angelegt und bearbeitet wird in Znuny. Siehe Kapitel 8, „Changes aus Znuny
+(ITSMChangeManagement)“.
 
 ### Umstellung
 
@@ -413,8 +426,9 @@ abbrechen, Znuny bleibt führend.
    zählt, schreibt aber nichts. Lesen Sie den Bericht (Abschnitt „ITSM-Daten aus Znuny übernehmen“) und
    beheben Sie, was in Znuny zu korrigieren ist (z. B. Attribut-Schlüssel mit Leerzeichen).
 2. **Übernehmen, beliebig oft wiederholen.** „Übernehmen“ kopiert Katalog, Klassen, CIs mit allen
-   Versionen, Verknüpfungen, Anhänge, Prioritätsmatrix und Service-Angaben. Jeder weitere Lauf holt nur
-   Neues nach. Solange Znuny führt, sehen Ihre Agenten weiter die Daten aus Znuny.
+   Versionen, Verknüpfungen, Anhänge, Prioritätsmatrix und Service-Angaben, dazu die Znuny-Changes
+   ins Change-Archiv. Jeder weitere Lauf holt nur Neues nach. Solange Znuny führt, sehen Ihre Agenten
+   weiter die Daten aus Znuny.
 3. **TiqoraITSM in Znuny installieren** (Anleitung: `packages/znuny-addon/TiqoraITSM/install/README.md`)
    und `TiqoraITSM::BaseURL` auf die Adresse Ihrer Tiqora-Installation setzen. Das Paket schreibt nie in
    die Datenbank und bleibt bis zur Umstellung inaktiv.
@@ -433,6 +447,11 @@ abbrechen, Znuny bleibt führend.
    Bildschirm „CI bearbeiten“ in Znuny zeigt die Sperrseite; in Tiqora steht oben „Tiqora führt das
    ITSM seit …“, und der Drift-Hinweis („Seit der Umstellung wurden in Znuny … CIs oder
    CI-Verknüpfungen geändert“) erscheint nicht.
+
+**Change-Archiv beim Umstieg.** Jeder Import kopiert die Changes aus Znunys Change-Verwaltung lesend
+ins Change-Archiv; nach der Umstellung legen Sie neue Changes im Change-Management von Tiqora an, und
+der Archiv-Lauf (Admin, „Change-Management“, „Change-Archiv“) holt nach, was in Znuny noch dazukommt.
+Siehe Kapitel 8.
 
 Gibt es in Znuny nur ITSMCore ohne das CMDB-Paket, läuft der normale Ablauf: Der Import übernimmt Katalog,
 Prioritätsmatrix und Service-Angaben (es gibt keine Klassen und CIs), danach stellen Sie wie oben um.
@@ -455,7 +474,7 @@ Tiqora diesen Weg ab (`409`), denn dann gilt der Ablauf mit Import.
 | CI mit Ticket verknüpfen (Verknüpfen-Maske) | gesperrt, soweit ein CI beteiligt ist; in Tiqora am Ticket („Betroffene CIs“) oder, wenn eingeschaltet, über die Verknüpfungsaktion der Erweiterung |
 | Klassen-Definition (Admin) | Ansicht bleibt (nur lesen); Ändern gesperrt; in Tiqora: CMDB, Klassen, Designer |
 | Import/Export von CIs | bleibt, wird aber nicht gesperrt (siehe Bekannte Lücken); in Tiqora: CMDB, Import und Export |
-| Change- und Arbeitsauftrag-Masken | bleiben unverändert in Znuny; in Tiqora entfällt (siehe [Welle 5](cmdb.md#nicht-enthalten-welle-5)), die Daten werden nur gezählt |
+| Change- und Arbeitsauftrag-Masken | bleiben unverändert in Znuny (sie kennen keine Tiqora-Changes); in Tiqora: neue Changes im Change-Management, die alten lesend im Change-Archiv (Kapitel 8) |
 | Kundenansicht der CIs in Znuny | bleibt (nur lesen); in Tiqora: Kundenportal, „Meine Geräte und Systeme“; optional die Seite der Erweiterung |
 | Service-Zoom | bleibt unverändert (wird nicht gesperrt); in Tiqora: Services, ITSM-Angaben |
 | ITSM-Statistiken (CI, Change) | entfällt (siehe [Welle 5](cmdb.md#nicht-enthalten-welle-5)); Tiqoras Berichte kennen die Znuny-ITSM-Auswertungen nicht |
@@ -486,6 +505,7 @@ vollständig nach Tiqora holen, löschen Sie die betroffenen CIs in Tiqora vor d
   Konsole bleibt es unbemerkt. Stellen Sie die Aufrufer vor der Umstellung um (Schritt 4).
 - **Changes und Arbeitsaufträge** von Znuny übernimmt der Import in ein Change-Archiv (nur lesen);
   Change-Vorlagen, Bedingungen und Benachrichtigungsregeln werden nur gezählt (Meldung `not_archived`).
+  Was nach der Umstellung noch in Znuny an Changes entsteht, holt der Archiv-Lauf nach (Kapitel 8).
 - **CI-Anhänge im Dateisystem** (Speicher „FS“ statt Datenbank) kann der Importer nicht lesen; sie
   erscheinen als `attachment_in_filesystem` im Bericht und müssen von Hand kopiert werden.
 - **ITSM-Statistiken** von Znuny werden nicht übernommen.
@@ -500,7 +520,7 @@ Arbeitsaufträge in Znuny, den letzten Lauf und die Läufe als Liste mit ihrem B
 | Lauf | Was er tut |
 |---|---|
 | Probelauf | Liest und zählt alles, schreibt nichts. Der Bericht zeigt, was ein echter Lauf täte, und die Meldungen dazu |
-| Übernahme | Schreibt Katalog, Klassen, CIs, Verknüpfungen, Anhänge, Prioritätsmatrix und Service-Angaben nach Tiqora; wiederholbar, nichts wird doppelt angelegt |
+| Übernahme | Schreibt Katalog, Klassen, CIs, Verknüpfungen, Anhänge, Prioritätsmatrix und Service-Angaben nach Tiqora und die Znuny-Changes ins Change-Archiv; wiederholbar, nichts wird doppelt angelegt |
 | Umstellung | Sperrt Znuny, importiert ein letztes Mal und stellt auf Modus B um (siehe „Umstellung auf Tiqora“) |
 | Zurück | Führt zu Modus A zurück |
 
@@ -590,3 +610,581 @@ Tickets, ohne Admin-Abkürzung. Hat Benutzer 1 dieses Recht in der Queue nicht, 
 (Grund `link_refused`) und der Übergang läuft weiter. Znunys `LinkAdd` prüft keine Rechte; wer CIs aus
 Portal-Prozessen verknüpfen will, gibt Benutzer 1 `rw` auf den betroffenen Queues oder setzt `UserID` in der
 Aktion auf einen Agenten mit diesen Rechten.
+
+## 8 Change-Management
+
+Ein **Change** ist in Tiqora ein Ticket vom Ticket-Typ für Changes (Einstellung `itsm.change_type`,
+Vorgabe `Change`) plus die **Change-Daten**, die Tiqora dazu führt: Art (Standard, Normal, Notfall),
+Phase, Pläne, geplantes und tatsächliches Zeitfenster, Risiko, Auswirkung, CAB und Nachbetrachtung.
+Aufgaben eines Changes sind eigene Tickets vom Typ `Change::Task`. Alles, was ein Ticket kann (Queue,
+Besitzer, Status, Artikel, Benachrichtigungen, SLA, Suche, Berichte), gilt deshalb auch für Changes.
+
+Change-Management gibt es nur in **Modus B** (Tiqora führt das ITSM). In Modus A zeigt Tiqora die
+Changes aus Znunys Change-Verwaltung (ITSMChangeManagement) nur lesend an, bei „Aus“ gar nichts:
+
+| Modus | Changes in Tiqora | Znuny-Changes (ITSMChangeManagement) |
+|---|---|---|
+| Aus | keine | nicht sichtbar |
+| Modus A (Znuny führt) | keine (Hinweis „Change-Management ist im Modus A nicht verfügbar“) | live aus Znuny, nur lesen („Changes (Znuny)“, „In Znuny bearbeiten“) |
+| Modus B (Tiqora führt) | vollständig, dieses Kapitel | aus dem Change-Archiv, nur lesen (nach dem ITSM-Import oder dem Archiv-Lauf) |
+
+Wo Sie was finden:
+
+- **Seitenleiste „Changes“** (`/agent/itsm/changes`, nach „CMDB“): Liste mit den Reitern „Alle“, „Meine
+  Changes“, „Meine Aufgaben“ und „Freigabe“, Filter nach Phase, Art, Service und Zeitfenster,
+  „Change anlegen“ und „Kalender“. In Modus A heißt der Eintrag „Changes (Znuny)“ und führt zur
+  Liste der Znuny-Changes.
+- **Change-Seite** (`/agent/itsm/changes/<Ticket-ID>`): Phasenleiste, Schaltflächen für den nächsten
+  Schritt, „Pläne und Zeitfenster“, „Freigabe (CAB)“ mit der Abstimmung, „Risikobewertung“,
+  „Auswirkung“, „Konflikte“, „Change-Aufgaben“, „Im Kundenportal im Wartungskalender anzeigen“ und
+  „Verlauf des Changes“.
+- **Ticket-Zoom**: Block „Change“ mit denselben Abschnitten in schmaler Form (ohne Verlauf; die
+  Abstimmung steht dort im Block „Freigaben“ des Tickets) und „Change-Seite öffnen“. Ein Ticket vom
+  Change-Typ ohne Change-Daten zeigt „Als Change führen“; ein Aufgaben-Ticket zeigt „Change-Aufgabe“
+  mit dem übergeordneten Change.
+- **Change-Kalender**, **CAB-Sitzungen** und **Changes (Znuny)** unter `/agent/itsm/…`.
+- **Admin, „Change-Management“** (`/admin/itsm/change`, auch als Karte auf der Seite „ITSM“): Reiter
+  „Vorlagen“, „CAB“, „Risikofragen“, „Sperrzeiträume“ und „Change-Archiv“ sowie der Verweis
+  „Einstellungen Change-Management“.
+
+![Change-Seite: Phasenleiste, Pläne, Freigabe, Risiko, Auswirkung, Konflikte und Aufgaben (Demo, englische Oberfläche)](images/itsm-change-detail.png)
+
+### Einrichtung des Change-Managements
+
+1. **Einrichten.** Admin, Seite „ITSM“, Abschnitt „Einrichtung“: Haken bei der Gruppe
+   **„Change-Management (optional)“** setzen und „Einrichten“. Die Gruppe legt an, was fehlt: die
+   Ticket-Typen `Change` und `Change::Task` (die Namen kommen aus `itsm.change_type` und
+   `itsm.change_task_type`) und zwei Dynamische Felder für Tickets, die Tiqora selbst befüllt:
+
+   | Feld | Typ | Werte |
+   |---|---|---|
+   | `ITSMChangeType` („Change Type“) | Auswahl | `standard`, `normal`, `emergency` (Standard, Normal, Emergency) |
+   | `ITSMChangePhase` („Change Phase“) | Auswahl | die zehn Phasen-Codes unten (Draft bis Cancelled) |
+
+   Vorhandene Zeilen werden nie geändert; ein gleichnamiges Feld anderen Typs ist ein Konflikt, den
+   die Seite meldet. Solange die Gruppe unvollständig ist, antwortet das Change-Management mit
+   `409 change_setup_missing` („Die Einrichtung ist unvollständig …“).
+2. **Ticket-Status prüfen.** Die Status aus den Einstellungen `state_*` müssen in Znuny existieren.
+   Fehlt einer, scheitert erst der Schritt, der ihn braucht (`409 change_state_not_found` mit dem
+   Namen der Einstellung).
+3. **Change-Manager festlegen.** Einstellung `manager_group`: Agenten mit `rw` in dieser
+   Znuny-Gruppe sind Change-Manager (leer: nur Administratoren). Change-Manager übergehen
+   blockierende Sperrzeiträume, übersteuern das Risiko, erzwingen Schritte mit offenen Aufgaben und
+   planen CAB-Sitzungen.
+4. **CAB anlegen** (Admin, „Change-Management“, Reiter „CAB“) und als `default_cab_id` eintragen,
+   sonst muss jeder Change sein CAB selbst wählen. Optional ein Notfall-CAB (`emergency_cab_id`),
+   Risikofragen, Sperrzeiträume und Vorlagen.
+5. **Dienst prüfen.** Der Worker-Dienst „Change-Auswirkung aktualisieren“ (`itsm_change`, Admin,
+   Dienste) frischt die Auswirkung aktiver Changes auf; Intervall `TIQORA_ITSM_CHANGE_INTERVAL`
+   (siehe [deployment.md](deployment.md#itsm-change-management)).
+
+![Admin, „Change-Management“: Vorlagen, CAB, Risikofragen, Sperrzeiträume und Change-Archiv (Demo, englische Oberfläche)](images/admin-itsm-change.png)
+
+### Change-Einstellungen
+
+Admin, Einstellungen, Abschnitt „ITSM-Changes“ (von Admin, „Change-Management“ über „Einstellungen
+Change-Management“ erreichbar; gespeichert als `itsm_change.<Schlüssel>`).
+
+| Schlüssel | Vorgabe | Bedeutung |
+|---|---|---|
+| `change_queue_id` | 0 | Queue neuer Changes; 0 = die Queue wird beim Anlegen gewählt |
+| `task_queue_id` | 0 | Queue der Change-Aufgaben; 0 = Queue des Changes |
+| `manager_group` | leer | Znuny-Gruppe der Change-Manager (`rw`); leer = nur Administratoren |
+| `default_cab_id` | 0 | Standard-CAB; 0 = das CAB muss am Change gewählt werden |
+| `emergency_cab_id` | 0 | CAB für Notfall-Changes; 0 = Standard-CAB |
+| `emergency_post_approval` | aus | Notfall-Changes dürfen vor der Entscheidung des CAB umgesetzt werden („Sofort umsetzen“) |
+| `auto_approve_low_risk` | aus | Normale Changes mit niedrigem Risiko ohne CAB einplanen |
+| `standard_requires_review` | aus | Standard-Changes durchlaufen vor dem Abschluss die Nachbetrachtung |
+| `approval_due_hours` | 72 | Frist des CAB in Stunden (1 bis 2160) |
+| `approval_timeout` | `notify` | Nach Ablauf der Frist: `notify` = nur erinnern, `reject` = Change ablehnen |
+| `cab_allow_self_approval` | aus | Besitzer und Antragsteller dürfen im CAB über den eigenen Change mitstimmen |
+| `state_open` | `open` | Ticket-Status beim Verlassen des Entwurfs |
+| `state_closed_successful` | `closed successful` | Ticket-Status bei „Abgeschlossen“ mit Ergebnis „Erfolgreich“ |
+| `state_closed_failed` | `closed unsuccessful` | Ticket-Status bei „Abgeschlossen“ mit „Fehlgeschlagen“ oder „Zurückgerollt“ |
+| `state_closed_cancelled` | `closed unsuccessful` | Ticket-Status bei „Abgebrochen“ |
+| `related_link_type` | `Normal` | Verknüpfungstyp zwischen Change und Incident oder Problem |
+| `task_link_type` | `ParentChild` | Verknüpfungstyp zwischen Change (übergeordnet) und Aufgabe |
+| `risk_medium_from`, `risk_high_from`, `risk_very_high_from` | 10, 20, 35 | Punktzahl, ab der das Risiko mittel, hoch, sehr hoch ist (1 bis 1000, aufsteigend) |
+| `weight_service_criticality` | 3 | Punkte je Kritikalitätsstufe über 2 eines betroffenen Services (0 bis 50) |
+| `weight_ci_incident` | 5 | Punkte, wenn ein betroffenes CI eine Störung oder Warnung hat |
+| `weight_open_incidents` | 4 | Punkte für offene Incidents auf den betroffenen Services |
+| `weight_overlap` | 4 | Punkte für andere Changes im selben Zeitfenster |
+| `weight_freeze` | 10 | Punkte, wenn das Zeitfenster einen Sperrzeitraum berührt |
+| `weight_failed_history` | 3 | Punkte für gescheiterte Changes an denselben CIs oder Services |
+| `weight_emergency` | 5 | Punkte für jeden Notfall-Change |
+| `weight_missing_backout` | 3 | Punkte, wenn der Rückfallplan fehlt |
+| `incident_lookback_days` | 7 | Rückblick für offene Incidents in Tagen (1 bis 90) |
+| `failed_change_lookback_days` | 180 | Rückblick für gescheiterte Changes in Tagen (1 bis 1095) |
+| `impact_refresh_hours` | 24 | Die Auswirkung aktiver Changes wird nach so vielen Stunden neu berechnet (1 bis 720) |
+| `max_tasks` | 50 | Höchstzahl Aufgaben je Change, auch in Vorlagen (1 bis 200) |
+| `calendar_id` | 0 | Znuny-Kalender, der je geplantem Change einen Termin erhält; 0 = aus |
+| `portal_schedule_enabled` | aus | Seite „Wartungsfenster“ im Kundenportal |
+| `legacy_change_group` | `itsm-change` | Mitglieder mit `ro` lesen die Znuny-Changes; gibt es die Gruppe nicht, Change-Manager und Administratoren |
+
+### Change-Arten und Phasen
+
+| Art | Bedeutung |
+|---|---|
+| **Standard-Change** | vorab genehmigt; entsteht nur aus einer gültigen Standard-Vorlage und braucht keine Bewertung und kein CAB |
+| **Normaler Change** | wird eingereicht, bewertet (Fragebogen, Auswirkung, Risiko) und vom CAB freigegeben |
+| **Notfall-Change** | ohne Bewertung, mit beschleunigter Freigabe durch das Notfall-CAB, auf Wunsch nachträglich |
+
+Phasen: **Entwurf** (`draft`), **Eingereicht** (`submitted`), **Bewertung** (`assessment`),
+**Freigabe** (`approval`), **Geplant** (`scheduled`), **Umsetzung** (`implementing`),
+**Nachbetrachtung** (`review`), **Abgeschlossen** (`closed`), **Abgelehnt** (`rejected`),
+**Abgebrochen** (`cancelled`). Endgültig sind nur Abgeschlossen und Abgebrochen; ein abgelehnter
+Change lässt sich überarbeiten. Ein neuer Change beginnt im Entwurf.
+
+Die Phase ändert sich nur über die Schritte dieser Tabelle; weder das Bearbeiten des Changes noch
+ein Statuswechsel des Tickets noch ein Dynamisches Feld setzt sie. Die Spalte „Bedingungen“ nennt,
+was vor dem Schritt erfüllt sein muss; fehlt etwas, nennt der Dialog alles auf einmal
+(`409 transition_refused` mit den Codes in `failures`).
+
+| Von | Nach | Arten | Schaltfläche | Bedingungen |
+|---|---|---|---|---|
+| Entwurf | Eingereicht | Normal | „Einreichen“ | keine |
+| Entwurf | Geplant | Standard | „Einplanen“ | Zeitfenster; kein blockierender Sperrzeitraum (*). Vorab genehmigt: die Freigabe wird ohne Abstimmung festgehalten |
+| Entwurf | Freigabe | Notfall | „Freigabe anfordern“ | Zeitfenster; kein blockierender Sperrzeitraum (*); Umsetzungs- und Rückfallplan; ein CAB mit Mitgliedern |
+| Entwurf | Umsetzung | Notfall | „Sofort umsetzen (Freigabe nachträglich)“ | nur mit `emergency_post_approval`; Zeitfenster; kein blockierender Sperrzeitraum (*); ein CAB mit Mitgliedern. Die Freigabe wird angefordert und nachträglich entschieden |
+| Eingereicht | Bewertung | Normal | „Bewertung beginnen“ | keine |
+| Eingereicht | Entwurf | Normal | „Zurück an Antragsteller“ | keine |
+| Bewertung | Freigabe | Normal | „Freigabe anfordern“ | Zeitfenster; kein blockierender Sperrzeitraum (*); Umsetzungs- und Rückfallplan; Fragebogen vollständig; Auswirkung aktuell berechnet; ein CAB mit Mitgliedern. Das Risiko wird vorher neu bewertet |
+| Bewertung | Geplant | Normal | „Ohne CAB einplanen (geringes Risiko)“ | `auto_approve_low_risk` an; wirksames Risiko „Niedrig“, kein blockierender Befund, Bewertung vollständig; Zeitfenster; Pläne; Fragebogen; Auswirkung. Hier hilft kein Übergehen: ein blockierender Konflikt verlangt den Weg über das CAB |
+| Freigabe | Geplant | Normal, Notfall | keine (das CAB stimmt zu) | Ergebnis der Freigabe |
+| Freigabe | Abgelehnt | Normal, Notfall | keine (das CAB lehnt ab) | Ergebnis der Freigabe, auch „Keine gültigen CAB-Mitglieder“ und eine Fristüberschreitung mit `approval_timeout = reject` |
+| Freigabe | Bewertung (Normal) / Entwurf (Notfall) | Normal, Notfall | keine | Die Anfrage wurde in der Freigabe-Verwaltung zurückgezogen |
+| Abgelehnt | Entwurf | Normal, Notfall | „Überarbeiten“ | keine; die nächste Freigabe ist eine neue Runde |
+| Geplant | Umsetzung | alle | „Umsetzung starten“ | Zeitfenster; kein blockierender Sperrzeitraum (*). Setzt den tatsächlichen Beginn |
+| Geplant | Entwurf | alle | „Neu planen“ | keine; die Freigabe entfällt, ein normaler oder Notfall-Change braucht vor „Geplant“ eine neue |
+| Umsetzung | Nachbetrachtung | Normal, Notfall; Standard nur mit `standard_requires_review` | „Zur Nachbetrachtung“ | alle Aufgaben erledigt (**). Setzt das tatsächliche Ende |
+| Umsetzung | Abgeschlossen | Standard ohne `standard_requires_review` | „Abschließen“ | alle Aufgaben erledigt (**); Ergebnis |
+| Nachbetrachtung | Abgeschlossen | alle | „Abschließen“ | Ergebnis; Nachbetrachtung (PIR) außer bei Standard-Changes; eine nachträgliche Freigabe ist entschieden; nach einer Ablehnung nicht „Erfolgreich“ |
+| Entwurf, Eingereicht, Bewertung, Freigabe, Geplant | Abgebrochen | alle | „Change abbrechen“ | keine; eine laufende Freigabe wird zurückgezogen |
+
+(*) Ein Change-Manager übergeht einen blockierenden Sperrzeitraum mit einer Begründung (Verlauf:
+„Sperrzeitraum übergangen“). (**) Ein Change-Manager setzt sich mit „Trotzdem fortfahren“ und einer
+Begründung über offene Aufgaben hinweg (Verlauf: „Schritt erzwungen“).
+
+Die Schritte ohne Schaltfläche nimmt nur die Entscheidung des CAB (Code `system_only`, wenn jemand
+sie anfordert). Weitere Regeln:
+
+- **Ergebnis.** Beim Abschließen wählen Sie „Erfolgreich“, „Fehlgeschlagen“ oder „Zurückgerollt“; die
+  Nachbetrachtung (PIR) ist ein Freitext, der nur bei „Zur Nachbetrachtung“ und „Abschließen“
+  angenommen wird. Nach „Fehlgeschlagen“ oder „Zurückgerollt“ bietet die Seite „Incident aus diesem
+  Change erstellen“ an: das neue Ticket entsteht im normalen Dialog und ist mit dem Change verknüpft.
+- **Ticket-Status.** Tiqora ändert den Status des Change-Tickets nur an drei Stellen: beim
+  Verlassen des Entwurfs auf `state_open`, wenn das Ticket noch einen Status vom Typ „new“ hat; bei
+  „Abgeschlossen“ auf `state_closed_successful` oder `state_closed_failed` (nach Ergebnis); bei
+  „Abgebrochen“ auf `state_closed_cancelled`. „Abgelehnt“ lässt den Status stehen, denn der Change
+  wird meist überarbeitet. Der Statuswechsel läuft über den normalen Ticket-Schreibdienst: er
+  verlangt `rw`, ein Plugin kann ihn ablehnen (`409 vetoed`, dann bleibt die Phase stehen), und beim
+  Schließen gelten Znunys Regeln für Sperre und Besitzer wie beim Schließen in Znuny. Die
+  Entscheidung des CAB ändert den Ticket-Status nie.
+- **Abgelehnt.** Der einzige Schritt aus „Abgelehnt“ ist „Überarbeiten“. Wer einen abgelehnten Change
+  aufgeben will, überarbeitet ihn und bricht ihn im Entwurf ab.
+- **Ticket außerhalb geschlossen.** Wird das Ticket in Znuny oder im Ticket-Dialog geschlossen, bleibt
+  die Phase stehen; die Change-Seite zeigt „Das Ticket wurde geschlossen …, der Change steht aber noch
+  in der Phase …“.
+- **Dynamische Felder.** Tiqora schreibt Art und Phase bei jeder Änderung in `ITSMChangeType` und
+  `ITSMChangePhase` (Historie `TicketDynamicFieldUpdate`, nichts bei gleichem Wert). Ändert jemand die
+  Felder in Znuny, liest Tiqora das nicht zurück: die Seite meldet „Die Ticket-Felder passen nicht mehr
+  zum Change“, der nächste Schritt schreibt sie neu. Hat ein Znuny-Admin die Auswahlwerte geändert, so
+  dass ein Wert nicht mehr erlaubt ist, wird das Feld übersprungen und der Schritt läuft trotzdem.
+- **Prozess-Tickets.** Ein Prozess-Ticket kann kein Change werden (`process_ticket`). Wird ein
+  Change-Ticket später zum Prozess-Ticket, kann nur noch ein Change-Manager den Change abbrechen, aus
+  jeder Phase außer den endgültigen (Hinweis „Das Ticket ist inzwischen ein Prozess-Ticket“).
+- **Bearbeiten.** Die Art des Changes ändert sich nur im Entwurf. Während der Freigabe sind Art,
+  Zeitfenster, Pläne und CAB gesperrt (`409 change_locked_in_approval`): das CAB entscheidet über
+  einen festen Stand. In späteren Phasen bleiben sie bearbeitbar, wie in Znuny; jede Änderung steht im
+  Verlauf („Geändert“ mit den Feldnamen). Abgeschlossene und abgebrochene Changes sind schreibgeschützt.
+- **Zeiten.** Alle Zeitfenster sind UTC; die Oberfläche schreibt das dazu.
+
+### Vorlagen und Standard-Changes
+
+Admin, „Change-Management“, Reiter „Vorlagen“. Eine **Change-Vorlage** hat Name, Beschreibung, Art,
+„Vorgaben für neue Changes“ und Change-Aufgaben:
+
+- **Vorgaben:** Titel, Queue, Priorität, Services, CAB, Dauer in Minuten (Ende = Beginn + Dauer, wenn
+  beim Anlegen nur ein Beginn angegeben wird), „Im Kundenportal als Wartung anzeigen“, Begründung,
+  Umsetzungs-, Rückfall- und Testplan und vorgegebene Antworten der Risikobewertung. Was beim Anlegen
+  angegeben wird, hat Vorrang. Verweise, die es seit dem Speichern der Vorlage nicht mehr gibt
+  (Queue, Service, CAB, Antwort), werden beim Anlegen weggelassen und im Verlauf unter „Hinweise der
+  Vorlage“ genannt; sie verhindern den Change nie. Beim Speichern der Vorlage prüft Tiqora sie.
+- **Aufgaben** (höchstens `max_tasks`): Schlüssel (`a–z`, `0–9`, `_`), Titel, Typ, Beginn relativ zum
+  geplanten Beginn des Changes in Minuten, Dauer, Queue, Besitzer und Beschreibung. Legen Sie einen
+  Change aus der Vorlage an, entstehen die Aufgaben im Hintergrund (Auftrag „Change-Aufgaben anlegen“,
+  `core.itsm_change_tasks`) als eigene Tickets; jede Aufgabe trägt ihren Schlüssel, so dass ein
+  Neustart nichts doppelt anlegt. Was nicht angelegt werden konnte (zum Beispiel ohne Recht `create`
+  auf der Queue), meldet der Dialog nach dem Anlegen.
+- **„Vorab freigegebener Standard-Change“** gibt es nur bei der Art Standard. Ein Standard-Change
+  entsteht ausschließlich aus einer gültigen solchen Vorlage (`standard_needs_template`). Sein
+  Schritt „Einplanen“ hält in der Freigabe-Engine eine Freigabe ohne Abstimmung fest (Grund `auto`,
+  keine E-Mail), so dass auch vorab genehmigte Changes eine Freigabe-Spur haben.
+
+Texte in Vorlagen und Changes sind reiner Text, kein HTML. Eine geänderte Vorlage ändert vorhandene
+Changes nicht; wird sie gelöscht, behalten die Changes ihre Daten. Standard-Changes aus dem
+Service-Katalog werden später denselben Weg nehmen (`POST /api/v1/itsm/changes` mit einer
+Standard-Vorlage); der Katalog ist nicht Teil dieses Kapitels.
+
+### Change-Aufgaben
+
+Eine Change-Aufgabe ist ein Ticket vom Typ `Change::Task`, mit dem Change verknüpft
+(`task_link_type`, Vorgabe `ParentChild`, der Change ist übergeordnet). Tiqora führt dazu Position,
+Typ („Arbeitsauftrag“, „Rückfall“, „Entscheidung“, „Nachbetrachtung“), geplantes und tatsächliches
+Zeitfenster und den geplanten Aufwand. **Zuständig** ist der Besitzer des Aufgaben-Tickets,
+**erledigt** ist eine Aufgabe, wenn ihr Ticket einen Status vom Typ „closed“, „removed“ oder „merged“
+hat: Zuweisen und Erledigen machen Sie also wie bei jedem Ticket.
+
+- **Anlegen:** „Aufgabe hinzufügen“ im Abschnitt „Change-Aufgaben“ legt ein Ticket an (`rw` auf dem
+  Change). Queue: die der Aufgabe, sonst `task_queue_id`, sonst die Queue des Changes; dort brauchen
+  Sie `create`. Besitzer: der gewählte Agent (gültig, mit `rw` auf der Queue) oder Sie. Kunde, Service
+  und Priorität kommen vom Change.
+- **Reihenfolge:** „Nach oben“ / „Nach unten“. Aufgaben ohne Leserecht behalten ihren Platz und
+  erscheinen nur als „n weitere ohne Leserecht“.
+- **Phase:** Erledigte Aufgaben bewegen den Change nicht. Für „Zur Nachbetrachtung“ und „Abschließen“
+  aus der Umsetzung müssen alle Aufgaben erledigt sein (ein Change-Manager kann mit Begründung
+  fortfahren); gezählt werden dabei alle Aufgaben, auch die ohne Leserecht.
+- **„Meine Aufgaben“** (Reiter der Change-Liste): offene Aufgaben, deren Besitzer Sie sind, von
+  Changes, die noch laufen; früheste geplante zuerst.
+
+Znunys Arbeitsauftrags-Typ „approval“ gibt es nicht: die Freigabe macht das CAB über die
+Freigabe-Engine. Archivierte Znuny-Arbeitsaufträge behalten ihren Typ.
+
+### Risiko
+
+Das Risiko eines Changes ist eine Punktzahl: die Punkte der Antworten im **Fragebogen** plus die
+Punkte der **automatischen Prüfungen**, nie unter 0. Die Stufe folgt den Schwellen der Einstellungen
+(Vorgabe: „Niedrig“ unter 10, „Mittel“ ab 10, „Hoch“ ab 20, „Sehr hoch“ ab 35 Punkten).
+
+**Fragebogen.** Admin, „Change-Management“, Reiter „Risikofragen“: Schlüssel (nach dem Anlegen fest),
+Frage, Hilfetext, 2 bis 10 Antworten mit Punkten von −50 bis 50 (negative Punkte senken das Risiko),
+gültig und Reihenfolge. Es werden keine Fragen automatisch angelegt; „Beispielfragen übernehmen“
+legt vier Fragen an, deren Schlüssel noch fehlen: Ausfall während der Umsetzung (`downtime`),
+Rückfallplan getestet (`backout_tested`), betroffene Anwender (`users_affected`), Erfahrung mit
+solchen Changes (`experience`). Bei normalen Changes muss vor „Freigabe anfordern“ jede gültige Frage
+beantwortet sein; ohne gültige Fragen gilt der Fragebogen als vollständig.
+
+**Automatische Prüfungen.** Sie lesen nur gespeicherte Daten (die berechnete Auswirkung, die
+Konflikte, Zählungen) und liefern je höchstens einen Befund:
+
+| Prüfung | Befund, wenn | Punkte | Wirkung |
+|---|---|---|---|
+| `core.service_criticality` | ein betroffener Service (direkt oder über die CMDB) hat Kritikalität 3 oder höher (erste Ziffer, z. B. `4 high`) | (höchste Stufe − 2) × `weight_service_criticality` | Warnung |
+| `core.ci_incident` | ein betroffenes CI hat den Vorfallstatus Störung oder Warnung | `weight_ci_incident` | Warnung |
+| `core.open_incidents` | offene Incidents oder Major Incidents auf den betroffenen Services, angelegt in den letzten `incident_lookback_days` Tagen | `weight_open_incidents` | Warnung |
+| `core.overlap` | andere Changes überschneiden sich (Konflikt „Überschneidung“) | `weight_overlap` | Warnung |
+| `core.freeze` | das Zeitfenster liegt in einem Sperrzeitraum | `weight_freeze` | blockiert bei einem sperrenden Sperrzeitraum, sonst Warnung |
+| `core.failed_history` | ein Change mit Ergebnis „Fehlgeschlagen“ oder „Zurückgerollt“ an denselben direkten CIs oder Services, abgeschlossen in den letzten `failed_change_lookback_days` Tagen | `weight_failed_history` | Warnung |
+| `core.emergency` | Notfall-Change | `weight_emergency` | Hinweis |
+| `core.missing_backout` | normaler oder Notfall-Change ohne Rückfallplan | `weight_missing_backout` | Warnung |
+
+Konnte eine Prüfung nicht laufen, erscheint „Eine Prüfung konnte nicht laufen“ mit 0 Punkten, und die
+Bewertung gilt als unvollständig, ebenso bei abgeschnittener Auswirkung. Ein blockierender Befund
+hält den Change an seinen Bedingungen fest. Gab es zu viele Sperrzeiträume, um alle zu prüfen,
+blockiert die Prüfung ebenfalls (im Zweifel sicher). Befunde nennen nur die Tickets, CIs und Services,
+die Sie lesen dürfen; den Rest zählen sie.
+
+„Neu bewerten“ rechnet sofort; vor „Freigabe anfordern“ und vor „Ohne CAB einplanen“ bewertet Tiqora
+ohnehin neu. Ein Change-Manager kann die Stufe mit „Risiko übersteuern“ und einer Begründung festlegen
+oder die Übersteuerung wieder entfernen (Verlauf „Risiko übersteuert“); die übersteuerte Stufe ist
+dann die wirksame, auch für „Ohne CAB einplanen“.
+
+### Auswirkung (CMDB)
+
+Die Auswirkung eines Changes sind seine **direkt betroffenen** CIs und Services und alles, was eine
+Störung an diesen CIs erreichen würde („über die CMDB“, nach denselben Regeln wie „Auswirkungen“ in
+[cmdb.md](cmdb.md)). Direkt betroffen sind die mit dem Change-Ticket verknüpften CIs, der Service des
+Tickets und die weiteren Services des Changes.
+
+Tiqora berechnet die Auswirkung im Hintergrund (Auftrag „Auswirkung eines Changes berechnen“,
+`core.itsm_change_impact`) und speichert sie: beim Anlegen, wenn sich Zeitfenster oder Services
+ändern, wenn das Ticket ein CI bekommt oder verliert, wenn sich der Service des Tickets ändert, auf
+„Neu berechnen“ und regelmäßig für aktive Changes (Einstellung `impact_refresh_hours`, je Lauf des
+Dienstes höchstens 200 Changes). Risiko und Konflikte lesen nur diesen gespeicherten Stand. Normale
+Changes brauchen vor „Freigabe anfordern“ eine aktuelle Berechnung (`impact_pending`: „Die
+Auswirkung ist nicht aktuell berechnet“).
+
+Der Abschnitt „Auswirkung“ zeigt die betroffenen Services mit ihrem Vorfallstatus, die CIs (direkt
+oder über die CMDB) und bis zu 50 offene Incidents auf diesen Services. CIs einer Klasse, die Sie
+nicht lesen dürfen, und Incidents ohne Leserecht fehlen und werden gezählt. Ist der
+Abhängigkeitsgraph größer als die CMDB-Grenze, steht „Die Auswirkung ist abgeschnitten“ da.
+
+### Sperrzeiträume und Konflikte
+
+**Sperrzeiträume** (Admin, „Change-Management“, Reiter „Sperrzeiträume“) sperren oder markieren
+Zeiten, in denen nicht geändert werden soll: Name, Notiz, Wirkung („Changes sperren“ oder „Nur
+warnen“), „Notfall-Changes zulassen (nur Warnung)“ (Vorgabe an), „Gilt für“ (alle Services oder
+bestimmte Services, höchstens 200), Beginn und Ende und eine Wiederholung (täglich, wöchentlich,
+monatlich, jährlich, mit Intervall und Ende nach Anzahl oder Datum). **Zeiten in UTC**: ein
+wöchentlicher Sperrzeitraum folgt der Sommerzeit nicht.
+
+Ein Sperrzeitraum trifft einen Change, wenn sich die Zeitfenster überschneiden und er für alle
+Services gilt oder für einen Service, den der Change direkt oder über die CMDB betrifft. Der Abschnitt
+„Konflikte“ zeigt:
+
+| Konflikt | Stufe |
+|---|---|
+| Sperrzeitraum | „Blockiert“ bei „Changes sperren“, sonst „Warnung“; für einen Notfall-Change mit „Notfall-Changes zulassen“ nur „Warnung“ |
+| Überschneidung mit einem anderen Change in Freigabe, Geplant oder Umsetzung, der ein CI oder einen Service teilt | Warnung |
+| Aufgabe außerhalb des Zeitfensters | Warnung |
+| Kein Zeitfenster gesetzt | Hinweis |
+| Zu viele Sperrzeiträume, um alle zu prüfen | Warnung; zählt bei den Bedingungen wie „Blockiert“ (im Zweifel sicher) |
+| Zu viele andere Changes im Zeitraum (mehr als 500 werden nicht geprüft) | Warnung; die Liste ist unvollständig |
+
+Ein blockierender Konflikt hält „Freigabe anfordern“, „Einplanen“ (Standard) und „Umsetzung starten“
+an, bis ein Change-Manager ihn mit Begründung übergeht. Eine Überschneidung mit einem Change, den Sie
+nicht lesen dürfen, erscheint als „Überschneidung mit einem Change ohne Leserecht“, mit Zeitfenster und
+Zahl der gemeinsamen Services und CIs, ohne Nummer und Titel.
+
+### Change-Kalender und geplante Serviceverfügbarkeit
+
+Der **Change-Kalender** (`/agent/itsm/changes/calendar`) zeigt Changes, Aufgaben und Sperrzeiträume
+(„Sperrzeitraum (blockiert)“ / „(Warnung)“) mit Konfliktmarken, als „Monat“ oder „Woche“, mit Filter
+nach Service. Abgelehnte und abgebrochene Changes fehlen, ebenso alles, was Sie nicht lesen dürfen;
+Sperrzeiträume erscheinen immer. Ein Zeitraum umfasst höchstens 92 Tage; sind es mehr als 5000
+Changes, sagt die Seite, dass nicht alle angezeigt werden. Alle Zeiten in UTC.
+
+Die Ansicht **„Nach Service“** ist die geplante Serviceverfügbarkeit (PSA): je Service die geplanten
+Change-Fenster (Freigabe, Geplant, Umsetzung) und Sperrzeiträume des Zeitraums mit der betroffenen
+Zeit, auch indirekt über die CMDB betroffene Services, höchstens 200 Services, die am stärksten
+betroffenen zuerst.
+
+![Change-Kalender mit Sperrzeitraum und Konfliktmarke (Demo, englische Oberfläche)](images/itsm-change-calendar.png)
+
+### CAB und Freigabe
+
+Ein **CAB** ist in Tiqora ein benanntes Gremium (Admin, „Change-Management“, Reiter „CAB“): Name,
+Beschreibung, Entscheidungsregel („Eine Zustimmung genügt“, „Alle müssen zustimmen“, „Mehrheit“,
+„Mindestzahl an Zustimmungen“ mit Zahl), „Notfall-CAB“ und gültig. Mitglieder sind bis zu 50 Einträge
+der Freigabe-Engine: Agenten, Gruppen (alle mit `rw`), Rollen, Freigabegruppen, Freigeber-Regeln (zum
+Beispiel „Verantwortliche der betroffenen Services“, `itsm.service_owner`) und Kundenbenutzer. Jede
+Person stimmt einzeln ab. **Kundenbenutzer** im CAB nimmt Tiqora erst an, wenn in den
+Freigabe-Einstellungen Kunden als Freigeber erlaubt sind (sonst `422 cab_customer_members_disabled`).
+Ein CAB mit CAB-Sitzungen lässt sich nicht löschen, nur auf ungültig setzen.
+
+**Welches CAB entscheidet:** das am Change gewählte, sonst bei einem Notfall-Change das Notfall-CAB
+der Einstellungen, sonst das Standard-CAB. Ohne CAB oder mit einem CAB ohne Mitglieder ist „Freigabe
+anfordern“ nicht möglich (`cab_missing`, `cab_empty`).
+
+**Die Freigabe.** „Freigabe anfordern“ (und bei einem Notfall-Change „Sofort umsetzen“) legt in der
+gemeinsamen Freigabe-Engine eine Anfrage mit einem Schritt an: Regel und Mitglieder des CAB, Frist
+`approval_due_hours`, nach der Frist `approval_timeout`, Vertretung und E-Mail-Link erlaubt. Titel:
+„Change <Nummer>: <Titel>“, Beschreibung: die Begründung des Changes; Antragsteller ist der Besitzer
+des Change-Tickets. Freigeber ohne Zugriff auf das Ticket sehen nur Art, Risiko, Zeitfenster (UTC)
+und die Zahl der betroffenen Services und CIs. Wie abgestimmt, erinnert, eskaliert und vertreten wird,
+beschreibt [approvals.md](approvals.md); dieses Kapitel wiederholt es nicht.
+
+- **Runden.** Jede Anforderung ist eine neue Runde („Runde n“). „Überarbeiten“ und „Neu planen“ führen
+  zu einer neuen Runde; eine noch offene ältere Anfrage wird dabei ersetzt. Ergebnisse älterer Runden
+  ändern nichts mehr.
+- **Ergebnis.** Die Engine meldet die Entscheidung kurz nach der letzten Stimme (Auftrag
+  `core.approval_hook`): Zustimmung → „Geplant“, Ablehnung → „Abgelehnt“. Löst das CAB auf niemanden
+  auf, lehnt die Engine sofort ab („Keine gültigen CAB-Mitglieder“). Zieht ein Administrator die
+  Anfrage in der Freigabe-Verwaltung zurück, geht ein normaler Change zurück in die Bewertung, ein
+  Notfall-Change in den Entwurf.
+- **Frist.** Vorgabe ist „nur erinnern“: Znuny entscheidet über ein CAB nie durch Zeitablauf, Tiqora
+  ebenfalls nicht, solange Sie `approval_timeout` nicht auf `reject` stellen.
+- **Vier-Augen-Prinzip.** Besitzer und Antragsteller eines Changes stimmen im CAB nicht mit, es sei
+  denn, `cab_allow_self_approval` ist an. Das ist strenger als Znuny, das jedes CAB-Mitglied abstimmen
+  lässt.
+- **Abstimmen.** Auf der Change-Seite steht im Abschnitt „Freigabe (CAB)“ die Abstimmung des CAB;
+  im Ticket-Zoom zeigt der Block „Change“ nur den Stand („Abstimmen im Abschnitt Freigaben“), weil
+  das Ticket die Anfrage schon im Block „Freigaben“ führt. Ihre eigenen offenen Stimmen finden Sie in
+  „Meine Freigaben“. Der Reiter „Freigabe“ der Change-Liste zeigt alle Changes in der Phase Freigabe,
+  nicht nur die, bei denen Sie abstimmen.
+- **Ohne Abstimmung.** Standard-Changes („Vorab genehmigt durch die Standard-Vorlage“) und risikoarme
+  Changes („Ohne CAB eingeplant (geringes Risiko)“) bekommen eine bereits entschiedene Freigabe ohne
+  E-Mail.
+- **Nachträgliche Freigabe** (Notfall, `emergency_post_approval`): Die Umsetzung beginnt sofort, das
+  CAB entscheidet danach. Abschließen geht erst nach der Entscheidung. Lehnt das CAB während der
+  Umsetzung ab, wechselt der Change in die Nachbetrachtung („Schritt erzwungen“) und kann nicht mehr
+  „Erfolgreich“ abgeschlossen werden. Wurde die Anfrage zurückgezogen, kann ein Change-Manager mit
+  „Trotzdem fortfahren“ und Begründung abschließen.
+
+**CAB-Sitzungen** (`/agent/itsm/cab-meetings`) sind organisatorisch: Ein Change-Manager plant eine
+Sitzung („Sitzung planen“: CAB, Titel, Beginn, Ende, Ort; Zeiten in UTC), stellt die Tagesordnung aus
+Changes in Eingereicht, Bewertung, Freigabe oder Geplant zusammen (höchstens 100 Punkte; „Vorschläge“
+sind die Changes, die dieses CAB gerade freigeben soll), schreibt das Protokoll und setzt den Status
+(„Geplant“, „Durchgeführt“, „Abgesagt“). Jeder Punkt zeigt den Stand seiner Freigabe. Abgestimmt wird
+nicht in der Sitzung, sondern einzeln über die Freigabe-Engine; die Sitzungsleitung kann nicht für
+andere abstimmen. Sitzungen und **Protokoll sind für alle Agenten sichtbar**; Changes der
+Tagesordnung, die Sie nicht lesen dürfen, erscheinen als „Change ohne Leserecht“ und bleiben auf der
+Tagesordnung, wenn Sie sie speichern.
+
+![CAB-Sitzung mit Tagesordnung, Freigabestand und Protokoll (Demo, englische Oberfläche)](images/itsm-cab-meeting.png)
+
+### Verknüpfungen zu Incidents und Problemen
+
+Incidents und Probleme werden mit dem Change über den Verknüpfungstyp `related_link_type` (Vorgabe
+`Normal`, der Change ist die Quelle) verknüpft: als gewöhnliche Ticket-Verknüpfung mit Znunys Regeln
+und Historie (`TicketLinkAdd`), auch in Znuny sichtbar. Die Schnittstelle
+`/api/v1/itsm/changes/{id}/related` listet, verknüpft (`rw` auf dem Change, `ro` auf dem anderen
+Ticket; keine Change-Aufgabe) und löst. Sie zählt nur Verknüpfungen dieses Typs; Verknüpfungen
+anderer Typen stehen in der allgemeinen Verknüpfungsübersicht des Tickets. Die Change-Seite hat dafür
+noch keinen eigenen Abschnitt: Verknüpfen Sie in der Oberfläche über „Verknüpfen“ im Ticket mit dem
+Typ `Normal`.
+
+`POST /api/v1/tickets/{id}/change/create-from` legt einen Change aus einem Ticket an, das Sie lesen
+dürfen: Service, verknüpfte CIs (höchstens 50) und Kunde kommen aus dem Ticket, beide Tickets werden
+verknüpft. Umgekehrt bietet ein fehlgeschlagener oder zurückgerollter Change „Incident aus diesem
+Change erstellen“ an (siehe oben). Die Auswirkung zeigt offene Incidents auf den betroffenen Services.
+
+### Kundenportal
+
+Die Seite **„Wartungsfenster“** (`/portal/change-schedule`) zeigt Kunden geplante Changes ihrer
+Services. Sie ist **aus** (`portal_schedule_enabled`), und nur Changes mit dem Schalter „Im
+Kundenportal im Wartungskalender anzeigen“ (auf der Change-Seite und beim Anlegen; in Vorlagen als
+Vorgabe) erscheinen, in den Phasen Geplant, Umsetzung und Abgeschlossen, wenn ihr Zeitfenster den
+Monat berührt und sie mindestens einen Service betreffen, der dem Kunden zugeordnet ist (direkt oder
+über die CMDB; Zuordnung wie in Znunys `TicketServiceList`, also auch die Vorgabe-Services
+`<DEFAULT>`). Der Kunde sieht Nummer, Titel, Art, Phase, Zeitfenster und die Namen **seiner eigenen**
+betroffenen Services, nie Pläne oder andere Services. Den Titel eines markierten Changes sieht also
+jeder Kunde eines betroffenen Services. Die Schnittstelle `GET /api/portal/change-schedule?start=&end=`
+erlaubt höchstens 92 Tage; ist das Ergebnis gekürzt, setzt sie den Header `X-Schedule-Truncated: true`
+und die Seite zeigt einen Hinweis. Bei ausgeschalteter Seite antwortet sie 404.
+
+### Znuny-Kalender-Spiegelung
+
+Mit `calendar_id` (die Id eines Znuny-Kalenders) bekommt jeder Change in Geplant oder Umsetzung mit
+Zeitfenster einen Termin in diesem Kalender: Titel „Change <Nummer>: <Titel>“, Beschreibung mit dem
+Link nach Tiqora, Beginn und Ende aus dem Zeitfenster. Ändern sich Zeitfenster, Titel oder Kalender,
+wird der Termin neu angelegt; in jeder anderen Phase wird er gelöscht. So sehen Znuny-Nutzer die
+Changes in Znunys Kalender. Eine Verknüpfung zwischen Termin und Ticket (Znunys
+`calendar_appointment_ticket`) legt Tiqora nicht an. Fehlt der Kalender, wird das protokolliert
+(`change_calendar_missing`); der Schritt läuft trotzdem. Vorgabe: aus.
+
+### Changes aus Znuny (ITSMChangeManagement)
+
+Tiqora schreibt nie in Znunys Change-Tabellen (`change_*`, `condition_*`). Was dort steht, zeigt
+Tiqora nur lesend unter **„Changes (Znuny)“** (`/agent/itsm/legacy-changes`): Liste mit Suche nach
+Nummer und Titel, Detail mit Status, Kategorie, Auswirkung, Priorität, Change-Manager, Change-Builder,
+Zeiten, Beschreibung, Begründung, CAB, Arbeitsaufträgen (Anweisung, Bericht, Aufwand), Verknüpfungen,
+Dynamischen Feldern und Verlauf. Die Zeiten eines Changes leitet Tiqora wie Znuny aus den
+Arbeitsaufträgen ab ([itsm-import.md](itsm-import.md), „Change-Verwaltung: Schema und Verhalten“).
+
+- **Modus A, live.** Die Daten kommen direkt aus Znunys Tabellen; „In Znuny bearbeiten“ öffnet den
+  Change in Znuny. Ein Ticket zeigt im Zoom den Hinweis „Changes werden in Znuny geführt (Modus A)“ und
+  „Changes (Znuny) zu diesem Ticket“.
+- **Modus B, Archiv.** Der Schritt `changes` des ITSM-Imports kopiert bei jedem Lauf alle Znuny-Changes
+  mit Arbeitsaufträgen, CAB, Verlauf, Dynamischen Feldern und Verknüpfungen in das **Change-Archiv**
+  von Tiqora (nur lesen; „Archivierter Change: Er kann nicht mehr bearbeitet werden“). Nach der
+  Umstellung startet Admin, „Change-Management“, Reiter „Change-Archiv“ denselben Lauf allein
+  („Probelauf“ oder „Archivieren“, Auftrag `core.itsm_legacy_change_archive`), etwa für Changes, die
+  danach noch in Znuny bearbeitet wurden; er läuft nur in Modus B und nur, wenn Znuny
+  ITSMChangeManagement installiert ist. Jeder Lauf aktualisiert nur, was sich geändert hat; Changes, die
+  in Znuny gelöscht wurden, bleiben im Archiv. Change-Vorlagen, Bedingungen und Benachrichtigungsregeln
+  werden nicht übernommen, nur gezählt. Die Seitenleiste führt in Modus B zu den Tiqora-Changes; das
+  Archiv öffnen Sie unter `/agent/itsm/legacy-changes` (einen eigenen Menüpunkt gibt es dafür noch
+  nicht).
+- **Wer sie sieht.** Agenten mit `ro` in der Gruppe `legacy_change_group` (Vorgabe `itsm-change`, wie
+  Znunys Change-Masken) und Administratoren; gibt es die Gruppe nicht (mehr), auch die Change-Manager.
+  Verknüpfte Tickets ohne Leserecht und CIs einer Klasse ohne Leserecht fehlen; ein archiviertes CI, das
+  der Import nicht übernommen hat, erscheint nur mit seiner Znuny-Id.
+
+### Was Znuny-Nutzer sehen
+
+- Ein Tiqora-Change ist in Znuny ein **gewöhnliches Ticket** vom Typ `Change` in seiner Queue, mit den
+  Feldern `ITSMChangeType` und `ITSMChangePhase` (englische Werte; sichtbar, sobald Sie sie in Znunys
+  Ticket-Zoom einblenden) und den Status, die Tiqora setzt.
+- **Aufgaben** sind Kind-Tickets vom Typ `Change::Task` (Verknüpfung `ParentChild`).
+- Die Freigabe erscheint als `Misc`-Zeilen in der Ticket-Historie (siehe [approvals.md](approvals.md));
+  auf Wunsch stehen die Termine im Znuny-Kalender (Spiegelung oben).
+- **Keine Znuny-Change-Bildschirme**: Znunys Change-Verwaltung (AgentITSMChange…, Change-Kalender,
+  CAB-Masken) kennt Tiqora-Changes nicht. Sie arbeitet weiter auf ihren eigenen Tabellen; was dort
+  nach der Umstellung entsteht, ist kein Tiqora-Change und kommt mit dem nächsten Archiv-Lauf nur ins
+  Archiv.
+
+### Prozess-Vorlage oder Change-Management
+
+Für Änderungen gibt es zwei Wege, die sich nicht mischen: Ein **Prozess-Ticket** kann kein Change
+werden, und ein Change, dessen Ticket später einen Prozess bekommt, lässt sich nur noch abbrechen. Das
+**Change-Management** dieses Kapitels ist der Weg, wenn Sie CAB, Risikobewertung, Sperrzeiträume,
+Change-Kalender und Aufgaben brauchen. Eine Znuny-kompatible **Change-Prozess-Vorlage** gehört zur
+Prozessverwaltung ([process-management.md](process-management.md)); sie passt, wenn Sie den Ablauf
+frei mit Aktivitäten und Dialogen gestalten oder mit Znunys Prozessen austauschen wollen.
+
+### Change-Rechte und API
+
+| Aktion | Recht |
+|---|---|
+| Change lesen (Liste, Seite, Kalender, Auswirkung, Konflikte, Risiko, Verlauf) | `ro` auf der Queue des Change-Tickets; ohne: 404 |
+| Change bearbeiten, Schritt ausführen, Aufgabe hinzufügen, Antworten speichern | `rw`; ohne: 403 |
+| Change anlegen | `create` und `ro` auf der Queue (Tiqora liest den neuen Change sofort zurück). Znuny entscheidet über das Anlegen nach der Gruppe `itsm-change-manager`, nicht nach der Queue |
+| Sperrzeitraum übergehen, Risiko übersteuern, Schritt erzwingen, CAB-Sitzungen planen und ändern | Change-Manager (`manager_group`) oder Administrator |
+| CAB-Sitzungen und Protokolle lesen | jeder Agent |
+| Vorlagen, CAB, Risikofragen, Sperrzeiträume, Change-Archiv, Einstellungen | Administrator |
+| Znuny-Changes lesen | `ro` in `legacy_change_group` (siehe oben) |
+
+**API-Schlüsselbereiche.** Abweichend von den übrigen Routen unter `/api/v1/itsm` (Bereich `cmdb`)
+gehören alle Change-Routen zum Bereich **`tickets`**: `/api/v1/itsm/changes…`, `/itsm/change-tasks…`,
+`/itsm/change-calendar…`, `/itsm/change-templates`, `/itsm/cabs`, `/itsm/cab-meetings…`,
+`/itsm/freeze-windows` und `/itsm/legacy-changes…`, ebenso `/api/v1/tickets/{id}/change…`. Sie
+zeigen Ticket-Titel; ein Schlüssel mit `cmdb:ro` sieht sie deshalb nicht. Die Verwaltung unter
+`/api/v1/admin/itsm/change/…` gehört zum Bereich **`admin`**, `/api/portal/change-schedule` zur
+Kundensitzung.
+
+| Route | Zweck |
+|---|---|
+| `GET /itsm/changes/status` | Verfügbarkeit (`available`, `reason`: `ok`, `itsm_off`, `mode_a`, `setup_missing`), Znuny-Changes (`legacy`: `none`, `live`, `archive`), `can_manage`, `can_see_legacy` |
+| `GET`/`POST /itsm/changes` | Liste (`q`, `phase`, `type`, `service_id`, `ci_id`, Zeitfenster, `mine`, `order`, `limit` ≤ 100) und Anlegen (201, mit `tasks_job_id`) |
+| `GET`/`PATCH /itsm/changes/{id}` | Change lesen und bearbeiten (die Phase ist kein Feld) |
+| `POST /itsm/changes/{id}/transition` | Schritt: `to`, `reason`, `override_reason`, `force`, `outcome`, `pir_notes`; `409 transition_refused` mit `failures` (`code`, `overridable`) |
+| `GET /itsm/changes/{id}/events` | Verlauf des Changes |
+| `GET /itsm/changes/{id}/impact`, `POST …/impact/recompute` | Auswirkung lesen, neu berechnen (202, Auftrag) |
+| `GET /itsm/changes/{id}/conflicts` | Konflikte |
+| `GET /itsm/changes/{id}/risk`, `PUT …/risk/answers`, `POST …/risk/evaluate`, `PUT …/risk/override` | Risiko, Antworten, neu bewerten, übersteuern |
+| `GET`/`POST /itsm/changes/{id}/tasks`, `PATCH …/tasks/{task_id}`, `PUT …/tasks/order` | Aufgaben |
+| `GET`/`POST /itsm/changes/{id}/related`, `DELETE …/related/{other_id}` | Verknüpfte Incidents und Probleme |
+| `GET /itsm/changes/{id}/approval` | Stand der Freigabe (Runde, Weg, Momentaufnahme oder `history_missing`) |
+| `GET /itsm/change-tasks/mine` | Meine Aufgaben |
+| `GET /itsm/change-calendar`, `GET /itsm/change-calendar/services` | Kalender und geplante Serviceverfügbarkeit (`start`, `end`, höchstens 92 Tage) |
+| `GET /itsm/change-templates`, `GET /itsm/cabs`, `GET /itsm/freeze-windows` | gültige Vorlagen, CABs, Sperrzeiträume eines Zeitraums |
+| `GET`/`POST /itsm/cab-meetings`, `GET`/`PATCH …/{id}`, `PUT …/{id}/agenda`, `GET …/{id}/suggestions` | CAB-Sitzungen |
+| `GET /itsm/legacy-changes`, `GET …/{znuny_change_id}` | Znuny-Changes (`source`: `live` oder `archive`) |
+| `POST /tickets/{id}/change`, `POST /tickets/{id}/change/create-from` | „Als Change führen“, Change aus einem Ticket |
+
+Verwaltung: `/admin/itsm/change/templates`, `/cabs` (mit `…/{id}/members`), `/risk-questions` (mit
+`…/order` und `…/examples`), `/freeze-windows` und `/legacy-archive` (`GET` letzter Lauf, `POST` mit
+`{"dry_run": …}` startet den Archiv-Lauf). Fehler antworten als `{"detail": {"code": …}}`;
+Hintergrundaufträge verfolgen Sie über `GET /api/v1/jobs/{id}`. Zeiten sind UTC.
+
+### Datenschutz (DSGVO)
+
+- Die **DSGVO-Löschung eines Kunden** ([gdpr.md](gdpr.md#itsm-changes)) behält die Change-Daten seiner
+  Tickets, leert aber Begründung, Pläne, Nachbetrachtung, die Begründung der Risiko-Übersteuerung und
+  die Details im Verlauf. Werden die Tickets mitgelöscht, verschwinden die Change-Daten mit ihnen.
+- Löscht die Löschung auch die Freigabe-Anfrage, zeigt der Change „Freigabeverlauf nicht mehr
+  vorhanden“. Eine nachträgliche Freigabe mit festgehaltenem Freigabezeitpunkt zählt dann als
+  freigegeben, sonst als zurückgezogen (ein Change-Manager kann mit Begründung abschließen). Restfall:
+  Wurde ein nachträglich **abgelehnter** Change später gelöscht, ist die Ablehnung nicht mehr bekannt,
+  und „Erfolgreich“ ist beim Abschließen nicht mehr gesperrt.
+- **Change-Archiv.** Wird ein Kunde gelöscht, ersetzt Tiqora seinen Login und seine Adresse in
+  archivierten Znuny-Changes (CAB, Verlauf, Texte) durch das Pseudonym seiner Tickets beziehungsweise
+  „[gelöscht]“ und merkt sich nur einen geschlüsselten Hash. Ein späterer Archiv-Lauf holt die Person
+  deshalb nicht zurück. Der Schlüssel ist `TIQORA_SECRET_KEY`: Wird er gewechselt, greifen die
+  Merkzettel nicht mehr, und gelöschte Kunden können mit einem neuen Archiv-Lauf zurückkommen.
+  Benachrichtigungszeilen im Znuny-Verlauf enthalten Empfängeradressen und werden genauso behandelt.
+- Znunys eigene Tabellen `change_*` berührt die Löschung nie: In Modus A führt Znuny, dort löschen Sie
+  selbst.
+
+### Abweichungen von Znuny
+
+Die vollständige Liste mit Status steht in [compatibility.md](compatibility.md#znuny-features-not-implemented)
+(Zeilen „ITSMChangeManagement“). Kurz:
+
+- Der Ablauf ist die feste Phasenfolge oben, kein einstellbarer Statusautomat (Znuny
+  `change_state_machine`) und kein Prozess.
+- Znunys Bedingungen und Aktionen (`condition_*`) und Change-Benachrichtigungsregeln gibt es nicht;
+  Benachrichtigungen kommen aus den Ticket-Ereignissen und der Freigabe-Engine.
+- Die Priorität ist die des Tickets; Znunys Change-Prioritätsmatrix (Kategorie × Auswirkung) fehlt.
+- Das CAB ist ein benanntes Gremium, das der Change wählt; Znuny führt ein CAB je Change. Change-Manager
+  und Change-Builder je Change gibt es nicht: zuständig ist der Besitzer des Tickets, Change-Manager ist
+  die Gruppe `manager_group`.
+- Die Nachbetrachtung ist eine Phase mit Freitext am Change, keine eigene Maske; Arbeitsauftrags-Typen
+  sind Arbeitsauftrag, Rückfall, Entscheidung und Nachbetrachtung.
+- Art und Services lassen sich in der Oberfläche nach dem Anlegen nicht ändern (die Schnittstelle
+  erlaubt die Art im Entwurf und die Services).
+- Verknüpfte Tickets führt der Change nur über einen Verknüpfungstyp (`related_link_type`), und die
+  Change-Seite zeigt sie noch nicht in einem eigenen Abschnitt; Znunys Change-Zoom zeigt alle
+  Verknüpfungen in einer Tabelle.
+- Znunys Change-, Arbeitsauftrags- und CAB-Vorlagen werden nicht übernommen.

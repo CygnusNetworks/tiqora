@@ -122,7 +122,7 @@ Layer A CI: `.github/workflows/schema-matrix.yml` (release tags, nightly,
 | ITSM Mode A (read Znuny CMDB) and ITSM importer | Supported for Znuny ITSM **6.5.x** and **7.3.x** only; other ITSM versions: `unsupported_znuny_itsm_version` |
 | ITSM Mode B (Tiqora CMDB) in parallel operation | Supported on all profiles above; the CMDB lives in `tiqora_*` tables. After an import switch the optional `TiqoraITSM` add-on guards Znuny's CI screens |
 | GenericInterface `ConfigItem*` operations (provider) | Supported (REST + SOAP), behaviour depends on the ITSM mode: [compatibility.md](compatibility.md#configitemsearch) |
-| ITSMChangeManagement (changes, work orders) | Deferred: counted by the importer, not shown or imported |
+| ITSMChangeManagement (changes, work orders) | Supported for Znuny ITSM **6.5.x** and **7.3.x**, read-only: shown live in Mode A, copied into a read-only change archive by the ITSM import (and the archive job in Mode B); templates, conditions and notification rules are only counted. Tiqora's own change management runs in Mode B, see [itsm.md](itsm.md#8-change-management) |
 | Plugins (SDK 0.2.0), identity providers (SAML / OIDC / SCIM), web chat, reporting, dashboards | Configuration in `tiqora_*` tables, plugin data in `tqp_<short_id>_*`; accounts and role/group assignments created by SSO/SCIM are written to Znuny's own user and permission tables (`users`, `customer_user`, `role_user`, `group_user`); independent of the peer profile |
 | Fresh-install bootstrap (`tiqora bootstrap`) | Still seeds **Znuny 6.5** base DDL (standalone greenfield) |
 | Schema ownership / `versions_owned/` | Only after cutover — not multi-version parallel-op |

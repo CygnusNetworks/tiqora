@@ -1223,6 +1223,72 @@ it; it never imports `tiqora.process`, `tiqora.itsm`, `tiqora.cmdb` or `tiqora.a
   `/api/v1/admin/approvals` (`admin`), `/api/portal/approvals` (customer session); list in
   [api/rest-v1.md](api/rest-v1.md#approvals).
 
+### ITSM change management (`tiqora.itsm.change`)
+
+Change management for ITSM Mode B (user-facing description: [itsm.md](itsm.md) chapter 8). A change
+is a Znuny ticket of `ItsmSettings.change_type` plus a row in `tiqora_itsm_change`; every change
+table is a `tiqora_*` table of migration `20261010_0084`. Znuny rows are written only through the
+existing write services (`TicketWriteService.create_ticket` / `change_state` / `assign_owner`,
+`link_objects` / `unlink_objects`, `update_dynamic_field`, the setup's `create_dynamic_field_row`,
+`CalendarService.create_appointment_unchecked` / `delete_appointment_unchecked` for the calendar
+mirror); Znuny's `change_*` and `condition_*` tables are never written.
+
+- **Modules.** `phases.py` is the pure phase machine (`TRANSITIONS`, `SYSTEM_ONLY`, `check_transition`,
+  `allowed_targets`; public tuples `PHASES`, `CHANGE_TYPES`, `OUTCOMES`) and the **only lifecycle
+  authority**: the phase is written in `transitions.py` alone (plus the initial `draft` of
+  `service.create_change` / `adopt_ticket`), `ChangeUpdateIn` has no phase field, and a process ticket
+  never gets a change record. `transitions.py` locks the change row `FOR UPDATE`, builds the
+  `GuardContext` from stored data and runs the side effects in one savepoint: phase -> events ->
+  approval port -> ticket state -> dynamic-field mirror (`ITSMChangeType` / `ITSMChangePhase`) ->
+  calendar mirror -> listeners. Around it: `service.py` (create, adopt, update, event timeline
+  `tiqora_itsm_change_event`), `tasks.py`, `templates.py`, `impact.py`, `freeze.py`, `conflicts.py`
+  (pure `detect_conflicts` + loader), `risk.py`, `cab.py`, `related.py`, `calendar_mirror.py`,
+  `portal.py`, `gate.py` (availability, change manager), `settings.py` (section `itsm_change`).
+- **Approval port.** `approval_port.py` is the one seam to `tiqora.approvals`: `ChangeApprovalPort`
+  (`request`, `auto_decision`, `cancel`, `snapshot`) implemented by `EngineApprovalPort` on the
+  approvals service; tests swap in a fake (`set_approval_port_for_tests`). Requests use subject type
+  `itsm.change`, key `change_cab` and the approval round as `subject_ref`; the subject type's
+  `on_decided` (`transitions.on_cab_decided`) runs in job `core.approval_hook` after the deciding
+  commit and acts only when phase, round and `approval_id` still match (idempotent). Lock order:
+  change row -> `tiqora_approval` -> Znuny ticket row. Every `ApprovalError` becomes
+  `409 approval_request_failed` with the engine's code. The change block of `register_core` also
+  registers the resolver `itsm.service_owner`.
+- **Jobs and daemon.** `core.itsm_change_tasks` (tasks from a template, idempotent by template task
+  key), `core.itsm_change_impact` (stored affected set from `cmdb.impact.affected_set`, system scope,
+  up to three passes while new requests arrive) and `core.itsm_legacy_change_archive` (lane
+  `itsm_import`, shared with the ITSM import). The worker service `itsm_change`
+  (`worker/itsm_change.py`, interval `TIQORA_ITSM_CHANGE_INTERVAL`, default 3600 s; switch
+  `daemon.itsm_change.enabled`) queues the impact refresh of stale active changes, at most 200 per
+  tick. `cmdb.links.signal_ticket_link` and the ticket service change queue the impact job too.
+  Risk and conflict checks read only the stored impact set and capped candidate lists
+  (`CONFLICT_CANDIDATE_CAP = 500`), so no request depends on the size of the CMDB graph.
+- **Read contract (X2).** `read.py` (`list_changes`, `upcoming_changes`, `phase_counts`, `my_tasks`,
+  `calendar`, `service_availability`, `active_freezes`, `change_refs_for_tickets`,
+  `task_refs_for_tickets`) is the permission-filtered read for other features (dashboard widgets, AI
+  features); it returns nothing outside Mode B and scans at most `LIST_SCAN_CAP = 5000` rows. The
+  statistics aggregate `tiqora_itsm_change*`, `tiqora_itsm_change_event` and the legacy archive
+  directly under the reporting compiler's queue scope. Therefore the column names, the event names in
+  `tiqora_itsm_change_event.event` (one `phase` row per phase change on every path) and the dataclass
+  fields of `read.py` are additive-only.
+- **Extension points** (`sdk_stable=False`, core features only, not part of the plugin SDK):
+  `itsm.change_listeners` (`ChangeListener`: called after `created`, `phase`, `updated`, `impact`,
+  each in its own savepoint; errors are logged, never raised) and `itsm.change_risk_checks`
+  (`RiskCheck`: synchronous, bounded checks; the eight `core.*` checks are registered first;
+  findings carry numbers in `params` and ids only in `refs`, filtered at read time).
+- **Legacy changes.** `legacy/reader.py` holds every SQL statement on Znuny's `change_*` tables
+  (`text()` with bound parameters, joins only inside Znuny's tables); `legacy/mapping.py` is pure
+  (sentinel `9999-01-01`, change window from the work orders, plain texts); `legacy/sources.py`
+  picks the live source (Mode A) or the archive (Mode B, `tiqora_itsm_legacy_change` and
+  `_ref`); `legacy/archive.py` is shared by the importer step `changes` and the archive job.
+  GDPR: an erased customer leaves a tombstone in `tiqora_itsm_legacy_erased` (HMAC of the
+  identifier with the site secret), and every archive write redacts against all tombstones
+  (`legacy/redact.py`).
+- **API.** `/api/v1/itsm/changes*`, `/itsm/change-*`, `/itsm/cabs`, `/itsm/cab-meetings*`,
+  `/itsm/freeze-windows`, `/itsm/legacy-changes*` and `/api/v1/tickets/{id}/change*` belong to the
+  API-key area `tickets` (they show ticket titles), listed before the general `/api/v1/itsm` ->
+  `cmdb` prefix in `_PATH_PREFIX_TO_AREA`; `/api/v1/admin/itsm/change/*` is `admin`;
+  `/api/portal/change-schedule` uses the customer session.
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).

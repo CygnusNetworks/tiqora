@@ -578,6 +578,8 @@ refused. A key with only `cmdb` cannot poll at all and needs `tickets:ro` as wel
 | `core.cmdb_propagation`, `core.cmdb_reindex`, `core.cmdb_archive` | CMDB saves, class changes, the nightly archive; admin recompute |
 | `core.itsm_linked_articles` | `POST /tickets/{id}/linked-articles`, "close the linked incidents" |
 | `core.itsm_import`, `core.itsm_switch` | `POST /admin/itsm/import/runs` and `/switch` |
+| `core.itsm_change_tasks`, `core.itsm_change_impact` | `POST /itsm/changes` from a template with tasks; change edits, CI links, `POST /itsm/changes/{id}/impact/recompute` and the worker refresh |
+| `core.itsm_legacy_change_archive` | `POST /admin/itsm/change/legacy-archive` (Mode B; lane `itsm_import`) |
 | `core.plugin_install`, `core.plugin_uninstall`, `core.plugin_fetch`, `core.plugin_repository_refresh` | The plugin admin API |
 | `core.gi_invoke`, `core.gi_invoke_sync`, `gi_mail` | GenericInterface requester calls and outgoing GI mails (internal; not started through the jobs API) |
 | `<plugin id>.<name>` | Jobs registered by plugins |
@@ -947,6 +949,22 @@ read-only flag, then switch to Mode B; body `confirm: "UMSTELLEN"`,
 `addon_installed`, `edits_stopped`), `POST …/rollback` (back to Mode A; `confirm:
 "ZURÜCK"`) and `POST …/release-lock` ("Sperre aufheben"). See
 [`../itsm-import.md`](../itsm-import.md).
+
+**Change management** (ITSM Mode B): `/api/v1/itsm/changes*`, `/itsm/change-tasks/mine`,
+`/itsm/change-calendar*`, `/itsm/change-templates`, `/itsm/cabs`, `/itsm/cab-meetings*`,
+`/itsm/freeze-windows`, `/itsm/legacy-changes*` and `/api/v1/tickets/{id}/change*` belong to the
+API-key area **`tickets`** (not `cmdb`: they list ticket titles); the admin routes under
+`/api/v1/admin/itsm/change/*` to `admin`; the customer route is `GET /api/portal/change-schedule`.
+Errors answer `{"detail": {"code": …}}`; a refused phase step is `409 transition_refused` with
+`failures`. `GET /itsm/changes/status` says whether change management is available (`reason`
+`itsm_off`, `mode_a`, `setup_missing`). Route list and rules: [`../itsm.md`](../itsm.md#8-change-management)
+(German).
+
+```sh
+# Move a change to the CAB ("Freigabe anfordern"); a manager may add override_reason for a freeze window
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/itsm/changes/4711/transition" \
+  -H 'Content-Type: application/json' -d '{"to": "approval", "reason": "Wartung srv-db-01.example.org"}'
+```
 
 ## CMDB
 

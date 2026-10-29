@@ -595,6 +595,21 @@ runs) use the job system, so the same one-worker and 90 s nginx notes apply.
   inline within the 75 s budget.
 - **Migration.** `20261010_0074` adds the schedule and run tables (`tiqora migrate upgrade`).
 
+## ITSM change management
+
+Change management (ITSM Mode B, see [itsm.md](itsm.md) chapter 8) needs no extra container and no
+proxy change: all routes sit under `/api/`, and everything that can take long runs as a background job
+in the `worker` (`core.itsm_change_tasks`, `core.itsm_change_impact`, and
+`core.itsm_legacy_change_archive` in the lane `itsm_import`, one ITSM bulk job at a time).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TIQORA_ITSM_CHANGE_INTERVAL` | `3600` (60-86400) | Seconds between two ticks of the worker service `itsm_change` ("Change-Auswirkung aktualisieren"). A tick queues the impact job for active changes whose stored impact is older than `itsm_change.impact_refresh_hours` (default 24), at most 200 per tick. The Dienste page can override the interval (`daemon.itsm_change.interval_seconds`) and switch the service off (`daemon.itsm_change.enabled`, default on). Outside Mode B a tick does nothing. |
+
+The legacy change archive stores hashes of erased customers keyed with `TIQORA_SECRET_KEY`; rotating the
+key makes those tombstones unusable, so erased customers can reappear with the next archive run (see
+[itsm-import.md](itsm-import.md)).
+
 ## Upgrading to v0.19.0 (wave 4)
 
 Operator notes for the release that adds the ITSM core, the CMDB, the ITSM importer, SCIM 2.0 and the

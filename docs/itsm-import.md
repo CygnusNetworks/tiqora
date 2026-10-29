@@ -9,8 +9,10 @@
 > `/api/v1/admin/itsm/import` (API-key area `admin`) and the `tiqora itsm import|status` commands. The
 > importer only reads Znuny, writes only `tiqora_*` tables, can run any number of times and runs
 > before the switch to Tiqora; the admin page and API also require Mode A (the CLI checks only the
-> switch and a running job). Changes and workorders are counted, not
-> imported. Operational steps are in [itsm.md](itsm.md), chapter 7.
+> switch and a running job). Changes and work orders go into a read-only change archive (step
+> `changes`; templates, conditions and notification rules are only counted); Tiqora never writes
+> Znuny's `change_*` tables. Operational steps are in [itsm.md](itsm.md), chapter 7; change
+> management itself in chapter 8.
 
 Dieses Dokument beschreibt, wie Znuny sein ITSM speichert, und ist die Grundlage für den Adapter
 im Mode A (Znuny führt das ITSM, Tiqora liest) und für den Importer in den Mode B (Tiqora führt das
@@ -249,7 +251,7 @@ in 18 Klassen aus. Für Tiqora relevant:
 | `ITSM::Core::IncidentState` | Operational, Warning, Incident | Präferenz `Functionality` = `operational`, `warning`, `incident` |
 | `ITSM::Service::Type`, `ITSM::SLA::Type` | Typen für Service und SLA | Spalte `service.type_id` / `sla.type_id` |
 | `ITSM::ConfigItem::*::Type`, `ITSM::ConfigItem::YesNo`, `ITSM::ConfigItem::Software::LicenceType` | Auswahllisten der Klassendefinitionen | von `Input.Type: GeneralCatalog` referenziert |
-| `ITSM::ChangeManagement::*` | Change-Verwaltung | im Import nur dokumentiert |
+| `ITSM::ChangeManagement::*` | Change-Verwaltung | nicht in den Katalog übernommen; das Change-Archiv speichert die Namen (Status, Kategorie, Auswirkung, Priorität, Arbeitsauftrags-Status und -Typ) als Text am Change |
 
 Die Kritikalitäts- und Auswirkungsliste (`ITSM::Core::Criticality`/`Impact`) ist ab 6.5 **leer**; diese
 Werte sind Auswahlwerte der Dynamischen Felder `ITSMCriticality` und `ITSMImpact` (`1 very low` bis
@@ -259,7 +261,8 @@ Werte sind Auswahlwerte der Dynamischen Felder `ITSMCriticality` und `ITSMImpact
 
 25 Zeilen (5 Kritikalitäten x 5 Auswirkungen) mit `criticality`, `impact` (jeweils Text wie
 `3 normal`) und `priority_id` (Kernpriorität 1 bis 5). `change_cip_allocate` ist die entsprechende
-Matrix der Change-Verwaltung (ebenfalls 25 Zeilen, nur dokumentiert).
+Matrix der Change-Verwaltung (ebenfalls 25 Zeilen); sie wird nicht übernommen, Tiqoras Changes
+tragen die Priorität ihres Tickets.
 
 ### Speicher der Attribute: `xml_storage` (beide Profile)
 
@@ -424,10 +427,17 @@ Außerdem (Antwort 10): Arbeitsauftragsnummern zählen je Change ab 1; beim Wech
 einen Status ohne Folgestatus das tatsächliche Ende (jetzt + 1 Sekunde). Die Changenummer kommt aus
 `ITSMChange::NumberGenerator` (Vorgabe `DateChecksum`).
 
-**Was Tiqora damit tut** (ab Version mit Change-Management): Modus A zeigt Changes und Arbeitsaufträge lesend in
-Tiqora; es werden nie Zeilen der 20 Tabellen geschrieben. Der Importer übernimmt Changes, Arbeitsaufträge, CAB, Verlauf
-und Verknüpfungen in Tiqora-Tabellen (Zeiten nach obigen Regeln, ohne den Sentinel); Vorlagen, Bedingungen und
-Benachrichtigungsregeln werden nicht übernommen. Für das Archiv alter Changes gelten dieselben Regeln.
+**Was Tiqora damit tut:** Modus A zeigt Changes und Arbeitsaufträge live und lesend in Tiqora („Changes (Znuny)“); es
+werden nie Zeilen der 20 Tabellen geschrieben, und alles SQL auf ihnen steht in einem Modul
+(`tiqora/itsm/change/legacy/reader.py`). Der Importer (Schritt `changes`) und der eigenständige Archiv-Lauf in Modus B
+übernehmen Changes, Arbeitsaufträge, CAB, Verlauf, Dynamische Felder und Verknüpfungen lesend in das Change-Archiv
+(`tiqora_itsm_legacy_change`, `tiqora_itsm_legacy_change_ref`): Zeiten nach obigen Regeln, ohne den Sentinel; CI- und
+Service-Verknüpfungen hängen wie in Znuny an den Arbeitsaufträgen und werden dem Change zugeordnet; die Texte sind die
+`*_plain`-Spalten ohne Leerzeichen am Rand. Vorlagen, Bedingungen und Benachrichtigungsregeln werden nur gezählt, der
+Vorlagentext wird nie gelesen oder ausgeführt (Punkt 7). Die Verlaufszeilen `*NotificationSent` enthalten
+Empfängeradressen (Punkt 3); Tiqora behandelt sie als personenbezogene Daten: Sie stehen in keinem Protokoll, in den
+Test-Vektoren nur als `example.org`-Adressen, und die DSGVO-Löschung eines Kunden entfernt sie aus dem Archiv (Abschnitt
+„Schritt `changes`: Change-Archiv“). Die Bedienung beschreibt [itsm.md](itsm.md), Kapitel 8.
 
 ### Tabellen des Import/Export-Pakets (nur dokumentiert)
 
@@ -702,7 +712,7 @@ abgeleitete Zustände. Die Schlüssel und Namen auf der Seite sind:
 | `attachments` | „Anhänge“ | |
 | `priority_matrix` | „Prioritätsmatrix“ | |
 | `service_meta` | „Service-Angaben“ | |
-| `changes` | „Changes (nur gezählt)“ | |
+| `changes` | „Changes (nur gezählt)“ | archiviert die Changes (Abschnitt unten); die Bezeichnung auf der Seite ist noch die alte |
 | `deleted_in_znuny` | „In Znuny gelöscht“ | läuft nur mit installiertem CMDB-Paket |
 | `incident_states` | „Vorfallstatus“ | |
 
@@ -710,6 +720,35 @@ Je Schritt zählt der Bericht „Neu“, „Aktualisiert“, „Unverändert“,
 der Zusammenfassung des Laufs stehen höchstens die ersten 200 Meldungen (mit dem Hinweis „Es werden
 die ersten … von … Auffälligkeiten angezeigt“); die CSV-Datei enthält alle. Ohne installiertes CMDB-Paket (nur ITSMCore) erscheinen die Klassen- und CI-Schritte
 mit Zählern von 0; Katalog, Matrix und Service-Angaben werden trotzdem übernommen.
+
+### Schritt `changes`: Change-Archiv
+
+Der Schritt kopiert jeden Change aus Znunys Change-Verwaltung lesend ins Change-Archiv, in Seiten von
+`--page-size` Changes (eine Transaktion je Seite). Ohne ITSMChangeManagement in Znuny zählt er nichts. Seine
+Zähler gelten je Change:
+
+| Zähler | Bedeutung |
+|---|---|
+| Neu (`created`) | Der Change war noch nicht im Archiv |
+| Aktualisiert (`updated`) | Der Change hat sich in Znuny geändert (andere Prüfsumme), oder seit dem letzten Lauf wurde ein Kunde gelöscht, der darin vorkommt, oder eine solche Löschung wurde zurückgenommen |
+| Unverändert (`unchanged`) | Prüfsumme und Löschstand sind gleich; nichts wird geschrieben |
+| Übersprungen (`skipped`) | Der Change stand in der Liste, war beim Lesen aber nicht mehr da (in Znuny gelöscht, während der Lauf lief) |
+
+Dazu meldet er je Art eine Meldung `not_archived` mit der Zahl der Change-Vorlagen, Bedingungen und
+Benachrichtigungsregeln, die in Znuny bleiben. Ein Probelauf zählt genauso und schreibt nichts.
+
+- **Wiederholen.** Ein zweiter Lauf ohne Änderungen in Znuny meldet alle Changes als „unverändert“. Die Prüfsumme
+  wird über die gespeicherte Form gebildet: Ein CI, das ein späterer Lauf übernommen hat, macht aus dem Verweis
+  `znuny:<Id>` ein `tiqora:<Id>` und zählt den Change dann als „aktualisiert“. Changes, die in Znuny gelöscht wurden,
+  bleiben im Archiv.
+- **Nach der Umstellung** läuft derselbe Schritt als eigener Auftrag (`core.itsm_legacy_change_archive`, Admin,
+  „Change-Management“, Reiter „Change-Archiv“), nur in Modus B; er teilt sich mit dem Import die Spur `itsm_import`,
+  es läuft also immer nur ein ITSM-Massenauftrag.
+- **Datenschutz.** Wird ein Kunde gelöscht, ersetzt Tiqora seinen Login (CAB, Verlauf, Texte) durch das Pseudonym
+  seiner Tickets und seine Adresse durch „[gelöscht]“ und hinterlegt einen geschlüsselten Hash (HMAC mit
+  `TIQORA_SECRET_KEY`, nie den Wert selbst). Jeder spätere Lauf schreibt gegen diese Hashes geschwärzt, auch einen
+  Change, der erst danach ins Archiv kommt. Wird `TIQORA_SECRET_KEY` gewechselt, passen die Hashes nicht mehr, und
+  gelöschte Kunden können mit dem nächsten Lauf zurückkommen. Znunys Tabellen `change_*` ändert die Löschung nie.
 
 ### Wiederholen und Abgleich
 

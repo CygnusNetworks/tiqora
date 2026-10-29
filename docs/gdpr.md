@@ -261,6 +261,8 @@ does not bring it back.
 | GenericInterface debugger entries of the tickets | deleted | deleted | no; see [below](#genericinterface-debugger) |
 | Saved searches, saved reports, scheduled-report parameters and recipients | rewritten | rewritten | yes, except deleted recipient rows |
 | CMDB links and attribute values | see [CMDB](#cmdb-mode-b) | | yes |
+| ITSM change records of the customer's tickets (`tiqora_itsm_change*`) | kept, free texts blanked | kept, free texts blanked (deleted with `delete_tickets`) | yes; see [ITSM changes](#itsm-changes) |
+| Archived Znuny changes naming the customer (`tiqora_itsm_legacy_change*`) | pseudonymised, tombstone | pseudonymised, tombstone | yes; see [ITSM changes](#itsm-changes) |
 
 ### SCIM provisioning data
 
@@ -426,6 +428,31 @@ erasure (both modes) handles it in two parts. The preview counts the affected ro
   was deleted by a later erasure in the meantime is skipped (counted as `skipped_rows` in the
   rollback's audit row and logged as `gdpr_rollback_row_skipped`), and a request whose template was
   deleted since comes back without its template.
+
+### ITSM changes
+
+Change management ([itsm.md](itsm.md#8-change-management), Mode B) keeps a record per change ticket.
+
+- **Change records of the erased tickets stay** (they drive phases, CAB and the calendar) in both
+  modes; their free texts (`reason`, the three plans, `pir_notes`, `risk_override_reason`) are set to
+  NULL and the details of the change timeline (`tiqora_itsm_change_event.detail`) are blanked, with
+  backup. With `delete_tickets` the change rows (tasks, agenda items, events, answers, impact,
+  services, the record) are deleted child first, with backup.
+- The approval sets of these tickets are deleted (see [Approvals](#approvals)); the change then shows
+  "Freigabeverlauf nicht mehr vorhanden". An emergency post-approval counts as approved when the change
+  had recorded its approval time, otherwise as cancelled (a change manager may close with a reason).
+  Residual case: a post-approval that was **rejected** and then erased no longer bars the outcome
+  "Erfolgreich".
+- **Legacy change archive** (Znuny's changes copied into `tiqora_itsm_legacy_change` and `_ref`): the
+  customer's login (CAB entries, history values, free text) becomes the token of the tickets, the
+  e-mail address (also in Znuny's notification history, which holds recipient addresses) becomes
+  `[gelöscht]`, and the `customer_user` lookup rows are deleted. A tombstone
+  (`tiqora_itsm_legacy_erased`: an HMAC-SHA256 of the lowercased login or address keyed with the site
+  secret, never the value) makes every later archive write redact the person again, also in changes
+  archived for the first time later. Rotating `TIQORA_SECRET_KEY` invalidates the tombstones, so erased
+  customers can come back with the next archive run. Rollback restores the rows and deletes the job's
+  tombstones.
+- Znuny's own `change_*` tables are never touched (in Mode A Znuny leads; erase there).
 
 ### Caveats
 
