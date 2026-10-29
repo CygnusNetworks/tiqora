@@ -17,6 +17,7 @@ import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
 import { resolveChangeReply } from "../../src/demo/changeMock";
 import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
+import { changeStore } from "./change-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
@@ -1057,6 +1058,15 @@ export async function mockApi(page: Page) {
         return;
       }
     }
+    // Service pickers (change dialogs, freeze windows, calendar filter): ids and names of the ITSM demo.
+    if (path.endsWith("/api/v1/reference/services") && method === "GET") {
+      await json(route, 200, [
+        { id: 1, name: "E-Mail" },
+        { id: 2, name: "VPN" },
+        { id: 3, name: "Arbeitsplatz" },
+      ]);
+      return;
+    }
     if (path.endsWith("/api/v1/reference/share-groups") && method === "GET") {
       await json(route, 200, DEMO_SHARE_GROUPS);
       return;
@@ -1268,8 +1278,15 @@ export async function mockApi(page: Page) {
           return;
         }
       }
-      // Change management: every method; Mode A / off answer 409 / 404 like the backend (stateless writes).
-      const change = resolveChangeReply(path, method, url.search, mode);
+      // Change management: the changes a test creates live in the change store (backend rules, state);
+      // the fixtures and everything else come from the demo resolver. Mode A / off answer 409 / 404 like the backend.
+      const changeBody = hasBody ? (req.postDataJSON() as Record<string, unknown>) : undefined;
+      const owned = changeStore().handle(path, method, url.search, changeBody, mode);
+      if (owned) {
+        await fulfillAnswer(route, owned);
+        return;
+      }
+      const change = resolveChangeReply(path, method, url.search, mode, changeBody);
       if (change) {
         if (change.status === 204) await route.fulfill({ status: 204, body: "" });
         else await json(route, change.status, change.body ?? null);

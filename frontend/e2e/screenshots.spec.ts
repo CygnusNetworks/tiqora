@@ -459,3 +459,20 @@ test("approvals screenshots", async ({ page }) => {
     console.warn("screenshot 'admin-approval-template' failed:", err);
   }
 });
+
+// Change management (Mode B) on the demo store of the mock API: a change in the CAB approval, the change
+// calendar with freeze shading, a CAB meeting with its agenda and the change administration. German
+// example data; the clock stands at the demo's "today" so the calendar opens on the fixtures' month.
+test("change management screenshots", async ({ page }) => {
+  await prep(page);
+  await page.clock.setFixedTime(new Date("2026-10-12T08:00:00Z"));
+  await mockApi(page);
+  await loginAsAgent(page);
+  // Tall enough for the plans, approval, risk, impact, conflicts and tasks sections.
+  await page.setViewportSize({ width: 1440, height: 1500 });
+  await shot(page, "/agent/itsm/changes/130", "itsm-change-detail");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await shot(page, "/agent/itsm/changes/calendar", "itsm-change-calendar");
+  await shot(page, "/agent/itsm/cab-meetings/1", "itsm-cab-meeting");
+  await shot(page, "/admin/itsm/change", "admin-itsm-change");
+});
