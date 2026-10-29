@@ -120,6 +120,21 @@ describe("ApprovalTemplatesPage", () => {
     expect(lastTwo.sort()).toEqual(["itsm.change", "ticket"]);
   });
 
+  it("labels a subject type without a title text with its raw key", async () => {
+    mockApi({
+      [TEMPLATES]: () => [],
+      [VALIDATE]: () => ({ errors: [], warnings: [] }),
+      "GET /api/v1/admin/approvals/subject-types": () => [
+        { key: "ticket", title_key: "approvals.subject.ticket" },
+        { key: "plugin.example", title_key: "approvals.subject.plugin_example" },
+      ],
+    });
+    renderApproval(<ApprovalTemplatesPage />);
+    fireEvent.click(await screen.findByTestId("template-new"));
+    expect((await screen.findByTestId("template-subject-ticket")).closest("label")).toHaveTextContent("Ticket");
+    expect(screen.getByTestId("template-subject-plugin.example").closest("label")).toHaveTextContent("plugin.example");
+  });
+
   it("asks before discarding changes and requires a key for a new template", async () => {
     mockApi({ [TEMPLATES]: () => [], [VALIDATE]: () => ({ errors: [], warnings: [] }) });
     renderApproval(<ApprovalTemplatesPage />);

@@ -900,7 +900,8 @@ def _members(*pairs: tuple[str, str]) -> list[CabMemberIn]:
 
 
 async def test_cab_customer_members_need_the_engine_setting(w: ChangeWorld) -> None:
-    """CX21: customer users are refused (422) until customers may approve; then accepted."""
+    """CX21: customer users and customer-yielding resolvers are refused (422) until customers may
+    approve; then accepted."""
     await _cabs(w)
     customer = _members(("user", str(V1)), ("customer_user", "chg94-kunde@example.org"))
     with pytest.raises(ChangeError) as exc:
@@ -908,6 +909,18 @@ async def test_cab_customer_members_need_the_engine_setting(w: ChangeWorld) -> N
     assert (exc.value.error_code, exc.value.http_status) == ("cab_customer_members_disabled", 422)
     assert "Kundenbenutzer als CAB-Mitglieder" in exc.value.extra["message"]
     assert {c.id: c.customer_members_allowed for c in await list_cabs(w.session)}[CAB] is False
+    # a resolver that yields customers is refused the same way; one that yields agents is not
+    customer_rule = _members(("user", str(V1)), ("resolver", "ticket.customer_user"))
+    with pytest.raises(ChangeError) as by_rule:
+        await set_members(w.session, cab_id=CAB, members=customer_rule, user_id=1)
+    assert (by_rule.value.error_code, by_rule.value.http_status) == (
+        "cab_customer_members_disabled",
+        422,
+    )
+    agents = await set_members(
+        w.session, cab_id=CAB, members=_members(("resolver", "ticket.owner")), user_id=1
+    )
+    assert [m.member_ref for m in agents.members] == ["ticket.owner"]
 
     await save_section_values(
         w.session,
@@ -915,6 +928,8 @@ async def test_cab_customer_members_need_the_engine_setting(w: ChangeWorld) -> N
         {"customer_approvers_enabled": True},
         secret_key=APP_SETTINGS.secret_key,
     )
+    view = await set_members(w.session, cab_id=CAB, members=customer_rule, user_id=1)
+    assert [m.member_ref for m in view.members] == [str(V1), "ticket.customer_user"]
     view = await set_members(w.session, cab_id=CAB, members=customer, user_id=1)
     assert view.customer_members_allowed is True
     shown = {m.member_kind: m for m in view.members}

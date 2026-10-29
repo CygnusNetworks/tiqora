@@ -2,9 +2,9 @@
 
 ``ChangeError`` is an ``HTTPException`` whose ``detail`` is ``{**detail, "code": <code>}``, so
 services raise it and every route answers ``{"detail": {"code", ...}}`` without a translation
-layer. ``code`` and ``http_status`` are positional-only: a detail entry may itself be called
-``code`` (the approval adapter passes the engine's code that way): the primary code wins in the
-answer, the entry stays readable in ``extra``.
+layer. ``code`` and ``http_status`` are positional-only, and the primary code always wins in the
+answer: a detail entry called ``code`` would be shadowed (it stays readable only in ``extra``), so
+the approval adapter passes the engine's code as ``engine_code``.
 """
 
 from __future__ import annotations

@@ -7,6 +7,7 @@ import { ApprovalsOverviewPage } from "./ApprovalsOverviewPage";
 beforeAll(useGerman);
 
 const OVERVIEW = "GET /api/v1/admin/approvals";
+const SUBJECT_TYPES = "GET /api/v1/admin/approvals/subject-types";
 const page = () => resolveApprovalsData("/api/v1/admin/approvals", "GET");
 
 describe("ApprovalsOverviewPage", () => {
@@ -67,7 +68,7 @@ describe("ApprovalsOverviewPage", () => {
     mockApi({ [OVERVIEW]: overview });
     renderApproval(<ApprovalsOverviewPage />);
     const rows = await screen.findAllByTestId("admin-approval-row");
-    // both subject types show their translated title (`itsm.change` -> "Change")
+    // both registered types have a translated title (`itsm.change` -> "Change")
     expect(rows[1]).toHaveTextContent("· Ticket ·");
     expect(rows[0]).toHaveTextContent("· Change ·");
     fireEvent.click(screen.getByTestId("admin-approvals-filter-subject"));
@@ -76,6 +77,27 @@ describe("ApprovalsOverviewPage", () => {
       const q = (overview.mock.calls.at(-1) as unknown as [{ query: Record<string, unknown> }])[0].query;
       expect(q.subject_type).toBe("ticket");
     });
+  });
+
+  it("shows the raw key for a type without a title text and for an unregistered type", async () => {
+    const base = page() as { items: { subject_type: string }[] };
+    const items = base.items.map((it, i) => ({
+      ...it,
+      subject_type: i === 0 ? "plugin.example" : i === 1 ? "plugin.unregistered" : it.subject_type,
+    }));
+    mockApi({
+      [OVERVIEW]: () => ({ ...base, items }),
+      [SUBJECT_TYPES]: () => [
+        { key: "ticket", title_key: "approvals.subject.ticket" },
+        { key: "plugin.example", title_key: "approvals.subject.plugin_example" },
+      ],
+    });
+    renderApproval(<ApprovalsOverviewPage />);
+    const rows = await screen.findAllByTestId("admin-approval-row");
+    // a registered type whose title_key has no translation falls back to its key
+    expect(rows[0]).toHaveTextContent("· plugin.example ·");
+    // a type the server does not list stays as it is
+    expect(rows[1]).toHaveTextContent("· plugin.unregistered ·");
   });
 
   it("pages through the requests 25 at a time", async () => {

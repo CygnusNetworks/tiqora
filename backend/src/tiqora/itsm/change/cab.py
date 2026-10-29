@@ -14,7 +14,8 @@ the definition the CAB would request, the existence of user / group / role ids i
 (``IN`` lists) and the engine's own reference check ``templates.validate_definition_refs`` for the
 subject type ``itsm.change``: an unknown resolver or Freigabegruppe is refused, a customer login
 the customer table does not know is only flagged ``missing`` (customer backends may live outside
-it). Customer users are refused (422 ``cab_customer_members_disabled``) while the engine's setting
+it). Customer users and resolvers that yield customers are refused (422
+``cab_customer_members_disabled``) while the engine's setting
 ``approvals.customer_approvers_enabled`` is off: the request would fail at the transition.
 Freigabegruppen are shown with their name and size (``lists.list_lists``).
 
@@ -46,7 +47,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import lists as approval_lists
-from tiqora.approvals.contract import ApprovalDefinition, ApprovalError, ApproverEntry
+from tiqora.approvals.contract import (
+    APPROVER_RESOLVERS,
+    ApprovalDefinition,
+    ApprovalError,
+    ApproverEntry,
+)
 from tiqora.approvals.rules import validate_definition
 from tiqora.approvals.settings import load_approval_settings
 from tiqora.approvals.templates import validate_definition_refs
@@ -54,6 +60,7 @@ from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.user import PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain.ticket_access import readable_tickets
+from tiqora.extensions.core import get_registry
 from tiqora.itsm.change.approval_port import SUBJECT_TYPE, ApprovalSnapshot, get_approval_port
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.gate import is_change_manager
@@ -235,13 +242,23 @@ async def customer_members_allowed(session: AsyncSession, settings: Settings | N
     return loaded.customer_approvers_enabled
 
 
+def _yields_customers(member: CabMemberIn) -> bool:
+    """A customer user, or a resolver that resolves to customers (e.g. ``ticket.customer_user``)."""
+    if member.member_kind == "customer_user":
+        return True
+    if member.member_kind != "resolver":
+        return False
+    resolver = get_registry().get(APPROVER_RESOLVERS, member.member_ref)
+    return resolver is not None and resolver.yields_customers
+
+
 async def _check_engine_refs(
     session: AsyncSession, members: Sequence[CabMemberIn], settings: Settings | None
 ) -> None:
     """CX21 and the engine's reference check (N4); call after :func:`_check_members`."""
     if not members:
         return
-    if any(m.member_kind == "customer_user" for m in members) and not (
+    if any(_yields_customers(m) for m in members) and not (
         await customer_members_allowed(session, settings)
     ):
         raise ChangeError("cab_customer_members_disabled", 422, message=CUSTOMERS_DISABLED_TEXT)
