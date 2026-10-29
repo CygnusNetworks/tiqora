@@ -1,16 +1,15 @@
 import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, within } from "@testing-library/react";
-import type { ChangeTemplateTask } from "@/lib/changeAdminApi";
 import { serveChangeAdmin, useGerman } from "@/routes/admin/itsm/changeAdminTestUtils";
 import { renderWithClient } from "./changeTestSupport";
 import { TemplateTaskEditor } from "./TemplateTaskEditor";
-import { templateTaskProblems } from "./templateTasks";
+import { taskToSave, templateTaskProblems, type TaskDraft } from "./templateTasks";
 
 beforeAll(useGerman);
 afterEach(() => vi.restoreAllMocks());
 
-const task = (key: string, over: Partial<ChangeTemplateTask> = {}): ChangeTemplateTask => ({
+const task = (key: string, over: Partial<TaskDraft> = {}): TaskDraft => ({
   key,
   title: `Aufgabe ${key}`,
   task_kind: "workorder",
@@ -28,7 +27,7 @@ const QUEUES = [
   { id: 5, name: "Betrieb" },
 ];
 
-function Harness({ initial, onChange, showProblems = false }: { initial: ChangeTemplateTask[]; onChange: (v: ChangeTemplateTask[]) => void; showProblems?: boolean }) {
+function Harness({ initial, onChange, showProblems = false }: { initial: TaskDraft[]; onChange: (v: TaskDraft[]) => void; showProblems?: boolean }) {
   const [value, setValue] = useState(initial);
   return (
     <TemplateTaskEditor
@@ -66,7 +65,7 @@ describe("TemplateTaskEditor", () => {
     const onChange = vi.fn();
     renderWithClient(<Harness initial={[task("task_1"), task("backup")]} onChange={onChange} />);
     fireEvent.click(screen.getByTestId("template-task-add"));
-    const next = onChange.mock.calls.at(-1)?.[0] as ChangeTemplateTask[];
+    const next = onChange.mock.calls.at(-1)?.[0] as TaskDraft[];
     expect(next.map((t) => t.key)).toEqual(["task_1", "backup", "task_3"]);
     expect(next.map((t) => t.position)).toEqual([1, 2, 3]);
     expect(next[2]).toMatchObject({ title: "", task_kind: "workorder", offset_minutes: 0, duration_minutes: null });
@@ -106,6 +105,26 @@ describe("TemplateTaskEditor", () => {
     expect(onChange.mock.calls.at(-1)?.[0][0]).toMatchObject({ duration_minutes: null, queue_id: null });
   });
 
+  it("lets the start offset be cleared or start with a minus sign while typing", () => {
+    serveChangeAdmin();
+    const onChange = vi.fn();
+    renderWithClient(<Harness initial={[task("backup", { offset_minutes: -60 })]} onChange={onChange} />);
+    const offset = screen.getByTestId("template-task-offset-0") as HTMLInputElement;
+    expect(offset.value).toBe("-60");
+    // A cleared field (and a lone "-", which a number input reports as "") stays empty, never "0".
+    fireEvent.change(offset, { target: { value: "" } });
+    expect(offset.value).toBe("");
+    expect(onChange.mock.calls.at(-1)?.[0][0].offset_minutes).toBeNull();
+    fireEvent.change(offset, { target: { value: "-30" } });
+    expect(offset.value).toBe("-30");
+    expect(onChange.mock.calls.at(-1)?.[0][0].offset_minutes).toBe(-30);
+  });
+
+  it("saves an empty start offset as the change's start", () => {
+    expect(taskToSave(task("a", { offset_minutes: null }), 0)).toMatchObject({ offset_minutes: 0, position: 1 });
+    expect(taskToSave(task("b", { offset_minutes: -30 }), 1)).toMatchObject({ offset_minutes: -30, position: 2 });
+  });
+
   it("picks and clears an owner", async () => {
     serveChangeAdmin();
     const onChange = vi.fn();
@@ -124,9 +143,9 @@ describe("TemplateTaskEditor", () => {
     expect(screen.getByTestId("template-task-up-0")).toBeDisabled();
     expect(screen.getByTestId("template-task-down-2")).toBeDisabled();
     fireEvent.click(screen.getByTestId("template-task-down-0"));
-    expect((onChange.mock.calls.at(-1)?.[0] as ChangeTemplateTask[]).map((t) => t.key)).toEqual(["b", "a", "c"]);
+    expect((onChange.mock.calls.at(-1)?.[0] as TaskDraft[]).map((t) => t.key)).toEqual(["b", "a", "c"]);
     fireEvent.click(screen.getByTestId("template-task-remove-2"));
-    const next = onChange.mock.calls.at(-1)?.[0] as ChangeTemplateTask[];
+    const next = onChange.mock.calls.at(-1)?.[0] as TaskDraft[];
     expect(next.map((t) => [t.key, t.position])).toEqual([
       ["b", 1],
       ["a", 2],

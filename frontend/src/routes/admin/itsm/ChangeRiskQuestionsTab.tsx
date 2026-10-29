@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { changeAdminErrorText } from "@/components/itsm/change/changeAdminUi";
+import { AdminListState } from "@/components/itsm/change/AdminListState";
+import { useDeleteConfirm } from "@/components/itsm/change/useDeleteConfirm";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { changeAdminApi, changeAdminKeys, type AdminRiskQuestion } from "@/lib/changeAdminApi";
 import { changeKeys } from "@/lib/changeApi";
 import { RiskQuestionDialog } from "./RiskQuestionDialog";
@@ -22,8 +23,14 @@ export function ChangeRiskQuestionsTab() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [editor, setEditor] = useState<{ question: AdminRiskQuestion | null } | null>(null);
-  const [deleting, setDeleting] = useState<AdminRiskQuestion | null>(null);
   const q = useQuery({ queryKey: changeAdminKeys.riskQuestions(), queryFn: ({ signal }) => changeAdminApi.riskQuestions(signal) });
+  const del = useDeleteConfirm<AdminRiskQuestion>({
+    remove: (question) => changeAdminApi.deleteRiskQuestion(question.id),
+    invalidate: [changeAdminKeys.riskQuestions(), changeKeys.all()],
+    title: t("admin.itsmChange.risk.deleteTitle"),
+    message: (question) => t("admin.itsmChange.risk.deleteMessage", { question: question.question }),
+    errorTestId: "risk-delete-error",
+  });
   const questions = [...(q.data ?? [])].sort((a, b) => a.position - b.position);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: changeAdminKeys.riskQuestions() });
@@ -44,13 +51,6 @@ export function ChangeRiskQuestionsTab() {
     reorder.mutate(ids);
   };
   const examples = useMutation({ mutationFn: () => changeAdminApi.createRiskExamples(), onSuccess: refresh });
-  const remove = useMutation({
-    mutationFn: (question: AdminRiskQuestion) => changeAdminApi.deleteRiskQuestion(question.id),
-    onSuccess: () => {
-      setDeleting(null);
-      refresh();
-    },
-  });
   const failure = reorder.error ?? examples.error;
 
   return (
@@ -79,88 +79,59 @@ export function ChangeRiskQuestionsTab() {
         </p>
       )}
 
-      {q.isError ? (
-        <p className="text-sm text-danger" role="alert" data-testid="risk-questions-error">
-          {changeAdminErrorText(q.error, t)}
-        </p>
-      ) : questions.length === 0 ? (
-        <p className="text-sm text-muted" data-testid="risk-questions-empty">
-          {q.isPending ? t("common.loading") : t("admin.itsmChange.risk.empty")}
-        </p>
-      ) : (
-        <ol className="divide-y divide-hairline rounded-md border border-hairline bg-surface">
-          {questions.map((question, i) => {
-            const range = pointRange(question);
-            return (
-              <li
-                key={question.id}
-                className="flex flex-wrap items-start justify-between gap-2 px-3 py-2"
-                data-testid="risk-question-row"
-                data-question-key={question.question_key}
-              >
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-ink">
-                    <span className="min-w-0 break-words">{question.question}</span>
-                    {!question.valid && <Badge tone="muted">{t("admin.itsmChange.invalid")}</Badge>}
-                  </p>
-                  <p className="font-mono text-xs text-muted">{question.question_key}</p>
-                  {question.help && <p className="break-words text-xs text-muted">{question.help}</p>}
-                  <p className="text-xs text-muted" data-testid="risk-question-answers">
-                    {t("admin.itsmChange.risk.answerCount", { count: question.answers.length })} ·{" "}
-                    {t("admin.itsmChange.risk.pointRange", range)} ·{" "}
-                    {question.answers.map((a) => a.label).join(", ")}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <Button size="sm" variant="ghost" disabled={i === 0 || reorder.isPending} onClick={() => move(i, -1)} aria-label={t("admin.itsmChange.moveUp")} data-testid={`risk-question-up-${i}`}>
-                    ↑
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={i === questions.length - 1 || reorder.isPending}
-                    onClick={() => move(i, 1)}
-                    aria-label={t("admin.itsmChange.moveDown")}
-                    data-testid={`risk-question-down-${i}`}
-                  >
-                    ↓
-                  </Button>
-                  <Button size="sm" onClick={() => setEditor({ question })} data-testid="risk-question-edit">
-                    {t("common.edit")}
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={() => setDeleting(question)} data-testid="risk-question-delete">
-                    {t("common.delete")}
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <AdminListState query={q} count={questions.length} emptyText={t("admin.itsmChange.risk.empty")} testId="risk-questions">
+          <ol className="divide-y divide-hairline rounded-md border border-hairline bg-surface">
+            {questions.map((question, i) => {
+              const range = pointRange(question);
+              return (
+                <li
+                  key={question.id}
+                  className="flex flex-wrap items-start justify-between gap-2 px-3 py-2"
+                  data-testid="risk-question-row"
+                  data-question-key={question.question_key}
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-ink">
+                      <span className="min-w-0 break-words">{question.question}</span>
+                      {!question.valid && <Badge tone="muted">{t("admin.itsmChange.invalid")}</Badge>}
+                    </p>
+                    <p className="font-mono text-xs text-muted">{question.question_key}</p>
+                    {question.help && <p className="break-words text-xs text-muted">{question.help}</p>}
+                    <p className="text-xs text-muted" data-testid="risk-question-answers">
+                      {t("admin.itsmChange.risk.answerCount", { count: question.answers.length })} ·{" "}
+                      {t("admin.itsmChange.risk.pointRange", range)} ·{" "}
+                      {question.answers.map((a) => a.label).join(", ")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" variant="ghost" disabled={i === 0 || reorder.isPending} onClick={() => move(i, -1)} aria-label={t("admin.itsmChange.moveUp")} data-testid={`risk-question-up-${i}`}>
+                      ↑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={i === questions.length - 1 || reorder.isPending}
+                      onClick={() => move(i, 1)}
+                      aria-label={t("admin.itsmChange.moveDown")}
+                      data-testid={`risk-question-down-${i}`}
+                    >
+                      ↓
+                    </Button>
+                    <Button size="sm" onClick={() => setEditor({ question })} data-testid="risk-question-edit">
+                      {t("common.edit")}
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => del.ask(question)} data-testid="risk-question-delete">
+                      {t("common.delete")}
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+      </AdminListState>
 
       {editor && <RiskQuestionDialog key={editor.question?.id ?? "new"} question={editor.question} onClose={() => setEditor(null)} />}
-      <ConfirmDialog
-        open={deleting !== null}
-        title={t("admin.itsmChange.risk.deleteTitle")}
-        message={
-          <>
-            <p>{t("admin.itsmChange.risk.deleteMessage", { question: deleting?.question ?? "" })}</p>
-            {remove.isError && (
-              <p className="mt-2 text-danger" role="alert" data-testid="risk-delete-error">
-                {changeAdminErrorText(remove.error, t)}
-              </p>
-            )}
-          </>
-        }
-        variant="danger"
-        confirmLabel={t("common.delete")}
-        pending={remove.isPending}
-        onConfirm={() => deleting && remove.mutate(deleting)}
-        onCancel={() => {
-          remove.reset();
-          setDeleting(null);
-        }}
-      />
+      {del.dialog}
     </section>
   );
 }

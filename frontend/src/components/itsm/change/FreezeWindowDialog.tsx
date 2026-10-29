@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/Switch";
 import { changeAdminApi, changeAdminKeys, type FreezeWindow, type FreezeWindowIn } from "@/lib/changeAdminApi";
 import { changeKeys } from "@/lib/changeApi";
 import { changeAdminErrorText, intOrNull } from "./changeAdminUi";
-import { FIELD_CLASS, fromLocalInput, toLocalInput } from "./changeUi";
+import { FIELD_CLASS, fromLocalInput, LABEL_CLASS, toLocalInput } from "./changeUi";
 import { ServiceChipsField } from "./ServiceChipsField";
 
 /** Recurrence types of `tiqora.calendar.schemas.RecurrenceIn` (labels from the agent calendar). */
@@ -90,7 +90,6 @@ function bodyOf(f: Form): FreezeWindowIn {
   };
 }
 
-const LABEL = "mb-1 block text-xs font-medium text-muted";
 
 /**
  * Create or edit a freeze window (Sperrzeitraum): effect (block or warn), whether emergency changes
@@ -141,23 +140,23 @@ export function FreezeWindowDialog({ window: stored, onClose }: { window: Freeze
       <div className="space-y-4 text-sm" data-testid="freeze-dialog">
         <p className="text-xs text-muted">{t("admin.itsmChange.freeze.utc")}</p>
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.freeze.name")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.name")}</span>
           <input className={FIELD_CLASS} value={form.name} maxLength={200} onChange={(e) => set({ name: e.target.value })} aria-invalid={touched && problems.includes("name")} data-testid="freeze-name" />
         </label>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block min-w-0">
-            <span className={LABEL}>{t("admin.itsmChange.freeze.start")}</span>
+            <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.start")}</span>
             <input type="datetime-local" className={FIELD_CLASS} value={form.start} onChange={(e) => set({ start: e.target.value })} aria-invalid={touched && (problems.includes("window") || problems.includes("order"))} data-testid="freeze-start" />
           </label>
           <label className="block min-w-0">
-            <span className={LABEL}>{t("admin.itsmChange.freeze.end")}</span>
+            <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.end")}</span>
             <input type="datetime-local" className={FIELD_CLASS} value={form.end} onChange={(e) => set({ end: e.target.value })} aria-invalid={touched && (problems.includes("window") || problems.includes("order"))} data-testid="freeze-end" />
           </label>
         </div>
 
         <div>
-          <span className={LABEL}>{t("admin.itsmChange.freeze.enforcementLabel")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.enforcementLabel")}</span>
           <SegmentedControl
             items={(["block", "warn"] as const).map((v) => ({ value: v, label: t(`admin.itsmChange.freeze.enforcement.${v}`) }))}
             value={form.enforcement}
@@ -172,7 +171,7 @@ export function FreezeWindowDialog({ window: stored, onClose }: { window: Freeze
         </label>
 
         <div className="space-y-2">
-          <span className={LABEL}>{t("admin.itsmChange.freeze.scopeLabel")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.scopeLabel")}</span>
           <SegmentedControl
             items={(["all", "services"] as const).map((v) => ({ value: v, label: t(`admin.itsmChange.freeze.scope.${v}`) }))}
             value={form.scope}
@@ -208,14 +207,14 @@ export function FreezeWindowDialog({ window: stored, onClose }: { window: Freeze
             </div>
             {form.recurType && (
               <label className="block min-w-0">
-                <span className={LABEL}>{t("admin.itsmChange.freeze.interval")}</span>
+                <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.interval")}</span>
                 <input type="number" min={1} className={FIELD_CLASS} value={form.interval} onChange={(e) => set({ interval: e.target.value })} aria-invalid={touched && problems.includes("interval")} data-testid="freeze-recurrence-interval" />
               </label>
             )}
           </div>
           {form.recurType && (
             <div className="space-y-2">
-              <span className={LABEL}>{t("admin.itsmChange.freeze.recurrenceEnd")}</span>
+              <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.recurrenceEnd")}</span>
               <SegmentedControl
                 items={[
                   { value: "never" as const, label: t("admin.itsmChange.freeze.endNever") },
@@ -229,13 +228,13 @@ export function FreezeWindowDialog({ window: stored, onClose }: { window: Freeze
               />
               {form.recurEnd === "count" && (
                 <label className="block">
-                  <span className={LABEL}>{t("admin.itsmChange.freeze.count")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.count")}</span>
                   <input type="number" min={1} className={FIELD_CLASS} value={form.count} onChange={(e) => set({ count: e.target.value })} aria-invalid={touched && problems.includes("count")} data-testid="freeze-recurrence-count" />
                 </label>
               )}
               {form.recurEnd === "until" && (
                 <label className="block">
-                  <span className={LABEL}>{t("admin.itsmChange.freeze.until")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.until")}</span>
                   <input type="datetime-local" className={FIELD_CLASS} value={form.until} onChange={(e) => set({ until: e.target.value })} aria-invalid={touched && problems.includes("until")} data-testid="freeze-recurrence-until" />
                 </label>
               )}
@@ -244,7 +243,7 @@ export function FreezeWindowDialog({ window: stored, onClose }: { window: Freeze
         </fieldset>
 
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.freeze.note")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.freeze.note")}</span>
           <textarea className={FIELD_CLASS} rows={2} maxLength={5000} value={form.note} onChange={(e) => set({ note: e.target.value })} data-testid="freeze-note" />
         </label>
         <label className="flex items-center gap-2 text-ink">

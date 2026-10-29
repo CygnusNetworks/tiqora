@@ -47,10 +47,20 @@ export function ChangeArchiveTab() {
   }, [activeId]);
 
   const start = useMutation({
-    mutationFn: (dryRun: boolean) => changeAdminApi.startLegacyArchive({ dry_run: dryRun }),
-    onSuccess: (accepted) =>
-      // A new job starts as "queued"; "running" or the id of the run we knew means it was already going.
-      setFollowed({ jobId: accepted.job_id, joined: accepted.status === "running" || accepted.job_id === activeId, wasActive: false }),
+    mutationFn: async (dryRun: boolean) => {
+      // The status right before the start: a run another admin started meanwhile is answered instead
+      // of a new one (one active run per kind), and may still be "queued".
+      const before = await changeAdminApi.legacyArchive();
+      const accepted = await changeAdminApi.startLegacyArchive({ dry_run: dryRun });
+      return { accepted, knownActive: before.active_job_id };
+    },
+    onSuccess: ({ accepted, knownActive }) =>
+      // A new job starts as "queued"; "running" or the id of an active run means it was already going.
+      setFollowed({
+        jobId: accepted.job_id,
+        joined: accepted.status === "running" || accepted.job_id === knownActive || accepted.job_id === activeId,
+        wasActive: false,
+      }),
   });
   const { job, isTerminal, cancel, isCancelling } = useJob(followed?.jobId ?? null);
   useEffect(() => {

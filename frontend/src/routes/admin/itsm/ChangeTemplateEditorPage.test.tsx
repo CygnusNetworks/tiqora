@@ -1,6 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { resolveChangeData } from "@/demo/changeMock";
 import { ApiError } from "@/lib/api";
+import type { AdminRiskQuestion } from "@/lib/changeAdminApi";
 import { bodyOf, renderChangeAdmin, serveChangeAdmin, useGerman, type Recorded } from "./changeAdminTestUtils";
 import { ChangeTemplateEditorPage } from "./ChangeTemplateEditorPage";
 
@@ -103,6 +105,20 @@ describe("ChangeTemplateEditorPage", () => {
     fireEvent.click(screen.getByTestId("template-save"));
     await screen.findByTestId("template-saved");
     expect((bodyOf(requests, "PUT", `${BASE}/1`)?.defaults as Record<string, unknown>).risk_answers).toEqual({ downtime: "none" });
+  });
+
+  it("names the stored risk answers the save drops because their question is gone", async () => {
+    const requests: Recorded[] = [];
+    serveChangeAdmin(requests, (method, path) => {
+      if (method !== "GET" || path !== "/api/v1/admin/itsm/change/risk-questions") return undefined;
+      const questions = resolveChangeData(path, "GET", "", "tiqora") as AdminRiskQuestion[];
+      return questions.filter((q) => q.question_key === "tested");
+    });
+    await renderChangeAdmin(ChangeTemplateEditorPage, ROUTE, "/admin/itsm/change/templates/1");
+    expect(await screen.findByTestId("template-risk-stale")).toHaveTextContent("downtime: none");
+    fireEvent.click(screen.getByTestId("template-save"));
+    await screen.findByTestId("template-saved");
+    expect((bodyOf(requests, "PUT", `${BASE}/1`)?.defaults as Record<string, unknown>).risk_answers).toEqual({ tested: "yes" });
   });
 
   it("creates a template and returns to the list", async () => {

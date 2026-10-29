@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useRowKeys, newRowKey } from "@/components/approvals/rowKeys";
 import { changeAdminErrorText, intOrNull } from "@/components/itsm/change/changeAdminUi";
-import { FIELD_CLASS } from "@/components/itsm/change/changeUi";
+import { FIELD_CLASS, LABEL_CLASS } from "@/components/itsm/change/changeUi";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Switch } from "@/components/ui/Switch";
@@ -31,7 +31,6 @@ function answerOk(a: AnswerDraft, all: AnswerDraft[]): boolean {
   );
 }
 
-const LABEL = "mb-1 block text-xs font-medium text-muted";
 
 /**
  * Create or edit one question of the risk questionnaire: key (fixed once created), question, help text,
@@ -104,7 +103,7 @@ export function RiskQuestionDialog({ question, onClose }: { question: AdminRiskQ
     >
       <div className="space-y-4 text-sm" data-testid="risk-dialog">
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.risk.key")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.risk.key")}</span>
           <input
             className={`${FIELD_CLASS} font-mono disabled:opacity-60`}
             value={key}
@@ -121,11 +120,11 @@ export function RiskQuestionDialog({ question, onClose }: { question: AdminRiskQ
           )}
         </label>
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.risk.question")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.risk.question")}</span>
           <input className={FIELD_CLASS} value={text} maxLength={500} onChange={(e) => setText(e.target.value)} aria-invalid={touched && problems.includes("question")} data-testid="risk-question" />
         </label>
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.risk.help")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.risk.help")}</span>
           <textarea className={FIELD_CLASS} rows={2} maxLength={2000} value={help} onChange={(e) => setHelp(e.target.value)} data-testid="risk-help" />
         </label>
 

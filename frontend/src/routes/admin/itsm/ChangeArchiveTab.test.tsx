@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderWithClient } from "@/components/itsm/change/changeTestSupport";
-import { DEMO_ARCHIVE_JOB_ID, resolveChangeData } from "@/demo/changeMock";
+import { DEMO_ARCHIVE_DRY_JOB_ID, DEMO_ARCHIVE_JOB_ID, resolveChangeData } from "@/demo/changeMock";
 import type { LegacyArchiveStatus } from "@/lib/changeAdminApi";
 import type { Job } from "@/lib/jobsApi";
 import { bodyOf, serveChangeAdmin, useGerman, type Recorded } from "./changeAdminTestUtils";
@@ -71,15 +71,37 @@ describe("ChangeArchiveTab", () => {
     expect(screen.getByTestId("archive-run")).toBeDisabled();
   });
 
-  it("says so when the start was answered with a run that was already going", async () => {
+  it("says so when the start was answered with a dry run that was already running", async () => {
     serveChangeAdmin([], (method, path) =>
-      method === "POST" && path === BASE ? { job_id: DEMO_ARCHIVE_JOB_ID, status: "running" } : undefined,
+      method === "POST" && path === BASE ? { job_id: DEMO_ARCHIVE_DRY_JOB_ID, status: "running" } : undefined,
     );
     renderWithClient(<ChangeArchiveTab />);
     fireEvent.click(await screen.findByTestId("archive-dry-run"));
     expect(await screen.findByTestId("archive-joined")).toHaveTextContent("Es lief bereits ein Lauf dieser Art.");
-    // The job that answered is a real run: the result says so, not "dry run".
-    await waitFor(() => expect(screen.getByTestId("archive-result")).not.toHaveTextContent("Probelauf"));
+    await waitFor(() => expect(screen.getByTestId("archive-result")).toHaveTextContent("Probelauf"));
+  });
+
+  it("recognises a still queued run that another admin started after the page loaded", async () => {
+    let statusCalls = 0;
+    serveChangeAdmin([], (method, path) => {
+      if (method === "GET" && path === BASE) {
+        statusCalls += 1;
+        return status({ active_job_id: statusCalls === 1 ? null : DEMO_ARCHIVE_DRY_JOB_ID });
+      }
+      if (method === "POST" && path === BASE) return { job_id: DEMO_ARCHIVE_DRY_JOB_ID, status: "queued" };
+      return undefined;
+    });
+    renderWithClient(<ChangeArchiveTab />);
+    fireEvent.click(await screen.findByTestId("archive-dry-run"));
+    expect(await screen.findByTestId("archive-joined")).toBeInTheDocument();
+  });
+
+  it("does not call a fresh run joined", async () => {
+    serveChangeAdmin();
+    renderWithClient(<ChangeArchiveTab />);
+    fireEvent.click(await screen.findByTestId("archive-dry-run"));
+    await screen.findByTestId("archive-result");
+    expect(screen.queryByTestId("archive-joined")).toBeNull();
   });
 
   it("explains why the archive cannot start", async () => {

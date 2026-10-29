@@ -9,10 +9,16 @@ export const MAX_TEMPLATE_TASKS = 200;
 export const OFFSET_RANGE = [-43200, 525600] as const;
 export const DURATION_RANGE = [1, 525600] as const;
 
+/**
+ * A task while it is edited: the start offset may be empty (a cleared field, a lone "-" typed before
+ * the digits) and becomes 0 only on save (`taskToSave`), so the field never snaps back while typing.
+ */
+export type TaskDraft = Omit<ChangeTemplateTask, "offset_minutes"> & { offset_minutes: number | null };
+
 export type TaskProblem = "key" | "keyDuplicate" | "title" | "offset" | "duration";
 
 /** What is wrong with each task (same index); an empty list means the task can be saved. */
-export function templateTaskProblems(tasks: ChangeTemplateTask[]): TaskProblem[][] {
+export function templateTaskProblems(tasks: TaskDraft[]): TaskProblem[][] {
   const seen = new Map<string, number>();
   for (const task of tasks) seen.set(task.key, (seen.get(task.key) ?? 0) + 1);
   return tasks.map((task) => {
@@ -28,8 +34,8 @@ export function templateTaskProblems(tasks: ChangeTemplateTask[]): TaskProblem[]
   });
 }
 
-/** A stored task with every optional field filled, so the editor and the save body agree. */
-export function normalizeTask(task: ChangeTemplateTask, index: number): ChangeTemplateTask {
+/** A stored task with every optional field filled, as the editor holds it. */
+export function taskDraft(task: ChangeTemplateTask, index: number): TaskDraft {
   return {
     key: task.key,
     title: task.title,
@@ -43,7 +49,15 @@ export function normalizeTask(task: ChangeTemplateTask, index: number): ChangeTe
   };
 }
 
-export function freeKey(tasks: ChangeTemplateTask[]): string {
+/** The positions 1..n after a change of the list. */
+export const renumber = (tasks: TaskDraft[]): TaskDraft[] => tasks.map((task, i) => ({ ...task, position: i + 1 }));
+
+/** A task as `TemplateTask` of the save body: an empty start offset means "at the change's start". */
+export function taskToSave(task: TaskDraft, index: number): ChangeTemplateTask {
+  return { ...task, offset_minutes: task.offset_minutes ?? 0, position: index + 1 };
+}
+
+export function freeKey(tasks: { key: string }[]): string {
   const taken = new Set(tasks.map((t) => t.key));
   let n = tasks.length + 1;
   while (taken.has(`task_${n}`)) n += 1;

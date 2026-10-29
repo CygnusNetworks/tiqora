@@ -6265,7 +6265,8 @@
         "durationInvalid": "The duration must be between 1 and 525600 minutes.",
         "tasksInvalid": "Please check the marked tasks.",
         "saved": "Saved.",
-        "notFound": "The template no longer exists."
+        "notFound": "The template no longer exists.",
+        "riskAnswersStale": "Saving drops these default answers because their question or answer is no longer valid: {{list}}"
       },
       "tasks": {
         "empty": "The template has no tasks.",
@@ -6320,7 +6321,10 @@
         "customersOff": "Customer users can be CAB members only after customers are allowed as approvers in the approval settings.",
         "membersNotSaved": "The CAB was created, but its members are not saved yet.",
         "deleteTitle": "Delete CAB",
-        "deleteMessage": "Delete CAB “{{name}}”?"
+        "deleteMessage": "Delete CAB “{{name}}”?",
+        "quorumTooLarge": "The quorum is larger than the number of members. Add members or lower the minimum number.",
+        "ruleMismatch": "Decision rule, minimum number and members do not fit together.",
+        "boardSavedOnly": "Name and rule are saved, but the members are not."
       },
       "risk": {
         "new": "New question",
@@ -9826,7 +9830,9 @@
         "freeze_services_required": "Please choose at least one service.",
         "freeze_not_found": "The freeze window no longer exists.",
         "legacy_archive_mode_b_only": "The change archive runs on its own only in ITSM mode Tiqora; before that, the ITSM import copies the changes.",
-        "legacy_archive_no_tables": "The Znuny database has no change management (ITSMChangeManagement) installed."
+        "legacy_archive_no_tables": "The Znuny database has no change management (ITSMChangeManagement) installed.",
+        "validationMore_one": "The input is invalid (field: {{field}} and one more).",
+        "validationMore_other": "The input is invalid (field: {{field}} and {{count}} more)."
       },
       "transition": {
         "submit": "Go",

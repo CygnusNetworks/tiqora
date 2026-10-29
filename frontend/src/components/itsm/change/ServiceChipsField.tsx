@@ -1,7 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { SelectField } from "@/components/ui/SelectField";
-import { api } from "@/lib/api";
+import { useReferenceServices } from "./changeAdminUi";
 
 /** Several services as removable chips plus a picker for one more (`GET /reference/services`). */
 export function ServiceChipsField({
@@ -19,11 +18,7 @@ export function ServiceChipsField({
   invalid?: boolean;
 }) {
   const { t } = useTranslation();
-  const servicesQ = useQuery({
-    queryKey: ["reference", "services"],
-    queryFn: ({ signal }) => api.listReferenceServices(signal),
-    staleTime: 60_000,
-  });
+  const servicesQ = useReferenceServices();
   const services = servicesQ.data ?? [];
   const name = (id: number) => services.find((s) => s.id === id)?.name ?? `#${id}`;
   return (

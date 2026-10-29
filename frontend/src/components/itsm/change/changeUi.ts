@@ -12,6 +12,9 @@ import { changeDetailHref, ciDetailHref } from "@/lib/itsmRoutes";
 export const FIELD_CLASS =
   "w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none";
 
+/** The small label above a form field. */
+export const LABEL_CLASS = "mb-1 block text-xs font-medium text-muted";
+
 export const SECTION_CLASS = "min-w-0 space-y-2 rounded-md border border-hairline bg-surface p-3 text-sm";
 
 /** Badge tone of a conflict or finding severity. */

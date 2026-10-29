@@ -1,14 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { intOrNull } from "@/components/itsm/change/changeAdminUi";
-import { FIELD_CLASS } from "@/components/itsm/change/changeUi";
+import { FIELD_CLASS, LABEL_CLASS } from "@/components/itsm/change/changeUi";
 import { ServiceChipsField } from "@/components/itsm/change/ServiceChipsField";
 import { SelectField } from "@/components/ui/SelectField";
 import { Switch } from "@/components/ui/Switch";
 import type { AdminRiskQuestion } from "@/lib/changeAdminApi";
-import type { Defaults } from "./templateDefaults";
+import { fittingRiskAnswers, type Defaults } from "./templateDefaults";
 
 type Option = { id: number; name: string };
-const LABEL = "mb-1 block text-xs font-medium text-muted";
 const PLANS = [
   ["reason", "reason", "template-default-reason"],
   ["implementation_plan", "implementationPlan", "template-default-implementation-plan"],
@@ -41,6 +40,9 @@ export function ChangeTemplateDefaults({
   const none = { value: 0, label: t("admin.itsmChange.none") };
   const options = (list: Option[]) => [none, ...list.map((o) => ({ value: o.id, label: o.name }))];
   const validQuestions = (questions ?? []).filter((q) => q.valid).sort((a, b) => a.position - b.position);
+  // Stored answers without a valid question or answer: the save drops them (the backend refuses them).
+  const fitting = fittingRiskAnswers(value.risk_answers, questions);
+  const stale = Object.entries(value.risk_answers).filter(([q]) => !(q in fitting));
   const setAnswer = (questionKey: string, answerKey: string) => {
     const next = { ...value.risk_answers };
     if (answerKey) next[questionKey] = answerKey;
@@ -51,30 +53,30 @@ export function ChangeTemplateDefaults({
   return (
     <div className="space-y-3 text-sm">
       <label className="block">
-        <span className={LABEL}>{t("admin.itsmChange.editor.defaultTitle")}</span>
+        <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.defaultTitle")}</span>
         <input className={FIELD_CLASS} maxLength={255} value={value.title ?? ""} onChange={(e) => set({ title: e.target.value || null })} data-testid="template-default-title" />
       </label>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="min-w-0">
-          <span className={LABEL}>{t("admin.itsmChange.editor.queue")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.queue")}</span>
           <SelectField items={options(queues)} value={value.queue_id ?? 0} onChange={(id) => set({ queue_id: id || null })} testId="template-default-queue" aria-label={t("admin.itsmChange.editor.queue")} />
         </div>
         <div className="min-w-0">
-          <span className={LABEL}>{t("admin.itsmChange.editor.priority")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.priority")}</span>
           <SelectField items={options(priorities)} value={value.priority_id ?? 0} onChange={(id) => set({ priority_id: id || null })} testId="template-default-priority" aria-label={t("admin.itsmChange.editor.priority")} />
         </div>
         <div className="min-w-0">
-          <span className={LABEL}>{t("admin.itsmChange.editor.cab")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.cab")}</span>
           <SelectField items={options(cabs)} value={value.cab_id ?? 0} onChange={(id) => set({ cab_id: id || null })} testId="template-default-cab" aria-label={t("admin.itsmChange.editor.cab")} />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="min-w-0">
-          <span className={LABEL}>{t("admin.itsmChange.editor.services")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.services")}</span>
           <ServiceChipsField value={value.service_ids} onChange={(service_ids) => set({ service_ids })} testId="template-service" label={t("admin.itsmChange.editor.services")} />
         </div>
         <label className="block min-w-0">
-          <span className={LABEL}>{t("admin.itsmChange.editor.duration")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.duration")}</span>
           <input
             type="number"
             min={1}
@@ -95,7 +97,7 @@ export function ChangeTemplateDefaults({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {PLANS.map(([field, label, testId]) => (
           <label key={field} className="block min-w-0">
-            <span className={LABEL}>{t(`admin.itsmChange.editor.${label}`)}</span>
+            <span className={LABEL_CLASS}>{t(`admin.itsmChange.editor.${label}`)}</span>
             <textarea className={FIELD_CLASS} rows={3} value={value[field] ?? ""} onChange={(e) => set({ [field]: e.target.value || null })} data-testid={testId} />
           </label>
         ))}
@@ -127,6 +129,11 @@ export function ChangeTemplateDefaults({
               </li>
             ))}
           </ul>
+        )}
+        {stale.length > 0 && (
+          <p className="text-xs text-escalation" role="status" data-testid="template-risk-stale">
+            {t("admin.itsmChange.editor.riskAnswersStale", { list: stale.map(([q, a]) => `${q}: ${a}`).join(", ") })}
+          </p>
         )}
       </div>
     </div>

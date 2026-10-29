@@ -2,13 +2,11 @@ import { useTranslation } from "react-i18next";
 import { AgentSelect } from "@/components/approvals/pickers";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
-import type { ChangeTemplateTask } from "@/lib/changeAdminApi";
 import { useRowKeys, newRowKey } from "@/components/approvals/rowKeys";
 import { intOrNull } from "./changeAdminUi";
-import { FIELD_CLASS } from "./changeUi";
-import { DURATION_RANGE, MAX_TEMPLATE_TASKS, OFFSET_RANGE, TASK_KINDS, freeKey, normalizeTask, templateTaskProblems } from "./templateTasks";
+import { FIELD_CLASS, LABEL_CLASS } from "./changeUi";
+import { DURATION_RANGE, MAX_TEMPLATE_TASKS, OFFSET_RANGE, TASK_KINDS, freeKey, renumber, templateTaskProblems, type TaskDraft } from "./templateTasks";
 
-const LABEL = "mb-1 block text-xs font-medium text-muted";
 
 /**
  * The tasks a change template creates (`TemplateTask`): key, title, kind, start relative to the
@@ -21,18 +19,18 @@ export function TemplateTaskEditor({
   queues,
   showProblems,
 }: {
-  value: ChangeTemplateTask[];
-  onChange: (next: ChangeTemplateTask[]) => void;
+  value: TaskDraft[];
+  onChange: (next: TaskDraft[]) => void;
   queues: { id: number; name: string }[];
   showProblems: boolean;
 }) {
   const { t } = useTranslation();
   const [keys, setKeys] = useRowKeys(value.length);
-  const emit = (next: ChangeTemplateTask[], nextKeys = keys) => {
+  const emit = (next: TaskDraft[], nextKeys = keys) => {
     setKeys(nextKeys);
-    onChange(next.map(normalizeTask));
+    onChange(renumber(next));
   };
-  const patch = (i: number, p: Partial<ChangeTemplateTask>) => emit(value.map((task, idx) => (idx === i ? { ...task, ...p } : task)));
+  const patch = (i: number, p: Partial<TaskDraft>) => emit(value.map((task, idx) => (idx === i ? { ...task, ...p } : task)));
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
     const swap = <T,>(list: T[]) => list.map((x, idx) => (idx === i ? list[j] : idx === j ? list[i] : x));
@@ -85,7 +83,7 @@ export function TemplateTaskEditor({
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <label className="min-w-0">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.key")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.key")}</span>
                   <input
                     className={`${FIELD_CLASS} font-mono`}
                     value={task.key}
@@ -96,7 +94,7 @@ export function TemplateTaskEditor({
                   />
                 </label>
                 <label className="min-w-0 sm:col-span-2">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.title")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.title")}</span>
                   <input
                     className={FIELD_CLASS}
                     value={task.title}
@@ -109,7 +107,7 @@ export function TemplateTaskEditor({
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div className="min-w-0">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.kind")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.kind")}</span>
                   <SelectField
                     items={kindItems}
                     value={task.task_kind ?? "workorder"}
@@ -119,20 +117,21 @@ export function TemplateTaskEditor({
                   />
                 </div>
                 <label className="min-w-0">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.offset")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.offset")}</span>
                   <input
                     type="number"
                     className={FIELD_CLASS}
-                    value={task.offset_minutes ?? 0}
+                    value={task.offset_minutes ?? ""}
+                    placeholder="0"
                     min={OFFSET_RANGE[0]}
                     max={OFFSET_RANGE[1]}
-                    onChange={(e) => patch(i, { offset_minutes: intOrNull(e.target.value) ?? 0 })}
+                    onChange={(e) => patch(i, { offset_minutes: intOrNull(e.target.value) })}
                     aria-invalid={marked.includes("offset")}
                     data-testid={`template-task-offset-${i}`}
                   />
                 </label>
                 <label className="min-w-0">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.duration")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.duration")}</span>
                   <input
                     type="number"
                     className={FIELD_CLASS}
@@ -147,7 +146,7 @@ export function TemplateTaskEditor({
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="min-w-0">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.queue")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.queue")}</span>
                   <SelectField
                     items={queueItems}
                     value={task.queue_id ?? 0}
@@ -157,7 +156,7 @@ export function TemplateTaskEditor({
                   />
                 </div>
                 <div className="min-w-0">
-                  <span className={LABEL}>{t("admin.itsmChange.tasks.owner")}</span>
+                  <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.owner")}</span>
                   <div className="flex min-w-0 gap-1">
                     <div className="min-w-0 flex-1">
                       <AgentSelect
@@ -182,7 +181,7 @@ export function TemplateTaskEditor({
                 </div>
               </div>
               <label className="block min-w-0">
-                <span className={LABEL}>{t("admin.itsmChange.tasks.body")}</span>
+                <span className={LABEL_CLASS}>{t("admin.itsmChange.tasks.body")}</span>
                 <textarea
                   className={FIELD_CLASS}
                   rows={2}

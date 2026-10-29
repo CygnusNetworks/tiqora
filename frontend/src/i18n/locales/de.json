@@ -6265,7 +6265,8 @@
         "durationInvalid": "Die Dauer muss zwischen 1 und 525600 Minuten liegen.",
         "tasksInvalid": "Bitte prüfen Sie die markierten Aufgaben.",
         "saved": "Gespeichert.",
-        "notFound": "Die Vorlage gibt es nicht mehr."
+        "notFound": "Die Vorlage gibt es nicht mehr.",
+        "riskAnswersStale": "Beim Speichern entfallen diese vorgegebenen Antworten, weil Frage oder Antwort nicht mehr gültig ist: {{list}}"
       },
       "tasks": {
         "empty": "Die Vorlage hat keine Aufgaben.",
@@ -6320,7 +6321,10 @@
         "customersOff": "Kundenbenutzer als CAB-Mitglieder sind erst möglich, wenn Kunden in den Freigabe-Einstellungen als Freigeber erlaubt sind.",
         "membersNotSaved": "Das CAB ist angelegt, die Mitglieder sind aber noch nicht gespeichert.",
         "deleteTitle": "CAB löschen",
-        "deleteMessage": "CAB „{{name}}“ löschen?"
+        "deleteMessage": "CAB „{{name}}“ löschen?",
+        "quorumTooLarge": "Das Quorum ist größer als die Zahl der Mitglieder. Fügen Sie Mitglieder hinzu oder senken Sie die Mindestzahl.",
+        "ruleMismatch": "Entscheidungsregel, Mindestzahl und Mitglieder passen nicht zusammen.",
+        "boardSavedOnly": "Name und Regel sind gespeichert, die Mitglieder aber nicht."
       },
       "risk": {
         "new": "Neue Frage",
@@ -9826,7 +9830,9 @@
         "freeze_services_required": "Bitte wählen Sie mindestens einen Service.",
         "freeze_not_found": "Den Sperrzeitraum gibt es nicht mehr.",
         "legacy_archive_mode_b_only": "Das Change-Archiv wird nur im ITSM-Modus Tiqora eigenständig übernommen; vorher übernimmt der ITSM-Import die Changes.",
-        "legacy_archive_no_tables": "In der Znuny-Datenbank ist kein Change-Management (ITSMChangeManagement) installiert."
+        "legacy_archive_no_tables": "In der Znuny-Datenbank ist kein Change-Management (ITSMChangeManagement) installiert.",
+        "validationMore_one": "Die Eingabe ist ungültig (Feld: {{field}} und ein weiteres).",
+        "validationMore_other": "Die Eingabe ist ungültig (Feld: {{field}} und {{count}} weitere)."
       },
       "transition": {
         "submit": "Ausführen",

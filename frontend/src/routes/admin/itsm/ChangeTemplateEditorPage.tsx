@@ -4,9 +4,9 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { changeAdminErrorText } from "@/components/itsm/change/changeAdminUi";
-import { FIELD_CLASS } from "@/components/itsm/change/changeUi";
+import { FIELD_CLASS, LABEL_CLASS } from "@/components/itsm/change/changeUi";
 import { TemplateTaskEditor } from "@/components/itsm/change/TemplateTaskEditor";
-import { normalizeTask, templateTaskProblems } from "@/components/itsm/change/templateTasks";
+import { taskDraft, taskToSave, templateTaskProblems } from "@/components/itsm/change/templateTasks";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
@@ -18,7 +18,6 @@ import { CHANGE_TYPES } from "@/lib/changePhases";
 import { ChangeTemplateDefaults } from "./ChangeTemplateDefaults";
 import { fittingRiskAnswers, normalizeDefaults, type Defaults } from "./templateDefaults";
 
-const LABEL = "mb-1 block text-xs font-medium text-muted";
 const SECTION = "min-w-0 space-y-3 rounded-lg border border-hairline bg-surface p-4";
 type Problem = "nameMissing" | "durationInvalid" | "tasksInvalid";
 
@@ -32,7 +31,7 @@ function TemplateForm({ template }: { template: ChangeTemplate | null }) {
   const [isStandard, setIsStandard] = useState(template?.is_standard ?? false);
   const [valid, setValid] = useState(template?.valid ?? true);
   const [defaults, setDefaults] = useState<Defaults>(() => normalizeDefaults(template?.defaults));
-  const [tasks, setTasks] = useState(() => (template?.tasks ?? []).map(normalizeTask));
+  const [tasks, setTasks] = useState(() => (template?.tasks ?? []).map(taskDraft));
   const [touched, setTouched] = useState(false);
 
   const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
@@ -57,7 +56,7 @@ function TemplateForm({ template }: { template: ChangeTemplate | null }) {
         is_standard: standard,
         valid,
         defaults: { ...defaults, risk_answers: fittingRiskAnswers(defaults.risk_answers, questionsQ.data) },
-        tasks: tasks.map(normalizeTask),
+        tasks: tasks.map(taskToSave),
       };
       return template ? changeAdminApi.saveTemplate(template.id, body) : changeAdminApi.createTemplate(body);
     },
@@ -77,16 +76,16 @@ function TemplateForm({ template }: { template: ChangeTemplate | null }) {
     <>
       <section className={SECTION}>
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.editor.name")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.name")}</span>
           <input className={FIELD_CLASS} maxLength={200} value={name} onChange={(e) => setName(e.target.value)} aria-invalid={touched && problems.includes("nameMissing")} data-testid="template-name" />
         </label>
         <label className="block">
-          <span className={LABEL}>{t("admin.itsmChange.editor.description")}</span>
+          <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.description")}</span>
           <textarea className={FIELD_CLASS} rows={2} maxLength={5000} value={description} onChange={(e) => setDescription(e.target.value)} data-testid="template-description" />
         </label>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="min-w-0">
-            <span className={LABEL}>{t("admin.itsmChange.editor.changeType")}</span>
+            <span className={LABEL_CLASS}>{t("admin.itsmChange.editor.changeType")}</span>
             <SelectField
               items={CHANGE_TYPES.map((v) => ({ value: v, label: t(`itsm.change.types.${v}`) }))}
               value={changeType}
