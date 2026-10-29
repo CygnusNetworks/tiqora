@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ApprovalStatusBadge } from "@/components/approvals/ApprovalStatusBadge";
@@ -12,6 +13,8 @@ const CHANGE_APPROVAL_FILTER = { subjectType: "itsm.change", approvalKey: "chang
 /** Phases in which the CAB can still be chosen (not while it decides, not after the change is scheduled). */
 const CAB_PHASES: ReadonlySet<Change["phase"]> = new Set(["draft", "submitted", "assessment", "rejected"]);
 const DEFAULT_CAB = 0;
+/** The engine decides in a job after the vote's commit (`core.approval_hook`); look again after it ran. */
+const OUTCOME_RELOAD_MS = 3000;
 
 function Snapshot({ snapshot }: { snapshot: ChangeApprovalSnapshot }) {
   const { t } = useTranslation();
@@ -54,6 +57,16 @@ export function ChangeApprovalSection({ change, embedApprovals }: { change: Chan
   const cabsQ = useQuery({ queryKey: changeKeys.cabs(), queryFn: ({ signal }) => changeApi.cabs(signal), enabled: canChooseCab });
   const setCab = useMutation({ mutationFn: (cabId: number | null) => changeApi.update(id, { cab_id: cabId }), onSuccess: refresh });
 
+  // A vote in the embedded panel can decide the round: reload the change at once and once more after
+  // the outcome job had time to move the phase.
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const voted = () => {
+    refresh();
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => refresh(), OUTCOME_RELOAD_MS);
+  };
+
   const approval = q.data;
   // GDPR erasure may remove the engine's record of a round; the change keeps its approval_id (N6)
   const missing = !!approval && (approval.history_missing || (approval.approval_id != null && approval.snapshot == null));
@@ -71,7 +84,11 @@ export function ChangeApprovalSection({ change, embedApprovals }: { change: Chan
             className="mt-1"
             disabled={setCab.isPending || !cabsQ.data}
             items={[
-              { value: DEFAULT_CAB, label: t("itsm.change.approval.defaultCab") },
+              {
+                value: DEFAULT_CAB,
+                // an emergency change without its own CAB goes to the emergency CAB of the settings
+                label: t(change.change_type === "emergency" ? "itsm.change.approval.defaultEmergencyCab" : "itsm.change.approval.defaultCab"),
+              },
               ...(cabsQ.data ?? []).map((c) => ({
                 value: c.id,
                 label: c.name,
@@ -83,9 +100,9 @@ export function ChangeApprovalSection({ change, embedApprovals }: { change: Chan
           />
         </div>
       )}
-      {(q.error ?? setCab.error) && (
+      {(q.error ?? setCab.error ?? cabsQ.error) && (
         <p className="text-xs text-danger" role="alert" data-testid="change-approval-error">
-          {changeErrorText(q.error ?? setCab.error, t)}
+          {changeErrorText(q.error ?? setCab.error ?? cabsQ.error, t)}
         </p>
       )}
       {q.isLoading && <Spinner />}
@@ -118,7 +135,7 @@ export function ChangeApprovalSection({ change, embedApprovals }: { change: Chan
         </>
       )}
       {embedApprovals && approval?.approval_id != null && !missing && (
-        <TicketApprovalsPanel ticketId={id} filter={CHANGE_APPROVAL_FILTER} title={t("itsm.change.approval.panelTitle")} />
+        <TicketApprovalsPanel ticketId={id} filter={CHANGE_APPROVAL_FILTER} title={t("itsm.change.approval.panelTitle")} onChanged={voted} />
       )}
     </section>
   );

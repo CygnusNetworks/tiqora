@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { cn } from "@/lib/cn";
 import type { Change, ChangePhase } from "@/lib/changeApi";
 import { ChangeApprovalSection } from "./ChangeApprovalSection";
@@ -12,7 +13,7 @@ import { ChangeTasksSection } from "./ChangeTasksSection";
 import { ConflictList } from "./ConflictList";
 import { PirDialog } from "./PirDialog";
 import { TransitionDialog } from "./TransitionDialog";
-import { transitionLabel, useChangeRefresh } from "./changeUi";
+import { FAILED_OUTCOMES, incidentFromChangeHref, transitionLabel, useChangeRefresh } from "./changeUi";
 
 /** Dynamic-field drift (the Znuny fields were edited behind Tiqora's back); `ticket_closed` has its own banner. */
 const DRIFT_FIELDS = new Set(["type_field", "phase_field"]);
@@ -31,6 +32,21 @@ function Banners({ change }: { change: Change }) {
         <p className="rounded border border-escalation/30 bg-escalation/10 px-3 py-2 text-xs text-ink" role="status" data-testid="change-drift-banner">
           {t("itsm.change.banners.drift", { fields: drift.map((d) => t(`itsm.change.banners.fields.${d}`)).join(", ") })}
         </p>
+      )}
+      {change.phase === "closed" && FAILED_OUTCOMES.has(change.outcome ?? "") && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded border border-escalation/30 bg-escalation/10 px-3 py-2 text-xs text-ink"
+          data-testid="change-incident-offer"
+        >
+          <span>{t("itsm.change.incident.hint", { outcome: t(`itsm.change.pir.outcomes.${change.outcome}`) })}</span>
+          <RouterAnchor
+            href={incidentFromChangeHref(change, t("itsm.change.incident.subject", { tn: change.tn, title: change.title }))}
+            className="font-medium text-accent hover:underline"
+            data-testid="change-incident-create"
+          >
+            {t("itsm.change.incident.create")}
+          </RouterAnchor>
+        </div>
       )}
       {change.process_ticket && (
         <p className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-xs text-muted" data-testid="change-process-banner">

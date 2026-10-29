@@ -3,16 +3,19 @@
  * for the references the API returns (`ticket:12`, `ci:4`, …), error texts and the cache refresh
  * after a write.
  */
+import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { ApiError } from "@/lib/api";
-import { changeErrorCode, changeKeys, type Change, type ChangePhase } from "@/lib/changeApi";
+import { changeErrorCode, changeErrorDetail, changeKeys, type Change, type ChangePhase } from "@/lib/changeApi";
 import { changeDetailHref, ciDetailHref } from "@/lib/itsmRoutes";
 
 export const FIELD_CLASS =
   "w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none";
 
 export const SECTION_CLASS = "min-w-0 space-y-2 rounded-md border border-hairline bg-surface p-3 text-sm";
+
+/** Badge tone of a conflict or finding severity. */
+export const SEVERITY_TONE = { info: "muted", warn: "warn", block: "danger" } as const;
 
 export const FINAL_PHASES: ReadonlySet<Change["phase"]> = new Set(["closed", "cancelled"]);
 
@@ -28,6 +31,15 @@ export const fromLocalInput = (local: string): string | null => (local ? `${loca
 
 /** The Znuny change list filtered by a ticket (Mode A: changes live in Znuny and are read only). */
 export const legacyChangesHref = (ticketId: number) => `/agent/itsm/legacy-changes?ticket_id=${ticketId}`;
+
+/** Outcomes after which a follow-up incident is offered ("Incident aus diesem Change erstellen", plan I13). */
+export const FAILED_OUTCOMES: ReadonlySet<string> = new Set(["failed", "backed_out"]);
+
+/** The new-ticket form prefilled for an incident about a failed change; the form links the two (`from_change`). */
+export function incidentFromChangeHref(change: Pick<Change, "ticket_id" | "tn" | "title">, subject: string): string {
+  const search = new URLSearchParams({ from_change: String(change.ticket_id), subject });
+  return `/agent/tickets/new?${search.toString()}`;
+}
 
 /** Button and dialog title of a step: the pair (`scheduled_draft` = "Neu planen") wins over the target. */
 export function transitionLabel(from: ChangePhase, to: ChangePhase, t: TFunction): string {
@@ -65,14 +77,6 @@ export function refLabel(ref: string, t: TFunction): string {
   return parsed ? t(`itsm.change.refs.${parsed.kind}`, { id: parsed.id }) : ref;
 }
 
-/** `{detail: {...}}` of a failed change call. */
-export function changeErrorDetail(err: unknown): Record<string, unknown> | null {
-  if (!(err instanceof ApiError)) return null;
-  const body = err.detail as { detail?: unknown } | null;
-  const inner = body && typeof body === "object" && "detail" in body ? body.detail : body;
-  return inner && typeof inner === "object" && !Array.isArray(inner) ? (inner as Record<string, unknown>) : null;
-}
-
 export type GuardFailure = { code: string; overridable: boolean };
 
 /** The guard failures of a 409 `transition_refused`, else null. */
@@ -102,10 +106,13 @@ export function changeErrorText(err: unknown, t: TFunction): string {
  */
 export function useChangeRefresh(ticketId: number) {
   const qc = useQueryClient();
-  return (change?: Change) => {
-    if (change) qc.setQueryData(changeKeys.detail(ticketId), change);
-    void qc.invalidateQueries({ queryKey: changeKeys.detail(ticketId) });
-    void qc.invalidateQueries({ queryKey: [...changeKeys.all(), "list"] });
-    void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
-  };
+  return useCallback(
+    (change?: Change) => {
+      if (change) qc.setQueryData(changeKeys.detail(ticketId), change);
+      void qc.invalidateQueries({ queryKey: changeKeys.detail(ticketId) });
+      void qc.invalidateQueries({ queryKey: [...changeKeys.all(), "list"] });
+      void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
+    },
+    [qc, ticketId],
+  );
 }

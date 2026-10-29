@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SelectField } from "@/components/ui/SelectField";
 import type { Change, ChangeOutcome } from "@/lib/changeApi";
-import { FIELD_CLASS } from "./changeUi";
+import { FAILED_OUTCOMES, FIELD_CLASS } from "./changeUi";
 import { TransitionDialog } from "./TransitionDialog";
 
 const OUTCOMES: readonly ChangeOutcome[] = ["successful", "failed", "backed_out"];
@@ -59,6 +59,11 @@ export function PirDialog({
                 placeholder={t("itsm.change.pir.pickOutcome")}
               />
             </div>
+          )}
+          {closing && outcome && FAILED_OUTCOMES.has(outcome) && (
+            <p className="text-xs text-muted" data-testid="change-pir-incident-hint">
+              {t("itsm.change.incident.afterClose")}
+            </p>
           )}
           <label className="block text-xs text-muted">
             {t("itsm.change.pir.notes")}

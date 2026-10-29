@@ -9,7 +9,7 @@ import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { Spinner } from "@/components/ui/Spinner";
 import { changeApi, changeKeys, type Change } from "@/lib/changeApi";
 import { ciDetailHref, type CiSource } from "@/lib/itsmRoutes";
-import { HiddenCount } from "./ChangeRiskParts";
+import { HiddenCount } from "./ChangeRefs";
 import { changeErrorText, FINAL_PHASES, SECTION_CLASS, useChangeRefresh, utcText } from "./changeUi";
 
 const FUNCTION_TONE: Record<string, "success" | "warn" | "danger"> = { operational: "success", warning: "warn", incident: "danger" };
@@ -42,9 +42,7 @@ export function ChangeImpactSection({ change }: { change: Change }) {
 
   useEffect(() => {
     if (jobId != null && isTerminal) refresh();
-    // refresh is a fresh closure each render; the job finishing is the only trigger
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, isTerminal]);
+  }, [jobId, isTerminal, refresh]);
 
   const impact = q.data;
   const running = jobId != null && !isTerminal;

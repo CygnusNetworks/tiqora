@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { ChangeEventsSection } from "@/components/itsm/change/ChangeEventsSection";
 import { ChangeRecord } from "@/components/itsm/change/ChangeRecord";
+import { PortalVisibleSwitch } from "@/components/itsm/change/PortalVisibleSwitch";
 import { ChangeTypeBadge } from "@/components/itsm/change/ChangeTypeBadge";
 import { RiskBadge } from "@/components/itsm/change/RiskBadge";
 import { changeErrorText, legacyChangesHref } from "@/components/itsm/change/changeUi";
@@ -11,8 +13,9 @@ import { changeApi, changeErrorCode, changeKeys } from "@/lib/changeApi";
 
 /**
  * `/agent/itsm/changes/$ticketId`: one change, full width: number, title, type and risk, a link to
- * its ticket, then the record (phase bar, plans, approval with voting, risk, impact, conflicts,
- * tasks). In Mode A it points to the read-only Znuny changes of the ticket.
+ * its ticket and the portal switch, then the record (phase bar, plans, approval with voting, risk,
+ * impact, conflicts, tasks) and the change's own history. In Mode A it points to the read-only
+ * Znuny changes of the ticket.
  */
 export function ChangeDetailPage() {
   const { t } = useTranslation();
@@ -59,8 +62,10 @@ export function ChangeDetailPage() {
                 {t("itsm.change.detail.openTicket")}
               </RouterAnchor>
             </div>
+            <PortalVisibleSwitch change={change} />
           </header>
           <ChangeRecord change={change} embedApprovals wide />
+          <ChangeEventsSection ticketId={change.ticket_id} />
         </>
       )}
     </div>

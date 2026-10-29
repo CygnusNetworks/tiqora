@@ -122,6 +122,7 @@ export function ChangeTasksSection({ change }: { change: Change }) {
             <TaskRow
               key={task.ticket_id}
               task={task}
+              index={i + 1}
               canMove={canEdit}
               first={i === 0}
               last={i === tasks.length - 1}
@@ -137,6 +138,7 @@ export function ChangeTasksSection({ change }: { change: Change }) {
 
 function TaskRow({
   task,
+  index,
   canMove,
   first,
   last,
@@ -144,6 +146,8 @@ function TaskRow({
   onMove,
 }: {
   task: ChangeTask;
+  /** the row number among the readable tasks (positions may skip hidden ones) */
+  index: number;
   canMove: boolean;
   first: boolean;
   last: boolean;
@@ -154,7 +158,7 @@ function TaskRow({
   const slot = windowText(task.planned_start, task.planned_end);
   return (
     <li className="flex flex-wrap items-center gap-2 py-1.5" data-testid="change-task" data-task-id={task.ticket_id}>
-      <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted">{task.position}</span>
+      <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted">{index}</span>
       <div className="min-w-0 flex-1">
         <RouterAnchor href={`/agent/tickets/${task.ticket_id}`} className="break-words text-accent hover:underline">
           <span className="font-mono text-xs">{task.tn}</span> {task.title}

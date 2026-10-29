@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectField } from "@/components/ui/SelectField";
+import { Switch } from "@/components/ui/Switch";
 import { Spinner } from "@/components/ui/Spinner";
 import { api } from "@/lib/api";
 import { changeApi, changeErrorCode, changeKeys, type ChangeCreated, type ChangeType } from "@/lib/changeApi";
@@ -50,6 +51,7 @@ export function CreateChangeDialog({
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
   const [body, setBody] = useState("");
+  const [portalVisible, setPortalVisible] = useState(false);
   const [created, setCreated] = useState<ChangeCreated | null>(null);
 
   const templatesQ = useQuery({ queryKey: changeKeys.templates(), queryFn: ({ signal }) => changeApi.templates(signal), retry: false });
@@ -77,6 +79,7 @@ export function CreateChangeDialog({
     if (queueId === "" && d.queue_id) setQueueId(d.queue_id);
     if (serviceIds.length === 0 && d.service_ids?.length) setServiceIds(d.service_ids);
     if (!reason.trim() && d.reason) setReason(d.reason);
+    setPortalVisible(d.portal_visible);
   };
 
   const windowInvalid = Boolean(start && end && end <= start);
@@ -84,8 +87,8 @@ export function CreateChangeDialog({
   const canSubmit = title.trim() !== "" && !windowInvalid && !missingTemplate;
 
   const create = useMutation({
-    mutationFn: () =>
-      changeApi.create({
+    mutationFn: async (): Promise<ChangeCreated> => {
+      const out = await changeApi.create({
         change_type: type,
         title: title.trim(),
         template_id: templateId === "" ? null : templateId,
@@ -97,7 +100,15 @@ export function CreateChangeDialog({
         planned_end: utc(end),
         reason: reason.trim() || null,
         body: body.trim() || undefined,
-      }),
+      });
+      // `ChangeCreateIn` has no portal flag (the template's default applies): set it right after
+      if (out.change.portal_visible === portalVisible) return out;
+      try {
+        return { ...out, change: await changeApi.update(out.change.ticket_id, { portal_visible: portalVisible }) };
+      } catch {
+        return { ...out, warnings: [...(out.warnings ?? []), "portal_visible_failed"] };
+      }
+    },
     onSuccess: (out) => {
       void qc.invalidateQueries({ queryKey: changeKeys.all() });
       setCreated(out);
@@ -121,7 +132,9 @@ export function CreateChangeDialog({
   }, [created, clean]);
 
   const code = create.isError ? changeErrorCode(create.error) : null;
-  const errorText = create.isError ? t([`itsm.change.errors.${code}`, "itsm.change.errors.generic"]) : null;
+  // a 403 here is about creating in the queue; the generic `forbidden` text fits every other write
+  const errorKey = code === "forbidden" ? "forbidden_create" : code;
+  const errorText = create.isError ? t([`itsm.change.errors.${errorKey}`, "itsm.change.errors.generic"]) : null;
   const linked = useMemo(() => new Set(cis.map((c) => c.ref)), [cis]);
   const addCi = (ci: CiSummary) => {
     setCis((prev) => (prev.some((c) => c.ref === ci.ref) ? prev : [...prev, { ref: ci.ref, label: `${ci.number} ${ci.name}` }]));
@@ -316,6 +329,23 @@ export function CreateChangeDialog({
               {t("itsm.change.create.reason")}
             </label>
             <textarea id="change-create-reason" data-testid="change-create-reason" rows={2} className={FIELD_CLASS} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="change-create-portal"
+                testId="change-create-portal"
+                checked={portalVisible}
+                onChange={setPortalVisible}
+                aria-describedby="change-create-portal-help"
+              />
+              <label htmlFor="change-create-portal" className="text-sm text-ink">
+                {t("itsm.change.portal.label")}
+              </label>
+            </div>
+            <p id="change-create-portal-help" className="text-xs text-muted">
+              {t("itsm.change.portal.help")}
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted" htmlFor="change-create-body">

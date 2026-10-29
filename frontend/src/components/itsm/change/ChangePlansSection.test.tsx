@@ -65,11 +65,19 @@ describe("ChangePlansSection", () => {
     expect(await screen.findByTestId("change-plans-error")).toHaveTextContent("Während der Freigabe");
   });
 
-  it("locks window and plans while the CAB decides and on a final change", () => {
+  it("locks window and plans while the CAB decides, but not the reason", async () => {
+    update.mockResolvedValue(makeChange({ phase: "approval", reason: "Neue Begründung" }));
     renderWithClient(<ChangePlansSection change={makeChange({ phase: "approval" })} />);
-    expect(screen.queryByTestId("change-plans-edit")).toBeNull();
     expect(screen.getByTestId("change-plans-locked")).toHaveTextContent("Während der Freigabe");
-    cleanup();
+    fireEvent.click(screen.getByTestId("change-plans-edit"));
+    expect(screen.queryByTestId("change-plans-start")).toBeNull();
+    expect(screen.queryByTestId("change-plans-input-backout_plan")).toBeNull();
+    fireEvent.change(screen.getByTestId("change-plans-input-reason"), { target: { value: "Neue Begründung" } });
+    fireEvent.click(screen.getByTestId("change-plans-save"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(130, { reason: "Neue Begründung" }));
+  });
+
+  it("is read-only on a final change", () => {
     renderWithClient(<ChangePlansSection change={makeChange({ phase: "closed", pir_notes: "Lief gut" })} />);
     expect(screen.queryByTestId("change-plans-edit")).toBeNull();
     expect(screen.getByTestId("change-plan-pir_notes")).toHaveTextContent("Lief gut");

@@ -2,38 +2,27 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { SelectField } from "@/components/ui/SelectField";
 import type { ChangeRisk, ChangeRiskFinding, ChangeRiskOverrideIn } from "@/lib/changeApi";
 import { RISK_LEVELS } from "@/lib/changePhases";
 import { RiskBadge } from "./RiskBadge";
-import { FIELD_CLASS, refHref, refLabel } from "./changeUi";
+import { HiddenCount, RefLink } from "./ChangeRefs";
+import { FIELD_CLASS, SEVERITY_TONE } from "./changeUi";
 
-const SEVERITY_TONE = { info: "muted", warn: "warn", block: "danger" } as const;
 const NO_OVERRIDE = "none";
 
-/** A reference the caller may read: a link where an agent page exists, else its name. */
-export function RefLink({ refKey }: { refKey: string }) {
-  const { t } = useTranslation();
-  const href = refHref(refKey);
-  const label = refLabel(refKey, t);
-  return href ? (
-    <RouterAnchor href={href} className="text-accent hover:underline">
-      {label}
-    </RouterAnchor>
-  ) : (
-    <span className="text-ink">{label}</span>
-  );
-}
-
-export function HiddenCount({ count, testId }: { count: number; testId: string }) {
-  const { t } = useTranslation();
-  if (count <= 0) return null;
-  return (
-    <span className="text-xs text-muted" data-testid={testId}>
-      {t("itsm.change.hiddenCount", { count })}
-    </span>
-  );
+/**
+ * A finding's message. When the backend cut the list (`truncated`), the count is only a lower
+ * bound (it can be 0): use the `<key>_truncated` text, or mark the plain one.
+ */
+function FindingText({ finding: f }: { finding: ChangeRiskFinding }) {
+  const { t, i18n } = useTranslation();
+  const params = { ...f.params, check: f.check_key };
+  const generic = "itsm.change.risk.findings.generic";
+  if (!f.params.truncated || f.message_key.endsWith("_truncated")) return <>{t([f.message_key, generic], params)}</>;
+  const variant = `${f.message_key}_truncated`;
+  if (i18n.exists(variant)) return <>{t(variant, params)}</>;
+  return <>{`${t([f.message_key, generic], params)} ${t("itsm.change.risk.findingTruncated")}`}</>;
 }
 
 /** What the checks found; the API lists only readable refs and counts the others. */
@@ -52,7 +41,9 @@ export function RiskFindingList({ findings }: { findings: ChangeRiskFinding[] })
         <li key={`${f.check_key}-${i}`} className="text-xs" data-testid="change-risk-finding" data-check={f.check_key}>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={SEVERITY_TONE[f.severity]}>{t(`itsm.change.conflicts.severity.${f.severity}`)}</Badge>
-            <span className="text-ink">{t([f.message_key, "itsm.change.risk.findings.generic"], { ...f.params, check: f.check_key })}</span>
+            <span className="text-ink">
+              <FindingText finding={f} />
+            </span>
             <span className="tabular-nums text-muted">{t("itsm.change.risk.points", { count: f.points })}</span>
           </div>
           {(f.refs.length > 0 || f.hidden_ref_count > 0) && (

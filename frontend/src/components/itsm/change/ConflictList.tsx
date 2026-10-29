@@ -3,10 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { changeApi, changeKeys, type ChangeConflict } from "@/lib/changeApi";
-import { RefLink } from "./ChangeRiskParts";
-import { changeErrorText, SECTION_CLASS, windowText } from "./changeUi";
-
-const SEVERITY_TONE = { info: "muted", warn: "warn", block: "danger" } as const;
+import { RefLink } from "./ChangeRefs";
+import { changeErrorText, SECTION_CLASS, SEVERITY_TONE, windowText } from "./changeUi";
 
 function Shared({ conflict }: { conflict: ChangeConflict }) {
   const { t } = useTranslation();

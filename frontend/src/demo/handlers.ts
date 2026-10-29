@@ -166,6 +166,11 @@ export const handlers = [
       return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
     }),
   ),
+  // the portal switch on the change page keeps its state
+  http.patch("*/api/v1/itsm/changes/:id", async ({ request }) => {
+    const reply = resolveChangeReply(new URL(request.url).pathname, "PATCH", "", undefined, await request.json().catch(() => ({})));
+    return reply === undefined ? undefined : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+  }),
   // jobs of the CMDB mock (bulk edit, export); any other job id falls through to the generic resolver
   http.get("*/api/v1/jobs/:id", ({ params }) => {
     const job = demoCmdbJob(demoCmdb, Number(params.id));

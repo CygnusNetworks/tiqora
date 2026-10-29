@@ -13,6 +13,12 @@ vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
   return { ...actual, changeApi: { ...actual.changeApi, get } };
 });
+vi.mock("@/components/itsm/change/ChangeEventsSection", () => ({
+  ChangeEventsSection: ({ ticketId }: { ticketId: number }) => <div data-testid="change-events-stub" data-ticket={ticketId} />,
+}));
+vi.mock("@/components/itsm/change/PortalVisibleSwitch", () => ({
+  PortalVisibleSwitch: () => <div data-testid="portal-switch-stub" />,
+}));
 vi.mock("@/components/itsm/change/ChangeRecord", () => ({
   ChangeRecord: (props: { embedApprovals: boolean }) => {
     record(props);
@@ -41,6 +47,8 @@ describe("ChangeDetailPage", () => {
     expect(screen.getByTestId("change-record-stub")).toBeInTheDocument();
     expect(record).toHaveBeenCalledWith(expect.objectContaining({ embedApprovals: true }));
     expect(get).toHaveBeenCalledWith(130, expect.anything());
+    expect(screen.getByTestId("portal-switch-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("change-events-stub")).toHaveAttribute("data-ticket", "130");
   });
 
   it("points to the Znuny changes in Mode A", async () => {
@@ -55,6 +63,12 @@ describe("ChangeDetailPage", () => {
     renderWithClient(<ChangeDetailPage />);
     expect(await screen.findByTestId("change-detail-error")).toHaveTextContent("Den Change gibt es nicht");
     expect(screen.queryByTestId("change-detail-legacy")).toBeNull();
+  });
+
+  it("says the same when the ticket itself cannot be read (the API checks the ticket first)", async () => {
+    get.mockRejectedValue(changeError(404, { code: "ticket_not_found" }));
+    renderWithClient(<ChangeDetailPage />);
+    expect(await screen.findByTestId("change-detail-error")).toHaveTextContent("Den Change gibt es nicht");
   });
 
   it("refuses an id that is no number without asking the API", async () => {

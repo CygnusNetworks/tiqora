@@ -58,15 +58,17 @@ function Text({ label, value, testId }: { label: string; value: string | null; t
 /**
  * "Pläne und Zeitfenster": reason, the three plans, the planned window (UTC), the actual times and
  * the review notes. Writers edit everything but the review notes (those come with the step to the
- * review); while the CAB decides, window and plans are frozen (`change_locked_in_approval`).
+ * review); while the CAB decides, window and plans are frozen (`change_locked_in_approval`), the
+ * reason stays editable.
  */
 export function ChangePlansSection({ change }: { change: Change }) {
   const { t } = useTranslation();
   const refresh = useChangeRefresh(change.ticket_id);
   const [draft, setDraft] = useState<Draft | null>(null);
   const final = FINAL_PHASES.has(change.phase);
+  // while the CAB decides, window and plans are frozen (`change_locked_in_approval`); the reason is not
   const locked = change.phase === "approval";
-  const canEdit = change.can_write && !final && !locked;
+  const canEdit = change.can_write && !final;
 
   const save = useMutation({
     mutationFn: (body: ChangeUpdateIn) => changeApi.update(change.ticket_id, body),
@@ -98,6 +100,7 @@ export function ChangePlansSection({ change }: { change: Change }) {
       )}
       {draft ? (
         <div className="space-y-3">
+          {!locked && (
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block text-xs text-muted">
               {t("itsm.change.plans.start")}
@@ -120,12 +123,13 @@ export function ChangePlansSection({ change }: { change: Change }) {
               />
             </label>
           </div>
+          )}
           {(halfWindow || backwards) && (
             <p className="text-xs text-danger" data-testid="change-plans-window-invalid">
               {t(halfWindow ? "itsm.change.plans.windowHalf" : "itsm.change.errors.invalid_window")}
             </p>
           )}
-          {TEXTS.map((name) => (
+          {TEXTS.filter((name) => !locked || name === "reason").map((name) => (
             <label key={name} className="block text-xs text-muted">
               {label(name)}
               <textarea

@@ -1354,7 +1354,9 @@
       "answeredAt": "{{time}} angenommen",
       "endedAt": "beendet {{time}}"
     },
-    "processLabel": "Prozess starten"
+    "processLabel": "Prozess starten",
+    "fromChange": "Das neue Ticket wird mit dem Change (Ticket #{{id}}) verknüpft.",
+    "changeLinkFailed": "Das Ticket wurde angelegt, konnte aber nicht mit dem Change verknüpft werden."
   },
   "connection": {
     "live": "Live verbunden",
@@ -9389,13 +9391,14 @@
           "overlap_other": "{{count}} andere Changes im selben Zeitfenster",
           "freeze_one": "Das Zeitfenster liegt in {{count}} Sperrzeitraum",
           "freeze_other": "Das Zeitfenster liegt in {{count}} Sperrzeiträumen",
-          "freeze_truncated_one": "Das Zeitfenster liegt in {{count}} oder mehr Sperrzeiträumen (Liste abgeschnitten)",
-          "freeze_truncated_other": "Das Zeitfenster liegt in {{count}} oder mehr Sperrzeiträumen (Liste abgeschnitten)",
+          "freeze_truncated_one": "Viele Sperrzeiträume im Zeitfenster; nicht alle konnten geprüft werden",
+          "freeze_truncated_other": "Viele Sperrzeiträume im Zeitfenster; nicht alle konnten geprüft werden",
           "failed_history_one": "{{count}} fehlgeschlagener Change an denselben CIs oder Services in den letzten {{lookback_days}} Tagen",
           "failed_history_other": "{{count}} fehlgeschlagene Changes an denselben CIs oder Services in den letzten {{lookback_days}} Tagen",
           "emergency": "Notfall-Change",
           "missing_backout": "Der Rückfallplan fehlt",
-          "check_failed": "Eine Prüfung konnte nicht laufen; die Punktzahl kann zu niedrig sein"
+          "check_failed": "Eine Prüfung konnte nicht laufen; die Punktzahl kann zu niedrig sein",
+          "overlap_truncated": "Viele andere Changes im selben Zeitfenster; nicht alle konnten geprüft werden"
         },
         "override": {
           "current": "Übersteuert auf",
@@ -9403,7 +9406,8 @@
           "level": "Risikostufe",
           "none": "Keine Übersteuerung (berechnete Stufe)",
           "reason": "Begründung"
-        }
+        },
+        "findingTruncated": "(Liste abgeschnitten, es können mehr sein)"
       },
       "phaseBar": {
         "label": "Phasen dieses Changes"
@@ -9497,7 +9501,8 @@
         "open": "Change öffnen",
         "warnings": {
           "ci_refs_truncated": "Es wurden nicht alle CIs verknüpft: Die Obergrenze je Change ist erreicht.",
-          "generic": "Beim Anlegen gab es einen Hinweis."
+          "generic": "Beim Anlegen gab es einen Hinweis.",
+          "portal_visible_failed": "Die Anzeige im Kundenportal konnte nicht gesetzt werden. Sie können sie auf der Change-Seite einschalten."
         }
       },
       "errors": {
@@ -9511,7 +9516,7 @@
         "template_invalid": "Die Vorlage ist fehlerhaft und kann nicht verwendet werden.",
         "queue_required": "Bitte wählen Sie eine Queue: Es ist keine Standard-Queue für Changes eingestellt.",
         "queue_not_found": "Die Queue gibt es nicht.",
-        "forbidden": "Sie dürfen in dieser Queue keine Changes anlegen.",
+        "forbidden": "Dafür fehlen Ihnen die Rechte.",
         "service_not_found": "Einer der Services gibt es nicht mehr.",
         "cab_not_found": "Das CAB gibt es nicht.",
         "cab_invalid": "Das CAB ist ungültig.",
@@ -9546,7 +9551,9 @@
         "risk_override_reason_too_long": "Die Begründung ist zu lang (höchstens 1000 Zeichen).",
         "risk_level_invalid": "Diese Risikostufe gibt es nicht.",
         "risk_question_unknown": "Eine der Fragen gibt es nicht mehr. Bitte laden Sie die Seite neu.",
-        "risk_answer_unknown": "Eine der Antworten gibt es nicht mehr. Bitte laden Sie die Seite neu."
+        "risk_answer_unknown": "Eine der Antworten gibt es nicht mehr. Bitte laden Sie die Seite neu.",
+        "forbidden_create": "Sie dürfen in dieser Queue keine Changes anlegen.",
+        "ticket_not_found": "Den Change gibt es nicht, oder Sie dürfen ihn nicht sehen."
       },
       "transition": {
         "submit": "Ausführen",
@@ -9720,7 +9727,8 @@
         },
         "historyMissing": "Freigabeverlauf nicht mehr vorhanden",
         "none": "Noch keine Freigabe angefordert.",
-        "voteHint": "Abstimmen im Abschnitt Freigaben"
+        "voteHint": "Abstimmen im Abschnitt Freigaben",
+        "defaultEmergencyCab": "Notfall-CAB laut Einstellungen"
       },
       "banners": {
         "ticketClosed": "Das Ticket wurde geschlossen ({{state}}), der Change steht aber noch in der Phase „{{phase}}“. Bitte schließen Sie den Change ab oder brechen Sie ihn ab, oder öffnen Sie das Ticket wieder.",
@@ -9746,6 +9754,65 @@
       "detail": {
         "back": "Alle Changes",
         "openTicket": "Ticket öffnen"
+      },
+      "portal": {
+        "label": "Im Kundenportal im Wartungskalender anzeigen",
+        "help": "Sobald der Change eingeplant ist, sehen Kunden dort Titel, Zeitfenster und ihre betroffenen Services, aber keine Pläne."
+      },
+      "incident": {
+        "hint": "Der Change ist abgeschlossen mit dem Ergebnis „{{outcome}}“.",
+        "create": "Incident aus diesem Change erstellen",
+        "subject": "Incident nach Change {{tn}}: {{title}}",
+        "afterClose": "Nach dem Abschließen können Sie „Incident aus diesem Change erstellen“ wählen; das neue Ticket wird mit dem Change verknüpft."
+      },
+      "events": {
+        "title": "Verlauf des Changes",
+        "empty": "Noch keine Einträge.",
+        "more": "Ältere Einträge laden",
+        "system": "System",
+        "user": "Benutzer #{{id}}",
+        "phase": "Phase: {{from}} → {{to}}",
+        "phaseStart": "Phase: {{to}}",
+        "kinds": {
+          "created": "Change angelegt",
+          "adopted": "Als Change geführt",
+          "phase": "Phase geändert",
+          "updated": "Geändert",
+          "impact": "Auswirkung berechnet",
+          "approval_requested": "Freigabe angefordert",
+          "approval_outcome": "Ergebnis der Freigabe",
+          "conflict_override": "Sperrzeitraum übergangen",
+          "forced": "Schritt erzwungen",
+          "risk_override": "Risiko übersteuert",
+          "task_added": "Aufgabe hinzugefügt",
+          "related_linked": "Ticket verknüpft",
+          "related_unlinked": "Verknüpfung gelöst"
+        },
+        "detail": {
+          "reason": "Begründung",
+          "fields": "Felder",
+          "status": "Ergebnis",
+          "round": "Runde",
+          "approval_id": "Freigabe",
+          "approval": "Freigabe",
+          "cab_id": "CAB",
+          "cab_entries": "CAB-Einträge",
+          "block_conflicts": "Blockierende Konflikte",
+          "open_tasks": "Offene Aufgaben",
+          "from": "Von",
+          "to": "Auf",
+          "via": "Weg",
+          "ticket_id": "Ticket",
+          "link_type": "Verknüpfungsart",
+          "task_ticket_id": "Aufgabe",
+          "task_kind": "Typ",
+          "change_type": "Art",
+          "template_id": "Vorlage",
+          "template_warnings": "Hinweise der Vorlage",
+          "cis": "CIs",
+          "services": "Services",
+          "truncated": "Abgeschnitten"
+        }
       }
     }
   },

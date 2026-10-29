@@ -341,9 +341,41 @@ describe("change demo mock: phase steps, adopting and the ticket zoom", () => {
     expect(failures(step(132, { to: "review" }))).toEqual({ code: "transition_refused", failures: [{ code: "tasks_open", overridable: true }] });
     expect(failures(step(132, { to: "review", force: true })).failures).toEqual([{ code: "reason_missing", overridable: false }]);
     expect(step(132, { to: "review", force: true, reason: "Aufgabe entfällt" })?.status).toBe(200);
-    expect(failures(step(132, { to: "closed" })).failures).toEqual([{ code: "outcome_missing", overridable: false }]);
+    expect(failures(step(132, { to: "closed" })).failures).toEqual([
+      { code: "outcome_missing", overridable: false },
+      { code: "pir_missing", overridable: false },
+    ]);
     expect(step(132, { to: "closed", outcome: "successful", pir_notes: "Regel wirkt" })).toMatchObject({ body: { phase: "closed", outcome: "successful", pir_notes: "Regel wirkt" } });
     expect(failures(step(135, { to: "draft" })).failures).toEqual([{ code: "transition_not_allowed", overridable: false }]);
+  });
+
+  it("reports the CAB round that matches the phase", () => {
+    const snapshot = (id: number) => (get(`/api/v1/itsm/changes/${id}/approval`) as ChangeApproval).snapshot;
+    // the approvals demo's round of 130 is pending
+    expect(snapshot(DEMO_APPROVAL_CHANGE_TICKET_ID)).toMatchObject({ approval_id: 501, status: "pending", round: 1, decided_at: null });
+    // requesting the approval of 133 opens a pending first round, not an approved one
+    step(133, { to: "approval" });
+    expect(snapshot(133)).toMatchObject({ status: "pending", round: 1, decided_at: null, votes_approved: 0 });
+    expect(get("/api/v1/itsm/changes/133")).toMatchObject({ approved_at: null });
+    // the scheduled emergency change 132 went through its CAB round
+    expect(snapshot(132)).toMatchObject({ status: "approved", round: 1 });
+    // a forced step without anything to pass needs no reason
+    expect(step(130, { to: "cancelled", force: true })?.status).toBe(200);
+    expect(snapshot(DEMO_APPROVAL_CHANGE_TICKET_ID)).toMatchObject({ status: "cancelled" });
+  });
+
+  it("keeps the portal switch and logs the session's writes newest first", () => {
+    const events = () => (get("/api/v1/itsm/changes/133/events") as { event: string; to_phase: string | null; detail: Record<string, unknown> | null }[]);
+    expect(resolveChangeReply("/api/v1/itsm/changes/133", "PATCH", "", "tiqora", { portal_visible: true })).toMatchObject({ status: 200, body: { portal_visible: true } });
+    expect(get("/api/v1/itsm/changes/133")).toMatchObject({ portal_visible: true });
+    step(133, { to: "approval", reason: "CAB am Dienstag" });
+    expect(events().slice(0, 2)).toMatchObject([
+      { event: "phase", to_phase: "approval", detail: { reason: "CAB am Dienstag" } },
+      { event: "updated", detail: { fields: ["portal_visible"] } },
+    ]);
+    resetDemoChanges();
+    expect(get("/api/v1/itsm/changes/133")).toMatchObject({ portal_visible: false, phase: "assessment" });
+    expect(events()[0]).toMatchObject({ event: "phase", to_phase: "assessment" });
   });
 
   it("adopts the change-type ticket without a record once", () => {

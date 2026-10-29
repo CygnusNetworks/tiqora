@@ -36,6 +36,14 @@ describe("PirDialog", () => {
     expect(transition).toHaveBeenCalledWith(130, { to: "closed", outcome: "backed_out", pir_notes: "Rückfall nach 20 Minuten" });
   });
 
+  it("says that an incident can follow a failed or backed-out change", async () => {
+    renderWithClient(<PirDialog change={makeChange({ phase: "review" })} to="closed" onClose={vi.fn()} onDone={vi.fn()} />);
+    await pickOutcome("successful");
+    expect(screen.queryByTestId("change-pir-incident-hint")).toBeNull();
+    await pickOutcome("failed");
+    expect(screen.getByTestId("change-pir-incident-hint")).toHaveTextContent("Incident aus diesem Change erstellen");
+  });
+
   it("asks for the review notes before a normal change is closed from the review", async () => {
     renderWithClient(<PirDialog change={makeChange({ phase: "review" })} to="closed" onClose={vi.fn()} onDone={vi.fn()} />);
     await pickOutcome("successful");

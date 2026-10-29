@@ -3,7 +3,6 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import i18n from "@/i18n";
 import { changeError, makeChange, makeRisk, renderWithClient } from "./changeTestSupport";
 import { ChangeRiskSection } from "./ChangeRiskSection";
-import source from "./ChangeRiskSection.tsx?raw";
 
 const { risk, saveRiskAnswers, evaluateRisk, overrideRisk } = vi.hoisted(() => ({
   risk: vi.fn(),
@@ -82,6 +81,14 @@ describe("ChangeRiskSection", () => {
     expect(rows[2]).toHaveTextContent("Sperrzeitraum #1");
   });
 
+  it("marks a finding whose list the backend cut off", async () => {
+    risk.mockResolvedValue(
+      makeRisk({ findings: [finding({ check_key: "core.overlap", message_key: "itsm.change.risk.findings.overlap", params: { count: 0, truncated: 1 } })] }),
+    );
+    renderWithClient(<ChangeRiskSection change={makeChange()} />);
+    expect(await screen.findByTestId("change-risk-finding")).toHaveTextContent("Viele andere Changes im selben Zeitfenster; nicht alle konnten geprüft werden");
+  });
+
   it("has a text for every finding the core checks emit", async () => {
     const keys = ["service_criticality", "ci_incident", "open_incidents", "overlap", "freeze", "freeze_truncated", "failed_history", "emergency", "missing_backout", "check_failed"];
     // the API sends the params with the key; counted findings resolve to their plural forms
@@ -118,9 +125,5 @@ describe("ChangeRiskSection", () => {
     fireEvent.change(screen.getByTestId("change-risk-override-reason"), { target: { value: "x" } });
     fireEvent.click(screen.getByTestId("change-risk-override-save"));
     expect(await screen.findByTestId("change-risk-error")).toHaveTextContent("Bitte begründen Sie die Änderung der Risikostufe.");
-  });
-
-  it("keeps the slot where the AI risk line goes", () => {
-    expect(source).toContain("{/* slot: itsm-beyond ChangeAiRisk (X3) */}");
   });
 });

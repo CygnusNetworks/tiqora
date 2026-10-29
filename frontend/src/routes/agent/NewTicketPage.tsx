@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type CustomerRef } from "@/lib/api";
+import { changeApi } from "@/lib/changeApi";
 import { pluginPointsApi } from "@/lib/pluginPointsApi";
 import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
@@ -138,6 +139,10 @@ export type NewTicketSearch = {
   owner_id?: number;
   /** Set by the CTI popup: the direction is a fact of the call (badge). */
   from_call?: boolean;
+  /** "Incident aus diesem Change erstellen": the new ticket is linked to this change (ticket id). */
+  from_change?: number;
+  /** Subject to start with. */
+  subject?: string;
 };
 
 export function NewTicketPage() {
@@ -218,7 +223,7 @@ export function NewTicketPage() {
   // A queue the agent picked by hand (or the `?queue_id=` param) is never
   // replaced by a suggestion; otherwise the queue follows the customer.
   const [queuePinned, setQueuePinned] = useState(queueId !== undefined);
-  const [subject, setSubject] = useState("");
+  const [subject, setSubject] = useState(search.subject ?? "");
   const [priority, setPriority] = useState<number | "">("");
   // The ITSM matrix only fills the priority until the agent picks one by hand.
   const [priorityTouched, setPriorityTouched] = useState(false);
@@ -465,6 +470,20 @@ export function NewTicketPage() {
     }
   };
 
+  /** Opened from a failed change: link the new ticket to it (the change's related tickets).
+   * The ticket exists either way; a failed link keeps the agent here with a link to it. */
+  const linkToChange = async (ticketId: number): Promise<boolean> => {
+    if (!search.from_change) return true;
+    try {
+      await changeApi.addRelated(search.from_change, ticketId);
+      return true;
+    } catch {
+      setCreatedTicketId(ticketId);
+      setError(t("newTicket.changeLinkFailed"));
+      return false;
+    }
+  };
+
   const clearCustomer = () => {
     setCustomer(null);
     setCustomerQuery("");
@@ -577,6 +596,7 @@ export function NewTicketPage() {
           },
           send_auto_response: direction === "inbound",
         });
+        if (!(await linkToChange(phoneTicketId))) return;
         await navigate({
           to: "/agent/tickets/$ticketId",
           params: { ticketId: String(phoneTicketId) },
@@ -640,6 +660,7 @@ export function NewTicketPage() {
         setError(t("ticket.extrasFailedTime"));
         return;
       }
+      if (!(await linkToChange(ticket_id))) return;
       await navigate({
         to: "/agent/tickets/$ticketId",
         params: { ticketId: String(ticket_id) },
@@ -701,6 +722,11 @@ export function NewTicketPage() {
         {t("newTicket.title")}
       </h1>
       <p className="mt-1 text-[13px] text-muted">{t("newTicket.intro")}</p>
+      {search.from_change && (
+        <p className="mt-2 rounded border border-hairline bg-surface-subtle px-3 py-2 text-[13px] text-ink" data-testid="new-ticket-from-change">
+          {t("newTicket.fromChange", { id: search.from_change })}
+        </p>
+      )}
 
       <div className="mt-5 inline-flex overflow-hidden rounded-md border border-hairline text-sm">
         <button

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import i18n from "@/i18n";
 import { makeApproval, makeChange, renderWithClient } from "./changeTestSupport";
 import { ChangeApprovalSection } from "./ChangeApprovalSection";
@@ -11,9 +11,9 @@ vi.mock("@/lib/changeApi", async () => {
 });
 // The approvals panel has its own tests; here only what it is given counts.
 vi.mock("@/components/approvals/TicketApprovalsPanel", () => ({
-  TicketApprovalsPanel: (props: { ticketId: number; filter?: unknown }) => {
+  TicketApprovalsPanel: (props: { ticketId: number; filter?: unknown; onChanged?: () => void }) => {
     panel(props);
-    return <div data-testid="approvals-panel-stub" />;
+    return <button type="button" data-testid="approvals-panel-stub" onClick={() => props.onChanged?.()} />;
   },
 }));
 
@@ -42,6 +42,29 @@ describe("ChangeApprovalSection", () => {
     expect(panel).toHaveBeenCalledWith(
       expect.objectContaining({ ticketId: 130, filter: { subjectType: "itsm.change", approvalKey: "change_cab" } }),
     );
+  });
+
+  it("reloads the change after a vote in the embedded panel, and again when the outcome job had time", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      approval.mockResolvedValue(makeApproval());
+      renderWithClient(<ChangeApprovalSection change={makeChange({ phase: "approval" })} embedApprovals />);
+      fireEvent.click(await screen.findByTestId("approvals-panel-stub"));
+      await waitFor(() => expect(approval).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      await waitFor(() => expect(approval).toHaveBeenCalledTimes(3));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the emergency CAB as the default of an emergency change", async () => {
+    approval.mockResolvedValue({ approval_id: null, approval_round: 0, approval_via: null, approved_at: null, history_missing: false, snapshot: null });
+    renderWithClient(<ChangeApprovalSection change={makeChange({ phase: "draft", change_type: "emergency", cab_id: null })} embedApprovals />);
+    await waitFor(() => expect(screen.getByTestId("change-approval-cab")).toBeEnabled());
+    expect(screen.getByTestId("change-approval-cab")).toHaveTextContent("Notfall-CAB laut Einstellungen");
   });
 
   it("shows the snapshot only in the zoom and points to the approvals section", async () => {

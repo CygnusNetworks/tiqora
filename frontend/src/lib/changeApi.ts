@@ -119,12 +119,17 @@ export const changeKeys = {
   legacy: (id: number) => ["itsm", "changes", "legacy", id] as const,
 };
 
-/** The API's `{detail: {code}}` of a failed change call, or null (e.g. `change_mode_a`, `transition_refused`). */
-export function changeErrorCode(err: unknown): string | null {
+/** The `{detail: {...}}` of a failed change call (code plus the extra fields, e.g. `failures`, `engine_code`), or null. */
+export function changeErrorDetail(err: unknown): Record<string, unknown> | null {
   if (!(err instanceof ApiError)) return null;
   const body = err.detail as { detail?: unknown } | null;
   const inner = body && typeof body === "object" && "detail" in body ? body.detail : body;
-  const code = (inner as { code?: unknown } | null)?.code;
+  return inner && typeof inner === "object" && !Array.isArray(inner) ? (inner as Record<string, unknown>) : null;
+}
+
+/** The API's `{detail: {code}}` of a failed change call, or null (e.g. `change_mode_a`, `transition_refused`). */
+export function changeErrorCode(err: unknown): string | null {
+  const code = changeErrorDetail(err)?.code;
   return typeof code === "string" ? code : null;
 }
 

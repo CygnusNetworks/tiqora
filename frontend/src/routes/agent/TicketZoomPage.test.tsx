@@ -44,10 +44,26 @@ vi.mock("@/components/agent/TicketZoomOverflowMenu", () => ({
     return null;
   },
 }));
-vi.mock("@/components/approvals/TicketApprovalsPanel", () => ({ TicketApprovalsPanel: () => null }));
+// The ITSM panels and the approvals panel as markers, so their order in the zoom can be checked (CX13).
+vi.mock("@/components/itsm/MajorIncidentBanner", () => ({ MajorIncidentBanner: () => null }));
+vi.mock("@/components/itsm/TicketCisPanel", () => ({ TicketCisPanel: () => <div data-testid="zoom-panel" data-panel="cis" /> }));
+vi.mock("@/components/itsm/ProblemPanel", () => ({ ProblemPanel: () => <div data-testid="zoom-panel" data-panel="problem" /> }));
+vi.mock("@/components/itsm/MajorIncidentPanel", () => ({
+  MajorIncidentPanel: () => <div data-testid="zoom-panel" data-panel="major" />,
+}));
+vi.mock("@/components/approvals/TicketApprovalsPanel", () => ({
+  TicketApprovalsPanel: (props: { filter?: unknown }) => (
+    <div data-testid="zoom-panel" data-panel="approvals" data-filtered={props.filter ? "yes" : "no"} />
+  ),
+}));
+vi.mock("@/components/itsm/change/ChangePanel", () => ({
+  ChangePanel: (props: { embedApprovals: boolean }) => (
+    <div data-testid="zoom-panel" data-panel="change" data-embed={String(props.embedApprovals)} />
+  ),
+}));
 vi.mock("@/components/agent/process/ProcessWidget", () => ({
   ProcessWidget: (props: { allowedActions: ReadonlySet<string> | null }) => (
-    <div data-testid="process-widget-stub" data-allowed={props.allowedActions ? "set" : "null"} />
+    <div data-testid="process-widget-stub" data-panel="process" data-allowed={props.allowedActions ? "set" : "null"} />
   ),
 }));
 
@@ -110,5 +126,25 @@ describe("TicketZoomPage Action ACL", () => {
     renderPage();
     await waitFor(() => expect(overflow).toHaveBeenCalledWith(expected));
     if (!expected) expect(overflow).not.toHaveBeenCalledWith(true);
+  });
+});
+
+describe("TicketZoomPage panel order", () => {
+  beforeEach(() => {
+    getTicket.mockReset().mockResolvedValue({ id: 7, tn: "1", title: "T", permissions: { ro: true } });
+    postPresence.mockReset().mockResolvedValue({});
+    ticketState.mockReset().mockResolvedValue({ process_entity_id: null });
+    aclActions.mockReset().mockResolvedValue({ allowed: [] });
+  });
+
+  it("puts the change panel after the approvals panel and before the process (CX13), without its own approval UI", async () => {
+    renderPage();
+    await screen.findByTestId("process-widget-stub");
+    const order = Array.from(document.querySelectorAll("[data-panel]")).map((el) => el.getAttribute("data-panel"));
+    expect(order).toEqual(["cis", "problem", "major", "approvals", "change", "process"]);
+    const change = document.querySelector('[data-panel="change"]');
+    expect(change).toHaveAttribute("data-embed", "false");
+    // the zoom's approvals panel is the plain one: the CAB request shows there once
+    expect(document.querySelector('[data-panel="approvals"]')).toHaveAttribute("data-filtered", "no");
   });
 });

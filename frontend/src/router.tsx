@@ -402,6 +402,8 @@ const agentNewTicketRoute = createRoute({
     call_ended: epochMs(s.call_ended),
     owner_id: positiveInt(s.owner_id),
     from_call: s.from_call === true || s.from_call === 1 || s.from_call === "1" || s.from_call === "true" ? true : undefined,
+    from_change: positiveInt(s.from_change),
+    subject: typeof s.subject === "string" && s.subject !== "" ? s.subject.slice(0, 250) : undefined,
   }),
   component: AgentNewTicketPage,
 });

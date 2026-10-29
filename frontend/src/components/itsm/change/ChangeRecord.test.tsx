@@ -83,6 +83,21 @@ describe("ChangeRecord", () => {
     expect(screen.queryByTestId("change-drift-banner")).toBeNull();
   });
 
+  it("offers an incident about a change that failed or was backed out", () => {
+    renderWithClient(<ChangeRecord change={makeChange({ phase: "closed", outcome: "backed_out", allowed_targets: [] })} embedApprovals />);
+    const offer = screen.getByTestId("change-incident-offer");
+    expect(offer).toHaveTextContent("Zurückgerollt");
+    const link = screen.getByTestId("change-incident-create");
+    expect(link).toHaveTextContent("Incident aus diesem Change erstellen");
+    const url = new URL(link.getAttribute("href") ?? "", "http://x");
+    expect(url.pathname).toBe("/agent/tickets/new");
+    expect(url.searchParams.get("from_change")).toBe("130");
+    expect(url.searchParams.get("subject")).toBe("Incident nach Change 20261012130: Switch-Firmware aktualisieren");
+    cleanup();
+    renderWithClient(<ChangeRecord change={makeChange({ phase: "closed", outcome: "successful", allowed_targets: [] })} embedApprovals />);
+    expect(screen.queryByTestId("change-incident-offer")).toBeNull();
+  });
+
   it("lays out all sections and hands the approvals choice on", () => {
     renderWithClient(<ChangeRecord change={makeChange()} embedApprovals={false} />);
     for (const name of ["plans", "tasks", "risk", "impact", "conflicts", "approval"]) {

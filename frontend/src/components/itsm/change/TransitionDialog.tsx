@@ -16,8 +16,8 @@ export function GuardFailureList({ failures }: { failures: GuardFailure[] }) {
     <div className="rounded border border-danger/30 bg-danger/10 p-2 text-xs text-ink" role="alert" data-testid="change-guard-failures">
       <p className="font-medium">{t("itsm.change.transition.refused")}</p>
       <ul className="mt-1 list-disc space-y-0.5 pl-4">
-        {failures.map((f) => (
-          <li key={f.code} data-testid="change-guard-failure" data-code={f.code}>
+        {failures.map((f, i) => (
+          <li key={`${f.code}-${i}`} data-testid="change-guard-failure" data-code={f.code}>
             {t([`itsm.change.transition.failures.${f.code}`, "itsm.change.transition.failures.generic"], { code: f.code })}
           </li>
         ))}

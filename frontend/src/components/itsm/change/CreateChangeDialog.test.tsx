@@ -9,16 +9,17 @@ import type { Job } from "@/lib/jobsApi";
 import { makeCi } from "../testSupport";
 import { CreateChangeDialog } from "./CreateChangeDialog";
 
-const { templates, create, listQueues, listReferenceServices, getJob } = vi.hoisted(() => ({
+const { templates, create, update, listQueues, listReferenceServices, getJob } = vi.hoisted(() => ({
   templates: vi.fn(),
   create: vi.fn(),
+  update: vi.fn(),
   listQueues: vi.fn(),
   listReferenceServices: vi.fn(),
   getJob: vi.fn(),
 }));
 vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
-  return { ...actual, changeApi: { ...actual.changeApi, templates, create } };
+  return { ...actual, changeApi: { ...actual.changeApi, templates, create, update } };
 });
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -82,7 +83,12 @@ function renderDialog() {
   );
 }
 
-const created = (over: Record<string, unknown> = {}) => ({ change: { ticket_id: 140, tn: "20261012140" }, tasks_job_id: null, warnings: [], ...over });
+const created = (over: Record<string, unknown> = {}) => ({
+  change: { ticket_id: 140, tn: "20261012140", portal_visible: false },
+  tasks_job_id: null,
+  warnings: [],
+  ...over,
+});
 
 beforeEach(async () => {
   await i18n.changeLanguage("de");
@@ -94,6 +100,7 @@ beforeEach(async () => {
     template(3, "Neuer Benutzer", { change_type: "standard", is_standard: true, defaults: { portal_visible: false, title: "Benutzer anlegen", queue_id: 4, service_ids: [2] } }),
   ]);
   create.mockReset().mockResolvedValue(created());
+  update.mockReset();
   listQueues.mockReset().mockResolvedValue([
     { id: 4, name: "Support::Netz", valid: true, group_id: 1 },
     { id: 9, name: "Alt", valid: false, group_id: 1 },
@@ -168,6 +175,30 @@ describe("CreateChangeDialog", () => {
       reason: null,
       body: "Konto für neue Kollegin",
     });
+  });
+
+  it("shows the change in the portal schedule when switched on (set right after the create)", async () => {
+    update.mockResolvedValue({ ticket_id: 140, tn: "20261012140", portal_visible: true });
+    renderDialog();
+    fillTitle("Router tauschen");
+    expect(screen.getByText("Im Kundenportal im Wartungskalender anzeigen")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("change-create-portal"));
+    fireEvent.click(screen.getByTestId("change-create-submit"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(140, { portal_visible: true }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(140));
+  });
+
+  it("takes the portal default from the template and sends nothing extra when it is kept", async () => {
+    templates.mockResolvedValue([template(1, "Server-Wartung", { defaults: { portal_visible: true } })]);
+    create.mockResolvedValue(created({ change: { ticket_id: 140, tn: "20261012140", portal_visible: true } }));
+    renderDialog();
+    fireEvent.click(screen.getByTestId("change-create-template"));
+    fireEvent.click(await screen.findByTestId("change-create-template-menu-option-1"));
+    expect(screen.getByTestId("change-create-portal")).toBeChecked();
+    fillTitle("Wartung");
+    fireEvent.click(screen.getByTestId("change-create-submit"));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(140));
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("says so when the templates cannot be loaded", async () => {

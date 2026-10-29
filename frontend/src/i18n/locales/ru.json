@@ -1354,7 +1354,9 @@
       "answeredAt": "принят {{time}}",
       "endedAt": "завершён {{time}}"
     },
-    "processLabel": "Start process"
+    "processLabel": "Start process",
+    "fromChange": "The new ticket is linked to the change (ticket #{{id}}).",
+    "changeLinkFailed": "The ticket was created but could not be linked to the change."
   },
   "connection": {
     "live": "Подключено в прямом эфире",
@@ -9381,13 +9383,14 @@
           "overlap_other": "{{count}} other changes in the same window",
           "freeze_one": "The window lies in {{count}} freeze window",
           "freeze_other": "The window lies in {{count}} freeze windows",
-          "freeze_truncated_one": "The window lies in {{count}} or more freeze windows (list cut off)",
-          "freeze_truncated_other": "The window lies in {{count}} or more freeze windows (list cut off)",
+          "freeze_truncated_one": "Many freeze windows in the window; not all could be checked",
+          "freeze_truncated_other": "Many freeze windows in the window; not all could be checked",
           "failed_history_one": "{{count}} failed change on the same CIs or services in the last {{lookback_days}} days",
           "failed_history_other": "{{count}} failed changes on the same CIs or services in the last {{lookback_days}} days",
           "emergency": "Emergency change",
           "missing_backout": "The back-out plan is missing",
-          "check_failed": "A check could not run; the score may be too low"
+          "check_failed": "A check could not run; the score may be too low",
+          "overlap_truncated": "Many other changes in the same window; not all could be checked"
         },
         "override": {
           "current": "Overridden to",
@@ -9395,7 +9398,8 @@
           "level": "Risk level",
           "none": "No override (computed level)",
           "reason": "Reason"
-        }
+        },
+        "findingTruncated": "(list cut off, there may be more)"
       },
       "phaseBar": {
         "label": "Phases of this change"
@@ -9489,7 +9493,8 @@
         "open": "Open change",
         "warnings": {
           "ci_refs_truncated": "Not all CIs were linked: the per-change limit is reached.",
-          "generic": "Creating the change produced a notice."
+          "generic": "Creating the change produced a notice.",
+          "portal_visible_failed": "Showing it in the customer portal could not be set. You can switch it on on the change page."
         }
       },
       "errors": {
@@ -9503,7 +9508,7 @@
         "template_invalid": "The template is broken and cannot be used.",
         "queue_required": "Please choose a queue: no default queue is set for changes.",
         "queue_not_found": "The queue does not exist.",
-        "forbidden": "You may not create changes in this queue.",
+        "forbidden": "You lack the permissions for that.",
         "service_not_found": "One of the services no longer exists.",
         "cab_not_found": "The CAB does not exist.",
         "cab_invalid": "The CAB is invalid.",
@@ -9538,7 +9543,9 @@
         "risk_override_reason_too_long": "The reason is too long (at most 1000 characters).",
         "risk_level_invalid": "This risk level does not exist.",
         "risk_question_unknown": "One of the questions no longer exists. Please reload the page.",
-        "risk_answer_unknown": "One of the answers no longer exists. Please reload the page."
+        "risk_answer_unknown": "One of the answers no longer exists. Please reload the page.",
+        "forbidden_create": "You may not create changes in this queue.",
+        "ticket_not_found": "The change does not exist, or you may not see it."
       },
       "transition": {
         "submit": "Go",
@@ -9712,7 +9719,8 @@
         },
         "historyMissing": "Approval history no longer available",
         "none": "No approval requested yet.",
-        "voteHint": "Vote in the approvals section"
+        "voteHint": "Vote in the approvals section",
+        "defaultEmergencyCab": "Emergency CAB from the settings"
       },
       "banners": {
         "ticketClosed": "The ticket was closed ({{state}}), but the change is still in the phase \"{{phase}}\". Please close or cancel the change, or reopen the ticket.",
@@ -9738,6 +9746,65 @@
       "detail": {
         "back": "All changes",
         "openTicket": "Open ticket"
+      },
+      "portal": {
+        "label": "Show in the customer portal's maintenance schedule",
+        "help": "Once the change is scheduled, customers see its title, window and their affected services there, but no plans."
+      },
+      "incident": {
+        "hint": "The change is closed with the outcome \"{{outcome}}\".",
+        "create": "Create incident from this change",
+        "subject": "Incident after change {{tn}}: {{title}}",
+        "afterClose": "After closing you can choose \"Create incident from this change\"; the new ticket is linked to the change."
+      },
+      "events": {
+        "title": "Change history",
+        "empty": "No entries yet.",
+        "more": "Load older entries",
+        "system": "System",
+        "user": "User #{{id}}",
+        "phase": "Phase: {{from}} → {{to}}",
+        "phaseStart": "Phase: {{to}}",
+        "kinds": {
+          "created": "Change created",
+          "adopted": "Made a change",
+          "phase": "Phase changed",
+          "updated": "Edited",
+          "impact": "Impact computed",
+          "approval_requested": "Approval requested",
+          "approval_outcome": "Approval outcome",
+          "conflict_override": "Freeze window passed",
+          "forced": "Step forced",
+          "risk_override": "Risk overridden",
+          "task_added": "Task added",
+          "related_linked": "Ticket linked",
+          "related_unlinked": "Link removed"
+        },
+        "detail": {
+          "reason": "Reason",
+          "fields": "Fields",
+          "status": "Outcome",
+          "round": "Round",
+          "approval_id": "Approval",
+          "approval": "Approval",
+          "cab_id": "CAB",
+          "cab_entries": "CAB entries",
+          "block_conflicts": "Blocking conflicts",
+          "open_tasks": "Open tasks",
+          "from": "From",
+          "to": "To",
+          "via": "Route",
+          "ticket_id": "Ticket",
+          "link_type": "Link type",
+          "task_ticket_id": "Task",
+          "task_kind": "Kind",
+          "change_type": "Type",
+          "template_id": "Template",
+          "template_warnings": "Template notes",
+          "cis": "CIs",
+          "services": "Services",
+          "truncated": "Cut off"
+        }
       }
     }
   },

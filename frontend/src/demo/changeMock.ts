@@ -11,9 +11,9 @@
  * the real backend, the other routes are not answered in Mode A (409 there, 404 here).
  *
  * The resolver sees the path and the query string but no request body, so writes answer a fixed
- * record. The MSW handlers pass the body for creating a change, a phase step and "Als Change
- * führen" (`resolveChangeReply`), which are stateful: the list, the change page and the zoom show
- * the result. All example data uses example.org / .test only.
+ * record. The MSW handlers pass the body for creating a change, a phase step, the portal switch
+ * and "Als Change führen" (`resolveChangeReply`), which are stateful: the list, the change page
+ * (with its event history) and the zoom show the result. All example data uses example.org / .test only.
  */
 import type {
   AdminCab,
@@ -193,7 +193,7 @@ const CHANGES: ChangeRow[] = [
 const NEW_CHANGE = CHANGES[4];
 
 /** The phase facts of the fixtures, so a test can undo the demo's stateful steps. */
-const FIXTURE_STATE = new Map(CHANGES.map((c) => [c.id, { phase: c.phase, outcome: c.outcome, via: c.via, round: c.round, pir: c.pir }]));
+const FIXTURE_STATE = new Map(CHANGES.map((c) => [c.id, { phase: c.phase, outcome: c.outcome, via: c.via, round: c.round, pir: c.pir, portal: c.portal }]));
 
 const PHASE_TARGETS: Record<Change["phase"], Change["phase"][]> = {
   draft: ["submitted", "cancelled"],
@@ -271,7 +271,7 @@ function changeOut(c: ChangeRow): Change {
     effective_risk_level: riskCalc(c).level,
     approval_round: c.round ?? 0,
     approval_via: c.via ?? null,
-    approved_at: c.phase === "approval" || c.phase === "draft" || c.phase === "submitted" || c.phase === "assessment" ? null : T1,
+    approved_at: c.via && APPROVED_PHASES.has(c.phase) ? T1 : null,
     portal_visible: c.portal ?? false,
     process_ticket: false,
     service_ids: c.services,
@@ -606,9 +606,11 @@ function eventsOf(c: ChangeRow, params: URLSearchParams): ChangeEvent[] {
     { id: 1, created_at: T0, created_by: c.owner, event: "created", from_phase: null, to_phase: null, detail: null },
     { id: 2, created_at: T0, created_by: c.owner, event: "phase", from_phase: null, to_phase: "draft", detail: null },
   ];
-  if (c.phase !== "draft") {
-    events.push({ id: 3, created_at: T1, created_by: c.owner, event: "phase", from_phase: "draft", to_phase: c.phase, detail: null });
+  const fixturePhase = FIXTURE_STATE.get(c.id)?.phase ?? c.phase;
+  if (fixturePhase !== "draft") {
+    events.push({ id: 3, created_at: T1, created_by: c.owner, event: "phase", from_phase: "draft", to_phase: fixturePhase, detail: null });
   }
+  events.push(...(SESSION_EVENTS.get(c.id) ?? []));
   const before = Number(params.get("before_id")) || Infinity;
   const limit = Number(params.get("limit")) || 50;
   return events
@@ -631,29 +633,42 @@ const APPROVAL_SNAPSHOT: ChangeApprovalSnapshot = {
   decided_at: null,
 };
 
+/** Phases that come only after an approved CAB round (or a pre-approval). */
+const APPROVED_PHASES: ReadonlySet<Change["phase"]> = new Set(["scheduled", "implementing", "review", "closed"]);
+
+/**
+ * The CAB snapshot as the backend reports it for the change's current round: pending while the
+ * change is in `approval`, rejected in `rejected`, approved once it is scheduled or later, cancelled
+ * when the change went back or was cancelled. Ticket 130's first round is approvalsMock's 501.
+ */
 function approvalOf(c: ChangeRow): ChangeApproval {
-  if (c.id === DEMO_APPROVAL_CHANGE_TICKET_ID) {
-    return { approval_id: 501, approval_round: 1, approval_via: "cab", approved_at: null, history_missing: false, snapshot: APPROVAL_SNAPSHOT };
+  const round = c.round ?? 0;
+  if (c.via !== "cab" || round === 0) {
+    const approvedAt = c.via && APPROVED_PHASES.has(c.phase) ? T1 : null;
+    return { approval_id: null, approval_round: round, approval_via: c.via ?? null, approved_at: approvedAt, history_missing: false, snapshot: null };
   }
-  if (c.via === "cab") {
-    return {
-      approval_id: 500 + c.id,
-      approval_round: 1,
-      approval_via: "cab",
-      approved_at: T1,
-      history_missing: false,
-      snapshot: {
-        ...APPROVAL_SNAPSHOT,
-        approval_id: 500 + c.id,
-        status: "approved",
-        reason: null,
-        current_stage: null,
-        votes_approved: 3,
-        decided_at: T1,
-      },
-    };
-  }
-  return { approval_id: null, approval_round: c.round ?? 0, approval_via: c.via ?? null, approved_at: c.via ? T1 : null, history_missing: false, snapshot: null };
+  const approvalId = (c.id === DEMO_APPROVAL_CHANGE_TICKET_ID ? 501 : 500 + c.id) + (round - 1) * 1000;
+  const status: ChangeApprovalSnapshot["status"] =
+    c.phase === "approval" ? "pending" : c.phase === "rejected" ? "rejected" : APPROVED_PHASES.has(c.phase) ? "approved" : "cancelled";
+  const decided = status !== "pending";
+  return {
+    approval_id: approvalId,
+    approval_round: round,
+    approval_via: "cab",
+    approved_at: status === "approved" ? T1 : null,
+    history_missing: false,
+    snapshot: {
+      ...APPROVAL_SNAPSHOT,
+      approval_id: approvalId,
+      round,
+      status,
+      current_stage: decided ? null : 1,
+      // the approvals demo's round of 130 has one vote in; a fresh demo round none
+      votes_approved: status === "approved" ? 3 : c.id === DEMO_APPROVAL_CHANGE_TICKET_ID && round === 1 ? 1 : 0,
+      votes_rejected: status === "rejected" ? 2 : 0,
+      decided_at: decided ? T1 : null,
+    },
+  };
 }
 
 // ---- tasks of the logged-in agent, calendar, availability ------------------------------------
@@ -1179,10 +1194,23 @@ function listChanges(params: URLSearchParams): ChangePage {
 /** Changes created in this demo session (kept apart from the fixtures so a test can drop them). */
 let createdChanges = 0;
 
+/** Writer of the session events: the demo's own user is id 1, which the backend uses for system writes. */
+const DEMO_AGENT_ID = 2;
+
+/** Events of this demo session's writes (phase steps, edits), after the fixture events. */
+const SESSION_EVENTS = new Map<number, ChangeEvent[]>();
+
+function logEvent(id: number, event: Omit<ChangeEvent, "id" | "created_at" | "created_by">): void {
+  const list = SESSION_EVENTS.get(id) ?? [];
+  list.push({ id: 100 + list.length, created_at: new Date().toISOString(), created_by: DEMO_AGENT_ID, ...event });
+  SESSION_EVENTS.set(id, list);
+}
+
 /** Drops the changes the demo created (tests only). */
 export function resetDemoChanges(): void {
   CHANGES.splice(CHANGES.length - createdChanges, createdChanges);
   createdChanges = 0;
+  SESSION_EVENTS.clear();
   for (const c of CHANGES) Object.assign(c, FIXTURE_STATE.get(c.id));
 }
 
@@ -1232,18 +1260,38 @@ function transitionDemoChange(id: number, body: unknown): ChangeReply {
   const to = data.to;
   if (!to || !demoAllowedTargets(row.type, row.phase).includes(to)) return refused([{ code: "transition_not_allowed", overridable: false }]);
   const failures: Failure[] = [];
-  const open = (TASKS[id] ?? []).filter((t) => !t.finished).length;
-  if (row.phase === "implementing" && open > 0 && !data.force) failures.push({ code: "tasks_open", overridable: true });
-  if (data.force && !data.reason?.trim()) failures.push({ code: "reason_missing", overridable: false });
+  const open = row.phase === "implementing" ? (TASKS[id] ?? []).filter((t) => !t.finished).length : 0;
+  if (open > 0 && !data.force) failures.push({ code: "tasks_open", overridable: true });
   if (to === "closed" && !data.outcome) failures.push({ code: "outcome_missing", overridable: false });
+  if (to === "closed" && row.phase === "review" && row.type !== "standard" && !(data.pir_notes ?? row.pir)?.trim()) {
+    failures.push({ code: "pir_missing", overridable: false });
+  }
+  // like the backend: a reason is needed only when the force actually passes something
+  if (data.force && open > 0 && !data.reason?.trim()) failures.push({ code: "reason_missing", overridable: false });
   if (failures.length > 0) return refused(failures);
   if (to === "approval") {
     row.via = "cab";
     row.round = (row.round ?? 0) + 1;
   }
+  // "Neu planen" drops the approval; the next one is a new round
+  if (row.phase === "scheduled" && to === "draft") row.via = null;
   if (to === "closed") row.outcome = data.outcome ?? null;
   if (data.pir_notes) row.pir = data.pir_notes;
+  const reason = data.reason?.trim();
+  logEvent(id, { event: "phase", from_phase: row.phase, to_phase: to, detail: reason ? { reason } : null });
   row.phase = to;
+  return { status: 200, body: changeOut(row) };
+}
+
+/** `PATCH /itsm/changes/{id}` with its body: the demo keeps the portal flag (the switch on the change page). */
+function patchDemoChange(id: number, body: unknown): ChangeReply {
+  const row = CHANGES.find((c) => c.id === id);
+  if (!row) return { status: 404, body: { detail: { code: "change_not_found" } } };
+  const data = (body ?? {}) as { portal_visible?: boolean };
+  if (typeof data.portal_visible === "boolean" && data.portal_visible !== (row.portal ?? false)) {
+    row.portal = data.portal_visible;
+    logEvent(id, { event: "updated", from_phase: null, to_phase: null, detail: { fields: ["portal_visible"] } });
+  }
   return { status: 200, body: changeOut(row) };
 }
 
@@ -1464,6 +1512,8 @@ export function resolveChangeReply(
     const adopt = path.match(/\/api\/v1\/tickets\/(\d+)\/change$/);
     if (adopt) return adoptDemoChange(Number(adopt[1]), requestBody);
   }
+  const patch = mode === "tiqora" && method === "PATCH" && requestBody !== undefined && path.match(/\/api\/v1\/itsm\/changes\/(\d+)$/);
+  if (patch) return patchDemoChange(Number(patch[1]), requestBody);
   const body = resolveChangeData(path, method, search, mode);
   if (body === undefined) return undefined;
   if (body === null) return { status: 204 };

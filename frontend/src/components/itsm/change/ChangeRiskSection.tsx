@@ -132,12 +132,12 @@ export function ChangeRiskSection({ change }: { change: Change }) {
               </p>
             )}
           </div>
-          <Questionnaire key={`answers-${saved}`} risk={risk} pending={answers.isPending} onSave={(a) => answers.mutate(a)} />
+          {/* remounts with the stored answers whenever the server's change (also after another section's write) */}
+          <Questionnaire key={`answers-${saved}-${JSON.stringify(risk.answers)}`} risk={risk} pending={answers.isPending} onSave={(a) => answers.mutate(a)} />
           <div className="space-y-1">
             <h4 className="text-xs font-medium text-muted">{t("itsm.change.risk.findingsTitle")}</h4>
             <RiskFindingList findings={risk.findings} />
           </div>
-          {/* slot: itsm-beyond ChangeAiRisk (X3) */}
           <RiskOverride key={`override-${saved}`} risk={risk} pending={override.isPending} onSave={(body) => override.mutate(body)} />
         </>
       )}
