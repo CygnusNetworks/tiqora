@@ -170,6 +170,12 @@ describe("CreateChangeDialog", () => {
     });
   });
 
+  it("says so when the templates cannot be loaded", async () => {
+    templates.mockRejectedValue(new ApiError(409, { detail: { code: "change_mode_a" } }, "x"));
+    renderDialog();
+    expect(await screen.findByTestId("change-create-templates-error")).toHaveTextContent("im Modus A nicht verfügbar");
+  });
+
   it("refuses a window that ends before it starts", async () => {
     renderDialog();
     await screen.findByTestId("change-create-form");

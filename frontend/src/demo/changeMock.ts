@@ -78,8 +78,8 @@ const CHANGE_JOB: Job = {
 
 const JOB_ACCEPTED: JobAccepted = { job_id: DEMO_CHANGE_JOB_ID, status: "queued" };
 
-// ---- services (names as in the ITSM demo) ----------------------------------------------------
-const SERVICES: Record<number, string> = { 1: "Kundenportal", 2: "E-Mail", 3: "VPN-Zugang" };
+// ---- services (ids and names as in `reference/services` of mockData.ts: the list and the create dialog read those) ----------------------------------------------------
+const SERVICES: Record<number, string> = { 1: "E-Mail", 2: "VPN", 3: "Arbeitsplatz" };
 
 // ---- changes ---------------------------------------------------------------------------------
 type ChangeRow = {
@@ -672,8 +672,9 @@ function taskListItem(changeId: number, t: ChangeTask): ChangeTaskListItem {
 const ALL_TASKS: ChangeTaskListItem[] = Object.entries(TASKS).flatMap(([cid, ts]) => ts.map((t) => taskListItem(Number(cid), t)));
 
 function overlaps(start: string | null, end: string | null, from: string | null, to: string | null): boolean {
-  if (!start || !end || !from || !to) return true;
-  return start < to && end > from;
+  if (!from && !to) return true;
+  if (!start || !end) return true;
+  return (!to || start < to) && (!from || end > from);
 }
 
 function calendar(params: URLSearchParams): ChangeCalendar {
@@ -1047,7 +1048,7 @@ const LEGACY: LegacyChange[] = [
         workorder_number: 2,
       },
     ],
-    services: [{ service_id: 1, name: "Kundenportal", link_type: "RelevantTo", direction: "source", workorder_number: 2 }],
+    services: [{ service_id: 1, name: "E-Mail", link_type: "RelevantTo", direction: "source", workorder_number: 2 }],
     hidden_links: 0,
     history: [
       { created_at: "2024-03-20T08:00:00Z", history_type: "ChangeAdd", field: null, old: null, new: null, old_display: null, new_display: null, user_login: "mbeispiel", workorder_number: 0 },
@@ -1156,7 +1157,7 @@ function listChanges(params: URLSearchParams): ChangePage {
       (types.length === 0 || types.includes(c.type)) &&
       (service === null || c.services.includes(service)) &&
       (!mine || c.owner === 1) &&
-      (!from || !to || overlaps(c.start, c.end, from, to)),
+      overlaps(c.start, c.end, from, to),
   );
   if (params.get("order") === "planned_start") {
     rows = [...rows].sort((a, b) => (a.start ?? "9999").localeCompare(b.start ?? "9999"));

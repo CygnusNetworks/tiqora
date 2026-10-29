@@ -220,6 +220,11 @@ export function CreateChangeDialog({
               placeholder={t("itsm.change.create.pickTemplate")}
               testId="change-create-template"
             />
+            {templatesQ.isError && (
+              <p className="mt-1 text-xs text-danger" role="alert" data-testid="change-create-templates-error">
+                {t([`itsm.change.errors.${changeErrorCode(templatesQ.error)}`, "itsm.change.errors.generic"])}
+              </p>
+            )}
             {template?.description && <p className="mt-1 text-xs text-muted">{template.description}</p>}
             {type === "standard" && !templatesQ.isLoading && templates.length === 0 && (
               <p className="mt-1 text-xs text-danger" data-testid="change-create-no-standard">
@@ -259,7 +264,7 @@ export function CreateChangeDialog({
               <span className="mb-1 block text-xs font-medium text-muted">{t("itsm.change.create.services")}</span>
               <SelectField
                 items={services.filter((s) => !serviceIds.includes(s.id)).map((s) => ({ value: s.id, label: s.name }))}
-                value={null as unknown as number}
+                value={null}
                 onChange={(id) => setServiceIds((prev) => [...prev, id])}
                 placeholder={t("itsm.change.create.addService")}
                 testId="change-create-service"

@@ -9417,7 +9417,8 @@
           "backout": "Back-out",
           "decision": "Decision",
           "pir": "Post-implementation review"
-        }
+        },
+        "windowInvalid": "The end of the window must not be before its start."
       },
       "create": {
         "title": "Create change",

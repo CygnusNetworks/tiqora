@@ -174,6 +174,43 @@ describe("ChangeListPage", () => {
     expect(screen.getByTestId("change-list-range")).toHaveTextContent("mindestens 5000 Treffer");
   });
 
+  it("does not show the rows of the previous tab while the next one loads", async () => {
+    renderPage();
+    await screen.findByTestId("change-row-130");
+    list.mockImplementation(() => new Promise(() => {}));
+    fireEvent.click(screen.getByRole("tab", { name: "Freigabe" }));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ phase: ["approval"] }));
+    expect(screen.queryByTestId("change-row-130")).toBeNull();
+  });
+
+  it("keeps the rows while paging", async () => {
+    list.mockResolvedValue(page([item(130)], 60));
+    renderPage();
+    await screen.findByTestId("change-row-130");
+    list.mockImplementation(() => new Promise(() => {}));
+    fireEvent.click(screen.getByTestId("change-list-next"));
+    await waitFor(() => expect(lastQuery()).toMatchObject({ offset: 25 }));
+    expect(screen.getByTestId("change-row-130")).toBeInTheDocument();
+  });
+
+  it("warns when the window starts after it ends", async () => {
+    renderPage();
+    await screen.findByTestId("change-row-130");
+    fireEvent.change(screen.getByTestId("change-list-from"), { target: { value: "2026-10-26" } });
+    fireEvent.change(screen.getByTestId("change-list-to"), { target: { value: "2026-10-20" } });
+    expect(await screen.findByTestId("change-list-window-invalid")).toHaveTextContent("nicht vor dem Beginn");
+  });
+
+  it("shows the empty and the error state of my tasks", async () => {
+    myTasks.mockResolvedValueOnce([]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: "Meine Aufgaben" }));
+    expect(await screen.findByTestId("change-tasks-empty")).toHaveTextContent("Keine Aufgaben gefunden.");
+    myTasks.mockRejectedValue(new ApiError(409, { detail: { code: "change_mode_a" } }, "x"));
+    fireEvent.click(screen.getByTestId("change-list-open-only"));
+    expect(await screen.findByTestId("change-list-error")).toHaveAttribute("data-code", "change_mode_a");
+  });
+
   it("pages through the list", async () => {
     list.mockResolvedValue(page([item(130)], 60));
     renderPage();

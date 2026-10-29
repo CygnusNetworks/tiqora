@@ -9417,7 +9417,8 @@
           "backout": "Rückfall",
           "decision": "Entscheidung",
           "pir": "Nachbetrachtung"
-        }
+        },
+        "windowInvalid": "Das Ende des Zeitfensters darf nicht vor dem Beginn liegen."
       },
       "create": {
         "title": "Change anlegen",

@@ -46,6 +46,9 @@ const PHASE_TONE: Record<ChangePhase, "default" | "accent" | "warn" | "danger" |
   cancelled: "muted",
 };
 
+/** Whether two list queries differ at most in the page (`offset`). */
+const sameFilter = (a: ChangeListQuery, b: ChangeListQuery) => JSON.stringify({ ...a, offset: 0 }) === JSON.stringify({ ...b, offset: 0 });
+
 /** `YYYY-MM-DD` of a date input as the UTC start (or last second) of that day. */
 const dayStart = (d: string) => (d ? `${d}T00:00:00Z` : undefined);
 const dayEnd = (d: string) => (d ? `${d}T23:59:59Z` : undefined);
@@ -102,7 +105,8 @@ export function ChangeListPage() {
     queryFn: ({ signal }) => changeApi.list(query, signal),
     enabled: !onTasks,
     retry: false,
-    placeholderData: (prev) => prev,
+    // Keep the old rows only while paging: another tab or filter must not show rows of the previous one.
+    placeholderData: (prev, prevQuery) => (prevQuery && sameFilter(prevQuery.queryKey[3] as ChangeListQuery, query) ? prev : undefined),
   });
   const tasksQ = useQuery({
     queryKey: changeKeys.myTasks(openOnly),
@@ -203,6 +207,12 @@ export function ChangeListPage() {
             <input id="change-list-to" data-testid="change-list-to" type="date" className={FIELD_CLASS} value={to} onChange={(e) => reset(setTo)(e.target.value)} />
           </Filter>
         </div>
+      )}
+
+      {!onTasks && from && to && from > to && (
+        <p className="text-xs text-danger" role="alert" data-testid="change-list-window-invalid">
+          {t("itsm.change.list.windowInvalid")}
+        </p>
       )}
 
       {active.isLoading ? (
