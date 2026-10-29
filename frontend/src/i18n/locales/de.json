@@ -9360,6 +9360,49 @@
           "medium": "Mittel",
           "high": "Hoch",
           "very_high": "Sehr hoch"
+        },
+        "title": "Risikobewertung",
+        "evaluate": "Neu bewerten",
+        "points_one": "{{count}} Punkt",
+        "points_other": "{{count}} Punkte",
+        "computed": "berechnet: {{level}}",
+        "thresholds": "Mittel ab {{medium}}, Hoch ab {{high}}, Sehr hoch ab {{veryHigh}} Punkten",
+        "evaluatedAt": "Bewertet am {{time}} (UTC)",
+        "notEvaluated": "Noch nicht bewertet.",
+        "blocked": "Ein Befund blockiert den Change.",
+        "incomplete": "Die Bewertung ist unvollständig: Eine Prüfung schlug fehl oder die Auswirkung ist abgeschnitten.",
+        "questionnaire": "Fragebogen",
+        "answer_one": "{{label}} ({{count}} Punkt)",
+        "answer_other": "{{label}} ({{count}} Punkte)",
+        "unanswered": "Nicht beantwortet",
+        "questionnaireOpen": "Bitte beantworten Sie alle Fragen.",
+        "saveAnswers": "Antworten speichern",
+        "findingsTitle": "Befunde",
+        "findingsEmpty": "Keine Befunde.",
+        "findings": {
+          "generic": "Befund der Prüfung {{check}}",
+          "service_criticality": "Betroffene Services mit Kritikalität {{criticality}} ({{services}} Services)",
+          "ci_incident": "Betroffene CIs mit Störung: {{incident}}, mit Warnung: {{warning}}",
+          "open_incidents_one": "{{count}} offener Incident auf den betroffenen Services in den letzten {{lookback_days}} Tagen",
+          "open_incidents_other": "{{count}} offene Incidents auf den betroffenen Services in den letzten {{lookback_days}} Tagen",
+          "overlap_one": "{{count}} anderer Change im selben Zeitfenster",
+          "overlap_other": "{{count}} andere Changes im selben Zeitfenster",
+          "freeze_one": "Das Zeitfenster liegt in {{count}} Sperrzeitraum",
+          "freeze_other": "Das Zeitfenster liegt in {{count}} Sperrzeiträumen",
+          "freeze_truncated_one": "Das Zeitfenster liegt in {{count}} oder mehr Sperrzeiträumen (Liste abgeschnitten)",
+          "freeze_truncated_other": "Das Zeitfenster liegt in {{count}} oder mehr Sperrzeiträumen (Liste abgeschnitten)",
+          "failed_history_one": "{{count}} fehlgeschlagener Change an denselben CIs oder Services in den letzten {{lookback_days}} Tagen",
+          "failed_history_other": "{{count}} fehlgeschlagene Changes an denselben CIs oder Services in den letzten {{lookback_days}} Tagen",
+          "emergency": "Notfall-Change",
+          "missing_backout": "Der Rückfallplan fehlt",
+          "check_failed": "Eine Prüfung konnte nicht laufen; die Punktzahl kann zu niedrig sein"
+        },
+        "override": {
+          "current": "Übersteuert auf",
+          "open": "Risiko übersteuern",
+          "level": "Risikostufe",
+          "none": "Keine Übersteuerung (berechnete Stufe)",
+          "reason": "Begründung"
         }
       },
       "phaseBar": {
@@ -9478,10 +9521,231 @@
         "invalid_window": "Das Ende muss nach dem Beginn liegen.",
         "window_invalid": "Das Ende muss nach dem Beginn liegen.",
         "change_priority_not_found": "Die Priorität für Changes gibt es nicht.",
-        "change_state_not_found": "Der Anfangsstatus für Changes fehlt.",
+        "change_state_not_found": "Ein Ticket-Status für Changes fehlt in den Einstellungen.",
         "owner_invalid": "Der Besitzer ist ungültig.",
-        "vetoed": "Ein Plugin hat das Anlegen abgelehnt.",
-        "invalid_input": "Die Eingabe ist ungültig."
+        "vetoed": "Ein Plugin hat die Aktion abgelehnt.",
+        "invalid_input": "Die Eingabe ist ungültig.",
+        "engineCode": "(Code: {{code}})",
+        "change_not_found": "Den Change gibt es nicht, oder Sie dürfen ihn nicht sehen.",
+        "change_final": "Der Change ist abgeschlossen oder abgebrochen und kann nicht mehr geändert werden.",
+        "change_locked_in_approval": "Während der Freigabe sind Art, Zeitfenster, Pläne und CAB gesperrt. Ziehen Sie die Freigabe zurück oder warten Sie die Entscheidung ab.",
+        "change_type_locked": "Die Art des Changes lässt sich nur im Entwurf ändern.",
+        "approval_request_failed": "Die Freigabe konnte nicht angefordert werden.",
+        "cab_customer_members_disabled": "Das CAB enthält Kundenbenutzer, aber Kunden als Freigeber sind ausgeschaltet.",
+        "resolver_not_found": "Eine Freigeber-Regel des CAB gibt es nicht mehr.",
+        "list_not_found": "Eine Freigabegruppe des CAB gibt es nicht mehr.",
+        "not_a_change_ticket": "Das Ticket hat nicht den Ticket-Typ für Changes.",
+        "change_exists": "Das Ticket wird schon als Change geführt.",
+        "process_ticket": "Das Ticket ist ein Prozess-Ticket und kann nicht als Change geführt werden.",
+        "ticket_closed": "Das Ticket ist geschlossen. Öffnen Sie es wieder, um es als Change zu führen.",
+        "task_not_found": "Die Aufgabe gibt es nicht mehr.",
+        "max_tasks_reached": "Der Change hat schon die größte mögliche Zahl an Aufgaben.",
+        "order_invalid": "Die Reihenfolge passt nicht zu den Aufgaben. Bitte laden Sie die Seite neu.",
+        "task_link_failed": "Die Aufgabe konnte nicht mit dem Change verknüpft werden.",
+        "risk_override_reason_required": "Bitte begründen Sie die Änderung der Risikostufe.",
+        "risk_override_reason_too_long": "Die Begründung ist zu lang (höchstens 1000 Zeichen).",
+        "risk_level_invalid": "Diese Risikostufe gibt es nicht.",
+        "risk_question_unknown": "Eine der Fragen gibt es nicht mehr. Bitte laden Sie die Seite neu.",
+        "risk_answer_unknown": "Eine der Antworten gibt es nicht mehr. Bitte laden Sie die Seite neu."
+      },
+      "transition": {
+        "submit": "Ausführen",
+        "reason": "Begründung (optional, erscheint im Verlauf)",
+        "reasonRequired": "Wer einen Schritt erzwingt, muss ihn begründen.",
+        "refused": "Der Schritt ist noch nicht möglich:",
+        "overrideHint": "Als Change-Manager können Sie diese Prüfung übergehen.",
+        "overrideReason": "Begründung für das Übergehen des Sperrzeitraums",
+        "force": "Trotzdem fortfahren (offene Aufgaben bzw. zurückgezogene Freigabe übergehen)",
+        "actions": {
+          "draft": "Zurück in den Entwurf",
+          "submitted": "Einreichen",
+          "assessment": "Bewertung beginnen",
+          "approval": "Freigabe anfordern",
+          "scheduled": "Einplanen",
+          "implementing": "Umsetzung starten",
+          "review": "Zur Nachbetrachtung",
+          "closed": "Abschließen",
+          "rejected": "Ablehnen",
+          "cancelled": "Change abbrechen"
+        },
+        "pairs": {
+          "submitted_draft": "Zurück an Antragsteller",
+          "rejected_draft": "Überarbeiten",
+          "scheduled_draft": "Neu planen",
+          "assessment_scheduled": "Ohne CAB einplanen (geringes Risiko)",
+          "draft_implementing": "Sofort umsetzen (Freigabe nachträglich)"
+        },
+        "hints": {
+          "approval": "Die Freigabe wird beim CAB angefordert; die Mitglieder stimmen im Abschnitt Freigaben ab.",
+          "draft_implementing": "Die Umsetzung beginnt sofort; das CAB gibt den Notfall-Change nachträglich frei.",
+          "assessment_scheduled": "Ein Change mit geringem Risiko wird ohne CAB eingeplant, wenn die Einstellungen das erlauben.",
+          "scheduled_draft": "Der Change geht zurück in den Entwurf; ein normaler oder Notfall-Change braucht danach eine neue Freigabe.",
+          "rejected_draft": "Der Change geht zurück in den Entwurf; die nächste Freigabe ist eine neue Runde.",
+          "cancelled": "Der Change wird abgebrochen; eine laufende Freigabe wird zurückgezogen."
+        },
+        "failures": {
+          "generic": "Eine Prüfung ist fehlgeschlagen ({{code}}).",
+          "window_missing": "Das Zeitfenster fehlt.",
+          "plans_missing": "Umsetzungs- und Rückfallplan fehlen.",
+          "questionnaire_incomplete": "Der Risiko-Fragebogen ist nicht vollständig beantwortet.",
+          "impact_pending": "Die Auswirkung ist nicht aktuell berechnet. Bitte berechnen Sie sie neu.",
+          "block_conflict": "Ein Sperrzeitraum blockiert das Zeitfenster.",
+          "tasks_open": "Es sind noch Aufgaben offen.",
+          "outcome_missing": "Bitte wählen Sie das Ergebnis.",
+          "pir_missing": "Die Nachbetrachtung fehlt.",
+          "approval_pending": "Die Freigabe ist noch nicht entschieden.",
+          "cab_missing": "Es ist kein CAB gewählt, und es ist kein Standard-CAB eingestellt.",
+          "cab_empty": "Das CAB hat keine Mitglieder.",
+          "reason_missing": "Wer einen Schritt erzwingt, muss ihn begründen.",
+          "transition_not_allowed": "Dieser Schritt ist für diesen Change nicht möglich.",
+          "system_only": "Diesen Schritt nimmt nur die Freigabe-Entscheidung des CAB.",
+          "process_ticket": "Das Ticket ist ein Prozess-Ticket; ein Change-Manager kann den Change nur noch abbrechen.",
+          "auto_approval_not_eligible": "Der Change ist nicht für eine Einplanung ohne CAB geeignet (Einstellung aus, Risiko nicht niedrig oder Bewertung unvollständig)."
+        }
+      },
+      "pir": {
+        "closeTitle": "Change abschließen",
+        "reviewTitle": "Zur Nachbetrachtung",
+        "outcome": "Ergebnis",
+        "pickOutcome": "Ergebnis wählen",
+        "outcomes": {
+          "successful": "Erfolgreich",
+          "failed": "Fehlgeschlagen",
+          "backed_out": "Zurückgerollt"
+        },
+        "notes": "Nachbetrachtung (PIR)",
+        "notesRequired": "Bitte schreiben Sie die Nachbetrachtung, bevor Sie den Change abschließen."
+      },
+      "plans": {
+        "title": "Pläne und Zeitfenster",
+        "edit": "Bearbeiten",
+        "empty": "Nicht angegeben",
+        "locked": "Während der Freigabe sind Zeitfenster und Pläne gesperrt.",
+        "start": "Geplanter Beginn (UTC)",
+        "end": "Geplantes Ende (UTC)",
+        "windowHalf": "Bitte geben Sie Beginn und Ende an oder leeren Sie beide.",
+        "window": "Zeitfenster (UTC)",
+        "actual": "Tatsächlich (UTC)",
+        "since": "seit {{time}}",
+        "fields": {
+          "reason": "Begründung",
+          "implementation_plan": "Umsetzungsplan",
+          "backout_plan": "Rückfallplan",
+          "test_plan": "Testplan",
+          "pir_notes": "Nachbetrachtung (PIR)"
+        }
+      },
+      "tasks": {
+        "title": "Change-Aufgaben",
+        "add": "Aufgabe hinzufügen",
+        "addSubmit": "Hinzufügen",
+        "newTitle": "Titel der Aufgabe",
+        "kind": "Typ",
+        "progress": "{{done}} von {{total}} erledigt",
+        "empty": "Der Change hat keine Aufgaben.",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten"
+      },
+      "hiddenCount_one": "{{count}} weitere ohne Leserecht",
+      "hiddenCount_other": "{{count}} weitere ohne Leserecht",
+      "refs": {
+        "ticket": "Ticket #{{id}}",
+        "change": "Change #{{id}}",
+        "task": "Aufgabe #{{id}}",
+        "ci": "CI #{{id}}",
+        "service": "Service #{{id}}",
+        "freeze": "Sperrzeitraum #{{id}}"
+      },
+      "impact": {
+        "title": "Auswirkung",
+        "recompute": "Neu berechnen",
+        "computedAt": "Berechnet am {{time}} (UTC)",
+        "stale": "Die Auswirkung ist nicht mehr aktuell. Bitte berechnen Sie sie neu.",
+        "notComputed": "Die Auswirkung ist noch nicht berechnet.",
+        "truncated": "Die Auswirkung ist abgeschnitten: Es sind mehr CIs betroffen, als berechnet werden.",
+        "services": "Betroffene Services",
+        "cis": "Betroffene CIs",
+        "incidents": "Offene Incidents auf diesen Services",
+        "none": "Keine",
+        "noIncidents": "Keine offenen Incidents.",
+        "incidentsTruncated": "Es gibt weitere offene Incidents.",
+        "direct": "direkt",
+        "indirect": "über die CMDB",
+        "functionality": {
+          "operational": "Betriebsbereit",
+          "warning": "Warnung",
+          "incident": "Störung"
+        }
+      },
+      "conflicts": {
+        "title": "Konflikte",
+        "empty": "Keine Konflikte.",
+        "hidden": "Überschneidung mit einem Change ohne Leserecht",
+        "kinds": {
+          "freeze": "Sperrzeitraum",
+          "change_overlap": "Überschneidung mit",
+          "task_outside": "Außerhalb des Zeitfensters:",
+          "no_window": "Kein Zeitfenster gesetzt",
+          "freeze_truncated": "Zu viele Sperrzeiträume: nicht alle wurden geprüft",
+          "overlap_truncated": "Zu viele Changes im Zeitraum: nicht alle wurden geprüft"
+        },
+        "severity": {
+          "info": "Hinweis",
+          "warn": "Warnung",
+          "block": "Blockiert"
+        },
+        "sharedServices_one": "{{count}} gemeinsamer Service",
+        "sharedServices_other": "{{count}} gemeinsame Services",
+        "sharedCis_one": "{{count}} gemeinsames CI",
+        "sharedCis_other": "{{count}} gemeinsame CIs"
+      },
+      "approval": {
+        "title": "Freigabe (CAB)",
+        "panelTitle": "Abstimmung des CAB",
+        "cab": "CAB",
+        "defaultCab": "Standard-CAB laut Einstellungen",
+        "emergencyCab": "Notfall-CAB",
+        "round": "Runde {{round}}",
+        "votes_one": "{{approved}} von {{count}} Zustimmung",
+        "votes_other": "{{approved}} von {{count}} Zustimmungen",
+        "rejections_one": "{{count}} Ablehnung",
+        "rejections_other": "{{count}} Ablehnungen",
+        "requestedAt": "Angefordert am {{time}} (UTC)",
+        "decidedAt": "entschieden am {{time}} (UTC)",
+        "noApprovers": "Keine gültigen CAB-Mitglieder: Das CAB löst auf niemanden auf. Bitte prüfen Sie die Mitglieder.",
+        "via": {
+          "template": "Vorab genehmigt durch die Standard-Vorlage",
+          "risk": "Ohne CAB eingeplant (geringes Risiko)",
+          "post": "Notfall-Change: Freigabe nachträglich"
+        },
+        "historyMissing": "Freigabeverlauf nicht mehr vorhanden",
+        "none": "Noch keine Freigabe angefordert.",
+        "voteHint": "Abstimmen im Abschnitt Freigaben"
+      },
+      "banners": {
+        "ticketClosed": "Das Ticket wurde geschlossen ({{state}}), der Change steht aber noch in der Phase „{{phase}}“. Bitte schließen Sie den Change ab oder brechen Sie ihn ab, oder öffnen Sie das Ticket wieder.",
+        "drift": "Die Ticket-Felder passen nicht mehr zum Change: {{fields}}. Sie wurden außerhalb von Tiqora geändert; der nächste Schritt schreibt sie neu.",
+        "fields": {
+          "type_field": "Art",
+          "phase_field": "Phase"
+        },
+        "processTicket": "Das Ticket ist inzwischen ein Prozess-Ticket. Ein Change-Manager kann den Change nur noch abbrechen."
+      },
+      "zoom": {
+        "title": "Change",
+        "openPage": "Change-Seite öffnen",
+        "modeA": "Changes werden in Znuny geführt (Modus A). Sie können sie hier nur lesen.",
+        "modeALink": "Changes (Znuny) zu diesem Ticket",
+        "adoptHint": "Das Ticket hat den Ticket-Typ für Changes, wird aber noch nicht als Change geführt.",
+        "adopt": "Als Change führen",
+        "taskTitle": "Change-Aufgabe",
+        "taskOf": "Aufgabe von",
+        "taskParentHidden": "Change ohne Leserecht",
+        "taskStep": "Schritt {{position}}"
+      },
+      "detail": {
+        "back": "Alle Changes",
+        "openTicket": "Ticket öffnen"
       }
     }
   },

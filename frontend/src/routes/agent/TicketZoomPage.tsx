@@ -16,6 +16,7 @@ import { ProblemPanel } from "@/components/itsm/ProblemPanel";
 import { TicketCisPanel } from "@/components/itsm/TicketCisPanel";
 import { PresenceBar } from "@/components/agent/PresenceBar";
 import { TicketApprovalsPanel } from "@/components/approvals/TicketApprovalsPanel";
+import { ChangePanel } from "@/components/itsm/change/ChangePanel";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
 import { AiPanel } from "@/components/agent/AiPanel";
 import { SimilarTicketsChip } from "@/components/agent/SimilarTicketsChip";
@@ -192,6 +193,7 @@ export function TicketZoomPage() {
       <ProblemPanel ticket={ticketQ.data} />
       <MajorIncidentPanel ticket={ticketQ.data} />
       <TicketApprovalsPanel ticketId={ticketId} />
+      <ChangePanel ticket={ticketQ.data} embedApprovals={false} />
       <ProcessWidget
         ticketId={ticketId}
         hideInactiveStart

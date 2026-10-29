@@ -9360,6 +9360,49 @@
           "medium": "Medium",
           "high": "High",
           "very_high": "Very high"
+        },
+        "title": "Risk assessment",
+        "evaluate": "Assess again",
+        "points_one": "{{count}} point",
+        "points_other": "{{count}} points",
+        "computed": "computed: {{level}}",
+        "thresholds": "Medium from {{medium}}, high from {{high}}, very high from {{veryHigh}} points",
+        "evaluatedAt": "Assessed on {{time}} (UTC)",
+        "notEvaluated": "Not assessed yet.",
+        "blocked": "A finding blocks the change.",
+        "incomplete": "The assessment is incomplete: a check failed or the impact is truncated.",
+        "questionnaire": "Questionnaire",
+        "answer_one": "{{label}} ({{count}} point)",
+        "answer_other": "{{label}} ({{count}} points)",
+        "unanswered": "Not answered",
+        "questionnaireOpen": "Please answer all questions.",
+        "saveAnswers": "Save answers",
+        "findingsTitle": "Findings",
+        "findingsEmpty": "No findings.",
+        "findings": {
+          "generic": "Finding of the check {{check}}",
+          "service_criticality": "Affected services with criticality {{criticality}} ({{services}} services)",
+          "ci_incident": "Affected CIs with an incident: {{incident}}, with a warning: {{warning}}",
+          "open_incidents_one": "{{count}} open incident on the affected services in the last {{lookback_days}} days",
+          "open_incidents_other": "{{count}} open incidents on the affected services in the last {{lookback_days}} days",
+          "overlap_one": "{{count}} other change in the same window",
+          "overlap_other": "{{count}} other changes in the same window",
+          "freeze_one": "The window lies in {{count}} freeze window",
+          "freeze_other": "The window lies in {{count}} freeze windows",
+          "freeze_truncated_one": "The window lies in {{count}} or more freeze windows (list cut off)",
+          "freeze_truncated_other": "The window lies in {{count}} or more freeze windows (list cut off)",
+          "failed_history_one": "{{count}} failed change on the same CIs or services in the last {{lookback_days}} days",
+          "failed_history_other": "{{count}} failed changes on the same CIs or services in the last {{lookback_days}} days",
+          "emergency": "Emergency change",
+          "missing_backout": "The back-out plan is missing",
+          "check_failed": "A check could not run; the score may be too low"
+        },
+        "override": {
+          "current": "Overridden to",
+          "open": "Override risk",
+          "level": "Risk level",
+          "none": "No override (computed level)",
+          "reason": "Reason"
         }
       },
       "phaseBar": {
@@ -9478,10 +9521,231 @@
         "invalid_window": "The end must be after the start.",
         "window_invalid": "The end must be after the start.",
         "change_priority_not_found": "The priority for changes does not exist.",
-        "change_state_not_found": "The initial state for changes is missing.",
+        "change_state_not_found": "A ticket state for changes is missing in the settings.",
         "owner_invalid": "The owner is invalid.",
-        "vetoed": "A plugin refused to create the change.",
-        "invalid_input": "The input is invalid."
+        "vetoed": "A plugin refused the action.",
+        "invalid_input": "The input is invalid.",
+        "engineCode": "(code: {{code}})",
+        "change_not_found": "The change does not exist, or you may not see it.",
+        "change_final": "The change is closed or cancelled and can no longer be changed.",
+        "change_locked_in_approval": "While the CAB decides, type, window, plans and CAB are locked. Withdraw the approval or wait for the decision.",
+        "change_type_locked": "The change type can only be changed in the draft.",
+        "approval_request_failed": "The approval could not be requested.",
+        "cab_customer_members_disabled": "The CAB has customer users as members, but customers as approvers are switched off.",
+        "resolver_not_found": "An approver rule of the CAB no longer exists.",
+        "list_not_found": "An approver group of the CAB no longer exists.",
+        "not_a_change_ticket": "The ticket does not have the change ticket type.",
+        "change_exists": "The ticket is already a change.",
+        "process_ticket": "The ticket is a process ticket and cannot become a change.",
+        "ticket_closed": "The ticket is closed. Reopen it to make it a change.",
+        "task_not_found": "The task no longer exists.",
+        "max_tasks_reached": "The change already has the largest possible number of tasks.",
+        "order_invalid": "The order does not match the tasks. Please reload the page.",
+        "task_link_failed": "The task could not be linked to the change.",
+        "risk_override_reason_required": "Please give a reason for changing the risk level.",
+        "risk_override_reason_too_long": "The reason is too long (at most 1000 characters).",
+        "risk_level_invalid": "This risk level does not exist.",
+        "risk_question_unknown": "One of the questions no longer exists. Please reload the page.",
+        "risk_answer_unknown": "One of the answers no longer exists. Please reload the page."
+      },
+      "transition": {
+        "submit": "Go",
+        "reason": "Reason (optional, shown in the history)",
+        "reasonRequired": "Forcing a step needs a reason.",
+        "refused": "The step is not possible yet:",
+        "overrideHint": "As a change manager you can pass this check.",
+        "overrideReason": "Reason for passing the freeze window",
+        "force": "Continue anyway (pass open tasks or a withdrawn approval)",
+        "actions": {
+          "draft": "Back to draft",
+          "submitted": "Submit",
+          "assessment": "Start assessment",
+          "approval": "Request approval",
+          "scheduled": "Schedule",
+          "implementing": "Start implementation",
+          "review": "To review",
+          "closed": "Close",
+          "rejected": "Reject",
+          "cancelled": "Cancel change"
+        },
+        "pairs": {
+          "submitted_draft": "Back to requester",
+          "rejected_draft": "Rework",
+          "scheduled_draft": "Re-plan",
+          "assessment_scheduled": "Schedule without CAB (low risk)",
+          "draft_implementing": "Implement now (approval afterwards)"
+        },
+        "hints": {
+          "approval": "The approval is requested from the CAB; its members vote in the approvals section.",
+          "draft_implementing": "Implementation starts at once; the CAB approves the emergency change afterwards.",
+          "assessment_scheduled": "A low-risk change is scheduled without the CAB when the settings allow it.",
+          "scheduled_draft": "The change goes back to draft; a normal or emergency change then needs a new approval.",
+          "rejected_draft": "The change goes back to draft; the next approval is a new round.",
+          "cancelled": "The change is cancelled; a pending approval is withdrawn."
+        },
+        "failures": {
+          "generic": "A check failed ({{code}}).",
+          "window_missing": "The window is missing.",
+          "plans_missing": "Implementation and back-out plan are missing.",
+          "questionnaire_incomplete": "The risk questionnaire is not fully answered.",
+          "impact_pending": "The impact is not computed for the current state. Please recompute it.",
+          "block_conflict": "A freeze window blocks the change window.",
+          "tasks_open": "Tasks are still open.",
+          "outcome_missing": "Please choose the outcome.",
+          "pir_missing": "The post-implementation review is missing.",
+          "approval_pending": "The approval is not decided yet.",
+          "cab_missing": "No CAB is chosen and no default CAB is set.",
+          "cab_empty": "The CAB has no members.",
+          "reason_missing": "Forcing a step needs a reason.",
+          "transition_not_allowed": "This step is not possible for this change.",
+          "system_only": "Only the CAB's decision takes this step.",
+          "process_ticket": "The ticket is a process ticket; a change manager can only cancel the change.",
+          "auto_approval_not_eligible": "The change cannot be scheduled without the CAB (setting off, risk not low or assessment incomplete)."
+        }
+      },
+      "pir": {
+        "closeTitle": "Close change",
+        "reviewTitle": "To review",
+        "outcome": "Outcome",
+        "pickOutcome": "Choose outcome",
+        "outcomes": {
+          "successful": "Successful",
+          "failed": "Failed",
+          "backed_out": "Backed out"
+        },
+        "notes": "Post-implementation review (PIR)",
+        "notesRequired": "Please write the review before you close the change."
+      },
+      "plans": {
+        "title": "Plans and window",
+        "edit": "Edit",
+        "empty": "Not given",
+        "locked": "While the CAB decides, window and plans are locked.",
+        "start": "Planned start (UTC)",
+        "end": "Planned end (UTC)",
+        "windowHalf": "Please give start and end, or clear both.",
+        "window": "Window (UTC)",
+        "actual": "Actual (UTC)",
+        "since": "since {{time}}",
+        "fields": {
+          "reason": "Reason",
+          "implementation_plan": "Implementation plan",
+          "backout_plan": "Back-out plan",
+          "test_plan": "Test plan",
+          "pir_notes": "Post-implementation review (PIR)"
+        }
+      },
+      "tasks": {
+        "title": "Change tasks",
+        "add": "Add task",
+        "addSubmit": "Add",
+        "newTitle": "Task title",
+        "kind": "Kind",
+        "progress": "{{done}} of {{total}} done",
+        "empty": "The change has no tasks.",
+        "moveUp": "Move up",
+        "moveDown": "Move down"
+      },
+      "hiddenCount_one": "{{count}} more without read access",
+      "hiddenCount_other": "{{count}} more without read access",
+      "refs": {
+        "ticket": "Ticket #{{id}}",
+        "change": "Change #{{id}}",
+        "task": "Task #{{id}}",
+        "ci": "CI #{{id}}",
+        "service": "Service #{{id}}",
+        "freeze": "Freeze window #{{id}}"
+      },
+      "impact": {
+        "title": "Impact",
+        "recompute": "Recompute",
+        "computedAt": "Computed on {{time}} (UTC)",
+        "stale": "The impact is out of date. Please recompute it.",
+        "notComputed": "The impact has not been computed yet.",
+        "truncated": "The impact is cut off: more CIs are affected than are computed.",
+        "services": "Affected services",
+        "cis": "Affected CIs",
+        "incidents": "Open incidents on these services",
+        "none": "None",
+        "noIncidents": "No open incidents.",
+        "incidentsTruncated": "There are more open incidents.",
+        "direct": "direct",
+        "indirect": "through the CMDB",
+        "functionality": {
+          "operational": "Operational",
+          "warning": "Warning",
+          "incident": "Incident"
+        }
+      },
+      "conflicts": {
+        "title": "Conflicts",
+        "empty": "No conflicts.",
+        "hidden": "Overlap with a change you cannot read",
+        "kinds": {
+          "freeze": "Freeze window",
+          "change_overlap": "Overlap with",
+          "task_outside": "Outside the window:",
+          "no_window": "No window set",
+          "freeze_truncated": "Too many freeze windows: not all were checked",
+          "overlap_truncated": "Too many changes in the period: not all were checked"
+        },
+        "severity": {
+          "info": "Note",
+          "warn": "Warning",
+          "block": "Blocks"
+        },
+        "sharedServices_one": "{{count}} shared service",
+        "sharedServices_other": "{{count}} shared services",
+        "sharedCis_one": "{{count}} shared CI",
+        "sharedCis_other": "{{count}} shared CIs"
+      },
+      "approval": {
+        "title": "Approval (CAB)",
+        "panelTitle": "CAB vote",
+        "cab": "CAB",
+        "defaultCab": "Default CAB from the settings",
+        "emergencyCab": "Emergency CAB",
+        "round": "Round {{round}}",
+        "votes_one": "{{approved}} of {{count}} approval",
+        "votes_other": "{{approved}} of {{count}} approvals",
+        "rejections_one": "{{count}} rejection",
+        "rejections_other": "{{count}} rejections",
+        "requestedAt": "Requested on {{time}} (UTC)",
+        "decidedAt": "decided on {{time}} (UTC)",
+        "noApprovers": "No valid CAB members: the CAB resolves to nobody. Please check its members.",
+        "via": {
+          "template": "Pre-approved by the standard template",
+          "risk": "Scheduled without CAB (low risk)",
+          "post": "Emergency change: approval afterwards"
+        },
+        "historyMissing": "Approval history no longer available",
+        "none": "No approval requested yet.",
+        "voteHint": "Vote in the approvals section"
+      },
+      "banners": {
+        "ticketClosed": "The ticket was closed ({{state}}), but the change is still in the phase \"{{phase}}\". Please close or cancel the change, or reopen the ticket.",
+        "drift": "The ticket fields no longer match the change: {{fields}}. They were edited outside Tiqora; the next step writes them again.",
+        "fields": {
+          "type_field": "type",
+          "phase_field": "phase"
+        },
+        "processTicket": "The ticket has become a process ticket. A change manager can only cancel the change."
+      },
+      "zoom": {
+        "title": "Change",
+        "openPage": "Open change page",
+        "modeA": "Changes are managed in Znuny (mode A). You can only read them here.",
+        "modeALink": "Changes (Znuny) of this ticket",
+        "adoptHint": "The ticket has the change ticket type but is not a change record yet.",
+        "adopt": "Make it a change",
+        "taskTitle": "Change task",
+        "taskOf": "Task of",
+        "taskParentHidden": "Change without read access",
+        "taskStep": "Step {{position}}"
+      },
+      "detail": {
+        "back": "All changes",
+        "openTicket": "Open ticket"
       }
     }
   },

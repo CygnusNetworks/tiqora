@@ -28,6 +28,7 @@ import type {
   TicketLinkTarget,
 } from "@/lib/itsmApi";
 import type { Job } from "@/lib/jobsApi";
+import { demoTicketChange } from "./changeMock";
 import { demoItsmMode, type DemoItsmMode } from "./itsmMode";
 
 const T0 = "2026-10-11T08:00:00Z";
@@ -179,7 +180,9 @@ function ticketItsm(id: number, mode: DemoItsmMode): TicketItsm {
       major_banner: { ticket_id: 100, tn: "20260701000", title: "Website nicht erreichbar", summary: MAJOR.summary ?? null, declared_at: T0 },
     };
   }
-  return base;
+  // change and change-task tickets of the change demo (`changeMock.ts`)
+  const change = demoTicketChange(id, mode);
+  return change ? { ...base, ...change } : base;
 }
 
 function graph(id: number): LinkGraph {

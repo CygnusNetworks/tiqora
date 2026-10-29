@@ -11,7 +11,9 @@
  * the real backend, the other routes are not answered in Mode A (409 there, 404 here).
  *
  * The resolver sees the path and the query string but no request body, so writes answer a fixed
- * record. All example data uses example.org / .test only.
+ * record. The MSW handlers pass the body for creating a change, a phase step and "Als Change
+ * führen" (`resolveChangeReply`), which are stateful: the list, the change page and the zoom show
+ * the result. All example data uses example.org / .test only.
  */
 import type {
   AdminCab,
@@ -40,6 +42,7 @@ import type {
   ChangeTask,
   ChangeTaskListItem,
   ChangeTemplateSummary,
+  ChangeTransitionIn,
   FreezeOccurrence,
   JobAccepted,
   LegacyChange,
@@ -47,6 +50,7 @@ import type {
   LegacyChangeSummary,
   ServiceAvailability,
 } from "@/lib/changeApi";
+import type { TicketItsm } from "@/lib/itsmApi";
 import type { Job } from "@/lib/jobsApi";
 import type { PortalChange } from "@/lib/portalChangeApi";
 import { DEMO_APPROVAL_CHANGE_TICKET_ID } from "./approvalsMock";
@@ -97,6 +101,8 @@ type ChangeRow = {
   round?: number;
   reason: string | null;
   portal?: boolean;
+  /** review notes written in this demo session (the fixtures derive theirs from the phase) */
+  pir?: string | null;
 };
 
 const CHANGES: ChangeRow[] = [
@@ -186,6 +192,9 @@ const CHANGES: ChangeRow[] = [
 /** What a create or adopt write answers: a fresh draft. */
 const NEW_CHANGE = CHANGES[4];
 
+/** The phase facts of the fixtures, so a test can undo the demo's stateful steps. */
+const FIXTURE_STATE = new Map(CHANGES.map((c) => [c.id, { phase: c.phase, outcome: c.outcome, via: c.via, round: c.round, pir: c.pir }]));
+
 const PHASE_TARGETS: Record<Change["phase"], Change["phase"][]> = {
   draft: ["submitted", "cancelled"],
   submitted: ["assessment", "draft", "cancelled"],
@@ -254,7 +263,7 @@ function changeOut(c: ChangeRow): Change {
     implementation_plan: c.phase === "draft" ? null : "1. Wartungsmeldung versenden.\n2. Konfiguration sichern.\n3. Änderung einspielen.\n4. Funktion prüfen.",
     backout_plan: c.phase === "draft" ? null : "Gesicherte Konfiguration zurückspielen und die vorherige Version wiederherstellen.",
     test_plan: c.phase === "draft" ? null : "Erreichbarkeit der betroffenen Dienste und Anmeldung prüfen.",
-    pir_notes: finished ? "Der Austausch verlief ohne Unterbrechung." : null,
+    pir_notes: c.pir ?? (finished ? "Der Austausch verlief ohne Unterbrechung." : null),
     risk_level: riskCalc(c).level,
     risk_score: riskCalc(c).score,
     risk_override_level: null,
@@ -419,8 +428,8 @@ function riskCalc(c: ChangeRow): {
       severity: "warn",
       points: 10,
       message_key: "itsm.change.risk.findings.freeze",
-      params: { freezes: 1 },
-      refs: [],
+      params: { count: 1, blocking: 0, truncated: 0 },
+      refs: ["freeze:1"],
       hidden_ref_count: 0,
     });
   }
@@ -1174,6 +1183,7 @@ let createdChanges = 0;
 export function resetDemoChanges(): void {
   CHANGES.splice(CHANGES.length - createdChanges, createdChanges);
   createdChanges = 0;
+  for (const c of CHANGES) Object.assign(c, FIXTURE_STATE.get(c.id));
 }
 
 /**
@@ -1189,7 +1199,7 @@ function createDemoChange(body: unknown): ChangeReply {
   if (data.template_id != null && !template) return fail(422, "template_not_found");
   if (template && template.change_type !== data.change_type) return fail(422, "template_type_mismatch");
   if (data.planned_start && data.planned_end && data.planned_end <= data.planned_start) return fail(422, "invalid_window");
-  const id = Math.max(...CHANGES.map((c) => c.id)) + 1;
+  const id = Math.max(DEMO_UNADOPTED_CHANGE_TICKET_ID, ...CHANGES.map((c) => c.id)) + 1;
   CHANGES.push({
     id,
     title: (data.title ?? "").trim() || "Neuer Change",
@@ -1204,6 +1214,94 @@ function createDemoChange(body: unknown): ChangeReply {
   createdChanges += 1;
   const row = CHANGES[CHANGES.length - 1];
   return { status: 201, body: { change: changeOut(row), tasks_job_id: template && template.tasks.length > 0 ? DEMO_CHANGE_JOB_ID : null, warnings: [] } };
+}
+
+type Failure = { code: string; overridable: boolean };
+const refused = (failures: Failure[]): ChangeReply => ({ status: 409, body: { detail: { code: "transition_refused", failures } } });
+
+/**
+ * `POST /itsm/changes/{id}/transition` with its body: moves the demo change, so the page and the
+ * zoom show the new phase. Refuses like the backend where the demo can show it: open tasks when the
+ * implementation ends (a manager passes them with "Trotzdem fortfahren" and a reason), no outcome
+ * on close.
+ */
+function transitionDemoChange(id: number, body: unknown): ChangeReply {
+  const row = CHANGES.find((c) => c.id === id);
+  if (!row) return { status: 404, body: { detail: { code: "change_not_found" } } };
+  const data = (body ?? {}) as Partial<ChangeTransitionIn>;
+  const to = data.to;
+  if (!to || !demoAllowedTargets(row.type, row.phase).includes(to)) return refused([{ code: "transition_not_allowed", overridable: false }]);
+  const failures: Failure[] = [];
+  const open = (TASKS[id] ?? []).filter((t) => !t.finished).length;
+  if (row.phase === "implementing" && open > 0 && !data.force) failures.push({ code: "tasks_open", overridable: true });
+  if (data.force && !data.reason?.trim()) failures.push({ code: "reason_missing", overridable: false });
+  if (to === "closed" && !data.outcome) failures.push({ code: "outcome_missing", overridable: false });
+  if (failures.length > 0) return refused(failures);
+  if (to === "approval") {
+    row.via = "cab";
+    row.round = (row.round ?? 0) + 1;
+  }
+  if (to === "closed") row.outcome = data.outcome ?? null;
+  if (data.pir_notes) row.pir = data.pir_notes;
+  row.phase = to;
+  return { status: 200, body: changeOut(row) };
+}
+
+/** A ticket of the change ticket type that is no change record yet ("Als Change führen" in the zoom). */
+export const DEMO_UNADOPTED_CHANGE_TICKET_ID = 136;
+const UNADOPTED_TITLE = "Neue Telefonanlage für den Empfang";
+
+/** `POST /tickets/{id}/change` with its body: the unadopted ticket becomes a draft change. */
+function adoptDemoChange(id: number, body: unknown): ChangeReply {
+  if (CHANGES.some((c) => c.id === id)) return { status: 409, body: { detail: { code: "change_exists" } } };
+  if (id !== DEMO_UNADOPTED_CHANGE_TICKET_ID) return { status: 409, body: { detail: { code: "not_a_change_ticket" } } };
+  const data = (body ?? {}) as { change_type?: Change["change_type"] };
+  CHANGES.push({ id, title: UNADOPTED_TITLE, type: data.change_type ?? "normal", phase: "draft", start: null, end: null, services: [], owner: 1, reason: null });
+  createdChanges += 1;
+  return { status: 200, body: changeOut(CHANGES[CHANGES.length - 1]) };
+}
+
+function taskOf(id: number): { changeId: number; task: ChangeTask } | null {
+  for (const [cid, tasks] of Object.entries(TASKS)) {
+    const task = tasks.find((t) => t.ticket_id === id);
+    if (task) return { changeId: Number(cid), task };
+  }
+  return null;
+}
+
+/** Number and title of the demo's change and task tickets, so the zoom of `/agent/tickets/130` shows that ticket. */
+export function demoChangeTicketFields(id: number): { id: number; tn: string; title: string } | null {
+  const c = CHANGES.find((x) => x.id === id);
+  if (c) return { id, tn: tn(id), title: c.title };
+  if (id === DEMO_UNADOPTED_CHANGE_TICKET_ID) return { id, tn: tn(id), title: UNADOPTED_TITLE };
+  const found = taskOf(id);
+  return found ? { id, tn: found.task.tn, title: found.task.title } : null;
+}
+
+/**
+ * The change part of `GET /tickets/{id}/itsm` for the demo's change and task tickets (the ITSM
+ * mock merges it in); `null` for any other ticket. Mode A knows the role only: changes are Znuny's.
+ */
+export function demoTicketChange(id: number, mode: DemoItsmMode): Pick<TicketItsm, "role" | "change" | "change_task"> | null {
+  const c = CHANGES.find((x) => x.id === id);
+  const changeTicket = !!c || id === DEMO_UNADOPTED_CHANGE_TICKET_ID;
+  if (mode !== "tiqora") return changeTicket ? { role: "change", change: null, change_task: null } : null;
+  if (c) {
+    return {
+      role: "change",
+      change: { change_type: c.type, phase: c.phase, risk_level: riskCalc(c).level, planned_start: c.start, planned_end: c.end },
+      change_task: null,
+    };
+  }
+  if (changeTicket) return { role: "change", change: null, change_task: null };
+  const found = taskOf(id);
+  if (!found) return null;
+  const { changeId, task: t } = found;
+  return {
+    role: "change_task",
+    change: null,
+    change_task: { change_ticket_id: changeId, change_tn: tn(changeId), position: t.position, task_kind: t.task_kind, planned_start: t.planned_start, planned_end: t.planned_end },
+  };
 }
 
 function changeRoutes(path: string, method: string, params: URLSearchParams): unknown | undefined {
@@ -1360,6 +1458,12 @@ export function resolveChangeReply(
     return { status: 404, body: { detail: { code: "change_unavailable" } } };
   }
   if (mode === "tiqora" && method === "POST" && path.endsWith("/api/v1/itsm/changes")) return createDemoChange(requestBody);
+  if (mode === "tiqora" && method === "POST" && requestBody !== undefined) {
+    const step = path.match(/\/api\/v1\/itsm\/changes\/(\d+)\/transition$/);
+    if (step) return transitionDemoChange(Number(step[1]), requestBody);
+    const adopt = path.match(/\/api\/v1\/tickets\/(\d+)\/change$/);
+    if (adopt) return adoptDemoChange(Number(adopt[1]), requestBody);
+  }
   const body = resolveChangeData(path, method, search, mode);
   if (body === undefined) return undefined;
   if (body === null) return { status: 204 };

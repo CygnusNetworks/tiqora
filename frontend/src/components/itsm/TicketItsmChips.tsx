@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ItsmDialogs } from "@/components/itsm/ItsmDialogs";
 import { CiStateBadge } from "@/components/itsm/CiStateBadge";
+import { RiskBadge } from "@/components/itsm/change/RiskBadge";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { api, type TicketDetail } from "@/lib/api";
@@ -49,7 +50,7 @@ function FloodWarning({ ticketId, recent, canLink }: { ticketId: number; recent:
 }
 
 /**
- * ITSM row of the ticket-zoom header: role, criticality/impact, the matrix priority when it
+ * ITSM row of the ticket-zoom header: role, a change's phase and risk, criticality/impact, the matrix priority when it
  * differs from the current one, the service's incident state, the incident-flood warning and the
  * two ITSM field dialogs. Renders nothing unless `GET /tickets/{id}/itsm` says `enabled`.
  */
@@ -80,6 +81,14 @@ export function TicketItsmChips({ ticket, allowedActions = null }: { ticket: Tic
         <Badge tone={itsm.role === "major_incident" ? "danger" : "accent"} data-testid="itsm-chip-role">
           {roleLabel}
         </Badge>
+      )}
+      {itsm.role === "change" && itsm.change && (
+        <>
+          <Badge tone="accent" data-testid="itsm-chip-change-phase" data-phase={itsm.change.phase}>
+            {t(`itsm.change.phases.${itsm.change.phase}`, { defaultValue: itsm.change.phase })}
+          </Badge>
+          <RiskBadge level={itsm.change.risk_level} />
+        </>
       )}
       {itsm.criticality && <Badge data-testid="itsm-chip-criticality">{t("itsm.zoom.criticality", { value: itsm.criticality })}</Badge>}
       {itsm.impact && <Badge data-testid="itsm-chip-impact">{t("itsm.zoom.impact", { value: itsm.impact })}</Badge>}

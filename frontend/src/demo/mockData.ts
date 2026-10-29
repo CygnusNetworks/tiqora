@@ -17,7 +17,7 @@ import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
 import { resolveGiData } from "./giMock";
 import { resolveItsmData } from "./itsmMock";
-import { resolveChangeData } from "./changeMock";
+import { demoChangeTicketFields, resolveChangeData } from "./changeMock";
 import { resolveApprovalsData } from "./approvalsMock";
 import { resolveItsmImport } from "./itsmImportMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
@@ -249,7 +249,8 @@ const demoFreeTextFields = [
 ];
 
 function ticketDetailFor(id: number) {
-  const item = ticketById.get(id) ?? ticketItems[0];
+  // the change demo's tickets (130–146) reuse the first ticket's shape under their own number and title
+  const item = ticketById.get(id) ?? { ...ticketItems[0], ...demoChangeTicketFields(id) };
   return {
     ...item, type_id: 1, service_id: null, sla_id: null, responsible_user_id: 2,
     archive_flag: 0, create_by: 10, change_by: 1,

@@ -158,11 +158,14 @@ export const handlers = [
     const change = resolveChangeReply(url.pathname, "GET", url.search);
     return change === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((change.body ?? null) as never, { status: change.status });
   }),
-  // Creating a change is stateful (the new change shows in the list), so the body reaches the mock.
-  http.post("*/api/v1/itsm/changes", async ({ request }) => {
-    const reply = resolveChangeReply(new URL(request.url).pathname, "POST", "", undefined, await request.json().catch(() => ({})));
-    return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
-  }),
+  // Creating a change, a phase step and "Als Change führen" are stateful (the list, the change page
+  // and the zoom show the result), so the body reaches the mock.
+  ...["*/api/v1/itsm/changes", "*/api/v1/itsm/changes/:id/transition", "*/api/v1/tickets/:id/change"].map((route) =>
+    http.post(route, async ({ request }) => {
+      const reply = resolveChangeReply(new URL(request.url).pathname, "POST", "", undefined, await request.json().catch(() => ({})));
+      return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+    }),
+  ),
   // jobs of the CMDB mock (bulk edit, export); any other job id falls through to the generic resolver
   http.get("*/api/v1/jobs/:id", ({ params }) => {
     const job = demoCmdbJob(demoCmdb, Number(params.id));

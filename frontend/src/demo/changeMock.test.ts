@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_APPROVAL_CHANGE_TICKET_ID } from "./approvalsMock";
-import { DEMO_CHANGE_JOB_ID, demoAllowedTargets, resetDemoChanges, resolveChangeData, resolveChangeReply } from "./changeMock";
+import {
+  DEMO_CHANGE_JOB_ID,
+  DEMO_UNADOPTED_CHANGE_TICKET_ID,
+  demoAllowedTargets,
+  demoChangeTicketFields,
+  demoTicketChange,
+  resetDemoChanges,
+  resolveChangeData,
+  resolveChangeReply,
+} from "./changeMock";
 import { DEMO_ITSM_MODE_KEY } from "./itsmMode";
 import { resolveData } from "./mockData";
 import { PHASE_PATH } from "@/lib/changePhases";
@@ -314,5 +323,47 @@ describe("change demo mock fidelity", () => {
     expect(resolveChangeReply("/api/v1/admin/itsm/change/templates/1", "DELETE", "", "tiqora")?.status).toBe(204);
     expect(resolveChangeReply("/api/v1/tickets/7/change", "POST", "", "tiqora")?.status).toBe(200);
     expect(resolveChangeReply("/api/v1/itsm/services/1/recent-incident", "GET", "", "tiqora")).toBeUndefined();
+  });
+});
+
+describe("change demo mock: phase steps, adopting and the ticket zoom", () => {
+  const step = (id: number, body: Record<string, unknown>) => resolveChangeReply(`/api/v1/itsm/changes/${id}/transition`, "POST", "", "tiqora", body);
+
+  it("moves a change, so the detail shows the new phase until the reset", () => {
+    expect(step(133, { to: "approval" })).toMatchObject({ status: 200, body: { phase: "approval" } });
+    expect(get("/api/v1/itsm/changes/133")).toMatchObject({ phase: "approval", approval_round: 1, approval_via: "cab" });
+    resetDemoChanges();
+    expect(get("/api/v1/itsm/changes/133")).toMatchObject({ phase: "assessment", approval_round: 0 });
+  });
+
+  it("refuses like the backend: open tasks, forcing without a reason, closing without an outcome, a step that does not exist", () => {
+    const failures = (reply: ReturnType<typeof step>) => (reply?.body as { detail: { code: string; failures: { code: string; overridable: boolean }[] } }).detail;
+    expect(failures(step(132, { to: "review" }))).toEqual({ code: "transition_refused", failures: [{ code: "tasks_open", overridable: true }] });
+    expect(failures(step(132, { to: "review", force: true })).failures).toEqual([{ code: "reason_missing", overridable: false }]);
+    expect(step(132, { to: "review", force: true, reason: "Aufgabe entfällt" })?.status).toBe(200);
+    expect(failures(step(132, { to: "closed" })).failures).toEqual([{ code: "outcome_missing", overridable: false }]);
+    expect(step(132, { to: "closed", outcome: "successful", pir_notes: "Regel wirkt" })).toMatchObject({ body: { phase: "closed", outcome: "successful", pir_notes: "Regel wirkt" } });
+    expect(failures(step(135, { to: "draft" })).failures).toEqual([{ code: "transition_not_allowed", overridable: false }]);
+  });
+
+  it("adopts the change-type ticket without a record once", () => {
+    const adopt = (id: number) => resolveChangeReply(`/api/v1/tickets/${id}/change`, "POST", "", "tiqora", { change_type: "emergency" });
+    expect(demoTicketChange(DEMO_UNADOPTED_CHANGE_TICKET_ID, "tiqora")).toEqual({ role: "change", change: null, change_task: null });
+    expect(adopt(DEMO_UNADOPTED_CHANGE_TICKET_ID)).toMatchObject({ status: 200, body: { ticket_id: DEMO_UNADOPTED_CHANGE_TICKET_ID, phase: "draft", change_type: "emergency" } });
+    expect(demoTicketChange(DEMO_UNADOPTED_CHANGE_TICKET_ID, "tiqora")?.change).toMatchObject({ phase: "draft", change_type: "emergency" });
+    expect(adopt(DEMO_UNADOPTED_CHANGE_TICKET_ID)?.body).toEqual({ detail: { code: "change_exists" } });
+    expect(adopt(100)?.body).toEqual({ detail: { code: "not_a_change_ticket" } });
+  });
+
+  it("gives the zoom the change facts of change and task tickets", () => {
+    expect(demoTicketChange(DEMO_APPROVAL_CHANGE_TICKET_ID, "tiqora")).toMatchObject({ role: "change", change: { phase: "approval", change_type: "normal" } });
+    expect(demoTicketChange(143, "tiqora")).toMatchObject({ role: "change_task", change_task: { change_ticket_id: DEMO_APPROVAL_CHANGE_TICKET_ID, task_kind: "backout", position: 3 } });
+    // Mode A: the role only, the changes are Znuny's
+    expect(demoTicketChange(DEMO_APPROVAL_CHANGE_TICKET_ID, "znuny_readthrough")).toEqual({ role: "change", change: null, change_task: null });
+    expect(demoTicketChange(100, "tiqora")).toBeNull();
+    expect(resolveData("/api/v1/tickets/130/itsm", "GET")).toMatchObject({ role: "change", change: { phase: "approval" } });
+    expect(demoChangeTicketFields(130)).toEqual({ id: 130, tn: "20261012130", title: "Switch-Firmware im Rechenzentrum aktualisieren" });
+    expect(resolveData("/api/v1/tickets/130", "GET")).toMatchObject({ id: 130, tn: "20261012130" });
+    expect(demoChangeTicketFields(100)).toBeNull();
   });
 });
