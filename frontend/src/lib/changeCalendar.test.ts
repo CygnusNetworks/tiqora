@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_RANGE_DAYS,
   dayFreezeLevel,
-  freezesForService,
   overlapsDay,
   spanDayKeys,
   stepAnchor,
@@ -86,11 +85,5 @@ describe("freeze days", () => {
     expect(dayFreezeLevel(list, "2026-10-28")).toBe("block");
     expect(dayFreezeLevel([list[0]], "2026-10-28")).toBe("warn");
     expect(dayFreezeLevel(list, "2026-10-30")).toBeNull();
-  });
-
-  it("filters by service: global freezes and those naming it", () => {
-    const list = [freeze(), freeze({ freeze_id: 2, scope: "services", service_ids: [2] }), freeze({ freeze_id: 3, scope: "services", service_ids: [3] })];
-    expect(freezesForService(list, null)).toHaveLength(3);
-    expect(freezesForService(list, 2).map((f) => f.freeze_id)).toEqual([1, 2]);
   });
 });

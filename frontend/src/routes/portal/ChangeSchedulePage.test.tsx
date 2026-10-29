@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -85,14 +85,17 @@ describe("PortalChangeSchedulePage", () => {
     expect(await screen.findByTestId("portal-changes-empty")).toBeInTheDocument();
   });
 
-  it("says the schedule is unavailable on 404 and an error text otherwise", async () => {
+  it("says the schedule is unavailable on 404, without the generic error", async () => {
     list.mockRejectedValue(new ApiError(404, "nope", "/x"));
     renderPage();
-    expect(await screen.findByTestId("portal-changes-unavailable")).toBeInTheDocument();
-    cleanup();
+    expect(await screen.findByTestId("portal-changes-unavailable")).toHaveTextContent("Der Wartungskalender ist nicht verfügbar.");
+    expect(screen.queryByTestId("portal-changes-error")).toBeNull();
+  });
+
+  it("shows the load error on other failures, without the unavailable text", async () => {
     list.mockRejectedValue(new ApiError(500, "boom", "/x"));
     renderPage();
-    const err = await screen.findByTestId("portal-changes-error");
-    expect(within(err.parentElement as HTMLElement).queryByTestId("portal-changes-unavailable")).toBeNull();
+    expect(await screen.findByTestId("portal-changes-error")).toHaveTextContent("Der Wartungskalender konnte nicht geladen werden.");
+    expect(screen.queryByTestId("portal-changes-unavailable")).toBeNull();
   });
 });

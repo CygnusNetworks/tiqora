@@ -65,7 +65,6 @@ describe("changeApi paths and queries", () => {
     await changeApi.calendar({ start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z", service_id: [1, 2], include_tasks: true });
     await changeApi.calendarServices("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z");
     await changeApi.templates();
-    await changeApi.freezeWindows("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z");
     await changeApi.cabs();
     await changeApi.meetings("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z");
     await changeApi.meeting(1);
@@ -76,7 +75,6 @@ describe("changeApi paths and queries", () => {
       ["GET", "/api/v1/itsm/change-calendar", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z", service_id: [1, 2], include_tasks: true }],
       ["GET", "/api/v1/itsm/change-calendar/services", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z" }],
       ["GET", "/api/v1/itsm/change-templates", undefined],
-      ["GET", "/api/v1/itsm/freeze-windows", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z" }],
       ["GET", "/api/v1/itsm/cabs", undefined],
       ["GET", "/api/v1/itsm/cab-meetings", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z" }],
       ["GET", "/api/v1/itsm/cab-meetings/1", undefined],

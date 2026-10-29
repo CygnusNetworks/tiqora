@@ -110,7 +110,6 @@ export const changeKeys = {
   calendar: (query: ChangeCalendarQuery) => ["itsm", "changes", "calendar", query] as const,
   calendarServices: (start: string, end: string) => ["itsm", "changes", "calendar-services", start, end] as const,
   templates: () => ["itsm", "changes", "templates"] as const,
-  freezeWindows: (start: string, end: string) => ["itsm", "changes", "freeze-windows", start, end] as const,
   cabs: () => ["itsm", "changes", "cabs"] as const,
   meetings: (start: string, end: string) => ["itsm", "changes", "meetings", "range", start, end] as const,
   meeting: (id: number) => ["itsm", "changes", "meetings", id] as const,
@@ -244,9 +243,6 @@ export const changeApi = {
   },
   templates(signal?: AbortSignal) {
     return api.request<ChangeTemplateSummary[]>("GET", `${BASE}/change-templates`, { signal });
-  },
-  freezeWindows(start: string, end: string, signal?: AbortSignal) {
-    return api.request<FreezeOccurrences>("GET", `${BASE}/freeze-windows`, { query: { start, end }, signal });
   },
   cabs(signal?: AbortSignal) {
     return api.request<Cab[]>("GET", `${BASE}/cabs`, { signal });

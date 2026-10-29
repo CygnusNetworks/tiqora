@@ -68,10 +68,9 @@ export function dayFreezeLevel(freezes: readonly Pick<FreezeOccurrence, "enforce
   return level;
 }
 
-/** Freezes that apply when a service filter is set: global ones and those naming the service. */
-export function freezesForService(freezes: readonly FreezeOccurrence[], serviceId: number | null): FreezeOccurrence[] {
-  return serviceId === null ? [...freezes] : freezes.filter((f) => f.scope === "all" || f.service_ids.includes(serviceId));
-}
+// Freeze windows are never filtered by the service filter: the backend shows them always and marks a
+// conflict from the change's direct and impact services, which the calendar rows do not carry. Hiding
+// freezes by the filtered service alone could leave a conflict mark on an unshaded day.
 
 /** Tailwind classes of a change bar by phase; theme tokens only. */
 export const PHASE_BAR: Record<CalendarChange["phase"], string> = {

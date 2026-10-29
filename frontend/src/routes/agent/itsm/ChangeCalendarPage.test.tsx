@@ -186,7 +186,7 @@ describe("navigation and filter", () => {
     }
   });
 
-  it("sends the service filter and hides freezes of other services", async () => {
+  it("sends the service filter but keeps every freeze shaded, as the backend marks conflicts by all services", async () => {
     calendar.mockResolvedValue(
       cal({
         freezes: [{ freeze_id: 9, name: "Nur VPN", enforcement: "block", allow_emergency: false, scope: "services", service_ids: [2], start: "2026-10-27T00:00:00Z", end: "2026-10-28T00:00:00Z" }],
@@ -197,7 +197,39 @@ describe("navigation and filter", () => {
     fireEvent.click(screen.getByTestId("change-calendar-service"));
     fireEvent.click(await screen.findByTestId("change-calendar-service-menu-option-1"));
     await waitFor(() => expect(calendar.mock.calls.at(-1)?.[0].service_id).toEqual([1]));
-    await waitFor(() => expect(screen.queryByTestId("change-freeze-day-2026-10-27")).toBeNull());
+    expect(screen.getByTestId("change-freeze-day-2026-10-27")).toHaveAttribute("data-enforcement", "block");
+  });
+
+  it("shows the loading state, not the old data, when the view changes", async () => {
+    renderPage();
+    await screen.findByTestId("calendar-occurrence-130");
+    let release: (v: ChangeCalendar) => void = () => {};
+    calendar.mockReturnValueOnce(new Promise<ChangeCalendar>((r) => (release = r)));
+    fireEvent.click(screen.getByRole("tab", { name: "Woche" }));
+    await waitFor(() => expect(calendar).toHaveBeenCalledTimes(2));
+    expect(screen.queryByTestId("change-week-row-130")).toBeNull();
+    expect(screen.queryByTestId("calendar-month-grid")).toBeNull();
+    release(cal());
+    expect(await screen.findByTestId("change-week-row-130")).toBeInTheDocument();
+  });
+
+  it("keeps the old grid while stepping within the same view", async () => {
+    renderPage();
+    await screen.findByTestId("calendar-occurrence-130");
+    calendar.mockReturnValueOnce(new Promise(() => {}));
+    fireEvent.click(screen.getByTestId("change-calendar-next"));
+    await waitFor(() => expect(calendar).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("calendar-month-grid")).toBeInTheDocument();
+  });
+
+  it("opens the week list of a day from '+n more' and from the day cell", async () => {
+    const many = [1, 2, 3, 4, 5].map((n) => change(140 + n, { title: `Viele ${n}` }));
+    calendar.mockResolvedValue(cal({ changes: many }));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("calendar-more-2026-10-30"));
+    expect(await screen.findByTestId("change-week-day-2026-10-30")).toBeInTheDocument();
+    expect(calendar.mock.calls.at(-1)?.[0]).toMatchObject({ start: "2026-10-26T00:00:00Z", end: "2026-11-02T00:00:00Z" });
+    expect(within(screen.getByTestId("change-week-day-2026-10-30")).getAllByTestId(/^change-week-row-/)).toHaveLength(5);
   });
 });
 

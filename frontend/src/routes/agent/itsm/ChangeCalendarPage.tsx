@@ -19,7 +19,6 @@ import {
   CALENDAR_ZONE,
   PHASE_BAR,
   dayFreezeLevel,
-  freezesForService,
   spanDayKeys,
   stepAnchor,
   viewRange,
@@ -76,10 +75,11 @@ export function ChangeCalendarPage() {
 
   const calQuery = { start, end, service_id: serviceFilter === null ? undefined : [serviceFilter], include_tasks: false };
   const calQ = useQuery({
-    queryKey: changeKeys.calendar(calQuery),
+    queryKey: [...changeKeys.calendar(calQuery), view],
     queryFn: ({ signal }) => changeApi.calendar(calQuery, signal),
     enabled: view !== "service",
-    placeholderData: keepPreviousData,
+    // Stepping keeps the old grid until the new one arrives; a view switch shows the loading state.
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey.at(-1) === view ? previous : undefined),
     retry: false,
   });
   const svcQ = useQuery({
@@ -93,13 +93,19 @@ export function ChangeCalendarPage() {
   const active = view === "service" ? svcQ : calQ;
   const errorCode = active.isError ? changeErrorCode(active.error) : null;
   const changes = useMemo(() => calQ.data?.changes ?? [], [calQ.data]);
-  const freezes = useMemo(() => freezesForService(calQ.data?.freezes ?? [], serviceFilter), [calQ.data, serviceFilter]);
+  const freezes = useMemo(() => calQ.data?.freezes ?? [], [calQ.data]);
   const occurrences = useMemo(() => changeOccurrences(changes), [changes]);
   const byId = useMemo(() => new Map(changes.map((c) => [c.ticket_id, c])), [changes]);
   const tableServices = useMemo(
     () => (svcQ.data ?? []).filter((s) => serviceFilter === null || s.service_id === serviceFilter),
     [svcQ.data, serviceFilter],
   );
+
+  /** A day of the month grid opens as the week list around it. */
+  const openDay = (day: Date) => {
+    setAnchor(day);
+    setView("week");
+  };
 
   const label =
     view === "month"
@@ -181,6 +187,8 @@ export function ChangeCalendarPage() {
             anchor={anchor}
             zone={CALENDAR_ZONE}
             occurrences={occurrences}
+            onSelectDay={openDay}
+            onSelectMore={openDay}
             onSelectOccurrence={(occ) => void navigate({ to: changeDetailHref(occ.appointment_id) })}
             dayClassName={(key) => {
               const level = dayFreezeLevel(freezes, key);

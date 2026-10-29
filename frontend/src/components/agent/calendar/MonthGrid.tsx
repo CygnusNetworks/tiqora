@@ -21,6 +21,7 @@ export function MonthGrid({
   calendarColors,
   onSelectDay,
   onSelectOccurrence,
+  onSelectMore,
   zone = displayTimeZone(),
   dayClassName,
   dayAdornment,
@@ -32,6 +33,8 @@ export function MonthGrid({
   calendarColors?: Record<number, string>;
   onSelectDay?: (day: Date) => void;
   onSelectOccurrence?: (occ: OccurrenceOut) => void;
+  /** The "+n more" line of a day; without it the line is plain text. */
+  onSelectMore?: (day: Date) => void;
   /** Zone whose days the grid shows (default: the display zone). */
   zone?: string;
   /** Extra classes of a day cell by its `YYYY-MM-DD` key (e.g. shading). */
@@ -109,7 +112,19 @@ export function MonthGrid({
                   );
                 })}
                 {dayOccurrences.length > 3 && (
-                  <span className="text-[10px] text-muted">
+                  <span
+                    data-testid={`calendar-more-${key}`}
+                    role={onSelectMore ? "link" : undefined}
+                    onClick={
+                      onSelectMore
+                        ? (e) => {
+                            e.stopPropagation();
+                            onSelectMore(day);
+                          }
+                        : undefined
+                    }
+                    className={cn("text-[10px] text-muted", onSelectMore && "cursor-pointer underline hover:text-ink")}
+                  >
                     {t("calendar.more", { count: dayOccurrences.length - 3 })}
                   </span>
                 )}
