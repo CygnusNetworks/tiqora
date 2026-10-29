@@ -69,7 +69,7 @@ export type ChangeListQuery = {
   ci_id?: number;
   window_start?: string;
   window_end?: string;
-  mine?: boolean;
+  mine?: "owned" | "created";
   order?: ChangeOrder;
   limit?: number;
   offset?: number;

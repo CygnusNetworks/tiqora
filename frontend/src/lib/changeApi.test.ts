@@ -19,7 +19,7 @@ describe("changeApi paths and queries", () => {
   it("builds the change routes", async () => {
     const spy = vi.spyOn(api, "request").mockResolvedValue({} as never);
     await changeApi.status();
-    await changeApi.list({ q: "switch", phase: ["approval", "scheduled"], change_type: ["normal"], service_id: 3, mine: true, order: "planned_start", limit: 25, offset: 50 });
+    await changeApi.list({ q: "switch", phase: ["approval", "scheduled"], change_type: ["normal"], service_id: 3, mine: "owned", order: "planned_start", limit: 25, offset: 50 });
     await changeApi.get(130);
     await changeApi.events(130, { limit: 20, before_id: 9 });
     await changeApi.impact(130);
@@ -41,7 +41,7 @@ describe("changeApi paths and queries", () => {
           ci_id: undefined,
           window_start: undefined,
           window_end: undefined,
-          mine: true,
+          mine: "owned",
           order: "planned_start",
           limit: 25,
           offset: 50,

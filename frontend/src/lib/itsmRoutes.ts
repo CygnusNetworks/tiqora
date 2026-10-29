@@ -11,3 +11,8 @@ export type CiSource = "znuny" | "tiqora";
 export function ciDetailHref(source: CiSource, id: number): string {
   return source === "tiqora" ? `/agent/cmdb/${id}` : `/agent/itsm/cis/znuny/${id}`;
 }
+
+/** Detail page of a change (Mode B); the id is the change's ticket id. */
+export function changeDetailHref(ticketId: number): string {
+  return `/agent/itsm/changes/${ticketId}`;
+}

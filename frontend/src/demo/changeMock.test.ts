@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_APPROVAL_CHANGE_TICKET_ID } from "./approvalsMock";
-import { DEMO_CHANGE_JOB_ID, demoAllowedTargets, resolveChangeData, resolveChangeReply } from "./changeMock";
+import { DEMO_CHANGE_JOB_ID, demoAllowedTargets, resetDemoChanges, resolveChangeData, resolveChangeReply } from "./changeMock";
 import { DEMO_ITSM_MODE_KEY } from "./itsmMode";
 import { resolveData } from "./mockData";
 import { PHASE_PATH } from "@/lib/changePhases";
@@ -22,7 +22,10 @@ import type {
 } from "@/lib/changeApi";
 import type { PortalChange } from "@/lib/portalChangeApi";
 
-afterEach(() => localStorage.removeItem(DEMO_ITSM_MODE_KEY));
+afterEach(() => {
+  localStorage.removeItem(DEMO_ITSM_MODE_KEY);
+  resetDemoChanges();
+});
 
 const get = (path: string, search = "") => resolveChangeData(path, "GET", search, "tiqora");
 
@@ -179,6 +182,44 @@ describe("change demo mock (Mode B)", () => {
     expect(resolveChangeData("/api/v1/itsm/changes/130/impact/recompute", "POST", "", "tiqora")).toEqual({ job_id: DEMO_CHANGE_JOB_ID, status: "queued" });
     expect(resolveChangeData(`/api/v1/jobs/${DEMO_CHANGE_JOB_ID}`, "GET", "", "tiqora")).toMatchObject({ status: "succeeded" });
     expect(resolveChangeData("/api/v1/admin/itsm/change/templates/1", "DELETE", "", "tiqora")).toBeNull();
+  });
+});
+
+describe("change demo mock: creating a change", () => {
+  const create = (body: Record<string, unknown>) => resolveChangeReply("/api/v1/itsm/changes", "POST", "", "tiqora", body);
+
+  it("adds the change, so the list and the detail show it", () => {
+    const before = (get("/api/v1/itsm/changes") as ChangePage).total;
+    const out = create({ change_type: "normal", title: "Router tauschen", service_id: 2, service_ids: [3], planned_start: "2026-11-01T08:00:00Z", planned_end: "2026-11-01T09:00:00Z" });
+    expect(out?.status).toBe(201);
+    const { change } = out?.body as { change: Change; tasks_job_id: number | null };
+    expect(change).toMatchObject({ title: "Router tauschen", phase: "draft", change_type: "normal" });
+    const page = get("/api/v1/itsm/changes", "?q=router") as ChangePage;
+    expect(page.items.map((i) => i.ticket_id)).toEqual([change.ticket_id]);
+    expect(page.items[0].service_ids).toEqual([2, 3]);
+    expect((get("/api/v1/itsm/changes") as ChangePage).total).toBe(before + 1);
+    expect(get(`/api/v1/itsm/changes/${change.ticket_id}`)).toMatchObject({ title: "Router tauschen" });
+    resetDemoChanges();
+    expect((get("/api/v1/itsm/changes") as ChangePage).total).toBe(before);
+  });
+
+  it("answers the job only for a template with tasks", () => {
+    expect((create({ change_type: "normal", title: "A", template_id: 2 })?.body as { tasks_job_id: number | null }).tasks_job_id).toBe(DEMO_CHANGE_JOB_ID);
+    expect((create({ change_type: "normal", title: "B" })?.body as { tasks_job_id: number | null }).tasks_job_id).toBeNull();
+  });
+
+  it.each([
+    [{ change_type: "standard", title: "A" }, "standard_needs_template"],
+    [{ change_type: "normal", title: "A", template_id: 999 }, "template_not_found"],
+    [{ change_type: "emergency", title: "A", template_id: 2 }, "template_type_mismatch"],
+    [{ change_type: "normal", title: "A", planned_start: "2026-11-01T09:00:00Z", planned_end: "2026-11-01T08:00:00Z" }, "invalid_window"],
+  ])("refuses %j with %s", (body, code) => {
+    expect(create(body)).toEqual({ status: 422, body: { detail: { code } } });
+    expect((get("/api/v1/itsm/changes") as ChangePage).items.some((i) => i.title === "A")).toBe(false);
+  });
+
+  it("answers 409 change_mode_a in Mode A before it creates anything", () => {
+    expect(resolveChangeReply("/api/v1/itsm/changes", "POST", "", "znuny_readthrough", { change_type: "normal", title: "A" })).toEqual({ status: 409, body: { detail: { code: "change_mode_a" } } });
   });
 });
 

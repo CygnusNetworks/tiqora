@@ -25,6 +25,7 @@ import type {
   CalendarChange,
   CabMeeting,
   Change,
+  ChangeCreateIn,
   ChangeApproval,
   ChangeApprovalSnapshot,
   ChangeCalendar,
@@ -1145,7 +1146,7 @@ function listChanges(params: URLSearchParams): ChangePage {
   const phases = params.getAll("phase");
   const types = params.getAll("change_type");
   const service = Number(params.get("service_id")) || null;
-  const mine = params.get("mine") === "true";
+  const mine = params.get("mine") !== null && params.get("mine") !== "";
   const from = params.get("window_start");
   const to = params.get("window_end");
   let rows = CHANGES.filter(
@@ -1163,6 +1164,45 @@ function listChanges(params: URLSearchParams): ChangePage {
   const offset = Number(params.get("offset")) || 0;
   const limit = Number(params.get("limit")) || 25;
   return { items: rows.slice(offset, offset + limit).map(listItem), total: rows.length, truncated: false };
+}
+
+/** Changes created in this demo session (kept apart from the fixtures so a test can drop them). */
+let createdChanges = 0;
+
+/** Drops the changes the demo created (tests only). */
+export function resetDemoChanges(): void {
+  CHANGES.splice(CHANGES.length - createdChanges, createdChanges);
+  createdChanges = 0;
+}
+
+/**
+ * `POST /itsm/changes`: a stateful create, so the new change shows in the list and its detail page
+ * opens. Refuses like the backend where a form can get it wrong: a standard change needs a standard
+ * template, a template must match the type, the window must not end before it starts.
+ */
+function createDemoChange(body: unknown): ChangeReply {
+  const data = (body ?? {}) as Partial<ChangeCreateIn>;
+  const template = TEMPLATES.find((t) => t.id === data.template_id && t.valid);
+  const fail = (status: number, code: string): ChangeReply => ({ status, body: { detail: { code } } });
+  if (data.change_type === "standard" && !template?.is_standard) return fail(422, "standard_needs_template");
+  if (data.template_id != null && !template) return fail(422, "template_not_found");
+  if (template && template.change_type !== data.change_type) return fail(422, "template_type_mismatch");
+  if (data.planned_start && data.planned_end && data.planned_end <= data.planned_start) return fail(422, "invalid_window");
+  const id = Math.max(...CHANGES.map((c) => c.id)) + 1;
+  CHANGES.push({
+    id,
+    title: (data.title ?? "").trim() || "Neuer Change",
+    type: data.change_type ?? "normal",
+    phase: "draft",
+    start: data.planned_start ?? null,
+    end: data.planned_end ?? null,
+    services: [...new Set([...(data.service_id != null ? [data.service_id] : []), ...(data.service_ids ?? [])])],
+    owner: 1,
+    reason: data.reason ?? null,
+  });
+  createdChanges += 1;
+  const row = CHANGES[CHANGES.length - 1];
+  return { status: 201, body: { change: changeOut(row), tasks_job_id: template && template.tasks.length > 0 ? DEMO_CHANGE_JOB_ID : null, warnings: [] } };
 }
 
 function changeRoutes(path: string, method: string, params: URLSearchParams): unknown | undefined {
@@ -1308,6 +1348,7 @@ export function resolveChangeReply(
   method: string,
   search = "",
   mode: DemoItsmMode = demoItsmMode(),
+  requestBody?: unknown,
 ): ChangeReply | undefined {
   if (mode !== "tiqora" && MODE_B_ONLY.test(path)) {
     return mode === "off"
@@ -1317,6 +1358,7 @@ export function resolveChangeReply(
   if (mode === "off" && path.includes("/api/v1/itsm/legacy-changes")) {
     return { status: 404, body: { detail: { code: "change_unavailable" } } };
   }
+  if (mode === "tiqora" && method === "POST" && path.endsWith("/api/v1/itsm/changes")) return createDemoChange(requestBody);
   const body = resolveChangeData(path, method, search, mode);
   if (body === undefined) return undefined;
   if (body === null) return { status: 204 };
