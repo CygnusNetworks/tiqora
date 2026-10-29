@@ -109,6 +109,17 @@ describe("ItsmPage", () => {
     expect(screen.getByTestId("admin-itsm-settings").getAttribute("href")).toBe("/admin/settings/itsm");
   });
 
+  it("links change management in Mode B only", async () => {
+    const first = renderPage();
+    await screen.findByTestId("itsm-mode-current");
+    expect(screen.queryByTestId("itsm-change-card")).toBeNull();
+    first.unmount();
+    current = admin({ mode: "tiqora", allowed_transitions: ["off"] });
+    renderPage();
+    expect(await screen.findByTestId("itsm-change-card")).toHaveTextContent(i18n.t("admin.itsm.changeCard.title"));
+    expect(screen.getByTestId("itsm-change-link").getAttribute("href")).toBe("/admin/itsm/change");
+  });
+
   it("states how the mode was set for admin and importer", async () => {
     current = admin({ source: "importer", mode: "tiqora", allowed_transitions: ["off"] });
     renderPage();

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_APPROVAL_CHANGE_TICKET_ID } from "./approvalsMock";
 import {
+  DEMO_ARCHIVE_DRY_JOB_ID,
+  DEMO_ARCHIVE_JOB_ID,
   DEMO_CHANGE_JOB_ID,
   DEMO_UNADOPTED_CHANGE_TICKET_ID,
   demoAllowedTargets,
@@ -29,6 +31,8 @@ import type {
   LegacyChangePage,
   ServiceAvailability,
 } from "@/lib/changeApi";
+import type { FreezeWindow } from "@/lib/changeAdminApi";
+import type { Job } from "@/lib/jobsApi";
 import type { PortalChange } from "@/lib/portalChangeApi";
 
 afterEach(() => {
@@ -314,6 +318,24 @@ describe("change demo mock fidelity", () => {
 
   it("counts the archive like the legacy list", () => {
     expect(get("/api/v1/admin/itsm/change/legacy-archive")).toMatchObject({ archived: 2 });
+  });
+
+  it("answers the archive start with a finished dry-run or real job and its counts", () => {
+    const start = (body: unknown) => resolveChangeReply("/api/v1/admin/itsm/change/legacy-archive", "POST", "", "tiqora", body);
+    const dry = start({ dry_run: true });
+    const real = start({ dry_run: false });
+    expect(dry).toEqual({ status: 202, body: { job_id: DEMO_ARCHIVE_DRY_JOB_ID, status: "queued" } });
+    expect(real?.body).toEqual({ job_id: DEMO_ARCHIVE_JOB_ID, status: "queued" });
+    const job = (id: number) => get(`/api/v1/jobs/${id}`) as Job;
+    expect(job(DEMO_ARCHIVE_DRY_JOB_ID)).toMatchObject({ kind: "core.itsm_legacy_change_archive", status: "succeeded", result: { dry_run: true } });
+    expect(job(DEMO_ARCHIVE_JOB_ID).result).toMatchObject({ dry_run: false, created: 1, updated: 1, unchanged: 1, skipped: 0 });
+  });
+
+  it("answers the admin writes in the backend's shapes", () => {
+    const examples = resolveChangeReply("/api/v1/admin/itsm/change/risk-questions/examples", "POST", "", "tiqora");
+    expect((examples?.body as { created: unknown[] }).created.every((k) => typeof k === "string")).toBe(true);
+    const windows = get("/api/v1/admin/itsm/change/freeze-windows") as FreezeWindow[];
+    for (const w of windows) if (w.recurrence) expect(["Daily", "Weekly", "Monthly", "Yearly"]).toContain(w.recurrence.type);
   });
 
   it("answers the backend's error codes in Mode A and off", () => {

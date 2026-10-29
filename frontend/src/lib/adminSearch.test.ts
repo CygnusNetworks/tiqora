@@ -74,4 +74,19 @@ describe("ADMIN_PAGES", () => {
     expect(slugs("Freigabevorlagen")).toContain("approval-templates");
     expect(t("admin.nav.approvals")).toBe("Freigaben");
   });
+
+  it("lists change management and its settings section and finds them by change words", async () => {
+    await i18n.changeLanguage("de");
+    const t = (key: string) => i18n.t(key);
+    const routes = Object.fromEntries(ADMIN_PAGES.map((p) => [p.slug, p.route]));
+    expect(routes["itsm-change"]).toBe("/admin/itsm/change");
+    expect(routes["settings-itsm-change"]).toBe("/admin/settings/itsm_change");
+    const slugs = (q: string) => rankAdminPages(ADMIN_PAGES, q, t).map((p) => p.slug);
+    for (const query of ["CAB", "Sperrzeitraum", "RFC", "Change-Management"]) {
+      expect(slugs(query), query).toContain("itsm-change");
+    }
+    expect(slugs("Change-Manager")).toContain("settings-itsm-change");
+    expect(t("admin.nav.itsmChange")).toBe("Change-Management");
+    expect(t("admin.settings.itsmChange.title")).toBe("ITSM-Changes");
+  });
 });

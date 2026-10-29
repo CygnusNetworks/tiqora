@@ -1,6 +1,8 @@
 import type { Page, Route } from "@playwright/test";
 import { mockApi, loginAsAgent } from "./mock-api";
 import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
+import { resolveChangeReply } from "../../src/demo/changeMock";
+import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import type { AdminProcess, DeployStatus } from "../../src/lib/deployStatusApi";
 
 async function json(route: Route, status: number, body: unknown) {
@@ -437,6 +439,19 @@ export async function mockAdminApi(page: Page) {
       }
       if (method === "DELETE") {
         await route.fulfill({ status: 204 });
+        return;
+      }
+    }
+
+    // Change management admin (/admin/itsm/change: templates, CAB, risk questions, freeze windows,
+    // archive): the demo change mock in the ITSM mode the test stored (default Mode B), writes with their body.
+    if (path.includes("/api/v1/admin/itsm/change/")) {
+      const stored = await page.evaluate((key) => localStorage.getItem(key), DEMO_ITSM_MODE_KEY).catch(() => null);
+      const mode: DemoItsmMode = stored === "off" || stored === "znuny_readthrough" ? stored : "tiqora";
+      const out = resolveChangeReply(path, method, url.search, mode, bodyOf(req));
+      if (out) {
+        if (out.status === 204) await route.fulfill({ status: 204, body: "" });
+        else await json(route, out.status, out.body ?? null);
         return;
       }
     }

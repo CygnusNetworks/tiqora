@@ -128,6 +128,9 @@ import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { WebservicesPage } from "@/routes/admin/WebservicesPage";
 import { ItsmPage } from "@/routes/admin/ItsmPage";
+import { ChangeAdminPage } from "@/routes/admin/itsm/ChangeAdminPage";
+import { parseChangeAdminTab, type ChangeAdminTab } from "@/routes/admin/itsm/changeAdminTabs";
+import { ChangeTemplateEditorPage } from "@/routes/admin/itsm/ChangeTemplateEditorPage";
 import { ApprovalsOverviewPage } from "@/routes/admin/approvals/ApprovalsOverviewPage";
 import { ApprovalTemplatesPage } from "@/routes/admin/approvals/ApprovalTemplatesPage";
 import { ApprovalListsPage } from "@/routes/admin/approvals/ApprovalListsPage";
@@ -1172,6 +1175,23 @@ const adminItsmRoute = createRoute({
   component: ItsmPage,
 });
 
+const adminChangeRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm/change",
+  // The router JSON-parses search values: the page falls back to the first tab for anything unknown.
+  validateSearch: (s: Record<string, unknown>): { tab?: ChangeAdminTab } => {
+    const tab = parseChangeAdminTab(s.tab);
+    return { tab: tab === "templates" ? undefined : tab };
+  },
+  component: ChangeAdminPage,
+});
+
+const adminChangeTemplateRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm/change/templates/$templateId",
+  component: ChangeTemplateEditorPage,
+});
+
 const adminItsmLinkTypesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/itsm/link-types",
@@ -1666,6 +1686,8 @@ const routeTree = rootRoute.addChildren([
     adminWebhooksRoute,
     adminWebservicesRoute,
     adminItsmRoute,
+    adminChangeRoute,
+    adminChangeTemplateRoute,
     adminItsmLinkTypesRoute,
     adminItsmImportRoute,
     adminApprovalsRoute,

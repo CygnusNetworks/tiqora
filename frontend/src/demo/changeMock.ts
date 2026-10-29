@@ -13,7 +13,9 @@
  * The resolver sees the path and the query string but no request body, so writes answer a fixed
  * record. The MSW handlers pass the body for creating a change, a phase step, the portal switch
  * and "Als Change führen" (`resolveChangeReply`), which are stateful: the list, the change page
- * (with its event history) and the zoom show the result. All example data uses example.org / .test only.
+ * (with its event history) and the zoom show the result. The archive start on the admin page reads
+ * `dry_run` from its body and answers the matching finished job. All example data uses example.org /
+ * .test only.
  */
 import type {
   AdminCab,
@@ -81,6 +83,20 @@ const CHANGE_JOB: Job = {
 };
 
 const JOB_ACCEPTED: JobAccepted = { job_id: DEMO_CHANGE_JOB_ID, status: "queued" };
+
+/** The Znuny change archive job of the admin page (`dry_run` false / true): done at once with its counts. */
+export const DEMO_ARCHIVE_JOB_ID = 9462;
+export const DEMO_ARCHIVE_DRY_JOB_ID = 9463;
+
+const archiveJob = (dryRun: boolean): Job => ({
+  ...CHANGE_JOB,
+  id: dryRun ? DEMO_ARCHIVE_DRY_JOB_ID : DEMO_ARCHIVE_JOB_ID,
+  kind: "core.itsm_legacy_change_archive",
+  title_key: "jobs.kinds.core.itsm_legacy_change_archive",
+  progress_done: 3,
+  progress_total: 3,
+  result: { dry_run: dryRun, created: 1, updated: 1, unchanged: 1, skipped: 0, not_archived: { templates: 2, conditions: 1 } },
+});
 
 // ---- services (ids and names as in `reference/services` of mockData.ts: the list and the create dialog read those) ----------------------------------------------------
 const SERVICES: Record<number, string> = { 1: "E-Mail", 2: "VPN", 3: "Arbeitsplatz" };
@@ -955,7 +971,7 @@ const FREEZE_WINDOWS: FreezeWindow[] = [
     scope: "services",
     service_ids: [1],
     note: "Keine Änderungen am Kundenportal während des Abschlusses.",
-    recurrence: { type: "monthly", interval: 3, count: null, until: null },
+    recurrence: { type: "Monthly", interval: 3, count: null, until: null },
     valid: true,
     created_at: T0,
     created_by: 1,
@@ -1421,7 +1437,7 @@ function legacyRoutes(path: string, params: URLSearchParams, mode: DemoItsmMode)
   return undefined;
 }
 
-function adminRoutes(path: string, method: string): unknown | undefined {
+function adminRoutes(path: string, method: string, requestBody?: unknown): unknown | undefined {
   const at = path.indexOf("/api/v1/admin/itsm/change/");
   if (at < 0) return undefined;
   const rest = path.slice(at + "/api/v1/admin/itsm/change/".length);
@@ -1438,7 +1454,8 @@ function adminRoutes(path: string, method: string): unknown | undefined {
     return CABS.find((c) => c.id === Number(cab[1]));
   }
   if (rest === "risk-questions") return method === "POST" ? RISK_QUESTIONS[0] : RISK_QUESTIONS;
-  if (rest === "risk-questions/examples") return { created: RISK_QUESTIONS.map((q) => q.id) };
+  // The backend inserts the example questions whose keys are absent ("downtime" exists in the demo).
+  if (rest === "risk-questions/examples") return { created: ["backout_tested", "users_affected", "experience"] };
   if (rest === "risk-questions/order") return RISK_QUESTIONS;
   const question = rest.match(/^risk-questions\/(\d+)$/);
   if (question) {
@@ -1451,7 +1468,11 @@ function adminRoutes(path: string, method: string): unknown | undefined {
     if (method === "DELETE") return null;
     return FREEZE_WINDOWS.find((f) => f.id === Number(freeze[1]));
   }
-  if (rest === "legacy-archive") return method === "POST" ? JOB_ACCEPTED : archiveStatus();
+  if (rest === "legacy-archive") {
+    if (method !== "POST") return archiveStatus();
+    const dryRun = (requestBody as { dry_run?: unknown } | undefined)?.dry_run === true;
+    return { job_id: dryRun ? DEMO_ARCHIVE_DRY_JOB_ID : DEMO_ARCHIVE_JOB_ID, status: "queued" } satisfies JobAccepted;
+  }
   return undefined;
 }
 
@@ -1460,9 +1481,12 @@ export function resolveChangeData(
   method: string,
   search = "",
   mode: DemoItsmMode = demoItsmMode(),
+  requestBody?: unknown,
 ): unknown | undefined {
   const params = new URLSearchParams(search);
   if (path.endsWith(`/api/v1/jobs/${DEMO_CHANGE_JOB_ID}`) && method === "GET") return CHANGE_JOB;
+  if (path.endsWith(`/api/v1/jobs/${DEMO_ARCHIVE_JOB_ID}`) && method === "GET") return archiveJob(false);
+  if (path.endsWith(`/api/v1/jobs/${DEMO_ARCHIVE_DRY_JOB_ID}`) && method === "GET") return archiveJob(true);
   if (path.endsWith("/api/v1/itsm/changes/status")) return changeStatus(mode);
   if (path.includes("/api/v1/itsm/legacy-changes") && mode !== "off") return legacyRoutes(path, params, mode);
   if (mode !== "tiqora") return undefined;
@@ -1471,7 +1495,7 @@ export function resolveChangeData(
     const to = params.get("end");
     return PORTAL.filter((c) => overlaps(c.planned_start, c.planned_end, from, to));
   }
-  const admin = adminRoutes(path, method);
+  const admin = adminRoutes(path, method, requestBody);
   if (admin !== undefined) return admin;
   if (path.includes("/api/v1/itsm/")) return changeRoutes(path, method, params);
   // Adopt / create-from live under the ticket.
@@ -1518,7 +1542,7 @@ export function resolveChangeReply(
   }
   const patch = mode === "tiqora" && method === "PATCH" && requestBody !== undefined && path.match(/\/api\/v1\/itsm\/changes\/(\d+)$/);
   if (patch) return patchDemoChange(Number(patch[1]), requestBody);
-  const body = resolveChangeData(path, method, search, mode);
+  const body = resolveChangeData(path, method, search, mode, requestBody);
   if (body === undefined) return undefined;
   if (body === null) return { status: 204 };
   if (method !== "POST") return { status: 200, body };

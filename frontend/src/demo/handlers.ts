@@ -172,6 +172,11 @@ export const handlers = [
       return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
     }),
   ),
+  // the change archive on the admin page: a dry run and a real run answer their own job
+  http.post("*/api/v1/admin/itsm/change/legacy-archive", async ({ request }) => {
+    const reply = resolveChangeReply(new URL(request.url).pathname, "POST", "", undefined, await request.json().catch(() => ({})));
+    return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+  }),
   // the portal switch on the change page keeps its state
   http.patch("*/api/v1/itsm/changes/:id", async ({ request }) => {
     const reply = resolveChangeReply(new URL(request.url).pathname, "PATCH", "", undefined, await request.json().catch(() => ({})));
