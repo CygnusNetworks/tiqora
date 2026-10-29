@@ -703,6 +703,11 @@ const agentCabMeetingRoute = createRoute({
 const agentLegacyChangesRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/itsm/legacy-changes",
+  // `?ticket_id=` comes from the ticket zoom in Mode A (changes linked to that ticket).
+  validateSearch: (s: Record<string, unknown>): { ticket_id?: number } => {
+    const n = typeof s.ticket_id === "number" ? s.ticket_id : typeof s.ticket_id === "string" && s.ticket_id !== "" ? Number(s.ticket_id) : NaN;
+    return Number.isInteger(n) && n > 0 ? { ticket_id: n } : {};
+  },
   component: LegacyChangeListPage,
 });
 

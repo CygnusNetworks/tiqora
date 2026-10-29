@@ -16,7 +16,7 @@ const DEFAULT_CAB = 0;
 /** The engine decides in a job after the vote's commit (`core.approval_hook`); look again after it ran. */
 const OUTCOME_RELOAD_MS = 3000;
 
-function Snapshot({ snapshot }: { snapshot: ChangeApprovalSnapshot }) {
+export function Snapshot({ snapshot }: { snapshot: ChangeApprovalSnapshot }) {
   const { t } = useTranslation();
   return (
     <div className="space-y-1 text-xs" data-testid="change-approval-snapshot" data-status={snapshot.status}>
