@@ -15,6 +15,7 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
+import { resolveChangeData } from "../../src/demo/changeMock";
 import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
@@ -1261,7 +1262,7 @@ export async function mockApi(page: Page) {
         return;
       }
       if (method === "GET") {
-        const itsm = resolveItsmData(path, method, url.search, mode);
+        const itsm = resolveItsmData(path, method, url.search, mode) ?? resolveChangeData(path, method, url.search, mode);
         if (itsm !== undefined) {
           await json(route, 200, itsm);
           return;

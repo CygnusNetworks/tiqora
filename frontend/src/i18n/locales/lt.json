@@ -81,7 +81,9 @@
     "escalatedCount": "{{count}} eskaluota",
     "customers": "Customers",
     "searches": "Saved searches",
-    "approvals": "My approvals"
+    "approvals": "My approvals",
+    "changes": "Changes",
+    "changesLegacy": "Changes (Znuny)"
   },
   "views": {
     "mine": "Mano bilietai",
@@ -9323,6 +9325,50 @@
     "newTicket": {
       "recentIncident": "This service already had an incident {{minutes}} minutes ago: #{{tn}} {{title}}. Is it the same problem?",
       "openTicket": "Open ticket"
+    },
+    "change": {
+      "phases": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "assessment": "Assessment",
+        "approval": "Approval",
+        "scheduled": "Scheduled",
+        "implementing": "Implementation",
+        "review": "Review",
+        "closed": "Closed",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "types": {
+        "standard": "Standard change",
+        "normal": "Normal change",
+        "emergency": "Emergency change"
+      },
+      "risk": {
+        "label": "Risk",
+        "none": "Not rated",
+        "levels": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "very_high": "Very high"
+        }
+      },
+      "phaseBar": {
+        "label": "Phases of this change"
+      },
+      "pages": {
+        "list": "Changes",
+        "detail": "Change",
+        "calendar": "Change calendar",
+        "cabMeetings": "CAB meetings",
+        "cabMeeting": "CAB meeting",
+        "legacyList": "Changes (Znuny)",
+        "legacyDetail": "Znuny change"
+      },
+      "stub": {
+        "body": "This page is being built."
+      }
     }
   },
   "approvals": {

@@ -251,7 +251,7 @@ function resolveAdminItsm(path: string, method: string, mode: DemoItsmMode): unk
         { group: "incident_problem", kind: "ticket_type", name: "Incident", status: "present", detail: null },
         { group: "incident_problem", kind: "ticket_type", name: "Problem", status: "present", detail: null },
         { group: "incident_problem", kind: "dynamic_field", name: "ITSMCriticality", status: "present", detail: null },
-        { group: "change", kind: "ticket_type", name: "Change", status: "missing", detail: null },
+        { group: "change", kind: "ticket_type", name: "Change", status: "present", detail: null },
       ],
     };
   }

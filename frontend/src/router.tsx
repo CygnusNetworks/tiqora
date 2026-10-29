@@ -139,6 +139,13 @@ import { PortalApprovalPage } from "@/routes/portal/ApprovalPage";
 import { LinkTypesPage } from "@/routes/admin/LinkTypesPage";
 import { ItsmImportPage } from "@/routes/admin/ItsmImportPage";
 import { CiListPage } from "@/routes/agent/CiListPage";
+import { ChangeListPage } from "@/routes/agent/itsm/ChangeListPage";
+import { ChangeDetailPage } from "@/routes/agent/itsm/ChangeDetailPage";
+import { ChangeCalendarPage } from "@/routes/agent/itsm/ChangeCalendarPage";
+import { CabMeetingsPage } from "@/routes/agent/itsm/CabMeetingsPage";
+import { CabMeetingPage } from "@/routes/agent/itsm/CabMeetingPage";
+import { LegacyChangeListPage } from "@/routes/agent/itsm/LegacyChangeListPage";
+import { LegacyChangeDetailPage } from "@/routes/agent/itsm/LegacyChangeDetailPage";
 import { CiDetailPage } from "@/routes/agent/CiDetailPage";
 import { WebserviceDetailPage } from "@/routes/admin/WebserviceDetailPage";
 import { WEBSERVICE_TABS, type WebserviceTab } from "@/lib/webservicesApi";
@@ -654,6 +661,49 @@ const agentItsmCiDetailRoute = createRoute({
     }
   },
   component: CiDetailPage,
+});
+
+// Change management (I19). Static segments before the param routes: "calendar" is never read as a ticket id.
+const agentChangesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/changes",
+  component: ChangeListPage,
+});
+
+const agentChangeCalendarRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/changes/calendar",
+  component: ChangeCalendarPage,
+});
+
+const agentChangeRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/changes/$ticketId",
+  component: ChangeDetailPage,
+});
+
+const agentCabMeetingsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/cab-meetings",
+  component: CabMeetingsPage,
+});
+
+const agentCabMeetingRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/cab-meetings/$meetingId",
+  component: CabMeetingPage,
+});
+
+const agentLegacyChangesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/legacy-changes",
+  component: LegacyChangeListPage,
+});
+
+const agentLegacyChangeRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/legacy-changes/$changeId",
+  component: LegacyChangeDetailPage,
 });
 
 const agentCalendarRoute = createRoute({
@@ -1534,6 +1584,13 @@ const routeTree = rootRoute.addChildren([
     agentSearchViewRoute,
     agentItsmCisRoute,
     agentItsmCiDetailRoute,
+    agentChangesRoute,
+    agentChangeCalendarRoute,
+    agentChangeRoute,
+    agentCabMeetingsRoute,
+    agentCabMeetingRoute,
+    agentLegacyChangesRoute,
+    agentLegacyChangeRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,

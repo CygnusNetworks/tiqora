@@ -95,6 +95,23 @@ vi.mock("@/lib/itsmApi", async () => {
   return { ...actual, itsmApi: { ...actual.itsmApi, status: itsmStatus } };
 });
 
+const { changeStatus } = vi.hoisted(() => ({ changeStatus: vi.fn() }));
+vi.mock("@/lib/changeApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
+  return { ...actual, changeApi: { ...actual.changeApi, status: changeStatus } };
+});
+
+const changeStatusOf = (over: Record<string, unknown> = {}) => ({
+  mode: "off",
+  available: false,
+  reason: "itsm_off",
+  legacy: "none",
+  can_manage: false,
+  can_see_legacy: false,
+  setup_complete_change: false,
+  ...over,
+});
+
 const statusOf = (mode: string, ciSource: "znuny" | "tiqora" | null) => ({
   mode,
   source: "auto",
@@ -144,6 +161,8 @@ async function renderShell(initialEntry = "/agent") {
     "/agent/search",
     "/agent/customers",
     "/agent/itsm/cis",
+    "/agent/itsm/changes",
+    "/agent/itsm/legacy-changes",
     "/agent/cmdb",
     "/agent/approvals",
   ];
@@ -189,6 +208,7 @@ describe("AgentShell sidebar", () => {
     chatTopics.mockReset().mockResolvedValue([]);
     itsmStatus.mockReset().mockResolvedValue(statusOf("off", null));
     approvalsInboxCount.mockReset().mockResolvedValue({ pending: 0 });
+    changeStatus.mockReset().mockResolvedValue(changeStatusOf());
     cmdbStatus.mockReset().mockResolvedValue({ mode: "off", readable_class_count: 0, can_admin: false, views_present: true });
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
@@ -490,5 +510,60 @@ describe("AgentShell sidebar", () => {
     const link = await screen.findByTestId("agent-nav-approvals");
     await waitFor(() => expect(approvalsInboxCount).toHaveBeenCalled());
     expect(link.textContent).toBe("Meine Freigaben");
+  });
+
+  it("shows Changes when the change management is available", async () => {
+    changeStatus.mockResolvedValue(changeStatusOf({ mode: "tiqora", available: true, reason: "ok", setup_complete_change: true }));
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-changes");
+    expect(link).toHaveAttribute("href", "/agent/itsm/changes");
+    expect(link).toHaveTextContent("Changes");
+    expect(link).not.toHaveTextContent("Znuny");
+  });
+
+  it("shows Changes (Znuny) for the live Znuny changes and points to the legacy list", async () => {
+    changeStatus.mockResolvedValue(
+      changeStatusOf({ mode: "znuny_readthrough", reason: "mode_a", legacy: "live", can_see_legacy: true }),
+    );
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-changes");
+    expect(link).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+    expect(link).toHaveTextContent("Changes (Znuny)");
+  });
+
+  it("hides Changes while ITSM is off", async () => {
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(changeStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-changes")).toBeNull();
+  });
+
+  it("hides Changes (Znuny) from someone who may not read the Znuny changes", async () => {
+    changeStatus.mockResolvedValue(
+      changeStatusOf({ mode: "znuny_readthrough", reason: "mode_a", legacy: "live", can_see_legacy: false }),
+    );
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(changeStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-changes")).toBeNull();
+  });
+
+  it("hides Changes when the status call fails", async () => {
+    changeStatus.mockRejectedValue(new Error("boom"));
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(changeStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-changes")).toBeNull();
+  });
+
+  it("puts Changes between the CMDB entry and Meine Freigaben", async () => {
+    changeStatus.mockResolvedValue(changeStatusOf({ mode: "tiqora", available: true, reason: "ok" }));
+    cmdbStatus.mockResolvedValue({ mode: "tiqora", readable_class_count: 1, can_admin: false, views_present: true });
+    await renderShell();
+    const changes = await screen.findByTestId("agent-nav-changes");
+    const cmdb = await screen.findByTestId("agent-nav-cmdb");
+    const approvals = await screen.findByTestId("agent-nav-approvals");
+    expect(cmdb.compareDocumentPosition(changes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(changes.compareDocumentPosition(approvals) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

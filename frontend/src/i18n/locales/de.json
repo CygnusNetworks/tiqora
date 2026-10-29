@@ -81,7 +81,9 @@
     "escalatedCount": "{{count}} eskaliert",
     "customers": "Kunden",
     "searches": "Gespeicherte Suchen",
-    "approvals": "Meine Freigaben"
+    "approvals": "Meine Freigaben",
+    "changes": "Changes",
+    "changesLegacy": "Changes (Znuny)"
   },
   "views": {
     "mine": "Meine Tickets",
@@ -9331,6 +9333,50 @@
     "newTicket": {
       "recentIncident": "Für diesen Service gab es bereits vor {{minutes}} Minuten einen Vorfall: #{{tn}} {{title}}. Handelt es sich um dasselbe Problem?",
       "openTicket": "Ticket öffnen"
+    },
+    "change": {
+      "phases": {
+        "draft": "Entwurf",
+        "submitted": "Eingereicht",
+        "assessment": "Bewertung",
+        "approval": "Freigabe",
+        "scheduled": "Geplant",
+        "implementing": "Umsetzung",
+        "review": "Nachbetrachtung",
+        "closed": "Abgeschlossen",
+        "rejected": "Abgelehnt",
+        "cancelled": "Abgebrochen"
+      },
+      "types": {
+        "standard": "Standard-Change",
+        "normal": "Normaler Change",
+        "emergency": "Notfall-Change"
+      },
+      "risk": {
+        "label": "Risiko",
+        "none": "Nicht bewertet",
+        "levels": {
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Hoch",
+          "very_high": "Sehr hoch"
+        }
+      },
+      "phaseBar": {
+        "label": "Phasen dieses Changes"
+      },
+      "pages": {
+        "list": "Changes",
+        "detail": "Change",
+        "calendar": "Change-Kalender",
+        "cabMeetings": "CAB-Sitzungen",
+        "cabMeeting": "CAB-Sitzung",
+        "legacyList": "Changes (Znuny)",
+        "legacyDetail": "Znuny-Change"
+      },
+      "stub": {
+        "body": "Diese Seite wird gerade aufgebaut."
+      }
     }
   },
   "approvals": {
