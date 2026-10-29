@@ -61,6 +61,8 @@ _MARK_TABLES = (
     "tiqora_gdpr_backup",
     "tiqora_gdpr_job",
     "tiqora_gdpr_audit",
+    # tombstones the erasure leaves for the change archive
+    "tiqora_itsm_legacy_erased",
     "tiqora_cache_invalidation",
     "tiqora_event_outbox",
     "ticket_history",
