@@ -1057,7 +1057,7 @@ Changes in Znunys Kalender. Eine Verknüpfung zwischen Termin und Ticket (Znunys
 
 Tiqora schreibt nie in Znunys Change-Tabellen (`change_*`, `condition_*`). Was dort steht, zeigt
 Tiqora nur lesend unter **„Changes (Znuny)“** (`/agent/itsm/legacy-changes`): Liste mit Suche nach
-Nummer und Titel, Detail mit Status, Kategorie, Auswirkung, Priorität, Change-Manager, Change-Builder,
+Nummer und Titel (live in Modus A zusätzlich in Beschreibung und Begründung, ab drei Zeichen), Detail mit Status, Kategorie, Auswirkung, Priorität, Change-Manager, Change-Builder,
 Zeiten, Beschreibung, Begründung, CAB, Arbeitsaufträgen (Anweisung, Bericht, Aufwand), Verknüpfungen,
 Dynamischen Feldern und Verlauf. Die Zeiten eines Changes leitet Tiqora wie Znuny aus den
 Arbeitsaufträgen ab ([itsm-import.md](itsm-import.md), „Change-Verwaltung: Schema und Verhalten“).
