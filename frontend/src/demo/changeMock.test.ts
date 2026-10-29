@@ -142,6 +142,14 @@ describe("change demo mock (Mode B)", () => {
     }
   });
 
+  it("limits the portal schedule to the requested window", () => {
+    const all = get("/api/portal/change-schedule") as PortalChange[];
+    const first = all[0];
+    const inside = get("/api/portal/change-schedule", `start=${first.planned_start}&end=${first.planned_end}`) as PortalChange[];
+    expect(inside.map((c) => c.tn)).toContain(first.tn);
+    expect(get("/api/portal/change-schedule", "start=2030-01-01T00:00:00Z&end=2030-02-01T00:00:00Z")).toEqual([]);
+  });
+
   it("returns undefined for an unknown change and for foreign paths", () => {
     expect(get("/api/v1/itsm/changes/999")).toBeUndefined();
     expect(get("/api/v1/itsm/cis")).toBeUndefined();

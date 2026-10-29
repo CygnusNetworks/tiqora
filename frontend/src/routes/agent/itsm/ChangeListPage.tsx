@@ -24,6 +24,7 @@ import {
 } from "@/lib/changeApi";
 import { CHANGE_PHASES, CHANGE_TYPES } from "@/lib/changePhases";
 import { changeDetailHref } from "@/lib/itsmRoutes";
+import { PHASE_TONE } from "@/components/itsm/change/changeUi";
 
 const PAGE = 25;
 const DEBOUNCE_MS = 300;
@@ -32,19 +33,6 @@ const FIELD_CLASS =
 
 type Tab = "all" | "mine" | "tasks" | "approval";
 const TABS: Tab[] = ["all", "mine", "tasks", "approval"];
-
-const PHASE_TONE: Record<ChangePhase, "default" | "accent" | "warn" | "danger" | "success" | "muted"> = {
-  draft: "muted",
-  submitted: "default",
-  assessment: "default",
-  approval: "warn",
-  scheduled: "accent",
-  implementing: "accent",
-  review: "default",
-  closed: "success",
-  rejected: "danger",
-  cancelled: "muted",
-};
 
 /** Whether two list queries differ at most in the page (`offset`). */
 const sameFilter = (a: ChangeListQuery, b: ChangeListQuery) => JSON.stringify({ ...a, offset: 0 }) === JSON.stringify({ ...b, offset: 0 });
@@ -132,9 +120,14 @@ export function ChangeListPage() {
     <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-6" data-testid="changeListPage">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-xl font-semibold text-ink">{t("itsm.change.pages.list")}</h1>
-        <Button variant="primary" size="sm" onClick={() => setCreating(true)} data-testid="change-list-create">
-          {t("itsm.change.list.create")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <RouterAnchor href="/agent/itsm/changes/calendar" className="text-sm text-accent hover:underline" data-testid="change-list-calendar-link">
+            {t("itsm.change.list.calendar")}
+          </RouterAnchor>
+          <Button variant="primary" size="sm" onClick={() => setCreating(true)} data-testid="change-list-create">
+            {t("itsm.change.list.create")}
+          </Button>
+        </div>
       </div>
 
       <Tabs

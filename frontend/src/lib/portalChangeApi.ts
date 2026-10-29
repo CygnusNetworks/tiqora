@@ -4,6 +4,9 @@ import { portalApi } from "./portalApi";
 
 export type PortalChange = Schemas["PortalChangeOut"];
 
+/** The visible changes of a window; `truncated` is the `X-Schedule-Truncated` header (more changes than answered). */
+export type PortalSchedule = { items: PortalChange[]; truncated: boolean };
+
 const BASE = "/api/portal/change-schedule";
 
 export const portalChangeKeys = {
@@ -14,7 +17,8 @@ export const portalChangeKeys = {
 };
 
 export const portalChangeApi = {
-  list(start: string, end: string, signal?: AbortSignal) {
-    return portalApi.request<PortalChange[]>("GET", BASE, { query: { start, end }, signal });
+  async list(start: string, end: string, signal?: AbortSignal): Promise<PortalSchedule> {
+    const { data, headers } = await portalApi.requestWithHeaders<PortalChange[]>("GET", BASE, { query: { start, end }, signal });
+    return { items: data, truncated: (headers.get("X-Schedule-Truncated") ?? "").toLowerCase() === "true" };
   },
 };

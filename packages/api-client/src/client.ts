@@ -927,6 +927,17 @@ function joinUrl(base: string, path: string): string {
   return `${b}${p}`;
 }
 
+type RequestOptions = {
+  body?: unknown;
+  /** Scalar values use ``set``; arrays emit repeated keys (FastAPI list Query). */
+  query?: Record<
+    string,
+    string | number | boolean | null | undefined | ReadonlyArray<string | number | boolean>
+  >;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+};
+
 export class ApiClient {
   readonly baseUrl: string;
   private readonly onUnauthorized?: () => void;
@@ -954,22 +965,17 @@ export class ApiClient {
   async request<T>(
     method: HttpMethod,
     path: string,
-    init?: {
-      body?: unknown;
-      /** Scalar values use ``set``; arrays emit repeated keys (FastAPI list Query). */
-      query?: Record<
-        string,
-        | string
-        | number
-        | boolean
-        | null
-        | undefined
-        | ReadonlyArray<string | number | boolean>
-      >;
-      headers?: Record<string, string>;
-      signal?: AbortSignal;
-    },
+    init?: RequestOptions,
   ): Promise<T> {
+    return (await this.requestWithHeaders<T>(method, path, init)).data;
+  }
+
+  /** Like `request`, plus the response headers (for endpoints that answer metadata in a header). */
+  async requestWithHeaders<T>(
+    method: HttpMethod,
+    path: string,
+    init?: RequestOptions,
+  ): Promise<{ data: T; headers: Headers }> {
     let url = joinUrl(this.baseUrl, path);
     if (init?.query) {
       const qs = new URLSearchParams();
@@ -1009,7 +1015,7 @@ export class ApiClient {
     });
 
     if (res.status === 204) {
-      return undefined as T;
+      return { data: undefined as T, headers: res.headers };
     }
 
     const contentType = res.headers.get("content-type") ?? "";
@@ -1035,7 +1041,7 @@ export class ApiClient {
       );
     }
 
-    return payload as T;
+    return { data: payload as T, headers: res.headers };
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────

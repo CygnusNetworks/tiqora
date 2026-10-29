@@ -1466,7 +1466,11 @@ export function resolveChangeData(
   if (path.endsWith("/api/v1/itsm/changes/status")) return changeStatus(mode);
   if (path.includes("/api/v1/itsm/legacy-changes") && mode !== "off") return legacyRoutes(path, params, mode);
   if (mode !== "tiqora") return undefined;
-  if (path.endsWith("/api/portal/change-schedule")) return PORTAL;
+  if (path.endsWith("/api/portal/change-schedule")) {
+    const from = params.get("start");
+    const to = params.get("end");
+    return PORTAL.filter((c) => overlaps(c.planned_start, c.planned_end, from, to));
+  }
   const admin = adminRoutes(path, method);
   if (admin !== undefined) return admin;
   if (path.includes("/api/v1/itsm/")) return changeRoutes(path, method, params);

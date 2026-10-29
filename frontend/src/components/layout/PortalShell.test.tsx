@@ -34,6 +34,12 @@ vi.mock("@/lib/portalApprovalsApi", async () => {
   return { ...actual, portalApprovalsApi: { ...actual.portalApprovalsApi, list: listApprovals } };
 });
 
+const { listChanges } = vi.hoisted(() => ({ listChanges: vi.fn() }));
+vi.mock("@/lib/portalChangeApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/portalChangeApi")>("@/lib/portalChangeApi");
+  return { ...actual, portalChangeApi: { list: listChanges } };
+});
+
 const { toggleTheme } = vi.hoisted(() => ({ toggleTheme: vi.fn() }));
 vi.mock("@/themes/theme", () => ({
   useTheme: () => ({ theme: "dark", resolvedTheme: "dark", toggleTheme }),
@@ -56,6 +62,7 @@ async function renderShell() {
     "/portal/security",
     "/portal/config-items",
     "/portal/approvals",
+    "/portal/change-schedule",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
@@ -82,6 +89,7 @@ describe("PortalShell", () => {
     logout.mockReset().mockResolvedValue(undefined);
     portalSetLanguage.mockReset().mockResolvedValue({});
     toggleTheme.mockReset();
+    listChanges.mockReset().mockRejectedValue(new Error("404"));
     listCis.mockReset().mockResolvedValue({ items: [], total: 0 });
     listApprovals.mockReset().mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 });
     void i18n.changeLanguage("en");
@@ -180,5 +188,19 @@ describe("PortalShell", () => {
     await renderShell();
     await waitFor(() => expect(listApprovals).toHaveBeenCalled());
     expect(screen.queryByTestId("portal-nav-approvals")).toBeNull();
+  });
+
+  it("shows the maintenance windows entry when the schedule answers 200", async () => {
+    listChanges.mockResolvedValue({ items: [], truncated: false });
+    await renderShell();
+    const link = await screen.findByTestId("portal-nav-changes");
+    expect(link).toHaveAttribute("href", "/portal/change-schedule");
+  });
+
+  it("hides the maintenance windows entry when the schedule answers 404", async () => {
+    listChanges.mockRejectedValue(new Error("404"));
+    await renderShell();
+    await waitFor(() => expect(listChanges).toHaveBeenCalled());
+    expect(screen.queryByTestId("portal-nav-changes")).toBeNull();
   });
 });

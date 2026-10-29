@@ -174,10 +174,18 @@ describe("changeAdminApi paths", () => {
 });
 
 describe("portalChangeApi", () => {
-  it("asks the schedule for the window", async () => {
-    const spy = vi.spyOn(portalApi, "request").mockResolvedValue([] as never);
-    await portalChangeApi.list("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z");
+  it("asks the schedule for the window and reads the truncation header", async () => {
+    const spy = vi
+      .spyOn(portalApi, "requestWithHeaders")
+      .mockResolvedValue({ data: [], headers: new Headers({ "X-Schedule-Truncated": "true" }) } as never);
+    const out = await portalChangeApi.list("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z");
     expect(calls(spy)).toEqual([["GET", "/api/portal/change-schedule", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z" }]]);
+    expect(out).toEqual({ items: [], truncated: true });
+  });
+
+  it("is not truncated without the header", async () => {
+    vi.spyOn(portalApi, "requestWithHeaders").mockResolvedValue({ data: [], headers: new Headers() } as never);
+    expect((await portalChangeApi.list("a", "b")).truncated).toBe(false);
   });
 });
 

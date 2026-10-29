@@ -1382,7 +1382,8 @@
       "kb": "Artikel bantuan",
       "preferences": "Tetapan",
       "cmdb": "Devices and systems",
-      "approvals": "Approvals"
+      "approvals": "Approvals",
+      "changes": "Maintenance"
     },
     "login": {
       "stepUp": {
@@ -1497,6 +1498,22 @@
         "add": "Add a device or system",
         "remove": "Remove {{name}}",
         "max": "You can select up to {{max}}."
+      }
+    },
+    "changes": {
+      "title": "Maintenance windows",
+      "intro": "Planned changes that affect your services.",
+      "prev": "Previous month",
+      "next": "Next month",
+      "truncated": "Not all maintenance windows of this month are shown.",
+      "unavailable": "The maintenance schedule is not available.",
+      "loadError": "The maintenance schedule could not be loaded.",
+      "empty": "No maintenance windows planned in this month.",
+      "noWindow": "No time window",
+      "phases": {
+        "scheduled": "Planned",
+        "implementing": "In progress",
+        "closed": "Completed"
       }
     }
   },
@@ -9457,7 +9474,8 @@
           "decision": "Decision",
           "pir": "Post-implementation review"
         },
-        "windowInvalid": "The end of the window must not be before its start."
+        "windowInvalid": "The end of the window must not be before its start.",
+        "calendar": "Calendar"
       },
       "create": {
         "title": "Create change",
@@ -9805,6 +9823,30 @@
           "services": "Services",
           "truncated": "Cut off"
         }
+      },
+      "calendar": {
+        "views": {
+          "month": "Month",
+          "week": "Week",
+          "service": "By service"
+        },
+        "prev": "Previous",
+        "next": "Next",
+        "utcNote": "All times are UTC.",
+        "conflict": "Conflict",
+        "freeze": {
+          "block": "Freeze (blocking)",
+          "warn": "Freeze (warning)"
+        },
+        "noChanges": "No changes planned.",
+        "truncated": "Not all changes of this range are shown. Narrow the range with the service filter.",
+        "freezesTruncated": "Not all freeze windows of this range are shown.",
+        "serviceEmpty": "No service has a change or freeze window in this range.",
+        "colChanges": "Changes",
+        "colMinutes": "Affected",
+        "hoursMinutes": "{{hours}} h {{minutes}} min",
+        "minutesOnly": "{{minutes}} min",
+        "indirect": "indirectly affected"
       }
     }
   },

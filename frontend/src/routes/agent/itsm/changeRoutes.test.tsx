@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import { ChangeCalendarPage } from "./ChangeCalendarPage";
 import { CabMeetingsPage } from "./CabMeetingsPage";
 import { CabMeetingPage } from "./CabMeetingPage";
 import { LegacyChangeListPage } from "./LegacyChangeListPage";
@@ -15,7 +14,6 @@ afterEach(cleanup);
 
 describe("change route stubs", () => {
   it.each([
-    [ChangeCalendarPage, "Change-Kalender"],
     [CabMeetingsPage, "CAB-Sitzungen"],
     [CabMeetingPage, "CAB-Sitzung"],
     [LegacyChangeListPage, "Changes (Znuny)"],

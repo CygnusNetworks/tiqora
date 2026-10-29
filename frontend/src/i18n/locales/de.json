@@ -1382,7 +1382,8 @@
       "kb": "Hilfeartikel",
       "preferences": "Einstellungen",
       "cmdb": "Meine Geräte und Systeme",
-      "approvals": "Freigaben"
+      "approvals": "Freigaben",
+      "changes": "Wartungsfenster"
     },
     "login": {
       "stepUp": {
@@ -1497,6 +1498,22 @@
         "add": "Gerät oder System hinzufügen",
         "remove": "{{name}} entfernen",
         "max": "Sie können bis zu {{max}} auswählen."
+      }
+    },
+    "changes": {
+      "title": "Wartungsfenster",
+      "intro": "Geplante Änderungen, die Ihre Services betreffen.",
+      "prev": "Voriger Monat",
+      "next": "Nächster Monat",
+      "truncated": "Es werden nicht alle Wartungsfenster dieses Monats angezeigt.",
+      "unavailable": "Der Wartungskalender ist nicht verfügbar.",
+      "loadError": "Der Wartungskalender konnte nicht geladen werden.",
+      "empty": "In diesem Monat sind keine Wartungsfenster geplant.",
+      "noWindow": "Kein Zeitfenster",
+      "phases": {
+        "scheduled": "Geplant",
+        "implementing": "Läuft",
+        "closed": "Abgeschlossen"
       }
     }
   },
@@ -9465,7 +9482,8 @@
           "decision": "Entscheidung",
           "pir": "Nachbetrachtung"
         },
-        "windowInvalid": "Das Ende des Zeitfensters darf nicht vor dem Beginn liegen."
+        "windowInvalid": "Das Ende des Zeitfensters darf nicht vor dem Beginn liegen.",
+        "calendar": "Kalender"
       },
       "create": {
         "title": "Change anlegen",
@@ -9813,6 +9831,30 @@
           "services": "Services",
           "truncated": "Abgeschnitten"
         }
+      },
+      "calendar": {
+        "views": {
+          "month": "Monat",
+          "week": "Woche",
+          "service": "Nach Service"
+        },
+        "prev": "Zurück",
+        "next": "Weiter",
+        "utcNote": "Alle Zeiten in UTC.",
+        "conflict": "Konflikt",
+        "freeze": {
+          "block": "Sperrzeitraum (blockiert)",
+          "warn": "Sperrzeitraum (Warnung)"
+        },
+        "noChanges": "Keine Changes geplant.",
+        "truncated": "Es werden nicht alle Changes dieses Zeitraums angezeigt. Grenzen Sie den Zeitraum mit dem Service-Filter ein.",
+        "freezesTruncated": "Es werden nicht alle Sperrzeiträume dieses Zeitraums angezeigt.",
+        "serviceEmpty": "Für keinen Service gibt es in diesem Zeitraum ein Change- oder Sperrfenster.",
+        "colChanges": "Changes",
+        "colMinutes": "Betroffen",
+        "hoursMinutes": "{{hours}} Std. {{minutes}} Min.",
+        "minutesOnly": "{{minutes}} Min.",
+        "indirect": "indirekt betroffen"
       }
     }
   },

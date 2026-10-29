@@ -84,6 +84,7 @@ import {
 } from "@/routes/portal/TicketListPage";
 import { NewTicketPage, type PortalNewTicketSearch } from "@/routes/portal/NewTicketPage";
 import { PortalCisPage } from "@/routes/portal/PortalCisPage";
+import { ChangeSchedulePage as PortalChangeSchedulePage } from "@/routes/portal/ChangeSchedulePage";
 import { PortalCiPage } from "@/routes/portal/PortalCiPage";
 import {
   NewProcessTicketPage as PortalNewProcessTicketPage,
@@ -913,6 +914,12 @@ const portalKbArticleRoute = createRoute({
   component: KbArticlePage,
 });
 
+const portalChangeScheduleRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/change-schedule",
+  component: PortalChangeSchedulePage,
+});
+
 const portalPreferencesRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/preferences",
@@ -1621,6 +1628,7 @@ const routeTree = rootRoute.addChildren([
     portalCmdbListRoute,
     portalCmdbDetailRoute,
     portalApprovalsRoute,
+    portalChangeScheduleRoute,
     portalApprovalRoute,
   ]),
   adminLayoutRoute.addChildren([

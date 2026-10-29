@@ -17,6 +17,20 @@ export const SECTION_CLASS = "min-w-0 space-y-2 rounded-md border border-hairlin
 /** Badge tone of a conflict or finding severity. */
 export const SEVERITY_TONE = { info: "muted", warn: "warn", block: "danger" } as const;
 
+/** Badge tone of a phase (list, calendar). */
+export const PHASE_TONE: Record<ChangePhase, "default" | "accent" | "warn" | "danger" | "success" | "muted"> = {
+  draft: "muted",
+  submitted: "default",
+  assessment: "default",
+  approval: "warn",
+  scheduled: "accent",
+  implementing: "accent",
+  review: "default",
+  closed: "success",
+  rejected: "danger",
+  cancelled: "muted",
+};
+
 export const FINAL_PHASES: ReadonlySet<Change["phase"]> = new Set(["closed", "cancelled"]);
 
 /** `2026-10-24T20:00:00Z` → `2026-10-24 20:00` (the API's times are UTC; the labels say so). */

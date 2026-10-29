@@ -158,6 +158,12 @@ export const handlers = [
     const change = resolveChangeReply(url.pathname, "GET", url.search);
     return change === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((change.body ?? null) as never, { status: change.status });
   }),
+  // The portal's maintenance schedule filters on the window, which resolveData never sees.
+  http.get("*/api/portal/change-schedule", ({ request }) => {
+    const url = new URL(request.url);
+    const reply = resolveChangeReply(url.pathname, "GET", url.search);
+    return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+  }),
   // Creating a change, a phase step and "Als Change führen" are stateful (the list, the change page
   // and the zoom show the result), so the body reaches the mock.
   ...["*/api/v1/itsm/changes", "*/api/v1/itsm/changes/:id/transition", "*/api/v1/tickets/:id/change"].map((route) =>
