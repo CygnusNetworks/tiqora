@@ -11,7 +11,7 @@ import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
 import { demoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolveItsmData } from "./itsmMock";
-import { resolveChangeData } from "./changeMock";
+import { resolveChangeReply } from "./changeMock";
 import { resolveApprovalLink, resolveApprovalsData } from "./approvalsMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
@@ -152,8 +152,11 @@ export const handlers = [
   // ITSM: the CI list and service lookups filter on the query string, which resolveData never sees.
   http.get("*/api/v1/itsm/*", ({ request }) => {
     const url = new URL(request.url);
-    const out = resolveItsmData(url.pathname, "GET", url.search) ?? resolveChangeData(url.pathname, "GET", url.search);
-    return out === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json(out as never);
+    // Explicit `!== undefined`: the ITSM mock answers some routes with `null` (e.g. recent-incident).
+    const itsm = resolveItsmData(url.pathname, "GET", url.search);
+    if (itsm !== undefined) return HttpResponse.json(itsm as never);
+    const change = resolveChangeReply(url.pathname, "GET", url.search);
+    return change === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((change.body ?? null) as never, { status: change.status });
   }),
   // jobs of the CMDB mock (bulk edit, export); any other job id falls through to the generic resolver
   http.get("*/api/v1/jobs/:id", ({ params }) => {

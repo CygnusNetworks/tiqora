@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_APPROVAL_CHANGE_TICKET_ID } from "./approvalsMock";
-import { DEMO_CHANGE_JOB_ID, resolveChangeData } from "./changeMock";
+import { DEMO_CHANGE_JOB_ID, demoAllowedTargets, resolveChangeData, resolveChangeReply } from "./changeMock";
 import { DEMO_ITSM_MODE_KEY } from "./itsmMode";
 import { resolveData } from "./mockData";
 import { PHASE_PATH } from "@/lib/changePhases";
@@ -8,6 +8,7 @@ import type {
   Change,
   ChangeApproval,
   ChangeCalendar,
+  ChangeEvent,
   ChangeImpact,
   ChangePage,
   ChangeRisk,
@@ -117,7 +118,7 @@ describe("change demo mock (Mode B)", () => {
     for (const path of ["templates", "templates/1", "cabs", "risk-questions", "freeze-windows", "legacy-archive"]) {
       expect(get(`${base}/${path}`), path).toBeDefined();
     }
-    expect(get(`${base}/legacy-archive`)).toMatchObject({ can_start: true, archived: 3 });
+    expect(get(`${base}/legacy-archive`)).toMatchObject({ can_start: true, archived: 2 });
   });
 
   it("answers the portal schedule with scheduled, running and closed windows of portal-visible changes", () => {
@@ -216,5 +217,61 @@ describe("change demo mock (Mode A and off)", () => {
     expect((resolveData("/api/v1/itsm/changes/status", "GET") as ChangeStatus).available).toBe(true);
     localStorage.setItem(DEMO_ITSM_MODE_KEY, "znuny_readthrough");
     expect(resolveData("/api/v1/itsm/changes/status", "GET")).toMatchObject({ legacy: "live" });
+  });
+});
+
+describe("change demo mock fidelity", () => {
+  it("lists the events newest first and honours before_id and limit", () => {
+    const events = get("/api/v1/itsm/changes/130/events") as ChangeEvent[];
+    expect(events.map((e) => e.id)).toEqual([3, 2, 1]);
+    expect((get("/api/v1/itsm/changes/130/events", "?before_id=3") as ChangeEvent[]).map((e) => e.id)).toEqual([2, 1]);
+    expect((get("/api/v1/itsm/changes/130/events", "?limit=1") as ChangeEvent[]).map((e) => e.id)).toEqual([3]);
+  });
+
+  it("uses only ticket states the backend writes", () => {
+    const states = new Set<string>();
+    for (const id of [130, 131, 132, 133, 134, 135]) states.add((get(`/api/v1/itsm/changes/${id}`) as Change).ticket_state);
+    expect([...states].sort()).toEqual(["closed successful", "open"]);
+  });
+
+  it("offers a standard draft the pre-approved step to scheduled and no submission", () => {
+    expect(demoAllowedTargets("standard", "draft")).toEqual(["cancelled", "scheduled"]);
+    expect(demoAllowedTargets("normal", "draft")).toEqual(["submitted", "cancelled"]);
+    expect(demoAllowedTargets("emergency", "draft")).toEqual(["cancelled", "approval"]);
+    expect(demoAllowedTargets("standard", "implementing")).toEqual(["review", "closed"]);
+  });
+
+  it("derives score and level from answers and findings with the default thresholds", () => {
+    const risk = get("/api/v1/itsm/changes/132/risk") as ChangeRisk;
+    const sum = risk.answer_points + risk.findings.reduce((n, f) => n + f.points, 0);
+    expect(risk.score).toBe(sum);
+    expect(risk.level).toBe("very_high");
+    expect(risk.findings.find((f) => f.check_key === "core.freeze")?.points).toBe(10);
+    expect(risk.findings.find((f) => f.check_key === "core.emergency")?.points).toBe(5);
+    const list = get("/api/v1/itsm/changes") as ChangePage;
+    for (const item of list.items) {
+      expect(item.risk_level).toBe((get(`/api/v1/itsm/changes/${item.ticket_id}/risk`) as ChangeRisk).level);
+    }
+  });
+
+  it("counts the archive like the legacy list", () => {
+    expect(get("/api/v1/admin/itsm/change/legacy-archive")).toMatchObject({ archived: 2 });
+  });
+
+  it("answers the backend's error codes in Mode A and off", () => {
+    expect(resolveChangeReply("/api/v1/itsm/changes", "GET", "", "znuny_readthrough")).toEqual({ status: 409, body: { detail: { code: "change_mode_a" } } });
+    expect(resolveChangeReply("/api/v1/itsm/changes/130/transition", "POST", "", "off")).toEqual({ status: 404, body: { detail: { code: "change_unavailable" } } });
+    expect(resolveChangeReply("/api/v1/itsm/changes/status", "GET", "", "off")?.status).toBe(200);
+    expect(resolveChangeReply("/api/v1/itsm/legacy-changes", "GET", "", "off")?.status).toBe(404);
+    expect(resolveChangeReply("/api/v1/itsm/legacy-changes", "GET", "", "znuny_readthrough")?.status).toBe(200);
+  });
+
+  it("answers write statuses like the API", () => {
+    expect(resolveChangeReply("/api/v1/itsm/changes", "POST", "", "tiqora")?.status).toBe(201);
+    expect(resolveChangeReply("/api/v1/itsm/changes/130/transition", "POST", "", "tiqora")?.status).toBe(200);
+    expect(resolveChangeReply("/api/v1/itsm/changes/130/impact/recompute", "POST", "", "tiqora")?.status).toBe(202);
+    expect(resolveChangeReply("/api/v1/admin/itsm/change/templates/1", "DELETE", "", "tiqora")?.status).toBe(204);
+    expect(resolveChangeReply("/api/v1/tickets/7/change", "POST", "", "tiqora")?.status).toBe(200);
+    expect(resolveChangeReply("/api/v1/itsm/services/1/recent-incident", "GET", "", "tiqora")).toBeUndefined();
   });
 });

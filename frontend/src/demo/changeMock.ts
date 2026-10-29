@@ -86,8 +86,6 @@ type ChangeRow = {
   title: string;
   type: Change["change_type"];
   phase: Change["phase"];
-  risk: string | null;
-  score: number | null;
   start: string | null;
   end: string | null;
   services: number[];
@@ -106,8 +104,6 @@ const CHANGES: ChangeRow[] = [
     title: "Switch-Firmware im Rechenzentrum aktualisieren",
     type: "normal",
     phase: "approval",
-    risk: "high",
-    score: 24,
     start: "2026-10-24T20:00:00Z",
     end: "2026-10-25T00:00:00Z",
     services: [1, 3],
@@ -123,8 +119,6 @@ const CHANGES: ChangeRow[] = [
     title: "Neues Backup-Fenster für die Datenbankserver",
     type: "standard",
     phase: "scheduled",
-    risk: "low",
-    score: 4,
     start: "2026-10-20T01:00:00Z",
     end: "2026-10-20T03:00:00Z",
     services: [1],
@@ -138,8 +132,6 @@ const CHANGES: ChangeRow[] = [
     title: "Notfall: Firewall-Regel gegen Angriffswelle einspielen",
     type: "emergency",
     phase: "implementing",
-    risk: "very_high",
-    score: 41,
     start: "2026-10-14T09:00:00Z",
     end: "2026-10-14T11:00:00Z",
     services: [1, 2, 3],
@@ -155,8 +147,6 @@ const CHANGES: ChangeRow[] = [
     title: "Mail-Gateway auf neue Version migrieren",
     type: "normal",
     phase: "assessment",
-    risk: "medium",
-    score: 14,
     start: "2026-11-07T18:00:00Z",
     end: "2026-11-07T22:00:00Z",
     services: [2],
@@ -168,8 +158,6 @@ const CHANGES: ChangeRow[] = [
     title: "Wartung des Druckservers",
     type: "normal",
     phase: "draft",
-    risk: null,
-    score: null,
     start: null,
     end: null,
     services: [],
@@ -181,8 +169,6 @@ const CHANGES: ChangeRow[] = [
     title: "Zertifikat des Webportals erneuern",
     type: "normal",
     phase: "closed",
-    risk: "low",
-    score: 6,
     start: "2026-10-05T19:00:00Z",
     end: "2026-10-05T20:00:00Z",
     services: [1],
@@ -214,11 +200,12 @@ const PHASE_TARGETS: Record<Change["phase"], Change["phase"][]> = {
 
 const tn = (id: number) => `20261012${id}`;
 
+// The only ticket states the backend writes (settings `state_open`, `state_closed_*`).
 const TICKET_STATE: Record<Change["phase"], [string, string]> = {
-  draft: ["new", "new"],
+  draft: ["open", "open"],
   submitted: ["open", "open"],
   assessment: ["open", "open"],
-  approval: ["pending reminder", "pending reminder"],
+  approval: ["open", "open"],
   scheduled: ["open", "open"],
   implementing: ["open", "open"],
   review: ["open", "open"],
@@ -227,17 +214,24 @@ const TICKET_STATE: Record<Change["phase"], [string, string]> = {
   cancelled: ["closed unsuccessful", "closed"],
 };
 
-function changeOut(c: ChangeRow): Change {
-  const emergency = c.type === "emergency";
-  const [state, stateType] = TICKET_STATE[c.phase];
-  const targets = PHASE_TARGETS[c.phase].filter(
+/** Next phases a person may take in the demo (the allowed targets of `phases.py` without the SYSTEM-only ones). */
+export function demoAllowedTargets(type: Change["change_type"], phase: Change["phase"]): Change["phase"][] {
+  const emergency = type === "emergency";
+  const targets = PHASE_TARGETS[phase].filter(
     (p) =>
       // A standard change is pre-approved by its template; an emergency change skips the assessment.
-      !(c.type === "standard" && (p === "submitted" || p === "assessment" || p === "approval")) &&
+      !(type === "standard" && (p === "submitted" || p === "assessment" || p === "approval")) &&
       !(emergency && (p === "submitted" || p === "assessment")),
   );
-  if (emergency && c.phase === "draft") targets.push("approval");
-  if (c.type === "standard" && c.phase === "implementing") targets.push("closed");
+  if (emergency && phase === "draft") targets.push("approval");
+  if (type === "standard" && phase === "draft") targets.push("scheduled");
+  if (type === "standard" && phase === "implementing") targets.push("closed");
+  return targets;
+}
+
+function changeOut(c: ChangeRow): Change {
+  const [state, stateType] = TICKET_STATE[c.phase];
+  const targets = demoAllowedTargets(c.type, c.phase);
   const finished = c.phase === "closed";
   return {
     ticket_id: c.id,
@@ -260,11 +254,11 @@ function changeOut(c: ChangeRow): Change {
     backout_plan: c.phase === "draft" ? null : "Gesicherte Konfiguration zurückspielen und die vorherige Version wiederherstellen.",
     test_plan: c.phase === "draft" ? null : "Erreichbarkeit der betroffenen Dienste und Anmeldung prüfen.",
     pir_notes: finished ? "Der Austausch verlief ohne Unterbrechung." : null,
-    risk_level: c.risk,
-    risk_score: c.score,
+    risk_level: riskCalc(c).level,
+    risk_score: riskCalc(c).score,
     risk_override_level: null,
     risk_override_reason: null,
-    effective_risk_level: c.risk,
+    effective_risk_level: riskCalc(c).level,
     approval_round: c.round ?? 0,
     approval_via: c.via ?? null,
     approved_at: c.phase === "approval" || c.phase === "draft" || c.phase === "submitted" || c.phase === "assessment" ? null : T1,
@@ -296,7 +290,7 @@ function listItem(c: ChangeRow): ChangeListItem {
     owner_id: c.owner,
     planned_start: c.start,
     planned_end: c.end,
-    risk_level: c.risk,
+    risk_level: riskCalc(c).level,
     service_ids: c.services,
     updated_at: T1,
   };
@@ -393,58 +387,88 @@ const RISK_QUESTIONS: AdminRiskQuestion[] = [
   },
 ];
 
+const THRESHOLDS = { medium_from: 10, high_from: 20, very_high_from: 35 };
+
+/** Default weights of `ItsmChangeSettings`: freeze 10, emergency 5, service criticality (top - 2) * 3. */
+const ANSWERS: Record<number, Record<string, string>> = {
+  [DEMO_APPROVAL_CHANGE_TICKET_ID]: { tested: "partly", downtime: "long" },
+  131: { tested: "yes", downtime: "short" },
+  132: { tested: "no", downtime: "long" },
+  133: { tested: "partly", downtime: "long" },
+  135: { tested: "yes", downtime: "short" },
+};
+
+function riskCalc(c: ChangeRow): {
+  answers: Record<string, string>;
+  answerPoints: number;
+  findings: ChangeRisk["findings"];
+  score: number | null;
+  level: string | null;
+} {
+  if (c.phase === "draft") return { answers: {}, answerPoints: 0, findings: [], score: null, level: null };
+  const answers = ANSWERS[c.id] ?? {};
+  const answerPoints = RISK_QUESTIONS.reduce(
+    (sum, q) => sum + (q.answers.find((a) => a.key === answers[q.question_key])?.points ?? 0),
+    0,
+  );
+  const findings: ChangeRisk["findings"] = [];
+  if (c.id === 132) {
+    findings.push({
+      check_key: "core.freeze",
+      severity: "warn",
+      points: 10,
+      message_key: "itsm.change.risk.findings.freeze",
+      params: { freezes: 1 },
+      refs: [],
+      hidden_ref_count: 0,
+    });
+  }
+  if (c.services.length > 1) {
+    findings.push({
+      check_key: "core.service_criticality",
+      severity: "warn",
+      points: 9,
+      message_key: "itsm.change.risk.findings.service_criticality",
+      params: { criticality: 5, services: c.services.length },
+      refs: [`service:${c.services[0]}`],
+      hidden_ref_count: 0,
+    });
+  }
+  if (c.type === "emergency") {
+    findings.push({
+      check_key: "core.emergency",
+      severity: "info",
+      points: 5,
+      message_key: "itsm.change.risk.findings.emergency",
+      params: {},
+      refs: [],
+      hidden_ref_count: 0,
+    });
+  }
+  const score = answerPoints + findings.reduce((sum, f) => sum + f.points, 0);
+  const level =
+    score >= THRESHOLDS.very_high_from ? "very_high" : score >= THRESHOLDS.high_from ? "high" : score >= THRESHOLDS.medium_from ? "medium" : "low";
+  return { answers, answerPoints, findings, score, level };
+}
+
 function riskOf(c: ChangeRow): ChangeRisk {
+  const calc = riskCalc(c);
   const answered = c.phase !== "draft";
-  const findings: ChangeRisk["findings"] =
-    c.id === 132
-      ? [
-          {
-            check_key: "core.freeze",
-            severity: "warn",
-            points: 8,
-            message_key: "itsm.change.risk.findings.freeze",
-            params: { freezes: 1 },
-            refs: [],
-            hidden_ref_count: 0,
-          },
-          {
-            check_key: "core.emergency",
-            severity: "info",
-            points: 10,
-            message_key: "itsm.change.risk.findings.emergency",
-            params: {},
-            refs: [],
-            hidden_ref_count: 0,
-          },
-        ]
-      : c.services.length > 1
-        ? [
-            {
-              check_key: "core.service_criticality",
-              severity: "warn",
-              points: 6,
-              message_key: "itsm.change.risk.findings.service_criticality",
-              params: { criticality: 5, services: c.services.length },
-              refs: [`service:${c.services[0]}`],
-              hidden_ref_count: 0,
-            },
-          ]
-        : [];
   return {
     questions: RISK_QUESTIONS,
-    answers: answered ? { tested: "partly", downtime: "short" } : {},
-    answer_points: answered ? 6 : 0,
-    findings,
-    score: c.score,
-    level: c.risk,
+    answers: calc.answers,
+    answer_points: calc.answerPoints,
+    findings: calc.findings,
+    score: calc.score,
+    level: calc.level,
     override_level: null,
     override_reason: null,
-    effective_level: c.risk,
+    effective_level: calc.level,
     evaluated_at: answered ? T0 : null,
     questionnaire_complete: answered,
     incomplete: !answered,
     blocked: false,
-    thresholds: { medium_from: 10, high_from: 20, very_high_from: 35 },
+    thresholds: THRESHOLDS,
     can_answer: c.phase === "draft" || c.phase === "submitted" || c.phase === "assessment",
     can_override: true,
   };
@@ -566,7 +590,8 @@ function relatedOf(id: number): ChangeRelatedTicket[] {
   ];
 }
 
-function eventsOf(c: ChangeRow): ChangeEvent[] {
+/** Newest first like the API; `before_id` pages backwards, `limit` caps the page. */
+function eventsOf(c: ChangeRow, params: URLSearchParams): ChangeEvent[] {
   const events: ChangeEvent[] = [
     { id: 1, created_at: T0, created_by: c.owner, event: "created", from_phase: null, to_phase: null, detail: null },
     { id: 2, created_at: T0, created_by: c.owner, event: "phase", from_phase: null, to_phase: "draft", detail: null },
@@ -574,7 +599,12 @@ function eventsOf(c: ChangeRow): ChangeEvent[] {
   if (c.phase !== "draft") {
     events.push({ id: 3, created_at: T1, created_by: c.owner, event: "phase", from_phase: "draft", to_phase: c.phase, detail: null });
   }
-  return events;
+  const before = Number(params.get("before_id")) || Infinity;
+  const limit = Number(params.get("limit")) || 50;
+  return events
+    .filter((e) => e.id < before)
+    .reverse()
+    .slice(0, limit);
 }
 
 const APPROVAL_SNAPSHOT: ChangeApprovalSnapshot = {
@@ -925,14 +955,14 @@ const FREEZE_WINDOWS: FreezeWindow[] = [
   },
 ];
 
-const ARCHIVE_STATUS: LegacyArchiveStatus = {
-  archived: 3,
+const archiveStatus = (): LegacyArchiveStatus => ({
+  archived: LEGACY.length,
   last_archived_at: T0,
   can_start: true,
   blocked_code: null,
   blocked_message: null,
   active_job_id: null,
-};
+});
 
 // ---- Znuny changes (read-only) ---------------------------------------------------------------------
 const LEGACY: LegacyChange[] = [
@@ -1149,7 +1179,7 @@ function changeRoutes(path: string, method: string, params: URLSearchParams): un
     const leaf = at[3];
     if (!sub) return method === "GET" || method === "PATCH" ? changeOut(row) : undefined;
     if (sub === "transition" && method === "POST") return changeOut(row);
-    if (sub === "events" && method === "GET") return eventsOf(row);
+    if (sub === "events" && method === "GET") return eventsOf(row, params);
     if (sub === "impact") return leaf === "recompute" ? (method === "POST" ? JOB_ACCEPTED : undefined) : impactOf(row);
     if (sub === "conflicts" && method === "GET") return conflictsOf(row.id);
     if (sub === "risk") return riskOf(row);
@@ -1234,7 +1264,7 @@ function adminRoutes(path: string, method: string): unknown | undefined {
     if (method === "DELETE") return null;
     return FREEZE_WINDOWS.find((f) => f.id === Number(freeze[1]));
   }
-  if (rest === "legacy-archive") return method === "POST" ? JOB_ACCEPTED : ARCHIVE_STATUS;
+  if (rest === "legacy-archive") return method === "POST" ? JOB_ACCEPTED : archiveStatus();
   return undefined;
 }
 
@@ -1260,4 +1290,38 @@ export function resolveChangeData(
       : changeOut(NEW_CHANGE);
   }
   return undefined;
+}
+
+const MODE_B_ONLY =
+  /\/api\/v1\/itsm\/(changes(?!\/status$)|change-tasks|change-calendar|change-templates|freeze-windows|cabs|cab-meetings)|\/api\/v1\/tickets\/\d+\/change(\/create-from)?$|\/api\/portal\/change-schedule$/;
+
+export type ChangeReply = { status: number; body?: unknown };
+
+/**
+ * The answer with its status, for the handlers that can send one: the data of `resolveChangeData`
+ * (201/202 for the creating writes, 204 for deletes) and, like the backend, 404 `change_unavailable`
+ * while ITSM is off and 409 `change_mode_a` in Mode A for the routes that need the Tiqora change
+ * management. `undefined`: not a change route.
+ */
+export function resolveChangeReply(
+  path: string,
+  method: string,
+  search = "",
+  mode: DemoItsmMode = demoItsmMode(),
+): ChangeReply | undefined {
+  if (mode !== "tiqora" && MODE_B_ONLY.test(path)) {
+    return mode === "off"
+      ? { status: 404, body: { detail: { code: "change_unavailable" } } }
+      : { status: 409, body: { detail: { code: "change_mode_a" } } };
+  }
+  if (mode === "off" && path.includes("/api/v1/itsm/legacy-changes")) {
+    return { status: 404, body: { detail: { code: "change_unavailable" } } };
+  }
+  const body = resolveChangeData(path, method, search, mode);
+  if (body === undefined) return undefined;
+  if (body === null) return { status: 204 };
+  if (method !== "POST") return { status: 200, body };
+  if (/\/(impact\/recompute|legacy-archive)$/.test(path)) return { status: 202, body };
+  if (/\/(transition|risk\/evaluate)$/.test(path) || /\/tickets\/\d+\/change$/.test(path)) return { status: 200, body };
+  return { status: 201, body };
 }

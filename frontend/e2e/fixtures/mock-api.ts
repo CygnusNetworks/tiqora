@@ -15,7 +15,7 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
-import { resolveChangeData } from "../../src/demo/changeMock";
+import { resolveChangeReply } from "../../src/demo/changeMock";
 import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
@@ -1245,7 +1245,7 @@ export async function mockApi(page: Page) {
     // ITSM core: the stateful store answers the routes the e2e flows write to and read back; the demo
     // resolver answers the rest (read-only Mode A data). The mode comes from the page's localStorage
     // (default "tiqora").
-    if (/\/api\/v1\/(itsm\/|admin\/itsm|admin\/priorities|jobs\/|tickets\/(search$|\d+\/(cis|itsm|links|link-graph|problem|major-incident|linked-articles)))/.test(path)) {
+    if (/\/api\/v1\/(itsm\/|admin\/itsm|admin\/priorities|jobs\/|tickets\/(search$|\d+\/(cis|itsm|links|link-graph|problem|major-incident|linked-articles|change(\/create-from)?$)))|\/api\/portal\/change-schedule$/.test(path)) {
       // the ITSM import page (admin/itsm/import/*, its demo job): the demo resolver, read and write
       const imported = resolveItsmImport(path, method);
       if (imported !== undefined) {
@@ -1262,11 +1262,18 @@ export async function mockApi(page: Page) {
         return;
       }
       if (method === "GET") {
-        const itsm = resolveItsmData(path, method, url.search, mode) ?? resolveChangeData(path, method, url.search, mode);
+        const itsm = resolveItsmData(path, method, url.search, mode);
         if (itsm !== undefined) {
           await json(route, 200, itsm);
           return;
         }
+      }
+      // Change management: every method; Mode A / off answer 409 / 404 like the backend (stateless writes).
+      const change = resolveChangeReply(path, method, url.search, mode);
+      if (change) {
+        if (change.status === 204) await route.fulfill({ status: 204, body: "" });
+        else await json(route, change.status, change.body ?? null);
+        return;
       }
     }
 
