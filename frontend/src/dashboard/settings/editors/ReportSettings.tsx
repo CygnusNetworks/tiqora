@@ -38,6 +38,14 @@ export function ReportSettingsEditor({ value, onChange, errors }: SettingsEditor
   const reportKey = typeof value.report_key === "string" ? value.report_key : "";
   const chosen: ReportItem | undefined = reports.find((r) => r.key === reportKey);
   const definition = chosen?.definition ?? undefined;
+  // A built-in hidden from the catalogue (ITSM mode) still runs on this tile: name it instead of "choose".
+  const storedQ = useQuery({
+    queryKey: ["reports", "get", reportKey],
+    queryFn: ({ signal }) => reportsApi.get(reportKey, signal),
+    enabled: catalogue.isSuccess && reportKey !== "" && !chosen,
+    retry: false,
+  });
+  const hidden = !chosen && storedQ.data && isBuiltinReport(storedQ.data) ? storedQ.data : undefined;
   const hasParams = definition ? runtimeParameters(definition).length > 0 : false;
   const sources = useQuery({
     queryKey: ["reports", "sources"],
@@ -74,7 +82,7 @@ export function ReportSettingsEditor({ value, onChange, errors }: SettingsEditor
         </label>
         <select
           id={`${uid}-report`}
-          value={chosen ? reportKey : ""}
+          value={chosen || hidden ? reportKey : ""}
           onChange={(e) => pickReport(e.target.value)}
           aria-describedby={errors.report_key ? `${uid}-report-err` : undefined}
           aria-invalid={errors.report_key ? true : undefined}
@@ -84,6 +92,11 @@ export function ReportSettingsEditor({ value, onChange, errors }: SettingsEditor
           <option value="" disabled>
             {catalogue.isPending ? t("dashboards.state.loading") : t("dashboards.settings.report.choose")}
           </option>
+          {hidden && (
+            <option value={reportKey} disabled>
+              {reportTitle(hidden, t)}
+            </option>
+          )}
           {builtin.length > 0 && (
             <optgroup label={t("dashboards.settings.report.builtin")}>
               {builtin.map((r) => (

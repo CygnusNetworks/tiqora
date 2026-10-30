@@ -26,6 +26,7 @@ export const DEMO_FACTS: FactsStatus = {
   backfill_status: "done",
   backfill_job_id: null,
   backfill_progress: 1,
+  outdated_rows: 0,
 };
 
 /** Facts while the first build runs (demo switch `?demo_facts=building`, see handlers.ts). */
@@ -35,6 +36,7 @@ export const DEMO_FACTS_BUILDING: FactsStatus = {
   backfill_status: "running",
   backfill_job_id: 9203,
   backfill_progress: 0.42,
+  outdated_rows: 0,
 };
 
 let factsBuilding = false;

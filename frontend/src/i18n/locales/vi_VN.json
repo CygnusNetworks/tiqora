@@ -5285,6 +5285,7 @@
       "dirtyHint": "Tickets whose values are being recalculated",
       "lastSnapshot": "Last daily snapshot",
       "factRows": "Ticket rows",
+      "outdatedRows": "Still to recalculate",
       "eventRows": "Event rows",
       "rebuild": "Rebuild report data",
       "rebuildSince": "From date (optional)",
@@ -7079,6 +7080,7 @@
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
+    "emptyNoPeriod": "There is no data for this report.",
     "loading": "Building the report …",
     "error": "The report could not be built.",
     "other": "Others",
@@ -7098,6 +7100,7 @@
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
+    "factsUpgrading": "The figures are being recalculated after the update. First-level and ITSM solution time values are incomplete until then.",
     "factsAsOf": "As of {{time}}",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
@@ -7691,7 +7694,7 @@
         "heatmap": "Heatmap",
         "kpi": "Key figures"
       },
-      "sourceUnavailable": "This data basis only exists once Tiqora leads the ITSM (mode B)."
+      "sourceUnavailable": "This data basis is only maintained while Tiqora leads the ITSM (mode B). The figures may be empty or out of date."
     },
     "sources": {
       "tickets": "Tickets",

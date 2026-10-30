@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
@@ -8,11 +8,14 @@ import { reportsApi, type FactsStatus } from "@/lib/reportsApi";
 
 /** How often the build progress is re-read while the data is being built. */
 const FACTS_POLL_MS = 15_000;
+/** The fact upgrade after an update takes hours: the count behind its notice is re-read rarely. */
+const UPGRADE_POLL_MS = 5 * 60_000;
 
 /**
  * Notice while the report data is still being built (first start, rebuild):
  * the numbers are incomplete until then. Admins follow the rebuild's progress,
- * everyone else sees the percentage.
+ * everyone else sees the percentage. A second notice while the fact upgrade after
+ * an update recomputes old rows.
  */
 export function FactsBanner({
   facts,
@@ -26,26 +29,37 @@ export function FactsBanner({
   const queryClient = useQueryClient();
   // The page's own status (catalogue/result) is read once; while building, re-read it so
   // everyone sees the percentage move and the banner goes away when the build is done.
+  // A report result carries no upgrade count, so the status is always read once.
   const statusQ = useQuery({
     queryKey: ["reports", "facts"],
     queryFn: ({ signal }) => reportsApi.factsStatus(signal),
-    enabled: facts != null && !facts.ready,
-    refetchInterval: FACTS_POLL_MS,
+    enabled: facts != null,
+    refetchInterval: (query) =>
+      facts != null && !facts.ready
+        ? FACTS_POLL_MS
+        : (query.state.data?.outdated_rows ?? 0) > 0
+          ? UPGRADE_POLL_MS
+          : false,
   });
   const current = facts != null && !facts.ready ? (statusQ.data ?? facts) : facts;
   const building = current != null && !current.ready;
+  const upgrading = facts != null && !building && (statusQ.data?.outdated_rows ?? facts.outdated_rows ?? 0) > 0;
   const finished = facts != null && !facts.ready && statusQ.data?.ready === true;
+  const wasUpgrading = useRef(false);
   useEffect(() => {
-    // Built meanwhile: reload the catalogue and the reports with complete numbers.
-    if (finished) void queryClient.invalidateQueries({ queryKey: ["reports"] });
-  }, [finished, queryClient]);
+    // Built or upgraded meanwhile: reload the catalogue and the reports with complete numbers.
+    const upgraded = wasUpgrading.current && !upgrading;
+    wasUpgrading.current = upgrading;
+    if (finished || upgraded) void queryClient.invalidateQueries({ queryKey: ["reports"] });
+  }, [finished, upgrading, queryClient]);
   const jobId = building && user?.is_admin ? (current.backfill_job_id ?? null) : null;
   const { job } = useJob(jobId);
-  if (!building) return null;
+  if (!building && !upgrading) return null;
 
-  const progress = current.backfill_progress;
-  const text =
-    progress != null && progress > 0 && progress < 1
+  const progress = current?.backfill_progress;
+  const text = !building
+    ? t("reports.factsUpgrading")
+    : progress != null && progress > 0 && progress < 1
       ? t("reports.factsBuildingProgress", { percent: Math.floor(progress * 100) })
       : t("reports.factsBuilding");
 

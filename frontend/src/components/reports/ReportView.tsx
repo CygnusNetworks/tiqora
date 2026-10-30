@@ -21,7 +21,8 @@ import type { ReportCell, ReportColumn, ReportDefinition, ReportResult } from "@
 import { PivotTable } from "./PivotTable";
 import { ReportTable } from "./ReportTable";
 import { usePluginReportTexts } from "./usePluginReportTexts";
-import { ADDITIVE_AGGS, useMeasureAggs } from "./useMeasureAggs";
+import { SourceUnavailableHint } from "./SourceUnavailableHint";
+import { ADDITIVE_AGGS, useMeasureAggs, useSourceUnavailable } from "./useMeasureAggs";
 import { cellLabel, formatMeasure, toSeries } from "./reportFormat";
 
 /** Enum dimensions keep their colour whatever the filter leaves over. */
@@ -134,7 +135,18 @@ function KpiRow({
  */
 const NO_REPORTS: readonly never[] = [];
 
-export function ReportView({
+export function ReportView(props: Parameters<typeof ReportResultView>[0]) {
+  const unavailable = useSourceUnavailable(props.report.definition.source);
+  if (!unavailable) return <ReportResultView {...props} />;
+  return (
+    <div className="space-y-2">
+      <SourceUnavailableHint testId={`${props.testId ?? "report-view"}-source-unavailable`} />
+      <ReportResultView {...props} />
+    </div>
+  );
+}
+
+function ReportResultView({
   report,
   result,
   testId = "report-view",
@@ -185,7 +197,7 @@ export function ReportView({
           className="rounded-lg border border-dashed border-hairline px-4 py-8 text-center text-sm text-muted"
           data-testid={`${testId}-empty`}
         >
-          {t("reports.empty")}
+          {definition.time_range == null && result.time_window == null ? t("reports.emptyNoPeriod") : t("reports.empty")}
         </p>
       </div>
     );

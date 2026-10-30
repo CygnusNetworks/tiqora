@@ -170,13 +170,33 @@ describe("ReportBuilderPage", () => {
     vi.spyOn(reportsApi, "get").mockResolvedValue(saved({ definition: demoReport("builtin.itsm_changes_by_status")!.definition }));
     renderAt("/agent/reports/41/edit", CAN);
     const hint = await screen.findByTestId("builder-source-unavailable");
-    expect(hint).toHaveTextContent("Diese Datenbasis gibt es erst, wenn Tiqora das ITSM führt (Modus B).");
+    expect(hint).toHaveTextContent("Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein.");
     expect(screen.getByTestId("builder-source")).toHaveTextContent("Changes");
     expect(screen.getByTestId("builder-source")).toBeDisabled();
     expect(screen.getByTestId("builder-save")).toBeDisabled();
     expect(screen.getByTestId("builder-save-copy")).toBeDisabled();
     expect(screen.getByTestId("builder-load-file")).toBeDisabled();
     expect(screen.getByTestId("builder-name")).toHaveAttribute("readonly");
+    // nothing can complete the report further, so the preview does not promise that
+    expect(screen.getByTestId("builder-preview-unavailable")).toHaveTextContent("Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein.");
+    expect(screen.queryByTestId("builder-preview-issues")).not.toBeInTheDocument();
+    expect(screen.getByTestId("builder-preview")).not.toHaveTextContent("sobald der Bericht vollständig ist");
+  });
+
+  it("keeps 'Aus Datei laden' for a new report loaded from a file on a hidden data basis", async () => {
+    withUnavailable("changes");
+    vi.spyOn(reportsApi, "importFile").mockResolvedValue({
+      name: "Aus Datei",
+      description: null,
+      definition: demoReport("builtin.itsm_changes_by_status")!.definition,
+    } as never);
+    renderAt("/agent/reports/new", CAN);
+    const file = new File(["{}"], "bericht.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => "{}" });
+    fireEvent.change(await screen.findByTestId("builder-file-input"), { target: { files: [file] } });
+    await screen.findByTestId("builder-source-unavailable");
+    expect(screen.getByTestId("builder-save")).toBeDisabled();
+    expect(screen.getByTestId("builder-load-file")).toBeEnabled();
   });
 
   it("waits for the data bases before the editor opens, then locks an unavailable one at once", async () => {

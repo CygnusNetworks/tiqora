@@ -40,6 +40,7 @@ const status: ReportingStatus = {
   backfill_status: "done",
   backfill_job_id: null,
   backfill_progress: 1,
+  outdated_rows: 1234,
   last_history_id: 48213,
   history_lag: 12,
   gap_count: 0,
@@ -75,6 +76,7 @@ describe("ReportingAdminPage", () => {
     expect(screen.getByTestId("admin-reporting-lag")).toHaveTextContent("12");
     expect(screen.getByTestId("admin-reporting-dirty")).toHaveTextContent("3");
     expect(screen.getByTestId("admin-reporting-fact-rows")).toHaveTextContent("1.840");
+    expect(screen.getByTestId("admin-reporting-outdated-rows")).toHaveTextContent("1.234");
     expect(screen.getByTestId("admin-reporting-last-snapshot")).toHaveTextContent("07.10.2026");
     expect(screen.getByTestId("admin-reporting-as-of")).not.toHaveTextContent("—");
   });

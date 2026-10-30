@@ -4581,7 +4581,7 @@
           },
           "state_closed_failed": {
             "label": "Ticket-Status: erfolglos abgeschlossen",
-            "help": "Ticket-Status eines gescheiterten oder zurückgerollten Changes."
+            "help": "Ticket-Status eines fehlgeschlagenen oder zurückgerollten Changes."
           },
           "state_closed_cancelled": {
             "label": "Ticket-Status: abgebrochen",
@@ -4628,8 +4628,8 @@
             "help": "Punkte, wenn das Zeitfenster einen Sperrzeitraum berührt."
           },
           "weight_failed_history": {
-            "label": "Gewicht: frühere gescheiterte Changes",
-            "help": "Punkte für gescheiterte Changes an denselben Services."
+            "label": "Gewicht: frühere fehlgeschlagene Changes",
+            "help": "Punkte für fehlgeschlagene Changes an denselben Services."
           },
           "weight_emergency": {
             "label": "Gewicht: Notfall-Change",
@@ -4644,8 +4644,8 @@
             "help": "Störungen der letzten Tage gelten als aktuell."
           },
           "failed_change_lookback_days": {
-            "label": "Rückblick gescheiterte Changes (Tage)",
-            "help": "Gescheiterte Changes der letzten Tage fließen in das Risiko ein."
+            "label": "Rückblick fehlgeschlagene Changes (Tage)",
+            "help": "Fehlgeschlagene Changes der letzten Tage fließen in das Risiko ein."
           },
           "impact_refresh_hours": {
             "label": "Auswirkung aktualisieren nach (Stunden)",
@@ -5293,6 +5293,7 @@
       "dirtyHint": "Tickets, deren Werte neu berechnet werden",
       "lastSnapshot": "Letzter Tagesstand",
       "factRows": "Ticketzeilen",
+      "outdatedRows": "Noch neu zu berechnen",
       "eventRows": "Ereigniszeilen",
       "rebuild": "Berichtsdaten neu aufbauen",
       "rebuildSince": "Ab Datum (optional)",
@@ -7087,6 +7088,7 @@
     "allReports": "Alle Berichte",
     "back": "Zurück zu den Berichten",
     "empty": "Für diesen Zeitraum gibt es keine Daten.",
+    "emptyNoPeriod": "Für diesen Bericht gibt es keine Daten.",
     "loading": "Bericht wird erstellt …",
     "error": "Der Bericht konnte nicht erstellt werden.",
     "other": "Weitere",
@@ -7106,6 +7108,7 @@
     "timeZone": "Zeitzone",
     "factsBuilding": "Die Berichtsdaten werden noch aufgebaut. Die Zahlen sind bis dahin unvollständig.",
     "factsBuildingProgress": "Die Berichtsdaten werden aufgebaut ({{percent}} %). Die Zahlen sind bis dahin unvollständig.",
+    "factsUpgrading": "Die Kennzahlen werden nach dem Update neu berechnet. First-Level- und ITSM-Lösungszeit-Werte sind bis dahin unvollständig.",
     "factsAsOf": "Stand: {{time}}",
     "weekLabel": "KW {{week}}",
     "hourLabel": "{{hour}} Uhr",
@@ -7268,7 +7271,7 @@
       },
       "itsm_change_outcomes": {
         "title": "Ergebnis der Changes",
-        "description": "Changes der letzten drei Monate je Change-Art: erfolgreich, gescheitert oder zurückgerollt, Erfolgsquote, abgelehnt und später fertig als geplant."
+        "description": "Changes der letzten drei Monate je Change-Art: erfolgreich, fehlgeschlagen oder zurückgerollt, Erfolgsquote, abgelehnt und später fertig als geplant."
       },
       "itsm_change_transitions": {
         "title": "Abgelehnte und abgebrochene Changes",
@@ -7415,7 +7418,7 @@
       "changes": "Changes",
       "open_changes": "Offene Changes",
       "successful_changes": "Erfolgreich",
-      "failed_changes": "Gescheitert oder zurückgerollt",
+      "failed_changes": "Fehlgeschlagen oder zurückgerollt",
       "change_success_rate": "Erfolgsquote",
       "emergency_changes": "Notfall-Changes",
       "rejected_changes": "Derzeit abgelehnt",
@@ -7506,7 +7509,7 @@
       },
       "change_outcome": {
         "successful": "Erfolgreich",
-        "failed": "Gescheitert",
+        "failed": "Fehlgeschlagen",
         "backed_out": "Zurückgerollt"
       },
       "change_status": {
@@ -7521,7 +7524,7 @@
         "rejected": "Abgelehnt",
         "cancelled": "Abgebrochen",
         "closed_successful": "Abgeschlossen – erfolgreich",
-        "closed_failed": "Abgeschlossen – gescheitert",
+        "closed_failed": "Abgeschlossen – fehlgeschlagen",
         "closed_backed_out": "Abgeschlossen – zurückgerollt"
       },
       "change_type": {
@@ -7699,7 +7702,7 @@
         "heatmap": "Heatmap",
         "kpi": "Kennzahlen"
       },
-      "sourceUnavailable": "Diese Datenbasis gibt es erst, wenn Tiqora das ITSM führt (Modus B)."
+      "sourceUnavailable": "Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein."
     },
     "sources": {
       "tickets": "Tickets",

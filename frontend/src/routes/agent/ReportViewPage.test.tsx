@@ -115,6 +115,12 @@ describe("ReportViewPage", () => {
     }
   });
 
+  it("says on the page when the report's data basis is hidden", async () => {
+    vi.mocked(reportsApi.sources).mockResolvedValue(demoSources().map((src) => ({ ...src, available: false })));
+    renderPage();
+    expect(await screen.findByTestId("report-view-source-unavailable")).toHaveTextContent("nur gepflegt, solange Tiqora das ITSM führt");
+  });
+
   it("loads the definition, runs it and exports XLSX via a background job", async () => {
     searchParams = { preset: "custom", from: "2026-09-01", to: "2026-09-30", queues: "1,2" };
     renderPage();

@@ -197,6 +197,12 @@ describe("ReportWidget", () => {
     expect(await screen.findByTestId("report-widget-view", undefined, { timeout: 4000 })).toBeInTheDocument();
   });
 
+  it("a tile on a hidden data basis says why its figures can be empty or old", async () => {
+    vi.spyOn(reportsApi, "sources").mockResolvedValue(demoSources().map((s) => ({ ...s, available: false })));
+    mount({ state: { status: "ok", data: tile() } as never });
+    expect(await screen.findByTestId("report-widget-view-source-unavailable")).toHaveTextContent("Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein.");
+  });
+
   it("is a 'reports' widget that only people who may view reports can use", () => {
     const def = DASHBOARD_WIDGETS.get("core.report")!;
     expect(def.category).toBe("reports");
@@ -268,6 +274,18 @@ describe("ReportSettingsEditor", () => {
     // another report starts without the first one's parameters
     fireEvent.change(select, { target: { value: REPORT.key } });
     expect(seen).toHaveBeenLastCalledWith(expect.objectContaining({ report_key: REPORT.key, parameters: {} }));
+  });
+
+  it("keeps a built-in hidden from the catalogue as a disabled option with its title", async () => {
+    const cat = demoCatalogue();
+    vi.spyOn(reportsApi, "catalogue").mockResolvedValue({ ...cat, reports: cat.reports.filter((r) => r.key !== REPORT.key) } as never);
+    vi.spyOn(reportsApi, "get").mockResolvedValue(REPORT as never);
+    render(<Editor initial={{ report_key: REPORT.key, parameters: {}, dimension_choices: {}, display: "auto", max_rows: 10 }} onValue={vi.fn()} />);
+    const select = (await screen.findByTestId("report-settings-report")) as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe(REPORT.key));
+    const option = Array.from(select.querySelectorAll("option")).find((o) => o.value === REPORT.key)!;
+    expect(option.textContent).toBe(i18n.t(REPORT.title_key));
+    expect(option.disabled).toBe(true);
   });
 
   it("the display, row count and own time range land in the settings", async () => {

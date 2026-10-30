@@ -138,6 +138,11 @@ export function ReportingAdminPage() {
               value={num(s.fact_rows)}
             />
             <StatTile
+              testId="admin-reporting-outdated-rows"
+              label={t("admin.reporting.outdatedRows")}
+              value={num(s.outdated_rows ?? 0)}
+            />
+            <StatTile
               testId="admin-reporting-event-rows"
               label={t("admin.reporting.eventRows")}
               value={num(s.event_rows)}

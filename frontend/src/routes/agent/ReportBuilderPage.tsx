@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { SourceUnavailableHint } from "@/components/reports/SourceUnavailableHint";
 import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
@@ -248,7 +249,12 @@ function Editor({
                 if (file) void loadFile(file);
               }}
             />
-            <Button onClick={() => fileInput.current?.click()} disabled={locked} data-testid="builder-load-file">
+            <Button
+              onClick={() => fileInput.current?.click()}
+              // a new report on a hidden data basis has nothing to lose: another file may replace it
+              disabled={mode === "new" ? sourcesQ.isPending : locked}
+              data-testid="builder-load-file"
+            >
               {t("reports.builder.loadFile")}
             </Button>
             {mode === "edit" && (
@@ -279,22 +285,14 @@ function Editor({
         )}
       </div>
 
-      {unavailable && (
-        <p
-          className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-ink"
-          role="status"
-          data-testid="builder-source-unavailable"
-        >
-          {t("reports.builder.sourceUnavailable")}
-        </p>
-      )}
+      {unavailable && <SourceUnavailableHint testId="builder-source-unavailable" />}
 
       <fieldset
         disabled={locked}
         className="m-0 grid min-w-0 gap-6 border-0 p-0 lg:grid-cols-[20rem_minmax(0,1fr)_16rem] xl:grid-cols-[22rem_minmax(0,1fr)_18rem]"
       >
         <BuilderFieldsPanel state={state} dispatch={dispatch} sources={sources} source={source} issues={issues} />
-        <BuilderPreview definition={locked ? null : definition} issues={issues} />
+        <BuilderPreview definition={locked ? null : definition} issues={issues} unavailable={unavailable} />
         <BuilderOptionsPanel state={state} dispatch={dispatch} source={source} />
       </fieldset>
 

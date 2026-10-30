@@ -221,7 +221,7 @@
       "emergency_changes": "Notfall-Changes",
       "escalated": "Eskaliert",
       "events": "Ereignisse",
-      "failed_changes": "Gescheitert oder zurückgerollt",
+      "failed_changes": "Fehlgeschlagen oder zurückgerollt",
       "fcr_rate": "Im ersten Kontakt gelöst",
       "first_level_solution_rate": "First-Level-Lösungsquote",
       "first_level_solved": "Im ersten Kontakt gelöst",
@@ -280,7 +280,7 @@
     "values": {
       "change_outcome": {
         "backed_out": "Zurückgerollt",
-        "failed": "Gescheitert",
+        "failed": "Fehlgeschlagen",
         "successful": "Erfolgreich"
       },
       "change_phase": {
@@ -301,7 +301,7 @@
         "cancelled": "Abgebrochen",
         "closed": "Abgeschlossen",
         "closed_backed_out": "Abgeschlossen – zurückgerollt",
-        "closed_failed": "Abgeschlossen – gescheitert",
+        "closed_failed": "Abgeschlossen – fehlgeschlagen",
         "closed_successful": "Abgeschlossen – erfolgreich",
         "draft": "Entwurf",
         "implementing": "Umsetzung",
