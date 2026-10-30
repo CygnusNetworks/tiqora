@@ -382,6 +382,7 @@ async def test_sources_endpoint(env: Env) -> None:
         "daily_snapshot",
         "accounted_time",
         "open_tickets",
+        "config_items",
     }
     tickets = sources["tickets"]
     queue = next(d for d in tickets["dimensions"] if d["key"] == "queue")

@@ -112,7 +112,14 @@ def test_unrepresentable_relative_range_is_a_definition_error() -> None:
 
 def test_core_sources_registered_with_expected_keys() -> None:
     reg = _registry()
-    keys = ["tickets", "ticket_events", "daily_snapshot", "accounted_time", "open_tickets"]
+    keys = [
+        "tickets",
+        "ticket_events",
+        "daily_snapshot",
+        "accounted_time",
+        "open_tickets",
+        "config_items",
+    ]
     assert [s.key for s in reg.items(REPORT_SOURCES)] == keys
     assert [s.key for s in core_report_sources()] == keys
 
@@ -320,6 +327,7 @@ def test_source_keys_order_and_flags() -> None:
     assert [k for k, s in by_key.items() if not s.requires_facts] == [
         "accounted_time",
         "open_tickets",
+        "config_items",
     ]
     assert by_key["open_tickets"].default_time_field is None
     assert by_key["open_tickets"].time_fields == ("created",)

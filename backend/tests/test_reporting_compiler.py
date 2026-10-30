@@ -47,6 +47,8 @@ from tiqora.reporting.definition import (
 from tiqora.reporting.semantic import REPORT_SOURCES
 
 AGENT, Q_IN, Q_IN2, Q_OUT = 47710, 47711, 47712, 47713
+#: CMDB rows for the class-scoped ``config_items`` source (class, two catalog rows, one CI)
+CMDB_CLASS, CMDB_DEPLOYMENT, CMDB_INCIDENT, CMDB_CI = 47735, 47736, 47737, 47738
 G_IN, G_OUT = 47711, 47713
 T_A, T_OUT, T_ARCH, T_MOVED = 47720, 47721, 47722, 47723
 LO, HI = 47710, 47739
@@ -63,6 +65,7 @@ def _registry() -> Registry:
 
 
 SCOPE = TicketQueryScope(user_id=AGENT, queue_ids=frozenset({Q_IN, Q_IN2}))
+CLASS_IDS = frozenset({CMDB_CLASS})
 REG = _registry()
 NOW = datetime(2024, 6, 12, 10, 0)
 
@@ -76,6 +79,7 @@ def comp(defn: dict[str, Any], scope: TicketQueryScope = SCOPE, **params: Any) -
         now=NOW,
         near_miss_percent=10,
         registry=REG,
+        cmdb_class_ids=CLASS_IDS,
     )
 
 
@@ -555,6 +559,9 @@ def test_group_by_keeps_original_dimension_indices() -> None:
 _URLS: set[str] = set()
 _BAND = {"lo": LO, "hi": HI}
 _CLEANUP = (
+    "DELETE FROM tiqora_cmdb_ci WHERE id BETWEEN :lo AND :hi",
+    "DELETE FROM tiqora_cmdb_catalog WHERE id BETWEEN :lo AND :hi",
+    "DELETE FROM tiqora_cmdb_class WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_daily_snapshot WHERE queue_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_ticket_event WHERE ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_ticket_fact WHERE ticket_id BETWEEN :lo AND :hi",
@@ -637,6 +644,42 @@ def _event(tid: int, kind: str, at: datetime, queue: int, **kw: Any) -> dict[str
     return row
 
 
+def _seed_cmdb(conn: Any, created: datetime) -> None:
+    """One CI of a class the viewer may read (``CLASS_IDS``), created inside ``WINDOW``."""
+    stamps = {"u": AGENT, "t": created}
+    conn.execute(
+        text(
+            "INSERT INTO tiqora_cmdb_class (id, class_key, name, number_prefix, number_counter,"
+            " group_id, portal_visible, position, valid, lock_version, created_by, created_at,"
+            " changed_by, changed_at) VALUES (:id, 'rep47cmp', 'rep47cmp', '47', 0, :g, false, 0,"
+            " true, 1, :u, :t, :u, :t)"
+        ),
+        {"id": CMDB_CLASS, "g": G_IN, **stamps},
+    )
+    for cid, catalog, key, functionality in (
+        (CMDB_DEPLOYMENT, "rep47_deployment", "production", "productive"),
+        (CMDB_INCIDENT, "rep47_incident", "incident", "incident"),
+    ):
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_cmdb_catalog (id, catalog_class, item_key, name,"
+                " functionality, position, valid, created_at, changed_at)"
+                " VALUES (:id, :c, :k, :k, :f, 0, true, :t, :t)"
+            ),
+            {"id": cid, "c": catalog, "k": key, "f": functionality, "t": created},
+        )
+    conn.execute(
+        text(
+            "INSERT INTO tiqora_cmdb_ci (id, number, class_id, name, deployment_state_id,"
+            " incident_state_id, cur_incident_state_id, version_count, lock_version,"
+            " created_by, created_at, changed_by, changed_at)"
+            " VALUES (:id, '47-1', :cls, 'rep47-ci.example.org', :d, :i, :i, 1, 1,"
+            " :u, :t, :u, :t)"
+        ),
+        {"id": CMDB_CI, "cls": CMDB_CLASS, "d": CMDB_DEPLOYMENT, "i": CMDB_INCIDENT, **stamps},
+    )
+
+
 def _seed(sync_url: str) -> None:
     _URLS.add(sync_url)
     _clean(sync_url)
@@ -698,6 +741,7 @@ def _seed(sync_url: str) -> None:
                     "t": created,
                 },
             )
+        _seed_cmdb(conn, T_A_CREATED)
         for taid, tid, units, at in (
             (47730, T_A, "1.50", datetime(2024, 4, 2, 10, 0)),
             (47731, T_A, "2.00", datetime(2024, 4, 3, 10, 0)),
@@ -857,6 +901,7 @@ async def test_every_source_executes(url_fixture: str, request: pytest.FixtureRe
                     near_miss_percent=10,
                     registry=REG,
                     group_by=[],
+                    cmdb_class_ids=CLASS_IDS,
                 )
                 assert len(await _run(factory, totals.stmt)) == 1
             assert seen_rows > 0, src.key  # seeded rows reach every source
