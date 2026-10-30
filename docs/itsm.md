@@ -809,7 +809,7 @@ Admin, „Change-Management“, Reiter „Vorlagen“. Eine **Change-Vorlage** h
 „Vorgaben für neue Changes“ und Change-Aufgaben:
 
 - **Vorgaben:** Titel, Queue, Priorität, Services, CAB, Dauer in Minuten (Ende = Beginn + Dauer, wenn
-  beim Anlegen nur ein Beginn angegeben wird), „Im Kundenportal als Wartung anzeigen“, Begründung,
+  beim Anlegen nur ein Beginn angegeben wird), „Im Kundenportal bei den Wartungsfenstern anzeigen“, Begründung,
   Umsetzungs-, Rückfall- und Testplan und vorgegebene Antworten der Risikobewertung. Was beim Anlegen
   angegeben wird, hat Vorrang. Verweise, die es seit dem Speichern der Vorlage nicht mehr gibt
   (Queue, Service, CAB, Antwort), werden beim Anlegen weggelassen und im Verlauf unter „Hinweise der
