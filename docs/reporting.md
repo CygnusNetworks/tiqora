@@ -503,13 +503,12 @@ ITSM. Without Mode B it shows no rows; after a switch back from Mode B to Mode A
 remain. The report page and a dashboard tile show the same note ("Diese Datenbasis wird nur gepflegt,
 solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein."); a wallboard link
 does not. A dashboard tile or a schedule on such a report keeps running; the mail carries no note and goes
-out empty unless "only if non-empty" is set.
+out empty unless "only if non-empty" is set. Statistics over Znuny's own CMDB and change tables in Mode A
+are not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
 
 **Period of a tile or a schedule.** "CIs nach Klasse und Status" has no period of its own. A dashboard
 period or a schedule's "Zeitraum für den Versand" narrows it, like every CI report, to the CIs created
 in that period, the same rule as for "Offene Tickets (jetzt)".
-Statistics over Znuny's own CMDB and change tables in Mode A are
-not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
 
 **After the update.** This version adds two columns to the ticket facts ("first level solved" and
 "ITSM solution time") and raises the report fact version. The report worker recomputes all ticket
@@ -519,7 +518,7 @@ only the recomputed tickets and grow to the full numbers on their own; the newes
 The upgrade recomputes old tickets with today's configuration, so existing breach and working-minute
 figures can shift on sites that changed a calendar or an SLA since. Reports show "Die Kennzahlen werden
 nach dem Update neu berechnet. First-Level- und ITSM-Lösungszeit-Werte sind bis dahin unvollständig."
-while rows are left. No admin rebuild is needed for this. Operating notes: [deployment.md](deployment.md#reporting-data).
+while more than 500 rows are left. No admin rebuild is needed for this. Operating notes: [deployment.md](deployment.md#reporting-data).
 
 ## How the numbers are produced
 

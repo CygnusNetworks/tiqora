@@ -549,8 +549,10 @@ has finished, the first-level and ITSM solution-time figures cover only the alre
 tickets (tickets not yet reached are in neither the count nor the rate); the `tickets` column already
 counts everything. `tiqora report status` (`outdated_rows`) and Admin, **Berichtsdaten** ("Noch neu zu
 berechnen" = still to recalculate) show how many ticket rows are left, and reports show a notice while
-the count is above 0. A count that stops falling means single tickets fail to rebuild: see the worker
-log. No admin rebuild is needed for these two figures. The four ITSM
+more than 500 rows (one batch) are left. A small remainder that stays above 0 is tickets that fail to
+rebuild: they keep their old figures, the others are not held up, and the worker retries them and logs
+`report_facts_ticket_failed` with the ticket id. Fix the cause in that ticket; an admin rebuild does not
+pass it. No admin rebuild is needed for these two figures. The four ITSM
 report data bases read `tiqora_*` tables and need no configuration.
 
 The first backfill (and every admin rebuild) runs as a background job in the

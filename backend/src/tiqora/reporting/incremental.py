@@ -454,7 +454,7 @@ async def _run_tick(
                                 [i for i in _failing if _backing_off(i, wall_clock)] or [0]
                             ),
                         )
-                        # newest first: the default report windows are right within minutes
+                        # newest first: the default report windows are right soon after the start
                         .order_by(TiqoraReportTicketFact.ticket_id.desc())
                         .limit(VERSION_UPGRADE_BATCH)
                     )
