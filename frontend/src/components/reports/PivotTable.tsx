@@ -1,8 +1,20 @@
 import { useTranslation } from "react-i18next";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { cn } from "@/lib/cn";
 import type { ReportCell, ReportResult } from "@/lib/reportsApi";
+import { ticketHref } from "./reportFormat";
 import { ReportTable } from "./ReportTable";
 import { useCellText } from "./useCellText";
+
+/** Row header text, linked when it names a ticket. */
+function RowLabel({ href, label }: { href: string | null; label: string }) {
+  if (!href) return <>{label}</>;
+  return (
+    <RouterAnchor href={href} className="text-accent hover:underline">
+      {label}
+    </RouterAnchor>
+  );
+}
 
 function distinct(result: ReportResult, at: number): string[] {
   const seen = new Set<string>();
@@ -135,7 +147,7 @@ export function PivotTable({
                 title={text(rowDim, r)}
                 data-testid={`${testId}-row-${r}`}
               >
-                {text(rowDim, r)}
+                <RowLabel href={ticketHref(rowDim, r)} label={text(rowDim, r)} />
               </th>
               {colKeys.map((c) => (
                 <td key={c} className={cn(cellCls, "text-ink")} data-testid={`${testId}-cell-${r}-${c}`}>

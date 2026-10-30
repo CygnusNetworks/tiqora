@@ -18,6 +18,16 @@ const MAX_EXPORT_VALUES = 500;
 
 type ColumnType = ReportColumn["type"];
 
+/**
+ * Agent ticket link for a cell of the `ticket` dimension (its values are ticket
+ * ids), or null for any other column, an empty cell and the folded tail.
+ */
+export function ticketHref(column: ReportColumn, value: ReportCell): string | null {
+  if (column.role !== "dimension" || column.key !== "ticket") return null;
+  const id = Number(value);
+  return value != null && Number.isInteger(id) && id > 0 ? `/agent/tickets/${id}` : null;
+}
+
 function currentLocale(): string {
   return i18n.resolvedLanguage ?? i18n.language ?? "de";
 }

@@ -130,4 +130,30 @@ describe("PivotTable", () => {
     expect(screen.queryByTestId("pv-coltotal-new")).not.toBeInTheDocument();
     expect(screen.queryByTestId("pv-grand")).not.toBeInTheDocument();
   });
+
+  it("links ticket labels to the ticket, in the pivot and in the flat fallback", () => {
+    const ticketCol = { key: "ticket", role: "dimension", type: "id", label_key: "reports.dimensions.ticket", grain: null, i18n_values: null } as const;
+    const byTicket: ReportResult = {
+      ...base,
+      columns: [ticketCol, base.columns[1], base.columns[2]],
+      rows: [
+        [41, "2024-06-01", 2],
+        ["__other__", "2024-06-01", 1],
+      ],
+      labels: { ticket: { "41": "2024060110000041 Drucker" } },
+    };
+    const { unmount } = renderPivot(byTicket);
+    const link = within(screen.getByTestId("pv-row-41")).getByRole("link");
+    expect(link).toHaveAttribute("href", "/agent/tickets/41");
+    expect(link).toHaveTextContent("2024060110000041 Drucker");
+    expect(within(screen.getByTestId("pv-row-__other__")).queryByRole("link")).toBeNull();
+    unmount();
+
+    // one dimension only: the flat table links the same way
+    renderPivot({ ...byTicket, columns: [ticketCol, base.columns[2]], rows: [[41, 2]] });
+    expect(screen.getByRole("link", { name: "2024060110000041 Drucker" })).toHaveAttribute(
+      "href",
+      "/agent/tickets/41",
+    );
+  });
 });
