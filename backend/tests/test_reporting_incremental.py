@@ -35,7 +35,7 @@ from tiqora.reporting import incremental
 from tiqora.reporting.backfill import ReportBackfillPayload, run_backfill
 from tiqora.reporting.dirty import mark_tickets_dirty
 from tiqora.reporting.incremental import GAP_TTL_SECONDS, run_report_facts_tick
-from tiqora.reporting.state import load_state
+from tiqora.reporting.state import facts_status, load_state, reporting_status
 from tiqora.worker import report_facts as worker_module
 
 pytestmark = pytest.mark.db
@@ -912,6 +912,57 @@ async def test_version_upgrade_rebuilds_old_facts(
             ).scalar_one()
         assert version == FACT_VERSION
         assert (await _tick(factory))["upgraded"] == 0
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_version_upgrade_goes_newest_first_and_counts_what_is_left(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.reporting.facts import FACT_VERSION
+
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    engine, factory = _factory(url)
+    monkeypatch.setattr(incremental, "VERSION_UPGRADE_BATCH", 1)
+    try:
+        await _prime(url, factory)
+        async with factory() as s:
+            await mark_tickets_dirty(s, [47671, 47678])
+            await s.commit()
+        await _tick(factory)
+        await _set_state(factory, backfill_status="done")
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "UPDATE tiqora_report_ticket_fact SET fact_version = 0"
+                    " WHERE ticket_id IN (47671, 47678)"
+                )
+            )
+            await s.commit()
+        async with factory() as s:
+            assert (await facts_status(s)).outdated_rows == 2
+            assert (await reporting_status(s)).outdated_rows == 2
+        assert (await _tick(factory))["upgraded"] == 1
+        async with factory() as s:
+            rows = dict(
+                (
+                    await s.execute(
+                        text(
+                            "SELECT ticket_id, fact_version FROM tiqora_report_ticket_fact"
+                            " WHERE ticket_id IN (47671, 47678)"
+                        )
+                    )
+                )
+                .tuples()
+                .all()
+            )
+            assert rows == {47671: 0, 47678: FACT_VERSION}
+            assert (await facts_status(s)).outdated_rows == 1
+        assert (await _tick(factory))["upgraded"] == 1
+        async with factory() as s:
+            assert (await facts_status(s)).outdated_rows == 0
     finally:
         await engine.dispose()
 

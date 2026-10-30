@@ -23102,6 +23102,17 @@
             "title": "Backfill Status",
             "type": "string"
           },
+          "outdated_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outdated Rows"
+          },
           "ready": {
             "title": "Ready",
             "type": "boolean"
@@ -43959,6 +43970,17 @@
               }
             ],
             "title": "Last Snapshot Date"
+          },
+          "outdated_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outdated Rows"
           },
           "ready": {
             "title": "Ready",

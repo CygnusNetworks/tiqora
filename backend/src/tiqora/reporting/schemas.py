@@ -41,6 +41,9 @@ class FactsStatusOut(BaseModel):
     backfill_job_id: int | None
     #: 0..1 while the backfill runs, otherwise ``None``
     backfill_progress: float | None
+    #: fact rows still waiting for the version upgrade; ``None`` on a report result, which takes
+    #: the status from the loaded state row and does not count
+    outdated_rows: int | None = None
 
 
 class ReportingStatusOut(FactsStatusOut):
