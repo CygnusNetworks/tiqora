@@ -19,15 +19,6 @@ async def load_cmdb_class_scope(session: AsyncSession, user_id: int) -> frozense
     return frozenset(await readable_class_ids(session, await load_access(session, user_id)))
 
 
-async def source_available(session: AsyncSession, src: ReportSource) -> bool:
-    """Whether ``src`` is offered now; a saved report on an unavailable source still runs."""
-    if src.availability == "always":
-        return True
-    from tiqora.cmdb.gate import current_itsm_mode  # noqa: PLC0415 - import cycle
-
-    return await current_itsm_mode(session) == "tiqora"
-
-
 async def available_sources(session: AsyncSession, registry: Registry) -> list[ReportSource]:
     """The active sources that are offered now (the ITSM mode is read once per call)."""
     from tiqora.cmdb.gate import current_itsm_mode  # noqa: PLC0415 - import cycle

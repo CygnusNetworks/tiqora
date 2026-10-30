@@ -30,8 +30,8 @@ from tiqora.reporting.definition import ReportDefinition
 from tiqora.reporting.engine import RunPlan, _recompile, plan_report
 from tiqora.reporting.itsm_roles import itsm_role_dim
 from tiqora.reporting.labels import resolve_labels
-from tiqora.reporting.scope import available_sources, source_available
-from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource, active_sources
+from tiqora.reporting.scope import available_sources
+from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
 from tiqora.reporting.settings import ReportingSettings
 from tiqora.reporting.sources._common import col, measure
 
@@ -198,7 +198,6 @@ async def test_cmdb_labels(cmdb_db: CmdbWorld) -> None:
 async def test_available_sources_follow_mode(cmdb_db: CmdbWorld) -> None:
     src = _class_source()
     reg = _registry(src)
-    core = next(s for s in active_sources(reg) if s.key == "tickets")
     try:
         for mode, listed in (("tiqora", True), ("znuny_readthrough", False), ("off", False)):
             set_mode(cmdb_db, mode)
@@ -207,7 +206,5 @@ async def test_available_sources_follow_mode(cmdb_db: CmdbWorld) -> None:
                 keys = [s.key for s in await available_sources(session, reg)]
                 assert ("ist972_cis" in keys) is listed, mode
                 assert "tickets" in keys
-                assert await source_available(session, src) is listed
-                assert await source_available(session, core) is True
     finally:
         reset_mode_cache()

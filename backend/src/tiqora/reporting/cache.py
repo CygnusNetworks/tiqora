@@ -103,8 +103,8 @@ class ReportCache:
         extra_filter: Filter | None,
         last_snapshot_date: date | None,
         near_miss_percent: int,
-        cmdb_class_ids: Iterable[int] | None = None,
-        type_roles: Mapping[int, str] | None = None,
+        cmdb_class_ids: Iterable[int] | None,
+        type_roles: Mapping[int, str] | None,
     ) -> str:
         """``CACHE_PREFIX`` + sha256 over every input that changes a viewer's result."""
         payload: dict[str, Any] = {

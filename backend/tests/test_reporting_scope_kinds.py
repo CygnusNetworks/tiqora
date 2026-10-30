@@ -145,6 +145,8 @@ def _key(**over: Any) -> str:
         "extra_filter": None,
         "last_snapshot_date": None,
         "near_miss_percent": 10,
+        "cmdb_class_ids": None,
+        "type_roles": None,
     }
     args.update(over)
     return ReportCache.key_for(**args)
