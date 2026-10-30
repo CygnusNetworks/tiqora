@@ -17,7 +17,11 @@
 > `/api/v1/itsm`; the admin endpoints (`/api/v1/admin/cmdb`) need the `admin` area; the MCP tools
 > need `mcp:ro` (or higher) and optionally a `tool:<name>` allowlist.
 >
-> **Not included (wave 5):** reporting and statistics over CIs. Change management (Mode B) uses the
+> **Reports over CIs.** The report builder has two data bases for CIs ("Configuration Items (CMDB)"
+> and "CIs und verknüpfte Tickets"), with built-in reports for CIs by class and state, new CIs per
+> day, changes per CI class and incident-prone CIs; only the CI classes a viewer may read are
+> counted, and only in Mode B. CI attributes are not report dimensions. See
+> [reporting.md](reporting.md#itsm-reports-and-data-bases). Change management (Mode B) uses the
 > CMDB for the impact of a change, see [itsm.md](itsm.md) chapter 8.
 
 ## Was die CMDB ist
@@ -380,11 +384,31 @@ einem Zugriffsfehler. Schlüssel ohne `tool:`-Eintrag dürfen alle Werkzeuge.
   `unsupported_actions` gemeldet. Für den ITSM-Import liefert die CMDB die Schnittstelle
   `tiqora.cmdb.importer_api`.
 
-## Nicht enthalten (Welle 5)
+## Berichte über CIs
 
-Berichte und Statistiken über CIs (Reporting-Quelle) sind für Welle 5 vorgesehen; im
-Reporting gibt es derzeit keine CMDB-Quelle. Das Change-Management mit Arbeitsaufträgen
-(Change-Aufgaben) beschreibt [itsm.md](itsm.md) in Kapitel 8; es nutzt die CMDB für die
-Auswirkung eines Changes.
+Der Bericht-Editor kennt zwei Datenbasen für CIs, die nur in Modus B (Tiqora führt das ITSM)
+Daten liefern:
+
+- **„Configuration Items (CMDB)“**: eine Zeile je CI. Gruppieren können Sie nach CI-Klasse,
+  Verwendungsstatus, Vorfallsstatus, den beiden Statusgruppen („Verwendung (Gruppe)“,
+  „Vorfall (Gruppe)“), Erstellt, Geändert und „Angelegt von“. Werte sind „CIs“, „CIs mit Störung“,
+  „CIs mit Warnung“, „Produktive CIs“ und „Versionen Ø“.
+- **„CIs und verknüpfte Tickets“**: eine Zeile je Paar aus CI und verknüpftem Ticket, mit den
+  Werten „Tickets“, „CIs“, „Offen“, „Changes“, „Störungen“ und „Offene Störungen“. Der Vorfallsstatus
+  des CIs ist der aktuelle, nicht der im Zeitraum.
+
+Dazu gibt es vier Standardberichte in der Kategorie „ITSM“: „CIs nach Klasse und Status“, „Neue CIs
+je Tag“, „Changes je CI-Klasse“ und „Störungsanfällige CIs“.
+
+Die Berichte zählen nur CIs aus Klassen, die Sie lesen dürfen (`ro` in der Gruppe der Klasse;
+Administratoren alle Klassen); „CIs und verknüpfte Tickets“ verlangt zusätzlich eine Queue mit `ro` für
+das Ticket. Die Berichte über „Configuration Items (CMDB)“ haben keinen Queue-Filter, weil ein CI keine
+Queue hat. Geplante Berichte und Wallboards verwenden die Klassenrechte des Besitzers
+beziehungsweise des Link-Erstellers.
+
+Nicht möglich: CI-Attribute als Gruppierung oder Filter (die Attribute stehen nur in der CMDB selbst) und
+Auswertungen in Modus A. Alle Einzelheiten: [reporting.md](reporting.md#itsm-reports-and-data-bases).
+Das Change-Management mit Arbeitsaufträgen (Change-Aufgaben) beschreibt [itsm.md](itsm.md) in
+Kapitel 8; es nutzt die CMDB für die Auswirkung eines Changes.
 
 Beispieldaten in diesem Dokument verwenden ausschließlich `example.org`.

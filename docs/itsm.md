@@ -20,6 +20,9 @@
 > shared approval engine, opt-in portal schedule); every change route is API-key area `tickets`, not
 > `cmdb`. Znuny's ITSMChangeManagement data is never written: Mode A shows it live and read-only,
 > Mode B keeps a read-only change archive filled by the ITSM import or the archive job.
+> Chapter 9 covers the ITSM reports: first-level solution rate and solution time on tickets (every
+> mode but off), and reports on CIs and changes (Mode B only), plus the import of Znuny's ITSM
+> statistics; the figures of changes archived from Znuny are not included.
 
 Dieses Dokument beschreibt die ITSM-Funktionen von Tiqora: Incident und Problem, Services und
 Prioritätsmatrix, Verknüpfungen, die CMDB und den Betrieb neben Znuny.
@@ -477,7 +480,7 @@ Tiqora diesen Weg ab (`409`), denn dann gilt der Ablauf mit Import.
 | Change- und Arbeitsauftrag-Masken | bleiben unverändert in Znuny (sie kennen keine Tiqora-Changes); in Tiqora: neue Changes im Change-Management, die alten lesend im Change-Archiv (Kapitel 8) |
 | Kundenansicht der CIs in Znuny | bleibt (nur lesen); in Tiqora: Kundenportal, „Meine Geräte und Systeme“; optional die Seite der Erweiterung |
 | Service-Zoom | bleibt unverändert (wird nicht gesperrt); in Tiqora: Services, ITSM-Angaben |
-| ITSM-Statistiken (CI, Change) | entfällt (siehe [Welle 5](cmdb.md#nicht-enthalten-welle-5)); Tiqoras Berichte kennen die Znuny-ITSM-Auswertungen nicht |
+| ITSM-Statistiken (CI, Change, First-Level-Lösungsquote, Lösungszeit) | bleiben in Znuny erhalten; in Tiqora: Berichte, Kategorie „ITSM“ (16 Standardberichte), und „Statistiken aus Znuny übernehmen“ (Kapitel [9](#9-itsm-berichte)). Die Berichte über CIs und Changes zeigen Daten erst in Modus B |
 
 ### Zurück zu Modus A
 
@@ -508,7 +511,10 @@ vollständig nach Tiqora holen, löschen Sie die betroffenen CIs in Tiqora vor d
   Was nach der Umstellung noch in Znuny an Changes entsteht, holt der Archiv-Lauf nach (Kapitel 8).
 - **CI-Anhänge im Dateisystem** (Speicher „FS“ statt Datenbank) kann der Importer nicht lesen; sie
   erscheinen als `attachment_in_filesystem` im Bericht und müssen von Hand kopiert werden.
-- **ITSM-Statistiken** von Znuny werden nicht übernommen.
+- **ITSM-Statistiken** von Znuny (Paket ITSMServiceLevelManagement) übernimmt der Import der ITSM-Daten
+  nicht; sie kommen über „Statistiken aus Znuny übernehmen“ auf der Berichtsseite (Kapitel
+  [9](#9-itsm-berichte)). Die Berichte über CIs und Changes zeigen erst Daten, wenn Tiqora das ITSM
+  führt (Modus B); in Modus A bleiben Znunys eigene Statistiken über seine CIs und Changes die Quelle.
 
 ## ITSM-Daten aus Znuny übernehmen
 
@@ -1218,3 +1224,39 @@ Die vollständige Liste mit Status steht in [compatibility.md](compatibility.md#
   Change-Seite zeigt sie noch nicht in einem eigenen Abschnitt; Znunys Change-Zoom zeigt alle
   Verknüpfungen in einer Tabelle.
 - Znunys Change-, Arbeitsauftrags- und CAB-Vorlagen werden nicht übernommen.
+
+## 9 ITSM-Berichte
+
+Die Berichte von Tiqora beantworten die Fragen, die Znunys ITSM-Statistiken stellen (Paket
+ITSMServiceLevelManagement, 47 mitgelieferte Statistiken). Alles Weitere steht in
+[reporting.md](reporting.md#itsm-reports-and-data-bases); hier nur der Überblick.
+
+| Was | Modus | Wo |
+|---|---|---|
+| Tickets nach Typ, offene Tickets nach Typ, neue Tickets nach „ITSM-Art“, **First-Level-Lösungsquote**, **Lösungszeit (ITSM)** | A und B (nicht bei „Aus“) | Berichte, Kategorie „ITSM“; im Bericht-Editor Datenbasis „Tickets“ |
+| CIs nach Klasse und Status, neue CIs je Tag | nur B | Kategorie „ITSM“; Datenbasis „Configuration Items (CMDB)“ |
+| Changes nach Status, Ergebnis der Changes, abgelehnte und abgebrochene Changes, Changes je Antragsteller | nur B | Kategorie „ITSM“; Datenbasen „Changes“ und „Change-Statuswechsel“ |
+| Changes je CI-Klasse, störungsanfällige CIs | nur B | Kategorie „ITSM“; Datenbasis „CIs und verknüpfte Tickets“ |
+| Znunys ITSM-Statistiken | A und B | „Statistiken aus Znuny übernehmen“ ([compatibility.md](compatibility.md#importing-znuny-statistics)) |
+
+Die ITSM-Art eines Tickets („Störung“, „Schwere Störung“, „Service-Anfrage“, „Problem“, „Change“,
+„Change-Aufgabe“) folgt den Ticket-Typen, die Sie unter Admin, „ITSM“ eingestellt haben.
+
+Was Sie wissen sollten:
+
+- **Nur Modus B für CIs und Changes.** Tiqora liest für diese Berichte die eigene CMDB und die eigenen
+  Change-Daten, nie Znunys Tabellen `configitem*` und `change_*`. In Modus A und bei „Aus“ sind die
+  Datenbasen im Bericht-Editor nicht wählbar; ein gespeicherter oder importierter Bericht darauf lässt
+  sich öffnen und zeigt ein leeres Ergebnis. Auswertungen über Znunys CIs und Changes in Modus A gibt es
+  nicht; dafür bleiben Znunys eigene Statistiken.
+- **Changes aus dem Archiv fehlen.** Changes, die der Import oder der Archiv-Lauf aus Znuny in das
+  Change-Archiv kopiert hat (Kapitel 8), zählen die Berichte nicht; Auswertungen über diese Changes
+  stehen auf der Liste offener Punkte.
+- **Rechte.** Wie überall zählt ein Bericht nur Tickets aus Queues, in denen Sie `ro` haben. Berichte über
+  CIs zeigen nur CIs aus Klassen, die Sie lesen dürfen. Geplante Berichte und Wallboards rechnen mit den
+  Rechten ihres Besitzers beziehungsweise des Link-Erstellers, auch bei CI-Klassen.
+- **Keine Verfügbarkeitsstatistik.** Znuny liefert keine mit; Tiqora auch nicht. Die SLA-Berichte
+  (Kategorie „SLA“) gibt es unabhängig vom ITSM-Modus.
+- **Nach dem Update** rechnet der Berichts-Worker alle Ticketdaten neu; bis dahin decken die
+  First-Level- und Lösungszeit-Zahlen nur die bereits neu berechneten Tickets ab
+  ([deployment.md](deployment.md#reporting-data)).

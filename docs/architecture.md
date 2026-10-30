@@ -539,7 +539,7 @@ The consumer links a ticket as `{TIQORA_PUBLIC_BASE_URL}/agent/tickets/{ticket_i
 
 `tiqora/reporting/` — a semantic-layer report engine, a modern equivalent of
 Znuny's `Kernel::System::Stats`, not a port. Znuny's dynamic stats objects
-are replaced by a catalogue of 25 built-in reports over typed sources.
+are replaced by a catalogue of 25 core and 16 ITSM built-in reports over typed sources.
 
 - **Fact tables** (`db/tiqora/`, built by `reporting/facts.py`, `facts_store.py`,
   `history_events.py`): one row per ticket (`tickets`), parsed `ticket_history`
@@ -556,7 +556,10 @@ are replaced by a catalogue of 25 built-in reports over typed sources.
   SLA minutes count working time from the Znuny calendars (`working_time.py`).
 - **Semantic layer** (`semantic.py`, `sources/`): sources `tickets`,
   `ticket_events`, `daily_snapshot`, `accounted_time` and the live
-  `open_tickets` declare dimensions, measures and filters.
+  `open_tickets` declare dimensions, measures and filters. Four ITSM sources
+  (`config_items`, `changes`, `change_events`, `ci_tickets`) read the Tiqora CMDB
+  and change tables, are available in ITSM Mode B only and may carry a CI-class
+  scope next to the queue scope (`scope.py`).
   `definition.py` (`ReportDefinition`, `schema_version: 1`) is validated and
   turned into SQL by `compiler.py` / `filter_sql.py`; `engine.py` runs it
   (plan, cache lookup, queries, labels, post-processing). `catalogue.py` holds

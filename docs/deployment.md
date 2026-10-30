@@ -538,6 +538,16 @@ facts and events on its own, but stored daily snapshots (backlog history) are
 only rewritten for the last two days: run an admin rebuild (Admin,
 Berichtsdaten, "Berichtsdaten neu aufbauen" = rebuild report data) to recompute the older history as well.
 
+This version raises the report fact version to 3 (two new ticket columns for the first-level
+solution and the ITSM solution time; migration `20261010_0085`). After updating, the report worker
+recomputes all ticket facts in batches (500 per run of the `report_facts` loop; the interval is
+`TIQORA_REPORT_FACTS_INTERVAL`, default 60 seconds, or `daemon.report_facts.interval_seconds`
+in the settings), which is about 30 000 tickets per hour at the default; large installations need
+a few hours. Until it has finished, the first-level and ITSM solution-time figures cover only the
+already recomputed tickets (tickets not yet reached are in neither the count nor the rate). No
+admin rebuild is needed for these two figures. The four ITSM
+report data bases read `tiqora_*` tables and need no configuration.
+
 The first backfill (and every admin rebuild) runs as a background job in the
 default lane and occupies one of its `jobs.max_concurrency` slots (default 2) for
 minutes to hours; report runs, report exports and ticket exports share the

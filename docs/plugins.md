@@ -1724,7 +1724,12 @@ another plugin's tables, or a mix; the check walks the compiled FROM clause
 and is a collation guard, not a security boundary: raw `text()` hides table
 names from it). `requires_facts` must be `False`; `scope_column` is mandatory
 and enforced by the compiler (for a `tqp_` source it is your own column, so
-make it a real ownership column). Dimensions are classified for the kiosk
+make it a real ownership column). A plugin source must be scoped by queue
+(`scope_kind="queue"`, no `extra_scopes`) and always available
+(`availability="always"`); class scopes (CI classes), ITSM-only availability and
+dimension labels `labels="cmdb_*"` are reserved for the core's ITSM sources and are
+rejected at registration. A plugin report may use the category `itsm` of the
+catalogue. Dimensions are classified for the kiosk
 view by their key: a plugin dimension keyed like a core one (`channel`,
 `queue`) inherits its classification, so name person-related dimensions
 distinctively. A built-in report's source must be a core source or one of the
