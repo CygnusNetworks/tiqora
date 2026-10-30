@@ -113,21 +113,24 @@ async def sync_appointment(
     ticket_id: int,
     user_id: int,
     base_url: str,
-) -> None:
-    """Bring the change's appointment in line with its phase and window (no-op when off)."""
+) -> bool:
+    """Bring the change's appointment in line with its phase and window (no-op when off).
+
+    ``True`` when the mirror was written; a failed write is logged and answers ``False``."""
     if cfg.calendar_id == 0:
-        return
+        return False
     row = await session.get(TiqoraItsmChange, ticket_id)
     if row is None:
-        return
+        return False
     if not _wanted(row) and row.calendar_appointment_id is None:
-        return
+        return False
     try:
         # checked before the savepoint: rolling one back expires every object the caller holds
         if _wanted(row) and await session.get(Calendar, cfg.calendar_id) is None:
             raise CalendarNotFound(f"calendar {cfg.calendar_id} not found")
         async with session.begin_nested():
             await _sync(session, cfg, row, user_id=user_id, base_url=base_url)
+        return True
     except Exception as exc:  # noqa: BLE001 - a mirror error never fails the caller
         if isinstance(exc, CalendarNotFound | AppointmentNotFound):
             logger.warning(
@@ -139,6 +142,7 @@ async def sync_appointment(
         # the savepoint rollback expired the row (and undid the id change): reload it
         with contextlib.suppress(Exception):
             await session.refresh(row)
+        return False
 
 
 async def resync_after_title_edit(session: AsyncSession, *, ticket_id: int, user_id: int) -> None:
@@ -210,14 +214,15 @@ async def delete_appointments(
 
 async def resync_tickets(
     session: AsyncSession, settings: Settings, ticket_ids: Collection[int], *, user_id: int
-) -> None:
+) -> int:
     """Bring the appointments of these change tickets in line after their rows were written
     outside the change module (the anonymised title, a rollback's restored rows): recreated with
     the current title, or created again for a restored change in a mirrored phase. With the
     mirror switched off since, a left-over appointment goes (it carries the old title). Errors
-    are logged per change, like every mirror write."""
+    are logged per change, like every mirror write. Returns the number of successful writes."""
     if not ticket_ids:
-        return
+        return 0
+    written = 0
     cfg = await load_change_settings(session, settings)
     for ticket_id in sorted(set(ticket_ids)):
         row = await session.get(TiqoraItsmChange, ticket_id)
@@ -228,7 +233,7 @@ async def resync_tickets(
         if ticket is not None:
             await session.refresh(ticket)
         if cfg.calendar_id != 0:
-            await sync_appointment(
+            written += await sync_appointment(
                 session,
                 cfg,
                 ticket_id=ticket_id,
@@ -242,10 +247,12 @@ async def resync_tickets(
             async with session.begin_nested():
                 await _remove(CalendarService(session), row, user_id)
                 await session.flush()
+            written += 1
         except Exception:  # noqa: BLE001 - a mirror error never fails the caller
             logger.exception("change_calendar_mirror_failed", extra={"ticket_id": ticket_id})
             with contextlib.suppress(Exception):
                 await session.refresh(row)
+    return written
 
 
 __all__ = [

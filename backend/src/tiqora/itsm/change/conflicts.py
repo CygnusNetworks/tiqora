@@ -347,10 +347,11 @@ async def _load(
         conflicts = await _filter_readable(session, conflicts, user_id=user_id)
     if freeze_truncated:
         conflicts.append(Conflict("freeze_truncated", "warn", None, *(window or (None, None))))
-    if window is not None and not impact_is_current(row):
-        # services reached through CIs are unknown until the impact job ran: a service freeze
-        # that would block this change and matched no known service cannot be ruled out while
-        # the change has a CI (without one, the live direct services are the whole set)
+    if window is not None and (row.impact_truncated or not impact_is_current(row)):
+        # services reached through CIs are unknown until the impact job ran, and beyond the limit
+        # of a truncated set: a service freeze that would block this change and matched no known
+        # service cannot be ruled out while the change has a CI (without one, the live direct
+        # services are the whole set)
         matched = {c.ref for c in conflicts if c.kind == "freeze"}
         if any(
             f.scope == "services"

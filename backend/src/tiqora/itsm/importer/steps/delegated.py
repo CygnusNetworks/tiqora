@@ -136,8 +136,9 @@ async def run_changes(ctx: StepContext) -> None:
             "archive_key_changed",
             "TIQORA_ITSM_LEGACY_ERASED_KEY",
             "Change-Archiv nicht aktualisiert: der Schlüssel für gelöschte Kunden hat sich "
-            "geändert; setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen "
-            "TIQORA_SECRET_KEY",
+            "geändert. Bisheriger Schlüssel vorhanden und seit dem Wechsel keine Löschung: "
+            "setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY. "
+            "Sonst sind keine weiteren Archiv-Läufe möglich; das Archiv bleibt lesbar",
         )
         ctx.report.count(STEP_CHANGES, "problems")
         await ctx.progress(1, 1, STEP_CHANGES)

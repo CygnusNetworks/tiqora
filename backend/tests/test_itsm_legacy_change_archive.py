@@ -55,7 +55,12 @@ from tests._itsm_mode_helpers import make_factory, plain_url, store
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraItsmImportMap, TiqoraJob, TiqoraSettings
+from tiqora.db.tiqora.models import (
+    TiqoraGdprJob,
+    TiqoraItsmImportMap,
+    TiqoraJob,
+    TiqoraSettings,
+)
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import get_registry, set_registry_for_tests
 from tiqora.gdpr.anonymize import anonymize_customer
@@ -63,12 +68,15 @@ from tiqora.gdpr.erasure import ErasureError, rollback_job, run_erasure
 from tiqora.itsm.change.legacy import reader
 from tiqora.itsm.change.legacy.archive import (
     ARCHIVE_JOB_KIND,
+    KEY_CHANGED_COUNT,
     KEY_CHANGED_MESSAGE,
+    KEY_CHANGED_WARNING,
     KEY_CHECK_KIND,
     KIND_LEGACY_CHANGE,
     MODE_B_ONLY,
     NO_CHANGE_TABLES,
     ArchiveReport,
+    ErasedKeyChanged,
     LegacyArchivePayload,
     archive_blocker,
     archive_changes,
@@ -817,10 +825,10 @@ async def _customer(s: AsyncSession, login: str, email: str) -> int:
     )
 
 
-async def _erase(w: World, customer_id: int) -> Any:
+async def _erase(w: World, customer_id: int, settings: Settings = SETTINGS) -> Any:
     return await run_erasure(
         w.factory,
-        SETTINGS,
+        settings,
         customer_user_ids=[customer_id],
         mode="anonymize",
         seed=7,
@@ -1202,12 +1210,11 @@ async def test_rotated_key_refuses_instead_of_unredacting(
     dialect: str, profile: str, request: pytest.FixtureRequest
 ) -> None:
     """``TIQORA_SECRET_KEY`` rotated: the admin job fails, the import step reports
-    ``archive_key_changed``, an erasure is refused; nothing is written. With
-    ``TIQORA_ITSM_LEGACY_ERASED_KEY`` = the old secret the archive runs and stays redacted."""
+    ``archive_key_changed``; nothing is written. With ``TIQORA_ITSM_LEGACY_ERASED_KEY`` = the
+    old secret (and no erasure since) the archive runs and stays redacted."""
     async with archive_world(request, dialect, profile) as w:
         async with w.factory() as s:
             customer_id = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
-            other_id = await _customer(s, CUSTOMER4, CUSTOMER4_MAIL)
             await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
             await s.commit()
         await _archive(w)
@@ -1240,24 +1247,6 @@ async def test_rotated_key_refuses_instead_of_unredacting(
         counts = ctx.report.steps[STEP_CHANGES]
         assert (counts.created, counts.updated, counts.unchanged, counts.problems) == (0, 0, 0, 1)
 
-        with pytest.raises(ErasureError) as refused:
-            await run_erasure(
-                w.factory,
-                ROTATED,
-                customer_user_ids=[other_id],
-                mode="anonymize",
-                seed=7,
-                force_parallel=True,
-                actor="test",
-            )
-        assert str(refused.value) == KEY_CHANGED_MESSAGE
-        async with w.factory() as s:
-            login = (
-                await s.execute(
-                    text("SELECT login FROM customer_user WHERE id = :i"), {"i": other_id}
-                )
-            ).scalar_one()
-        assert login == CUSTOMER4  # the erasure rolled back as a whole
         assert await _stored(w) == before  # nothing rewritten anywhere
 
         report = await archive_changes(
@@ -1336,3 +1325,152 @@ async def test_tombstones_without_a_job_are_not_duplicated(
             key=lambda t: (t[0], t[1] or 0),
         )
         assert await _key_checks(w) == [key_check(key)]
+
+
+# --- round 2: a changed key never blocks an erasure, only archive runs ------------------------
+
+
+async def _archive_with(w: World, settings: Settings) -> ArchiveReport:
+    return await archive_changes(
+        w.factory,
+        run_id=RUN_ARCHIVE,
+        dry_run=False,
+        page_size=2,
+        progress=_noop,
+        check_cancelled=_noop,
+        report=ArchiveReport(),
+        settings=settings,
+    )
+
+
+async def _two_customers_in_the_archive(w: World) -> tuple[int, int]:
+    async with w.factory() as s:
+        first = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+        second = await _customer(s, CUSTOMER4, CUSTOMER4_MAIL)
+        await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+        await seed_change_cab(s, change_id=MAIL, cab_id=CAB3, customer_user_id=CUSTOMER4)
+        await s.commit()
+    await _archive(w)
+    return first, second
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_erasure_under_a_changed_key_completes_and_archive_runs_stay_refused(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """The stored row of the person erased during the mismatch is redacted (no key needed), the
+    job says so in its counts, and with tombstones of two keys no key can run the archive: not the
+    new one, not the old one set through ``TIQORA_ITSM_LEGACY_ERASED_KEY``."""
+    async with archive_world(request, dialect, profile) as w:
+        first, second = await _two_customers_in_the_archive(w)
+        await _erase(w, first)
+        assert CUSTOMER4 in (await _rows(w))[MAIL].data
+
+        result = await _erase(w, second, ROTATED)
+
+        assert result.counts[KEY_CHANGED_COUNT] == 1
+        assert result.counts["tiqora_itsm_legacy_change"] == 1
+        stored = (await _rows(w))[MAIL]
+        assert _absent(stored.data, CUSTOMER2, CUSTOMER2_MAIL, CUSTOMER4, CUSTOMER4_MAIL)
+        assert ("customer_user", CUSTOMER4, 0) not in await _refs(w, MAIL)
+        new_key = erased_key(ROTATED)
+        assert erased_hash(new_key, CUSTOMER4) in {h for h, _ in await _tombstones(w)}
+        assert sorted(await _key_checks(w)) == sorted(
+            [key_check(erased_key(SETTINGS)), key_check(new_key)]
+        )
+        async with w.factory() as s:
+            login = (
+                await s.execute(
+                    text("SELECT login FROM customer_user WHERE id = :i"), {"i": second}
+                )
+            ).scalar_one()
+        assert login != CUSTOMER4
+
+        await _edit_mail(w, 8)
+        before = await _stored(w)
+        for settings in (ROTATED, PINNED):
+            with pytest.raises(ErasedKeyChanged):
+                await _archive_with(w, settings)
+            ctx = _step_ctx(w, run_id=RUN_ARCHIVE + 7, settings=settings)
+            await run_changes(ctx)
+            assert [i.code for i in ctx.report.issues if i.step == STEP_CHANGES] == [
+                "archive_key_changed"
+            ]
+        assert await _stored(w) == before
+        for case in ("KEY", "Löschungen"):
+            assert case in KEY_CHANGED_MESSAGE
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_cli_anonymisation_under_a_changed_key_warns(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    async with archive_world(request, dialect, profile) as w:
+        first, _ = await _two_customers_in_the_archive(w)
+        await _erase(w, first)
+
+        result = await anonymize_customer(
+            w.factory, ROTATED, login=CUSTOMER4, seed=7, force_parallel=True, actor="test"
+        )
+
+        assert result.customer_users == 1
+        assert KEY_CHANGED_WARNING in result.progress
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER4, CUSTOMER4_MAIL)
+        with pytest.raises(ErasedKeyChanged):
+            await _archive_with(w, ROTATED)
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_rollback_refuses_only_when_it_needs_the_changed_key(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """A rollback that restores archive rows must redact them against the tombstones that remain,
+    which takes the key; it refuses as a whole. One that restores no archive row goes through."""
+    async with archive_world(request, dialect, profile) as w:
+        first, second = await _two_customers_in_the_archive(w)
+        async with w.factory() as s:
+            unarchived = await _customer(s, "chg94.ohne", "chg94-ohne@example.org")
+            await s.commit()
+        await _erase(w, first)
+        job = (await _erase(w, second, ROTATED)).job_id
+        other_job = (await _erase(w, unarchived, ROTATED)).job_id
+        before = await _stored(w)
+
+        with pytest.raises(ErasureError, match="TIQORA_ITSM_LEGACY_ERASED_KEY"):
+            await rollback_job(w.factory, ROTATED, job, force_parallel=True, actor="test")
+        assert await _stored(w) == before
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER4)
+        async with w.factory() as s:
+            status = (await s.get(TiqoraGdprJob, job)).status  # type: ignore[union-attr]
+        assert status == "applied"
+
+        restored = await rollback_job(
+            w.factory, ROTATED, other_job, force_parallel=True, actor="test"
+        )
+        assert restored["restored_rows"] > 0
+        async with w.factory() as s:
+            status = (await s.get(TiqoraGdprJob, other_job)).status  # type: ignore[union-attr]
+        assert status == "rolled_back"
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_stale_key_check_without_tombstones_is_replaced(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """The rollback of the only erasure leaves the check row: nothing can come back under a new
+    key, so archive runs go on, and the next tombstone replaces the stale check."""
+    async with archive_world(request, dialect, profile) as w:
+        first, second = await _two_customers_in_the_archive(w)
+        job = (await _erase(w, first)).job_id
+        await rollback_job(w.factory, SETTINGS, job, force_parallel=True, actor="test")
+        assert await _tombstones(w) == []
+        assert await _key_checks(w) == [key_check(erased_key(SETTINGS))]
+
+        assert _counts(await _archive_with(w, ROTATED))[3] == 0
+
+        result = await _erase(w, second, ROTATED)
+        assert KEY_CHANGED_COUNT not in result.counts
+        assert await _key_checks(w) == [key_check(erased_key(ROTATED))]
+        await _edit_mail(w, 8)
+        await _archive_with(w, ROTATED)
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER4, CUSTOMER4_MAIL)

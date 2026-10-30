@@ -24,10 +24,12 @@ history values. :func:`erase_legacy_change_customers` removes an erased customer
 and leaves a tombstone (``tiqora_itsm_legacy_erased``, a keyed hash only); every write of the
 archive redacts against all tombstones (:mod:`tiqora.itsm.change.legacy.redact`), so the person
 never re-enters it, also through a change archived for the first time later. The tombstones are
-keyed (:func:`~tiqora.itsm.change.legacy.redact.erased_key`); a key check row (``kind="check"``)
-written with the first tombstone makes a run under another key (``TIQORA_SECRET_KEY`` rotated
-without ``TIQORA_ITSM_LEGACY_ERASED_KEY``) refuse instead of storing erased customers again
-(:class:`ErasedKeyChanged`; nothing is written). The fingerprint is
+keyed (:func:`~tiqora.itsm.change.legacy.redact.erased_key`); each key that wrote tombstones leaves
+a check row (``kind="check"``). While tombstones exist and any check row is not the one of the
+current key (``TIQORA_SECRET_KEY`` rotated without ``TIQORA_ITSM_LEGACY_ERASED_KEY``), archive runs
+refuse instead of storing erased customers again (:class:`ErasedKeyChanged`; nothing is written).
+An erasure never waits for the key: it works under any key, adds that key's check row and so keeps
+archive runs refused (mixed keys cannot be matched by any one key). The fingerprint is
 taken of the unredacted form; a row is written again when its fingerprint or the set of
 tombstones it was redacted for (``data["redacted"]``) differs.
 
@@ -114,10 +116,19 @@ KEY_CHECK_KIND: Final = "check"
 KEY_CHANGED_MESSAGE: Final = (
     "Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (wurde "
     "TIQORA_SECRET_KEY gewechselt?). Mit dem neuen Schlüssel kämen gelöschte Kunden "
-    "unredigiert ins Archiv zurück, deshalb wird nichts geschrieben. Setzen Sie "
-    "TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY und starten Sie den "
-    "Vorgang erneut."
+    "ungeschwärzt ins Archiv zurück, deshalb wird nichts geschrieben; das Archiv bleibt lesbar "
+    "und geschwärzt. Haben Sie den bisherigen Schlüssel noch und lief seit dem Wechsel keine "
+    "Löschung: Setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY und "
+    "starten Sie den Vorgang erneut. Ist er verloren oder liefen inzwischen Löschungen: Weitere "
+    "Archiv-Läufe sind nicht möglich, Löschungen funktionieren weiter."
 )
+#: output of an erasure that ran under a changed key (CLI); the job has ``KEY_CHANGED_COUNT``
+KEY_CHANGED_WARNING: Final = (
+    "WARNING: the tombstone key of the change archive has changed; this erasure is complete, "
+    "but archive runs stay refused (see TIQORA_ITSM_LEGACY_ERASED_KEY in docs/deployment.md)"
+)
+#: key in the counts of an erasure job that ran under a changed key (value 1)
+KEY_CHANGED_COUNT: Final = "legacy_archive_key_changed"
 
 
 class ErasedKeyChanged(Exception):
@@ -357,25 +368,32 @@ async def _stored_checks(session: AsyncSession) -> set[str]:
     return {str(r[0]).strip() for r in rows}
 
 
+async def erased_key_changed(session: AsyncSession, key: bytes) -> bool:
+    """Tombstones exist and a stored key check is not the one of ``key``, so that some of them
+    cannot be matched under it (reads only). Without a check row there is nothing to compare."""
+    check = key_check(key)
+    return any(c != check for c in await _stored_checks(session)) and await _has_tombstones(session)
+
+
 async def require_erased_key(session: AsyncSession, key: bytes) -> None:
-    """Raise :class:`ErasedKeyChanged` when tombstones exist and the stored key check is not the
-    one of ``key`` (reads only). Without a check row there is nothing to compare."""
-    checks = await _stored_checks(session)
-    if checks and key_check(key) not in checks and await _has_tombstones(session):
+    """Raise :class:`ErasedKeyChanged` when :func:`erased_key_changed`."""
+    if await erased_key_changed(session, key):
         raise ErasedKeyChanged
 
 
 async def _ensure_key_check(session: AsyncSession, key: bytes) -> None:
-    """Before a tombstone is written: refuse under a changed key, else make sure the check row
-    of ``key`` exists (a stale one without any tombstone left is replaced)."""
-    await require_erased_key(session, key)
+    """Before a tombstone is written: make sure the check row of ``key`` exists. Never refuses:
+    a legal erasure does not wait for the key. Stale rows go only when no tombstone is left;
+    with tombstones they stay, so archive runs stay refused."""
     check = key_check(key)
     checks = await _stored_checks(session)
+    table = TiqoraItsmLegacyErased
+    if checks - {check} and not await _has_tombstones(session):
+        await session.execute(
+            delete(table).where(table.kind == KEY_CHECK_KIND, table.identifier_hash != check)
+        )
     if check in checks:
         return
-    table = TiqoraItsmLegacyErased
-    if checks:
-        await session.execute(delete(table).where(table.kind == KEY_CHECK_KIND))
     session.add(table(identifier_hash=check, kind=KEY_CHECK_KIND, job_id=None, created=utc_now()))
     await session.flush()
 
@@ -713,8 +731,7 @@ async def _add_tombstones(
     """One tombstone of this job per ``(kind, identifier)``; each new one is backed up as
     created, so a rollback of the job deletes its own rows only and an identifier another
     erasure also holds stays erased. Rows without a job (the CLI anonymisation) are matched
-    with ``job_id IS NULL`` before the insert: the unique key treats NULLs as distinct.
-    Refuses (:class:`ErasedKeyChanged`) when the tombstones were written under another key."""
+    with ``job_id IS NULL`` before the insert: the unique key treats NULLs as distinct."""
     wanted: dict[str, str] = {}
     for kind, identifier in identifiers:
         if identifier and identifier.strip():
@@ -762,6 +779,9 @@ async def erase_legacy_change_customers(
     becomes its token, each address :data:`REDACTED`; their ``customer_user`` lookup rows are
     deleted. Every changed, deleted or created row is backed up first, so ``rollback_job``
     restores the rows (incl. the fingerprint) and deletes the job's own tombstones.
+
+    The redaction of the stored rows goes by the identifiers themselves, so it holds under any
+    key; only the hashes it leaves behind depend on it (see :func:`erased_key_changed`).
     """
     logins = [lg for lg in replacements if lg and lg.strip()]
     addresses = [e for e in emails if e and e.strip()]
@@ -877,7 +897,8 @@ async def redact_restored_changes(
     if not holders:
         return 0
     key = erased_key(settings)
-    # under a changed key nothing would match: the restored rows would stay unredacted
+    # under a changed key the remaining tombstones cannot all match: the restored rows could
+    # name another erased customer, so this rollback refuses
     await require_erased_key(session, key)
     changed = 0
     table = TiqoraItsmLegacyChange

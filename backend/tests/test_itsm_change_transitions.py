@@ -782,6 +782,24 @@ async def test_service_freeze_unverified_while_impact_is_pending(
     assert (await _go(w, bare, "scheduled")).record.phase == "scheduled"
 
 
+async def test_service_freeze_unverified_on_a_truncated_impact_set(
+    w: ChangeWorld, port: FakeApprovalPort
+) -> None:
+    """A computed set cut off at the limit may miss the frozen service just the same."""
+    await _service_freeze(w)
+    tpl = await _standard_template(w)
+    tid = await _create(w, "standard", template_id=tpl)
+    await _ready(w, tid, cab_id=None)
+    w.session.add(TiqoraItsmChangeImpact(ticket_id=tid, kind="ci", ref_key="947090", direct=True))
+    (await _row(w, tid)).impact_truncated = True
+    await w.session.flush()
+    assert await _refused(w, tid, "scheduled") == {"block_conflict": True}
+
+    (await _row(w, tid)).impact_truncated = False
+    await w.session.flush()
+    assert (await _go(w, tid, "scheduled")).record.phase == "scheduled"
+
+
 async def test_standard_needs_a_valid_standard_template(
     w: ChangeWorld, port: FakeApprovalPort
 ) -> None:

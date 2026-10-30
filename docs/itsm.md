@@ -936,7 +936,7 @@ Abschnitt „Konflikte“ zeigt:
 | Aufgabe außerhalb des Zeitfensters | Warnung |
 | Kein Zeitfenster gesetzt | Hinweis |
 | Zu viele Sperrzeiträume, um alle zu prüfen | Warnung; zählt bei den Bedingungen wie „Blockiert“ (im Zweifel sicher) |
-| Auswirkung noch nicht berechnet, der Change hat CIs, und ein sperrender Sperrzeitraum für Services überschneidet das Zeitfenster (`freeze_unverified`) | Warnung; zählt bei den Bedingungen wie „Blockiert“, bis die Auswirkung berechnet ist: ein Service, den ein CI erreicht, könnte betroffen sein |
+| Auswirkung noch nicht berechnet oder an der Grenze abgeschnitten, der Change hat CIs, und ein sperrender Sperrzeitraum für Services überschneidet das Zeitfenster (`freeze_unverified`) | Warnung; zählt bei den Bedingungen wie „Blockiert“, solange das so ist: ein Service, den ein CI erreicht, könnte betroffen sein |
 | Zu viele andere Changes im Zeitraum (mehr als 500 werden nicht geprüft) | Warnung; die Liste ist unvollständig |
 
 Ein blockierender Konflikt hält „Freigabe anfordern“, „Einplanen“ (Standard) und „Umsetzung starten“
@@ -1184,9 +1184,14 @@ Hintergrundaufträge verfolgen Sie über `GET /api/v1/jobs/{id}`. Zeiten sind UT
   „[gelöscht]“ und merkt sich nur einen geschlüsselten Hash. Ein späterer Archiv-Lauf holt die Person
   deshalb nicht zurück. Der Schlüssel ist `TIQORA_ITSM_LEGACY_ERASED_KEY`, ohne diese Variable
   `TIQORA_SECRET_KEY`. Tiqora speichert einen Prüfwert des Schlüssels: Wird `TIQORA_SECRET_KEY`
-  gewechselt, schreiben Archiv-Lauf und Import-Schritt nichts (Meldung `archive_key_changed`), und
-  Löschungen und ihre Rücknahme werden abgelehnt, bis `TIQORA_ITSM_LEGACY_ERASED_KEY` auf den
-  bisherigen `TIQORA_SECRET_KEY` gesetzt ist; gelöschte Kunden kommen so nicht ungeschwärzt zurück.
+  gewechselt, schreiben Archiv-Lauf und Import-Schritt nichts (Meldung `archive_key_changed`), damit
+  gelöschte Kunden nicht ungeschwärzt zurückkommen. Löschungen laufen immer, auch dann: Sie schwärzen
+  das Archiv unabhängig vom Schlüssel und melden `legacy_archive_key_changed`. Haben Sie den bisherigen
+  Schlüssel noch und lief seit dem Wechsel keine Löschung, setzen Sie `TIQORA_ITSM_LEGACY_ERASED_KEY` auf
+  den bisherigen `TIQORA_SECRET_KEY`, und die Archiv-Läufe gehen weiter. Ist er verloren oder liefen
+  inzwischen Löschungen, gibt es keine weiteren Archiv-Läufe; das Archiv bleibt lesbar und geschwärzt.
+  Die Rücknahme einer Löschung wird in dieser Lage nur abgelehnt, wenn sie Archiv-Zeilen wiederherstellt
+  und noch Hashes anderer Löschungen bestehen.
   Benachrichtigungszeilen im Znuny-Verlauf enthalten Empfängeradressen und werden genauso behandelt.
 - Znunys eigene Tabellen `change_*` berührt die Löschung nie: In Modus A führt Znuny, dort löschen Sie
   selbst.

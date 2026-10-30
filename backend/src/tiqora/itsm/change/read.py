@@ -845,9 +845,11 @@ async def calendar(
     ``service_ids`` keeps the changes that touch one of the services the caller can see (the
     rule of ``read_impact``) and the tasks of those changes; freezes are always shown.
 
-    Conflict flags equal what ``read_conflicts`` reports: they are computed against all changes
-    and freeze occurrences over the union of the shown changes' own windows (at most
-    :data:`MAX_RANGE` beyond the range), readable or not, in one batched pass.
+    Conflict flags are computed against all changes and freeze occurrences over the union of the
+    shown changes' own windows (at most :data:`MAX_RANGE` beyond the range), readable or not, in
+    one batched pass. They use the stored impact sets, so they equal what ``read_conflicts``
+    reports once the impact is computed; while it is pending ``read_conflicts`` also counts the
+    live direct services and ``freeze_unverified``.
 
     ``truncated`` also covers the conflict pool and ``freezes_truncated`` the widened freeze
     window: a flag may be incomplete although everything shown is complete. Tasks are listed when

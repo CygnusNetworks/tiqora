@@ -65,10 +65,13 @@ from tiqora.itsm.change.calendar_mirror import (
 )
 from tiqora.itsm.change.legacy.archive import GDPR_TABLES as LEGACY_CHANGE_GDPR_TABLES
 from tiqora.itsm.change.legacy.archive import (
+    KEY_CHANGED_COUNT,
     ErasedKeyChanged,
     erase_legacy_change_customers,
+    erased_key_changed,
     redact_restored_changes,
 )
+from tiqora.itsm.change.legacy.redact import erased_key
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -142,6 +145,14 @@ _BACKUP_PK_COLUMNS: dict[str, tuple[str, ...]] = {
 #: calendar_mirror``): recreated with the anonymised title, or deleted with the tickets. Their
 #: ``calendar_appointment`` rows are not backed up: a rollback re-syncs the mirror instead.
 _CALENDAR_MIRROR_KEY = "calendar_appointment"
+_AGENDA_TABLE = "tiqora_itsm_cab_agenda_item"
+_ROLLBACK_KEY_CHANGED = (
+    "Die Löschung lässt sich gerade nicht zurücknehmen: Der Schlüssel für gelöschte Kunden im "
+    "Change-Archiv hat sich geändert, und die wiederhergestellten Archiv-Zeilen könnten Kunden "
+    "aus anderen Löschungen enthalten. Haben Sie den bisherigen Schlüssel noch und lief seit dem "
+    "Wechsel keine Löschung: Setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen "
+    "TIQORA_SECRET_KEY und versuchen Sie es erneut."
+)
 #: Free-text columns blanked (set NULL) on anonymise; the change record itself stays.
 _CHANGE_TEXT_COLUMNS: tuple[str, ...] = (
     "reason",
@@ -2119,8 +2130,9 @@ async def run_erasure(
 
         if mode == "anonymize" and mirrored:
             # the appointments carry the old title: recreate them with the anonymised one
-            await resync_tickets(session, settings, mirrored.keys(), user_id=_SYSTEM_USER_ID)
-            counts[_CALENDAR_MIRROR_KEY] += len(mirrored)
+            counts[_CALENDAR_MIRROR_KEY] += await resync_tickets(
+                session, settings, mirrored.keys(), user_id=_SYSTEM_USER_ID
+            )
 
         # ---- ticket_history + dynamic_field_value: scrub free-text PII ----
         # Only on anonymize (delete removes these rows outright, batch B). The
@@ -2647,8 +2659,8 @@ async def run_erasure(
         # recipients (S5) is pseudonymised / redacted, their lookup rows go, and a tombstone
         # keeps them out of every later archive run (rollback deletes the new tombstones).
         if await _table_exists(session, "tiqora_itsm_legacy_change"):
-            try:
-                erased_legacy = await erase_legacy_change_customers(
+            counts.update(
+                await erase_legacy_change_customers(
                     session,
                     replacements=login_to_new,
                     emails=erased_emails,
@@ -2656,9 +2668,11 @@ async def run_erasure(
                     settings=settings,
                     job_id=job_id,
                 )
-            except ErasedKeyChanged as exc:  # the whole erasure rolls back (fail closed)
-                raise ErasureError(exc.message) from exc
-            counts.update(erased_legacy)
+            )
+            # a legal duty does not wait for the key: the erasure is complete, archive runs refuse
+            if await erased_key_changed(session, erased_key(settings)):
+                counts[KEY_CHANGED_COUNT] = 1
+                logger.warning("gdpr_legacy_archive_key_changed", job_id=job_id)
         # GenericInterface debugger lines hold payloads of these tickets (customer names,
         # addresses). Debug logs are disposable, so they go in every mode, without backup.
         if ticket_ids:
@@ -2789,6 +2803,16 @@ async def rollback_job(
                     {"i": pk["id"]},
                 )
                 restored += 1
+                continue
+
+            if (
+                table == _AGENDA_TABLE
+                and "meeting_id" not in original
+                and await _fetch_full_row(session, table, pk) is None
+            ):
+                # the blanked note of an agenda line that saving the agenda replaced since
+                skipped += 1
+                logger.warning("gdpr_rollback_row_skipped", job_id=job_id, table=table, pk=pk)
                 continue
 
             if table == "tiqora_itsm_link":
@@ -2986,7 +3010,7 @@ async def rollback_job(
                     session, legacy_change_ids, settings=settings, add_backup_for=_backup_for
                 )
             except ErasedKeyChanged as exc:  # the rollback rolls back as a whole
-                raise ErasureError(exc.message) from exc
+                raise ErasureError(_ROLLBACK_KEY_CHANGED) from exc
 
         if ticket_ids and await _table_exists(session, "tiqora_itsm_change"):
             # the restored change rows (title, phase, window) own their appointment again: the
@@ -3417,31 +3441,31 @@ async def _blank_change_texts(
             await _update_row(
                 session, "tiqora_itsm_change_event", {"id": ev["id"]}, {"detail": None}
             )
-    if await _table_exists(session, "tiqora_itsm_cab_agenda_item"):
-        notes = (
-            (
-                await session.execute(
-                    text(
-                        "SELECT id, note FROM tiqora_itsm_cab_agenda_item"  # noqa: S608
-                        f" WHERE change_ticket_id IN ({id_list}) AND note IS NOT NULL"
+    if await _table_exists(session, _AGENDA_TABLE):
+        for part in _chunked(ids):
+            part_list = ", ".join(str(int(i)) for i in part)
+            notes = (
+                (
+                    await session.execute(
+                        text(
+                            f"SELECT id, note FROM {_AGENDA_TABLE}"  # noqa: S608
+                            f" WHERE change_ticket_id IN ({part_list}) AND note IS NOT NULL"
+                        )
                     )
                 )
+                .mappings()
+                .all()
             )
-            .mappings()
-            .all()
-        )
-        for item in notes:
-            await _add_backup(
-                session,
-                job_id=job_id,
-                table_name="tiqora_itsm_cab_agenda_item",
-                row_pk={"id": item["id"]},
-                original_row={"note": item["note"]},
-                created=now,
-            )
-            await _update_row(
-                session, "tiqora_itsm_cab_agenda_item", {"id": item["id"]}, {"note": None}
-            )
+            for item in notes:
+                await _add_backup(
+                    session,
+                    job_id=job_id,
+                    table_name=_AGENDA_TABLE,
+                    row_pk={"id": item["id"]},
+                    original_row={"note": item["note"]},
+                    created=now,
+                )
+                await _update_row(session, _AGENDA_TABLE, {"id": item["id"]}, {"note": None})
     return changed
 
 

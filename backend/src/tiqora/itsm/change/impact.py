@@ -110,9 +110,13 @@ async def recompute_impact(
     """Replace the stored affected set of a change (flushes, never commits).
 
     Direct CIs are the ones linked to the ticket; direct services are the ticket's service and
-    the change's extra services. Returns ``None`` for a ticket without a change record. An
-    unchanged set writes no rows, no ``impact`` event and calls no listener, so the periodic
-    refresh leaves the timeline alone.
+    the change's extra services. Returns ``None`` for a ticket without a change record or in a
+    final phase. An unchanged set writes no rows, no ``impact`` event and calls no listener, so
+    the periodic refresh leaves the timeline alone.
+
+    Call it first in a transaction: a plain read before the lock would fix the REPEATABLE READ
+    snapshot (MariaDB), the lock would then return a newer request stamp than the links and
+    services read below, and the set would count as current without them.
     """
     started = utc_now().replace(microsecond=0)
     # the change row first (``FOR UPDATE``), like a transition: inserting impact rows before it
@@ -126,7 +130,7 @@ async def recompute_impact(
             .execution_options(populate_existing=True)
         )
     ).scalar_one_or_none()
-    if row is None:
+    if row is None or row.phase not in REOPENABLE_PHASES:
         return None
     requested = row.impact_requested_at
     # a request that arrives later gets a stamp above this (see ``_next_stamp``)
@@ -327,19 +331,8 @@ async def run_change_impact_job(ctx: JobContext, payload: ChangeImpactPayload) -
     result: dict[str, Any] = {"passes": 0}
     for _ in range(MAX_PASSES):
         async with ctx.session_factory() as session:
-            phase = (
-                await session.execute(
-                    select(TiqoraItsmChange.phase).where(
-                        TiqoraItsmChange.ticket_id == payload.ticket_id
-                    )
-                )
-            ).scalar_one_or_none()
-            outcome = (
-                await recompute_impact(
-                    session, ticket_id=payload.ticket_id, user_id=payload.user_id
-                )
-                if phase in REOPENABLE_PHASES
-                else None
+            outcome = await recompute_impact(
+                session, ticket_id=payload.ticket_id, user_id=payload.user_id
             )
             await session.commit()
         if outcome is None:

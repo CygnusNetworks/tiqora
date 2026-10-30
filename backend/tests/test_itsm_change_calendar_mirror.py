@@ -28,7 +28,7 @@ from tests._change_fixtures import (
 from tiqora.calendar.service import CalendarService
 from tiqora.db.legacy.calendar import CalendarAppointment
 from tiqora.db.legacy.ticket import Ticket
-from tiqora.itsm.change.calendar_mirror import sync_appointment
+from tiqora.itsm.change.calendar_mirror import resync_tickets, sync_appointment
 from tiqora.itsm.change.models import TiqoraItsmChange
 from tiqora.itsm.change.service import ChangeCreateIn, ChangeUpdateIn, create_change, update_change
 from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION, load_change_settings
@@ -217,6 +217,14 @@ async def test_missing_calendar_logged_not_failed(
     await _sync(w, cfg, tid)
     (again,) = await _appointments(w)
     assert again.id != old_id
+
+
+async def test_resync_counts_only_successful_writes(w: ChangeWorld) -> None:
+    await _cfg(w, CAL_MISSING)
+    tid = await _change(w, "scheduled")
+    assert await resync_tickets(w.session, APP_SETTINGS, [tid], user_id=1) == 0
+    await _cfg(w, CAL)
+    assert await resync_tickets(w.session, APP_SETTINGS, [tid], user_id=1) == 1
 
 
 async def test_no_session_begin_used(w: ChangeWorld, monkeypatch: pytest.MonkeyPatch) -> None:

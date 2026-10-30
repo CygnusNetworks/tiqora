@@ -11,6 +11,8 @@ import json
 from datetime import UTC, datetime
 
 import pytest
+import structlog
+import structlog.testing
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -3115,6 +3117,8 @@ async def test_gdpr_ticket_delete_removes_change_rows(
 _MIRROR_CAL = 946150
 _MIRROR_CAB = 946152
 _MIRROR_MEETING = 946153
+_AGENDA_CAB = 946154
+_AGENDA_MEETING = 946155
 
 
 async def _mirror_title(factory: async_sessionmaker[AsyncSession], tid: int) -> str | None:
@@ -3345,6 +3349,163 @@ async def test_gdpr_erasure_keeps_the_change_calendar_mirror_in_line(
             stored = await session.get(TiqoraSettings, calendar_key)
             if stored is not None:
                 await session.delete(stored)
+            await session.commit()
+        await engine.dispose()
+        delete_above_marks(
+            url,
+            marks,
+            first=[
+                (
+                    "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id > :m",
+                    {"m": marks["ticket"]},
+                )
+            ],
+        )
+        sync_engine = create_engine(url)
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM customer_company WHERE customer_id = :c"), {"c": company}
+            )
+        sync_engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_gdpr_rollback_skips_an_agenda_line_replaced_since(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Saving an agenda replaces every line, so the partial backup of a blanked note can find its
+    row gone: it is skipped, counted and logged, and the rest of the job rolls back."""
+    from sqlalchemy import create_engine
+
+    from tests._row_cleanup import delete_above_marks, snapshot_marks
+    from tiqora.itsm.change.cab import AgendaItemIn, set_agenda
+
+    url = request.getfixturevalue(url_fixture)
+    mysql = _is_mysql(url)
+    marks = snapshot_marks(
+        url,
+        (
+            "tiqora_gdpr_backup",
+            "tiqora_gdpr_job",
+            "tiqora_gdpr_audit",
+            "tiqora_itsm_legacy_erased",
+            "tiqora_cache_invalidation",
+            "tiqora_event_outbox",
+            "ticket_history",
+            "article",
+            "ticket",
+            "customer_user",
+        ),
+    )
+    engine, factory = await _factory(url)
+    settings = Settings()
+    tag = url_fixture[:2]
+    login = f"erase.agenda.{tag}@example.com"
+    company = f"ERASE-AGENDA-{tag.upper()}"
+    tid = 0
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session, mysql=mysql)
+            await _insert_company(session, customer_id=company, name=f"Acme Agenda {tag}")
+            cuid = await _insert_customer(session, login=login, customer_id=company)
+            tn = f"2026AG{tag}{cuid}"
+            tid = await _insert_ticket(session, customer_user_id=login, customer_id=company, tn=tn)
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_change (ticket_id, change_type, phase, created_at,"
+                    " created_by, updated_at, updated_by)"
+                    " VALUES (:t, 'normal', 'assessment', :now, 1, :now, 1)"
+                ),
+                {"t": tid, "now": NOW},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab (id, name, rule, created_at, created_by,"
+                    " updated_at, updated_by) VALUES (:i, :n, 'any', :now, 1, :now, 1)"
+                ),
+                {"i": _AGENDA_CAB, "n": f"chg94-agenda-cab-{tag}", "now": NOW},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_meeting (id, cab_id, title, starts_at, ends_at,"
+                    " status, created_at, created_by, updated_at, updated_by)"
+                    " VALUES (:i, :c, 'chg94 agenda', :now, :now, 'planned', :now, 1, :now, 1)"
+                ),
+                {"i": _AGENDA_MEETING, "c": _AGENDA_CAB, "now": NOW},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_agenda_item (meeting_id, change_ticket_id,"
+                    " position, note) VALUES (:m, :t, 1, :n)"
+                ),
+                {"m": _AGENDA_MEETING, "t": tid, "n": f"Rückfrage bei {login}"},
+            )
+            await session.commit()
+        old_line = await _scalar(
+            factory, "SELECT id FROM tiqora_itsm_cab_agenda_item WHERE meeting_id = :m",
+            m=_AGENDA_MEETING,
+        )  # fmt: skip
+
+        result = await run_erasure(
+            factory,
+            settings,
+            customer_user_ids=[cuid],
+            mode="anonymize",
+            seed=31,
+            force_parallel=True,
+            actor="test",
+        )
+
+        async with factory() as session:
+            await set_agenda(
+                session,
+                settings,
+                meeting_id=_AGENDA_MEETING,
+                items=[AgendaItemIn(change_ticket_id=tid, note="Neue Notiz")],
+                user_id=1,
+            )
+            await session.commit()
+        new_line = await _scalar(
+            factory, "SELECT id FROM tiqora_itsm_cab_agenda_item WHERE meeting_id = :m",
+            m=_AGENDA_MEETING,
+        )  # fmt: skip
+        assert new_line != old_line
+
+        with structlog.testing.capture_logs() as logs:
+            restored = await rollback_job(
+                factory, settings, result.job_id, force_parallel=True, actor="test"
+            )
+
+        assert restored["skipped_rows"] == 1
+        assert [e["table"] for e in logs if e["event"] == "gdpr_rollback_row_skipped"] == [
+            "tiqora_itsm_cab_agenda_item"
+        ]
+        note = await _scalar(
+            factory, "SELECT note FROM tiqora_itsm_cab_agenda_item WHERE meeting_id = :m",
+            m=_AGENDA_MEETING,
+        )  # fmt: skip
+        assert note == "Neue Notiz"
+        title = await _scalar(factory, "SELECT title FROM ticket WHERE id = :t", t=tid)
+        assert title == "Erase me"  # the rest of the job came back
+        status = await _scalar(
+            factory, "SELECT status FROM tiqora_gdpr_job WHERE id = :j", j=result.job_id
+        )
+        assert status == "rolled_back"
+    finally:
+        async with factory() as session:
+            for sql, params in (
+                (
+                    "DELETE FROM tiqora_itsm_cab_agenda_item WHERE meeting_id = :m",
+                    {"m": _AGENDA_MEETING},
+                ),
+                ("DELETE FROM tiqora_itsm_change_event WHERE ticket_id = :t", {"t": tid}),
+                ("DELETE FROM tiqora_itsm_change WHERE ticket_id = :t", {"t": tid}),
+                ("DELETE FROM tiqora_itsm_cab_meeting WHERE id = :m", {"m": _AGENDA_MEETING}),
+                ("DELETE FROM tiqora_itsm_cab WHERE id = :c", {"c": _AGENDA_CAB}),
+            ):
+                await session.execute(text(sql), params)
             await session.commit()
         await engine.dispose()
         delete_above_marks(

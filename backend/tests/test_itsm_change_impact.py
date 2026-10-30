@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import create_engine, delete, select, text, update
 
 from tests._change_fixtures import (
     APP_SETTINGS,
@@ -35,6 +35,8 @@ from tests._change_fixtures import (
     make_change,
 )
 from tests._cmdb_helpers import make_ci, make_class
+from tests._itsm_mode_helpers import make_factory, plain_url
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
 from tiqora.cmdb.links import LinkEnd, LinkService
@@ -66,6 +68,7 @@ from tiqora.itsm.change.models import (
     TiqoraItsmChange,
     TiqoraItsmChangeEvent,
     TiqoraItsmChangeImpact,
+    TiqoraItsmChangeService,
 )
 from tiqora.itsm.change.service import (
     CHANGE_LISTENERS,
@@ -800,3 +803,104 @@ async def test_request_stamped_once_per_transaction(
         # one stamp, not nine seconds ahead of the clock
         assert stamp <= utc_now().replace(microsecond=0) + timedelta(seconds=1)
         assert len(await _jobs(w, tid)) == 1
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_edit_before_the_lock_is_in_the_set(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Committed sessions, not the test's one: a plain read before ``recompute_impact`` would fix
+    the MariaDB snapshot, the lock would return the edit's stamp and the set would count as current
+    without the edit's service. The phase comes from the locked row as well."""
+    url = plain_url(request, url_fixture)
+    marks = snapshot_marks(url, ("ticket_history", "ticket"))
+    engine, factory = make_factory(url)
+    tn = f"{TICKET_NO_BASE}{time.time_ns()}"
+    tid = 0
+    try:
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "INSERT INTO service (id, name, valid_id, create_time, create_by, change_time,"
+                    " change_by) VALUES (:id, 'chg94-service-impacted', 1, :t, 1, :t, 1)"
+                ),
+                {"id": SERVICE_IMPACTED, "t": _T},
+            )
+            await s.execute(
+                text(
+                    "INSERT INTO ticket (tn, title, queue_id, ticket_lock_id, type_id, user_id,"
+                    " responsible_user_id, ticket_priority_id, ticket_state_id, timeout,"
+                    " until_time, escalation_time, escalation_update_time,"
+                    " escalation_response_time, escalation_solution_time, archive_flag,"
+                    " create_time, create_by, change_time, change_by) VALUES (:tn, 'chg94 race',"
+                    " 1, 1, 1, 1, 1, 3, 1, 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+                ),
+                {"tn": tn, "t": _T},
+            )
+            tid = int(
+                (
+                    await s.execute(text("SELECT id FROM ticket WHERE tn = :tn"), {"tn": tn})
+                ).scalar_one()
+            )
+            await make_change(s, tid)
+            await s.commit()
+
+        real = impact_module.recompute_impact
+        edit: list[Any] = []
+
+        async def edit_first(session: Any, *, ticket_id: int, user_id: int | None = None) -> Any:
+            if edit:
+                async with factory() as other:
+                    await edit.pop()(other)
+                    await other.commit()
+            return await real(session, ticket_id=ticket_id, user_id=user_id)
+
+        async def add_service(other: Any) -> None:
+            other.add(TiqoraItsmChangeService(ticket_id=tid, service_id=SERVICE_IMPACTED))
+            row = await other.get(TiqoraItsmChange, tid)
+            row.impact_requested_at = impact_module._next_stamp(row.impact_requested_at)
+
+        async def cancel(other: Any) -> None:
+            (await other.get(TiqoraItsmChange, tid)).phase = "cancelled"
+
+        monkeypatch.setattr(impact_module, "recompute_impact", edit_first)
+        context = JobContext(
+            job_id=946601,
+            kind=ITSM_CHANGE_IMPACT_KIND,
+            created_by=U_FULL,
+            settings=Settings(environment="test"),
+            session_factory=factory,
+            attempt=1,
+            max_attempts=3,
+        )
+        payload = ChangeImpactPayload(ticket_id=tid, user_id=None)
+
+        edit.append(add_service)
+        result = await run_change_impact_job(context, payload)
+        assert result["services"] == 1
+        async with factory() as s:
+            row = await s.get(TiqoraItsmChange, tid)
+            assert row is not None and impact_is_current(row)
+            stored = await s.execute(
+                select(TiqoraItsmChangeImpact.ref_key).where(
+                    TiqoraItsmChangeImpact.ticket_id == tid
+                )
+            )
+            assert {str(k) for (k,) in stored} == {str(SERVICE_IMPACTED)}
+
+        edit.append(cancel)
+        assert (await run_change_impact_job(context, payload)).get("skipped") is True
+    finally:
+        await engine.dispose()
+        sync = create_engine(url)
+        with sync.begin() as conn:
+            for table in (
+                "tiqora_itsm_change_event",
+                "tiqora_itsm_change_impact",
+                "tiqora_itsm_change_service",
+            ):
+                conn.execute(text(f"DELETE FROM {table} WHERE ticket_id = :t"), {"t": tid})  # noqa: S608
+            conn.execute(text("DELETE FROM tiqora_itsm_change WHERE ticket_id = :t"), {"t": tid})
+            conn.execute(text("DELETE FROM service WHERE id = :i"), {"i": SERVICE_IMPACTED})
+        sync.dispose()
+        delete_above_marks(url, marks)

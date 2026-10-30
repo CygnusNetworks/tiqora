@@ -45,7 +45,12 @@ from tiqora.db.tiqora.models import TiqoraAvatar
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
-from tiqora.itsm.change.legacy.archive import erase_legacy_change_customers
+from tiqora.itsm.change.legacy.archive import (
+    KEY_CHANGED_WARNING,
+    erase_legacy_change_customers,
+    erased_key_changed,
+)
+from tiqora.itsm.change.legacy.redact import erased_key
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.reporting.dirty import mark_tickets_dirty
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -155,6 +160,7 @@ async def anonymize_customer(
 
     # --- customer_user PII ---
     login_to_new: dict[str, str] = {}
+    key_changed = False
     async with session_factory() as session, session.begin():
         for cust in customers:
             new_first = mapper.map_value(cust.first_name, "first_name")
@@ -210,7 +216,11 @@ async def anonymize_customer(
                 job_id=None,
             )
             result.legacy_changes = erased["tiqora_itsm_legacy_change"]
+            key_changed = await erased_key_changed(session, erased_key(settings))
     progress.append(f"customer_user: {result.customer_users} rows updated")
+    if key_changed:
+        logger.warning("gdpr_legacy_archive_key_changed", job_id=None)
+        progress.append(KEY_CHANGED_WARNING)
     if avatar_keys:
         await forget_cached(settings.redis_url, [cache_key(EMAIL, key) for key in avatar_keys])
         progress.append(f"tiqora_avatar: {result.avatars} rows deleted")

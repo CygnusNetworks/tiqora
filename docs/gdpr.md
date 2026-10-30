@@ -463,12 +463,21 @@ Change management ([itsm.md](itsm.md#8-change-management), Mode B) keeps a recor
   (`tiqora_itsm_legacy_erased`: an HMAC-SHA256 of the lowercased login or address keyed with the site
   secret, never the value) makes every later archive write redact the person again, also in changes
   archived for the first time later. The key is `TIQORA_ITSM_LEGACY_ERASED_KEY`, else
-  `TIQORA_SECRET_KEY`; the first tombstone stores a check value of it (a row of kind `check`). After
+  `TIQORA_SECRET_KEY`; the tombstones store a check value of it (a row of kind `check`). After
   `TIQORA_SECRET_KEY` is rotated the check no longer matches: archive runs (admin job and import step
-  `changes`, issue `archive_key_changed`), erasures and their rollback refuse and write nothing, instead
-  of letting erased customers come back unredacted. Set `TIQORA_ITSM_LEGACY_ERASED_KEY` to the previous
-  `TIQORA_SECRET_KEY` to go on. Rollback restores the rows and deletes the job's tombstones (the check
-  row stays).
+  `changes`, issue `archive_key_changed`) refuse and write nothing, instead of letting erased customers
+  come back unredacted.
+- **A changed key never blocks an erasure.** `run_erasure` and the CLI anonymisation run to completion:
+  they redact the stored archive rows by the identifiers themselves (no key involved), write their
+  tombstones and a check row under the current key, log a warning, and say that archive runs stay refused
+  (`legacy_archive_key_changed: 1` in the job counts, a `WARNING` line in the CLI output).
+  - Old key available and no erasure since the rotation: set `TIQORA_ITSM_LEGACY_ERASED_KEY` to the previous
+    `TIQORA_SECRET_KEY`, and archive runs resume.
+  - Old key lost, or erasures ran meanwhile (check rows of two keys): no further archive runs. The existing
+    archive stays readable and redacted, and erasures work.
+  - Rollback restores the rows and deletes the job's tombstones (the check row stays, so archive runs stay
+    refused after a mixed-key state). Under a changed key it is refused only when it restores archive rows
+    and tombstones of other erasures remain: the key is needed to redact the restored rows against them.
 - Znuny's own `change_*` tables are never touched (in Mode A Znuny leads; erase there).
 
 ### Caveats
