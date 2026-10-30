@@ -126,6 +126,20 @@ async def test_unreadable_class_is_invisible(world: World) -> None:
     assert "ist972srv" not in {v for col in res.labels.values() for v in col.values()}
     total = await _run(world, USER_B)
     assert total.rows == [[1, 0, 0]]
+    # filtering on the id of the unreadable class must not reveal anything
+    hidden = await _run(
+        world,
+        USER_B,
+        filter_={"version": 1, "where": {"field": "class", "op": "in", "value": [world.srv]}},
+    )
+    assert hidden.rows in ([], [[0, 0, 0]])
+    hidden_by_class = await _run(
+        world,
+        USER_B,
+        dims=("class",),
+        filter_={"version": 1, "where": {"field": "class", "op": "in", "value": [world.srv]}},
+    )
+    assert hidden_by_class.rows == []
 
 
 async def test_no_period_means_all_cis(world: World) -> None:
