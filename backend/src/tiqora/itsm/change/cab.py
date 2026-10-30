@@ -161,8 +161,26 @@ class CabView(BaseModel):
     customer_members_allowed: bool = False
 
 
-def _rule_error(exc: ApprovalError) -> ChangeError:
-    return ChangeError("cab_invalid", 422, message=exc.detail or exc.code)
+#: ``cab_invalid`` names why in ``reason`` (stable; the engine's English text stays in
+#: ``message``): the quorum is larger than the members when only users / customer users are
+#: members (the engine's countable case), another rule of the approval engine, or an entry the
+#: engine's model refuses
+CabInvalidReason = Literal["quorum_exceeds_members", "invalid_definition", "invalid_member"]
+
+
+def _quorum_exceeds_members(
+    rule: str, quorum: int | None, members: Sequence[tuple[str, str]]
+) -> bool:
+    """The engine's countable quorum check (``approvals.rules.validate_definition``)."""
+    if rule != "quorum" or quorum is None or not members:
+        return False
+    if not all(kind in ("user", "customer_user") for kind, _ in members):
+        return False
+    return quorum > len(set(members))
+
+
+def _rule_error(exc: ApprovalError, reason: CabInvalidReason) -> ChangeError:
+    return ChangeError("cab_invalid", 422, reason=reason, message=exc.detail or exc.code)
 
 
 def _members_definition(
@@ -194,9 +212,14 @@ def check_definition(
     try:
         validate_definition(_members_definition(name, rule, quorum, members))
     except ValidationError as exc:
-        raise ChangeError("cab_invalid", 422, message=str(exc.errors()[0]["msg"])) from exc
+        raise ChangeError(
+            "cab_invalid", 422, reason="invalid_member", message=str(exc.errors()[0]["msg"])
+        ) from exc
     except ApprovalError as exc:
-        raise _rule_error(exc) from exc
+        quorum_case = _quorum_exceeds_members(rule, quorum, members)
+        raise _rule_error(
+            exc, "quorum_exceeds_members" if quorum_case else "invalid_definition"
+        ) from exc
 
 
 async def _stored_members(session: AsyncSession, cab_id: int) -> list[tuple[str, str]]:

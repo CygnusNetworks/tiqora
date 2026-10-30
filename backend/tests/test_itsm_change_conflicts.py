@@ -49,6 +49,7 @@ from tiqora.itsm.change.freeze import FreezeIn, FreezeOccurrence, FreezeOccurren
 from tiqora.itsm.change.models import (
     TiqoraItsmChange,
     TiqoraItsmChangeImpact,
+    TiqoraItsmChangeService,
     TiqoraItsmChangeTask,
 )
 from tiqora.itsm.change.service import ChangeCreateIn, create_change
@@ -298,6 +299,42 @@ async def test_load_conflicts_uses_stored_impact(w: ChangeWorld) -> None:
     assert [c.kind for c in await load_conflicts(w.session, ticket_id=bare)] == []
     unplanned = await _change(w, window=None)
     assert [c.kind for c in await load_conflicts(w.session, ticket_id=unplanned)] == ["no_window"]
+
+
+async def test_pending_impact_uses_live_services_and_flags_unverified_freezes(
+    w: ChangeWorld,
+) -> None:
+    """The stored set lags behind: direct services count live; a CI may reach a frozen service
+    the job has not found yet (``freeze_unverified``) until the impact set is current."""
+    await create_freeze(
+        w.session,
+        data=FreezeIn.model_validate(
+            {
+                "name": "chg94-freeze",
+                "starts_at": WIN[0].isoformat() + "Z",
+                "ends_at": WIN[1].isoformat() + "Z",
+                "scope": "services",
+                "service_ids": [SVC_A],
+            }
+        ),
+        user_id=1,
+    )
+    live = await _change(w, services=(), cis=())
+    w.session.add(TiqoraItsmChangeService(ticket_id=live, service_id=SVC_A))
+    await w.session.flush()
+    got = await load_conflicts(w.session, ticket_id=live)
+    assert [(c.kind, c.severity, c.shared_services) for c in got] == [("freeze", "block", (SVC_A,))]
+
+    via_ci = await _change(w, services=(), cis=(CI_A,))
+    got = await load_conflicts(w.session, ticket_id=via_ci)
+    assert [(c.kind, c.severity, c.ref, c.start) for c in got] == [
+        ("freeze_unverified", "warn", None, WIN[0])
+    ]
+    row = await w.session.get(TiqoraItsmChange, via_ci)
+    assert row is not None
+    row.impact_requested_at, row.impact_computed_at = None, WIN[0]
+    await w.session.flush()
+    assert await load_conflicts(w.session, ticket_id=via_ci) == []
 
 
 async def test_load_conflicts_candidate_cap(

@@ -55,6 +55,11 @@
       "normal",
       "standard"
     ],
+    "rejected>cancelled": [
+      "emergency",
+      "normal",
+      "standard"
+    ],
     "rejected>draft": [
       "emergency",
       "normal"

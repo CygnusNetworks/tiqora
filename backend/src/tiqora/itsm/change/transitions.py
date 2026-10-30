@@ -60,7 +60,7 @@ from tiqora.itsm.change.approval_port import (
     get_approval_port,
 )
 from tiqora.itsm.change.calendar_mirror import sync_appointment
-from tiqora.itsm.change.conflicts import load_conflicts
+from tiqora.itsm.change.conflicts import UNVERIFIED_KINDS, Conflict, load_conflicts
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.gate import is_change_manager, require_change_mode
 from tiqora.itsm.change.impact import impact_is_current
@@ -69,6 +69,7 @@ from tiqora.itsm.change.models import (
     TiqoraItsmCabMember,
     TiqoraItsmChange,
     TiqoraItsmChangeEvent,
+    TiqoraItsmChangeTemplate,
 )
 from tiqora.itsm.change.phases import (
     FINAL_PHASES,
@@ -207,7 +208,7 @@ def _definition(cab: _Cab, cfg: ItsmChangeSettings) -> ApprovalDefinition:
         )
     except ValidationError as exc:
         # an admin row the CAB editor would refuse (Task 13 validates on save)
-        raise ChangeError("cab_invalid", 409, cab_id=cab.id) from exc
+        raise ChangeError("cab_invalid", 409, cab_id=cab.id, reason="invalid_member") from exc
 
 
 # --- reading the guard facts -----------------------------------------------------------------
@@ -249,6 +250,18 @@ async def _post_approval(session: AsyncSession, row: TiqoraItsmChange) -> _PostA
     if snap.status == "cancelled":
         return _PostApproval(pending=True, cancelled=True)
     return _PostApproval(rejected=snap.status == "rejected")
+
+
+async def _require_standard_template(session: AsyncSession, row: TiqoraItsmChange) -> None:
+    """A standard change is pre-approved by its template: only while that template is still
+    there, valid and a standard template (an admin who retires it stops the pre-approval)."""
+    template = (
+        None
+        if row.template_id is None
+        else await session.get(TiqoraItsmChangeTemplate, int(row.template_id))
+    )
+    if template is None or not template.valid or not template.is_standard:
+        raise ChangeError("standard_template_invalid", 422)
 
 
 def _has_window(row: TiqoraItsmChange) -> bool:
@@ -324,22 +337,30 @@ async def transition(
     auto_route = pair == ("assessment", "scheduled")
     requests_cab = to == "approval" or pair == ("draft", "implementing")
 
+    if known and pair == ("draft", "scheduled"):
+        await _require_standard_template(session, row)
+
+    block_conflicts = 0
+    conflicts: list[Conflict] | None = None
+    if known and to in _WINDOW_TARGETS:
+        # loaded once: the guard counts them, the risk checks below read the same list
+        conflicts = await load_conflicts(session, ticket_id=ticket_id, user_id=None)
+        # freeze occurrences that were cut off, or a service freeze the stale impact set cannot
+        # rule out, count as a block (fail closed; a manager may override them)
+        block_conflicts = sum(
+            1 for c in conflicts if c.severity == "block" or c.kind in UNVERIFIED_KINDS
+        )
     auto_low_risk = False
     if known and (to == "approval" or auto_route):
         # F16: never decide on a stale level
-        evaluation = await evaluate_risk(session, settings, ticket_id=ticket_id, user_id=user_id)
+        evaluation = await evaluate_risk(
+            session, settings, ticket_id=ticket_id, user_id=user_id, conflicts=conflicts
+        )
         auto_low_risk = (
             cfg.auto_approve_low_risk
             and evaluation.effective_level == "low"
             and not evaluation.blocked
             and not evaluation.incomplete
-        )
-    block_conflicts = 0
-    if known and to in _WINDOW_TARGETS:
-        conflicts = await load_conflicts(session, ticket_id=ticket_id, user_id=None)
-        # freeze occurrences that were cut off count as a block (fail closed)
-        block_conflicts = sum(
-            1 for c in conflicts if c.severity == "block" or c.kind == "freeze_truncated"
         )
     open_tasks = 0
     if known and from_phase == "implementing":

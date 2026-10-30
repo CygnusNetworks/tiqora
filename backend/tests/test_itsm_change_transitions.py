@@ -27,6 +27,7 @@ from tests._change_fixtures import (
     APP_SETTINGS,
     G_A,
     Q_A,
+    SERVICE,
     U_FULL,
     U_MANAGER,
     U_NONE,
@@ -58,11 +59,19 @@ from tiqora.itsm.change.freeze import FreezeIn, create_freeze
 from tiqora.itsm.change.models import (
     TiqoraItsmChange,
     TiqoraItsmChangeEvent,
+    TiqoraItsmChangeImpact,
     TiqoraItsmChangeTask,
     TiqoraItsmChangeTemplate,
 )
 from tiqora.itsm.change.risk import CHECK_FAILED_KEY, RiskFinding, evaluate_risk
-from tiqora.itsm.change.service import ChangeCreateIn, ChangeView, create_change, get_change
+from tiqora.itsm.change.service import (
+    ChangeCreateIn,
+    ChangeUpdateIn,
+    ChangeView,
+    create_change,
+    get_change,
+    update_change,
+)
 from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
 from tiqora.itsm.change.transitions import TransitionIn, on_approval_outcome, transition
 from tiqora.itsm.settings import ItsmSettings
@@ -684,6 +693,131 @@ async def test_override_requires_manager_and_reason(
     assert await _refused(w, other, "approval") == {"block_conflict": True}
 
 
+async def _service_freeze(w: ChangeWorld) -> None:
+    """A blocking Sperrzeitraum on ``SERVICE`` only, no exception for emergencies."""
+    await create_freeze(
+        w.session,
+        data=FreezeIn(
+            name="chg94 Mail-Wochenende",
+            enforcement="block",
+            allow_emergency=False,
+            scope="services",
+            service_ids=[SERVICE],
+            starts_at=WINDOW[0] - timedelta(hours=1),
+            ends_at=WINDOW[1] + timedelta(hours=1),
+        ),
+        user_id=1,
+    )
+
+
+async def _impact_pending(w: ChangeWorld, tid: int) -> None:
+    """The impact job has not run yet (``_ready`` marks it current)."""
+    row = await _row(w, tid)
+    row.impact_computed_at = None
+    await w.session.flush()
+
+
+async def test_service_freeze_blocks_before_the_impact_job_ran(
+    w: ChangeWorld, port: FakeApprovalPort
+) -> None:
+    """A-I1: the direct services count at once, the stored impact set is not needed."""
+    await _cabs(w)
+    await _settings(w, emergency_post_approval=True, emergency_cab_id=ECAB)
+    await _service_freeze(w)
+
+    # emergency "Sofort umsetzen" right after creating it on the frozen service
+    emergency = await _create(w, "emergency", service_ids=[SERVICE])
+    await _ready(w, emergency, cab_id=None)
+    await _impact_pending(w, emergency)
+    assert await _refused(w, emergency, "implementing") == {"block_conflict": True}
+    assert (await _row(w, emergency)).phase == "draft"
+
+    # a standard change from a template, planned at once
+    standard = await _create(
+        w, "standard", template_id=await _standard_template(w), service_id=SERVICE
+    )
+    await _ready(w, standard, cab_id=None)
+    await _impact_pending(w, standard)
+    assert await _refused(w, standard, "scheduled") == {"block_conflict": True}
+    await _go(w, standard, "scheduled", U_MANAGER, override_reason="Abgestimmt")
+    (override,) = await _events(w, standard, "conflict_override")
+    assert _detail(override) == {"block_conflicts": 1, "reason": "Abgestimmt"}
+
+    # a scheduled change gets the frozen service and is started at once
+    scheduled = await _create(w)
+    await _ready(w, scheduled)
+    await _at(w, scheduled, "scheduled")
+    await update_change(
+        w.session,
+        APP_SETTINGS,
+        SysConfig(w.session),
+        ticket_id=scheduled,
+        data=ChangeUpdateIn(service_ids=[SERVICE]),
+        user_id=U_FULL,
+    )
+    assert await _refused(w, scheduled, "implementing") == {"block_conflict": True}
+
+
+async def test_service_freeze_unverified_while_impact_is_pending(
+    w: ChangeWorld, port: FakeApprovalPort
+) -> None:
+    """A-I1 (b): a change with a CI may reach the frozen service through it; until the impact
+    job ran that cannot be ruled out, so it blocks (overridable), like cut-off freezes."""
+    await _service_freeze(w)
+    tpl = await _standard_template(w)
+    tid = await _create(w, "standard", template_id=tpl)
+    await _ready(w, tid, cab_id=None)
+    w.session.add(TiqoraItsmChangeImpact(ticket_id=tid, kind="ci", ref_key="947090", direct=True))
+    await _impact_pending(w, tid)
+    assert await _refused(w, tid, "scheduled") == {"block_conflict": True}
+
+    # computed: the CI reaches no frozen service, the step is free
+    await _ready(w, tid, cab_id=None)
+    assert (await _go(w, tid, "scheduled")).record.phase == "scheduled"
+
+    # without any CI the live direct services are the whole set: nothing to verify
+    bare = await _create(w, "standard", template_id=tpl)
+    await _ready(w, bare, cab_id=None)
+    await _impact_pending(w, bare)
+    assert (await _go(w, bare, "scheduled")).record.phase == "scheduled"
+
+
+async def test_standard_needs_a_valid_standard_template(
+    w: ChangeWorld, port: FakeApprovalPort
+) -> None:
+    """A-M2: a retired, edited or deleted template no longer pre-approves its drafts."""
+    tpl_id = await _standard_template(w)
+    tids = [await _create(w, "standard", template_id=tpl_id) for _ in range(3)]
+    for tid in tids:
+        await _ready(w, tid, cab_id=None)
+    tpl = await w.session.get(TiqoraItsmChangeTemplate, tpl_id)
+    assert tpl is not None
+
+    tpl.valid = False
+    await w.session.flush()
+    with pytest.raises(ChangeError) as exc:
+        await _go(w, tids[0], "scheduled")
+    assert (exc.value.error_code, exc.value.http_status) == ("standard_template_invalid", 422)
+
+    tpl.valid, tpl.is_standard = True, False
+    await w.session.flush()
+    with pytest.raises(ChangeError) as exc:
+        await _go(w, tids[1], "scheduled")
+    assert exc.value.error_code == "standard_template_invalid"
+
+    row = await _row(w, tids[2])
+    row.template_id = None  # the template was deleted (ON DELETE SET NULL)
+    await w.session.flush()
+    with pytest.raises(ChangeError) as exc:
+        await _go(w, tids[2], "scheduled")
+    assert exc.value.error_code == "standard_template_invalid"
+    assert port.auto_decisions == []
+
+    tpl.is_standard = True
+    await w.session.flush()
+    assert (await _go(w, tids[1], "scheduled")).record.phase == "scheduled"
+
+
 async def test_force_close_with_open_tasks_manager_only(
     w: ChangeWorld, port: FakeApprovalPort
 ) -> None:
@@ -857,6 +991,40 @@ async def test_rejected_then_rework_starts_new_round(
     assert await _state_updates(w, tid) == 1  # only the first new -> open
     assert await _outcome(w, tid, "approved", approval_id=first, round=1) is False
     assert (await _row(w, tid)).phase == "approval"
+
+
+async def test_rejected_change_can_be_given_up(w: ChangeWorld, port: FakeApprovalPort) -> None:
+    """A-M7: Abgelehnt -> Abgebrochen directly (no fake rework step); the ticket closes, the
+    decided approval is left alone and the impact refresh no longer picks the change."""
+    from tiqora.itsm.change.impact import refresh_stale_impacts
+    from tiqora.itsm.change.settings import ItsmChangeSettings
+
+    await _cabs(w)
+    tid = await _create(w)
+    await _ready(w, tid)
+    for to in ("submitted", "assessment", "approval"):
+        await _go(w, tid, to)
+    assert await _outcome(w, tid, "rejected") is True
+    view = await get_change(w.session, APP_SETTINGS, ticket_id=tid, user_id=U_FULL)
+    assert "cancelled" in view.allowed_targets
+    # an agent action that needs rw
+    assert await _code_of(_go(w, tid, "cancelled", U_RO)) == "forbidden"
+
+    await _go(w, tid, "cancelled", reason="Nicht mehr nötig")
+    row = await _row(w, tid)
+    assert row.phase == "cancelled"
+    assert (await _phases(w, tid))[-1] == ("rejected", "cancelled")
+    assert port.cancels == []  # the rejection is final: nothing to cancel in the engine
+    assert await _ticket_state(w, tid) == "closed unsuccessful"
+    row.impact_computed_at = None  # stale: a reworkable change would be re-queued
+    await w.session.flush()
+    assert await refresh_stale_impacts(w.session, ItsmChangeSettings()) == 0
+
+
+async def _code_of(call: Any) -> str:
+    with pytest.raises(ChangeError) as exc:
+        await call
+    return exc.value.error_code
 
 
 async def test_stale_round_outcome_ignored(w: ChangeWorld, port: FakeApprovalPort) -> None:

@@ -45,7 +45,8 @@ EXPECTED: dict[tuple[Phase, Phase], frozenset[ChangeType]] = {
     ("implementing", "closed"): frozenset({"standard"}),
     ("review", "closed"): ALL,
     **{
-        (p, "cancelled"): ALL for p in ("draft", "submitted", "assessment", "approval", "scheduled")
+        (p, "cancelled"): ALL
+        for p in ("draft", "submitted", "assessment", "approval", "scheduled", "rejected")
     },
 }
 SYSTEM_PAIRS = {
@@ -343,7 +344,7 @@ def test_allowed_targets_respects_flags() -> None:
     assert at("implementing", "standard", standard_requires_review=True) == ("review",)
     assert at("implementing", "normal") == ("review",)
     assert at("review", "normal") == ("closed",)
-    assert at("rejected", "normal") == ("draft",)
+    assert at("rejected", "normal") == ("draft", "cancelled")  # A-M7: give up without a rework
     assert at("scheduled", "normal") == ("draft", "implementing", "cancelled")  # PHASES order
     assert at("draft", "standard") == ("scheduled", "cancelled")
     assert at("draft", "normal") == ("submitted", "cancelled")

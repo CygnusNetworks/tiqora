@@ -149,16 +149,17 @@ class _Detail(BaseModel):
 
 
 async def _change_ticket(
-    session: AsyncSession, ticket_id: int, *, user_id: int, write: bool
+    session: AsyncSession, ticket_id: int, *, user_id: int, write: bool, lock: bool | None = None
 ) -> tuple[int, TiqoraItsmChange]:
-    """Queue of the change ticket and its record, locked when ``write`` (serialises adds)."""
+    """Queue of the change ticket and its record, locked when ``write`` (serialises adds) or
+    ``lock`` (a task edit: ``ro`` on the change is enough, the row is still locked first)."""
     try:
         facts = await require_ticket(session, ticket_id, user_id=user_id, write=write)
     except TicketAccessDenied as exc:
         raise ChangeError(exc.code, exc.http_status) from exc
     stmt = select(TiqoraItsmChange).where(TiqoraItsmChange.ticket_id == ticket_id)
-    if write:
-        stmt = stmt.with_for_update()
+    if write if lock is None else lock:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
     row = (await session.execute(stmt)).scalar_one_or_none()
     if row is None:
         raise ChangeError("change_not_found", 404)
@@ -417,9 +418,15 @@ async def update_task(
     user_id: int,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
 ) -> TaskView:
-    """Kind, window, effort and owner of one task (needs ``rw`` on the task ticket)."""
+    """Kind, window, effort and owner of one task (needs ``rw`` on the task ticket and ``ro`` on
+    the change). The change row is locked first (lock order: change row, then ticket); the tasks
+    of a closed or cancelled change are read-only (409 ``change_final``)."""
     await require_change_mode(session, settings)
-    await _change_ticket(session, change_ticket_id, user_id=user_id, write=False)
+    _, change = await _change_ticket(
+        session, change_ticket_id, user_id=user_id, write=False, lock=True
+    )
+    if change.phase in FINAL_PHASES:
+        raise ChangeError("change_final", 409)
     rows = [r for r in await _task_rows(session, change_ticket_id) if r.ticket_id == task_ticket_id]
     if not rows:
         raise ChangeError("task_not_found", 404)

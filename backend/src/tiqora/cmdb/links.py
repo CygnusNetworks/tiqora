@@ -208,7 +208,10 @@ async def signal_ticket_link(
         session, event, ticket_id, {"target_object": _CI_TICKET_PAYLOAD, "target_key": ci_key}
     )
     await invalidate_ticket_cache(session, ticket_id)
-    # a change ticket gets a new impact set (lazy: the change module imports the CMDB)
+    # a change ticket gets a new impact set (lazy: the change module imports the CMDB). Lock
+    # order: the link and its history are written first, the change row second; a change
+    # transition locks the change row first, so the two can deadlock on MariaDB (rare; one side
+    # gets an error and may retry).
     from tiqora.itsm.change.impact import enqueue_impact_if_change
 
     await enqueue_impact_if_change(session, ticket_id)

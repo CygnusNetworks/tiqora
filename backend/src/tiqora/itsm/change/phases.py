@@ -72,6 +72,7 @@ TRANSITIONS: Final[Mapping[tuple[Phase, Phase], frozenset[ChangeType]]] = Mappin
         ("assessment", "cancelled"): _ALL,
         ("approval", "cancelled"): _ALL,
         ("scheduled", "cancelled"): _ALL,
+        ("rejected", "cancelled"): _ALL,  # give up a rejected change (no approval to cancel)
     }
 )
 

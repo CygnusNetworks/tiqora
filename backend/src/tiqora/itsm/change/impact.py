@@ -115,7 +115,17 @@ async def recompute_impact(
     refresh leaves the timeline alone.
     """
     started = utc_now().replace(microsecond=0)
-    row = await session.get(TiqoraItsmChange, ticket_id)
+    # the change row first (``FOR UPDATE``), like a transition: inserting impact rows before it
+    # would take a shared lock on it (FK check) that the later update has to upgrade, which
+    # deadlocks with a transition queued in between
+    row = (
+        await session.execute(
+            select(TiqoraItsmChange)
+            .where(TiqoraItsmChange.ticket_id == ticket_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
     if row is None:
         return None
     requested = row.impact_requested_at

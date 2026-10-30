@@ -291,6 +291,9 @@ async def test_cab_crud_and_members(w: ChangeWorld) -> None:
             w.session, cab_id=cab.id, members=_members(("user", str(U_FULL))), user_id=1
         )
     assert (_code(unreachable), unreachable.value.http_status) == ("cab_invalid", 422)
+    # A-M8: a stable reason next to the engine's English text
+    assert unreachable.value.extra["reason"] == "quorum_exceeds_members"
+    assert unreachable.value.detail["reason"] == "quorum_exceeds_members"
 
     await _role(w)
     list_id = await _engine_members(w)
@@ -326,6 +329,7 @@ async def test_cab_crud_and_members(w: ChangeWorld) -> None:
             user_id=1,
         )
     assert _code(fit) == "cab_invalid"
+    assert fit.value.extra["reason"] == "quorum_exceeds_members"
     renamed = await update_cab(
         w.session,
         cab_id=cab.id,
@@ -567,14 +571,22 @@ async def test_meetings_api(w: ChangeWorld) -> None:
         )
         assert made.status_code == 201, made.text
         mid = made.json()["id"]
+        noted = await api.client.patch(
+            f"/api/v1/itsm/cab-meetings/{mid}", json={"minutes": "Beschluss: Freigabe"}
+        )
+        assert noted.status_code == 200, noted.text
         api.login(U_FULL)
         listed = await api.client.get(
             "/api/v1/itsm/cab-meetings",
             params={"start": "2026-11-01T00:00:00Z", "end": "2026-12-01T00:00:00Z"},
         )
         assert [m["id"] for m in listed.json()] == [mid]
+        # B-M1: the list carries no minutes and no agenda; the meeting itself has them
+        assert not {"minutes", "agenda"} & listed.json()[0].keys()
+        assert listed.json()[0]["agenda_count"] == 0
         one = await api.client.get(f"/api/v1/itsm/cab-meetings/{mid}")
         assert one.status_code == 200 and one.json()["starts_at"].startswith("2026-11-05T09:00:00")
+        assert one.json()["minutes"] == "Beschluss: Freigabe"
         denied = await api.client.patch(f"/api/v1/itsm/cab-meetings/{mid}", json={"status": "held"})
         assert denied.status_code == 403
         assert (

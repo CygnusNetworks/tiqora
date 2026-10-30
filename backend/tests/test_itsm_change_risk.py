@@ -524,9 +524,31 @@ async def test_answers_validated_against_questions(w: ChangeWorld) -> None:
     )
     assert dict((await risk_input(w.session, APP_SETTINGS, ticket_id=tid)).answers) == {}
 
+    # A-M10: a question with an answer is not deleted (the score of the change came from it);
+    # the admin retires it instead
+    answered = next(q for q in await list_questions(w.session) if q.question_key == "q2")
+    assert await _code(delete_question(w.session, question_id=answered.id)) == (
+        "risk_question_in_use",
+        409,
+    )
+    await update_question(
+        w.session,
+        question_id=answered.id,
+        data=_question(
+            "q2",
+            valid=False,
+            answers=[
+                {"key": "c", "label": "C", "points": 1},
+                {"key": "d", "label": "D", "points": 0},
+            ],
+        ),
+        user_id=1,
+    )
+
     # no valid question at all: nothing to answer, so the questionnaire is complete
     for q in await list_questions(w.session):
-        await delete_question(w.session, question_id=q.id)
+        if q.id != answered.id:
+            await delete_question(w.session, question_id=q.id)
     assert await questionnaire_complete(w.session, ticket_id=tid) is True
 
     row = await _row(w, tid)

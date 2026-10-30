@@ -620,6 +620,28 @@ async def test_every_engine_outcome_writes_one_phase_event(w: ChangeWorld, path:
     assert [e.id for e in again] == [e.id for e in new]
 
 
+async def test_hook_after_auto_decision_is_ignored(w: ChangeWorld) -> None:
+    """A-M9: the engine announces a pre-approval (``record_auto_decision``) through
+    ``core.approval_hook`` like any decision; the change took ``draft -> scheduled`` itself and
+    the real ``on_decided`` must change nothing (no phase, no second ``approval_outcome``)."""
+    tid = await _create(w, "standard", template_id=await _standard_template(w))
+    await _ready(w, tid, cab_id=None)
+    await _go(w, tid, "scheduled")
+    await w.session.commit()
+    row = await _row(w, tid)
+    assert (row.phase, row.approval_via) == ("scheduled", "template")
+    aid = int(row.approval_id or 0)
+    assert (await approval_service.get_info(w.session, aid)).status == "approved"
+    before = [(e.id, e.event) for e in await _events(w, tid)]
+    assert [e for _, e in before].count("approval_outcome") == 1
+
+    assert await _hook_jobs(w, aid) == [f"approval:{aid}:approved"]
+    await _hook(w, aid)
+    assert [(e.id, e.event) for e in await _events(w, tid)] == before
+    row = await _row(w, tid)
+    assert (row.phase, row.approval_round, row.approval_via) == ("scheduled", 1, "template")
+
+
 async def test_outcome_of_other_keys_is_ignored(w: ChangeWorld) -> None:
     """The listener acts on the CAB key only; anything else of the subject type is left alone."""
     tid, aid = await _to_approval(w)

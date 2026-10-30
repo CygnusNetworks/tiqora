@@ -2,9 +2,14 @@
 
 :func:`detect_conflicts` is pure (no database, network or file system). :func:`load_conflicts`
 feeds it from the stored impact set, the freeze occurrences and a capped list of overlapping
-changes; it never reads another ticket's content. Two situations are reported as findings of their
-own instead of passing silently: the freeze occurrences were cut off (``freeze_truncated``) or
-more overlapping changes exist than are examined (``overlap_truncated``).
+changes; it never reads another ticket's content. The change's own direct services (the ticket's
+service and the extra services) are read live from the row as well, because the stored set lags
+behind until the impact job has run. Three situations are reported as findings of their own
+instead of passing silently: the freeze occurrences were cut off (``freeze_truncated``), more
+overlapping changes exist than are examined (``overlap_truncated``), or the impact set is not
+current, the change has a CI and a service-scoped freeze that would block it overlaps the window
+without matching a known service (``freeze_unverified``: a service reached through a CI may still
+be missing). The transition guard counts ``freeze_truncated`` and ``freeze_unverified`` as blocks.
 
 ``user_id=None`` is the system view (guards and the risk score); with a user, an overlapping
 change on a queue the user cannot read becomes ``hidden`` (no reference, window kept, ruling F27)
@@ -20,22 +25,24 @@ from datetime import datetime
 from typing import Final, Literal
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.impact import services_reached_from
+from tiqora.cmdb.links import LinkService
 from tiqora.config import Settings
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_access import CHUNK, readable_tickets
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import FreezeOccurrence, occurrences
 from tiqora.itsm.change.gate import require_change_mode
+from tiqora.itsm.change.impact import impact_is_current
 from tiqora.itsm.change.models import (
     TiqoraItsmChange,
     TiqoraItsmChangeImpact,
     TiqoraItsmChangeTask,
 )
-from tiqora.itsm.change.service import _ticket
+from tiqora.itsm.change.service import _extra_services, _ticket
 from tiqora.itsm.ci_provider import CiRef
 from tiqora.itsm.providers import get_ci_provider
 from tiqora.znuny.sysconfig import SysConfig
@@ -46,8 +53,17 @@ CONFLICT_CANDIDATE_CAP: Final = 500
 OVERLAP_PHASES: Final = frozenset({"approval", "scheduled", "implementing"})
 
 ConflictKind = Literal[
-    "freeze", "change_overlap", "task_outside", "no_window", "freeze_truncated", "overlap_truncated"
+    "freeze",
+    "change_overlap",
+    "task_outside",
+    "no_window",
+    "freeze_truncated",
+    "overlap_truncated",
+    "freeze_unverified",
 ]
+#: findings the transition guard counts as a block although their severity is ``warn``: the
+#: check could not be completed (fail closed; a manager may override them with a reason)
+UNVERIFIED_KINDS: Final = frozenset({"freeze_truncated", "freeze_unverified"})
 Severity = Literal["info", "warn", "block"]
 
 
@@ -86,6 +102,13 @@ def _overlap(a: tuple[datetime, datetime], b_start: datetime, b_end: datetime) -
     return a[0] < b_end and b_start < a[1]
 
 
+def _blocks(freeze: FreezeOccurrence, change_type: str) -> bool:
+    """The freeze would block a change of this type (after the emergency downgrade)."""
+    if freeze.enforcement != "block":
+        return False
+    return not (change_type == "emergency" and freeze.allow_emergency)
+
+
 def detect_conflicts(
     *,
     change_type: str,
@@ -108,9 +131,7 @@ def detect_conflicts(
             shared = tuple(sorted(services & freeze.service_ids))
             if not shared:
                 continue
-        severity: Severity = "block" if freeze.enforcement == "block" else "warn"
-        if severity == "block" and change_type == "emergency" and freeze.allow_emergency:
-            severity = "warn"
+        severity: Severity = "block" if _blocks(freeze, change_type) else "warn"
         out.append(
             Conflict(
                 "freeze",
@@ -230,6 +251,22 @@ async def load_conflicts(
     return (await _load(session, ticket_id=ticket_id, user_id=user_id))[0]
 
 
+async def _live_direct_services(session: AsyncSession, ticket_id: int) -> frozenset[int]:
+    """The ticket's service and the change's extra services, as they are now (two reads)."""
+    found = set(await _extra_services(session, ticket_id))
+    own = (
+        await session.execute(text("SELECT service_id FROM ticket WHERE id = :t"), {"t": ticket_id})
+    ).first()
+    if own is not None and own[0] is not None:
+        found.add(int(own[0]))
+    return frozenset(found)
+
+
+async def _has_linked_ci(session: AsyncSession, ticket_id: int) -> bool:
+    linked = await LinkService(session).ci_ids_for_tickets([ticket_id])
+    return bool(linked.get(ticket_id))
+
+
 async def _load(
     session: AsyncSession, *, ticket_id: int, user_id: int | None
 ) -> tuple[list[Conflict], _ImpactSet]:
@@ -241,6 +278,15 @@ async def _load(
     if start is not None and end is not None and end > start:
         window = (start, end)
     mine = (await _impact_sets(session, [ticket_id]))[ticket_id]
+    # the stored set lags behind a service edit until the impact job ran: the direct services
+    # count from the moment they are set (a blocking service freeze must not fail open)
+    live = await _live_direct_services(session, ticket_id)
+    if not live <= mine.direct_services:
+        mine = replace(
+            mine,
+            services=mine.services | live,
+            direct_services=mine.direct_services | live,
+        )
 
     freezes: list[FreezeOccurrence] = []
     freeze_truncated = False
@@ -301,6 +347,19 @@ async def _load(
         conflicts = await _filter_readable(session, conflicts, user_id=user_id)
     if freeze_truncated:
         conflicts.append(Conflict("freeze_truncated", "warn", None, *(window or (None, None))))
+    if window is not None and not impact_is_current(row):
+        # services reached through CIs are unknown until the impact job ran: a service freeze
+        # that would block this change and matched no known service cannot be ruled out while
+        # the change has a CI (without one, the live direct services are the whole set)
+        matched = {c.ref for c in conflicts if c.kind == "freeze"}
+        if any(
+            f.scope == "services"
+            and _blocks(f, row.change_type)
+            and f"freeze:{f.freeze_id}" not in matched
+            and _overlap(window, f.start, f.end)
+            for f in freezes
+        ) and (mine.cis or await _has_linked_ci(session, ticket_id)):
+            conflicts.append(Conflict("freeze_unverified", "warn", None, *window))
     if overlap_truncated:
         conflicts.append(Conflict("overlap_truncated", "warn", None, *(window or (None, None))))
     return conflicts, mine
@@ -379,6 +438,7 @@ __all__ = [
     "ConflictOut",
     "OtherChange",
     "TaskWindow",
+    "UNVERIFIED_KINDS",
     "detect_conflicts",
     "load_conflicts",
     "read_conflicts",

@@ -31,7 +31,7 @@ from datetime import datetime, timedelta
 from typing import Any, Final, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.impact import services_reached_from
@@ -334,13 +334,19 @@ async def update_question(
 
 
 async def delete_question(session: AsyncSession, *, question_id: int) -> None:
-    """Delete the question and the answers given to it (``valid=False`` keeps them)."""
+    """Delete a question nobody has answered yet. Once a change has an answer to it (closed
+    changes included: their score was computed from it) the delete is refused with 409
+    ``risk_question_in_use``; ``valid=False`` retires it and keeps the answers."""
     row = await _question(session, question_id)
-    await session.execute(
-        delete(TiqoraItsmChangeRiskAnswer).where(
-            TiqoraItsmChangeRiskAnswer.question_key == row.question_key
+    answered = (
+        await session.execute(
+            select(TiqoraItsmChangeRiskAnswer.ticket_id)
+            .where(TiqoraItsmChangeRiskAnswer.question_key == row.question_key)
+            .limit(1)
         )
-    )
+    ).first()
+    if answered is not None:
+        raise ChangeError("risk_question_in_use", 409)
     await session.delete(row)
     await session.flush()
 
@@ -447,8 +453,18 @@ async def questionnaire_complete(session: AsyncSession, *, ticket_id: int) -> bo
 # --- risk input and the core checks ----------------------------------------------------------
 
 
-async def risk_input(session: AsyncSession, settings: Settings, *, ticket_id: int) -> RiskInput:
-    """The input of every check; also what itsm-beyond reads (X3). Reads only."""
+async def risk_input(
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    ticket_id: int,
+    conflicts: Sequence[Conflict] | None = None,
+) -> RiskInput:
+    """The input of every check; also what itsm-beyond reads (X3). Reads only.
+
+    ``conflicts``: the system view of :func:`load_conflicts`, when the caller has loaded it in
+    this transaction already (the transition guard); otherwise it is loaded here.
+    """
     cfg = await load_change_settings(session, settings)
     itsm_cfg = await load_itsm_settings(session, settings)
     row = await _row(session, ticket_id)
@@ -467,7 +483,8 @@ async def risk_input(session: AsyncSession, settings: Settings, *, ticket_id: in
             int(k) for kd, k, d in impact if kd == kind and bool(d) is direct and str(k).isdigit()
         )
 
-    conflicts = await load_conflicts(session, ticket_id=ticket_id, user_id=None)
+    if conflicts is None:
+        conflicts = await load_conflicts(session, ticket_id=ticket_id, user_id=None)
     answered = await _answered(session, ticket_id)
     return RiskInput(
         ticket_id=ticket_id,
@@ -802,9 +819,12 @@ def stored_evaluation(row: TiqoraItsmChange) -> RiskEvaluation:
 
 
 async def _evaluate(
-    session: AsyncSession, settings: Settings, row: TiqoraItsmChange
+    session: AsyncSession,
+    settings: Settings,
+    row: TiqoraItsmChange,
+    conflicts: Sequence[Conflict] | None = None,
 ) -> RiskEvaluation:
-    inp = await risk_input(session, settings, ticket_id=int(row.ticket_id))
+    inp = await risk_input(session, settings, ticket_id=int(row.ticket_id), conflicts=conflicts)
     findings = await _run_checks(session, inp)
     score = max(0, inp.answer_points + sum(f.points for f in findings))
     row.risk_score = score
@@ -816,19 +836,25 @@ async def _evaluate(
 
 
 async def evaluate_risk(
-    session: AsyncSession, settings: Settings, *, ticket_id: int, user_id: int
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    ticket_id: int,
+    user_id: int,
+    conflicts: Sequence[Conflict] | None = None,
 ) -> RiskEvaluation:
     """Run the checks and store score, level, findings and time.
 
     The caller has checked the caller's rights (the route, or the transition that calls this
-    first); ``user_id`` only names who asked. Final changes are not evaluated.
+    first); ``user_id`` only names who asked. Final changes are not evaluated. ``conflicts``:
+    see :func:`risk_input` (the transition loads them once for its guard and the checks).
     """
     _ = user_id
     await require_change_mode(session, settings)
     row = await _row(session, ticket_id, lock=True)
     if row.phase in FINAL_PHASES:
         raise ChangeError("change_final", 409)
-    return await _evaluate(session, settings, row)
+    return await _evaluate(session, settings, row, conflicts)
 
 
 async def set_answers(

@@ -8,6 +8,8 @@ Settings are edited through the generic settings-sections API (section ``itsm_ch
 
 from __future__ import annotations
 
+from typing import Any, Final
+
 from fastapi import APIRouter, Response, status
 
 from tiqora.api.deps import AppSettings, DbSession
@@ -166,6 +168,20 @@ async def delete_freeze_window(freeze_id: int, admin: AdminUser, session: DbSess
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+#: documented on the two routes that check the CAB against the approval engine (A-M8)
+_CAB_INVALID: Final[dict[int | str, dict[str, Any]]] = {
+    422: {
+        "description": (
+            'Validation error, or `{"detail": {"code": "cab_invalid", "reason": ...,'
+            ' "message": ...}}`: the approval engine refuses the CAB\'s step. `reason` is'
+            " `quorum_exceeds_members` (only users / customer users as members and fewer of them"
+            " than the quorum), `invalid_definition` (another engine rule) or `invalid_member`;"
+            " `message` is the engine's English text."
+        )
+    }
+}
+
+
 @router.get("/cabs", response_model=list[CabOut])
 async def get_cabs(admin: AdminUser, session: DbSession) -> list[CabOut]:
     """All CABs with their members, valid or not."""
@@ -181,7 +197,7 @@ async def post_cab(body: CabIn, admin: AdminUser, session: DbSession) -> CabOut:
     return out
 
 
-@router.put("/cabs/{cab_id}", response_model=CabOut)
+@router.put("/cabs/{cab_id}", response_model=CabOut, responses=_CAB_INVALID)
 async def put_cab(cab_id: int, body: CabIn, admin: AdminUser, session: DbSession) -> CabOut:
     """Replace name, rule and flags; the members stay and must fit the rule."""
     out = cab_out(await update_cab(session, cab_id=cab_id, data=body, user_id=admin.id))
@@ -189,7 +205,7 @@ async def put_cab(cab_id: int, body: CabIn, admin: AdminUser, session: DbSession
     return out
 
 
-@router.put("/cabs/{cab_id}/members", response_model=CabOut)
+@router.put("/cabs/{cab_id}/members", response_model=CabOut, responses=_CAB_INVALID)
 async def put_cab_members(
     cab_id: int,
     body: list[CabMemberIn],
@@ -272,7 +288,8 @@ async def put_risk_question(
 
 @router.delete("/risk-questions/{question_id:int}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_risk_question(question_id: int, admin: AdminUser, session: DbSession) -> Response:
-    """Delete the question and the answers given to it (mark it invalid to keep them)."""
+    """Delete a question nobody has answered; once answered, 409 ``risk_question_in_use``
+    (mark it invalid instead, which keeps the answers)."""
     _ = admin
     await delete_question(session, question_id=question_id)
     await session.commit()

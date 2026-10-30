@@ -40,6 +40,7 @@ from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.change import tasks as change_tasks
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.models import (
+    TiqoraItsmChange,
     TiqoraItsmChangeEvent,
     TiqoraItsmChangeTask,
     TiqoraItsmChangeTemplate,
@@ -463,6 +464,18 @@ async def test_update_task_fields_and_owner(w: ChangeWorld) -> None:
     with pytest.raises(ChangeError) as err:
         await update(planned_end=datetime(2026, 11, 7, 19, 0, 0))
     assert err.value.error_code == "invalid_window"
+
+    # A-M3: the tasks of a closed or cancelled change are read-only like the change
+    record = await w.session.get(TiqoraItsmChange, change)
+    assert record is not None
+    for final in ("closed", "cancelled"):
+        record.phase = final
+        await w.session.flush()
+        with pytest.raises(ChangeError) as err:
+            await update(task_kind="workorder")
+        assert (err.value.error_code, err.value.http_status) == ("change_final", 409)
+    stored = await w.session.get(TiqoraItsmChangeTask, task.ticket_id)
+    assert stored is not None and stored.task_kind == "pir"
 
 
 async def test_task_state_counts(w: ChangeWorld) -> None:
