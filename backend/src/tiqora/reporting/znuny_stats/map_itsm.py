@@ -58,6 +58,9 @@ _SOLUTION_OBJECT: Final = (
     "Tiqora die Zeit zwischen Erstellen bzw. Wiedereröffnen und Schließen."
 )
 _IDS_AS_STORED: Final = "IDs wie in Znuny hinterlegt – bitte Typ und Status prüfen."
+_CLOSED_WITHOUT_SELECTION: Final = (
+    "Der Bericht zählt nur geschlossene Tickets, auch ohne Status-Auswahl."
+)
 _STORED_ID_ELEMENTS: Final = frozenset({"TypeIDs", "StateIDs"})
 _STATE_FIELDS: Final = frozenset({"state", "state_type"})
 _DROPPED_TICKETS: Final[Mapping[str, str]] = {
@@ -99,13 +102,15 @@ def _ticket_itsm(
         axes.conditions.append(Condition(field="state_type", op="in", value=["closed"]))
         for el in stat.elements:
             fmap = ELEMENT_FIELDS_TICKETS.get(el.element)
-            if fmap is not None and fmap.field in _STATE_FIELDS and el.selected:
+            if fmap is not None and fmap.field in _STATE_FIELDS:
                 issues.append(
                     make_issue(
                         element_ref(el),
                         ", ".join(el.selected),
                         "Der Bericht zählt immer nur geschlossene Tickets; "
-                        "wählen Sie einen offenen Status, bleibt das Ergebnis leer.",
+                        "wählen Sie einen offenen Status, bleibt das Ergebnis leer."
+                        if el.selected
+                        else _CLOSED_WITHOUT_SELECTION,
                         "approximated",
                     )
                 )

@@ -222,3 +222,28 @@ def test_file_ids_unreliable_names_in_file_flag() -> None:
     assert file_ids_unreliable(file_stat, klass, FieldMap("class", "cmdb_class"))
     names = el("restriction", "ClassIDs", "Computer")
     assert not file_ids_unreliable(file_stat, names, FieldMap("class", "cmdb_class"))
+
+
+def test_file_state_type_ids_pin_filter_and_text_on_014() -> None:
+    # the file's ids become a fixed filter here, so "counts everything" would be untrue
+    m = map_stat(itsm_fixture("ITSMStats-014-Ticket.xml"), LOOKUPS, is_admin=False)
+    assert m.definition is not None and m.definition.filter is not None
+    conds = _conditions(m.definition.filter.where)
+    assert ("state_type", "in", ["open"]) in [(c.field, c.op, c.value) for c in conds]
+    assert all(p.field != "state_type" for p in m.definition.parameters)
+    reasons = {i.reason for i in m.issues if i.element == "UseAsRestriction.StateTypeIDs"}
+    assert reasons == {
+        "Status-Typ-IDs aus einer Exportdatei wurden auf die Status-Typen dieses Systems "
+        "abgebildet. Bitte prüfen Sie die Auswahl."
+    }
+
+
+def test_first_level_state_axis_without_selection_says_closed_default() -> None:
+    m = map_stat(_stat(el("x", "StateIDs"), **_FLS), LOOKUPS, is_admin=False)
+    assert m.definition is not None and m.definition.filter is not None
+    conds = _conditions(m.definition.filter.where)
+    assert [(c.field, c.op, c.value) for c in conds] == [("state_type", "in", ["closed"])]
+    assert (
+        "UseAsXvalue.StateIDs",
+        "Der Bericht zählt nur geschlossene Tickets, auch ohne Status-Auswahl.",
+    ) in _issues(m, "approximated")

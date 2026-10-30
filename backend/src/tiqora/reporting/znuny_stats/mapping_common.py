@@ -30,6 +30,7 @@ from tiqora.reporting.definition import (
 from tiqora.reporting.sources._common import STATE_TYPES
 from tiqora.reporting.sql import Grain
 from tiqora.reporting.znuny_stats.change_states import (
+    CHANGE_OUTCOMES_COLLAPSED,
     CHANGE_STATE_MAPPED,
     CHANGE_STATE_UNKNOWN,
     ZNUNY_CHANGE_STATES,
@@ -201,6 +202,10 @@ _FILE_IDS_REASON: Final = (
     "IDs aus einer Exportdatei lassen sich nicht zuordnen. "
     "Solange Sie keine Auswahl treffen, zählt der Bericht alle Werte."
 )
+_STATE_TYPE_IDS_REASON: Final = (
+    "Status-Typ-IDs aus einer Exportdatei wurden auf die Status-Typen dieses Systems abgebildet. "
+    "Bitte prüfen Sie die Auswahl."
+)
 
 
 def dropped_reason(
@@ -363,8 +368,14 @@ def resolve_values(
                 out.append(raw)
     if any_state:
         issues.append(make_issue(ref, ", ".join(el.selected), CHANGE_STATE_MAPPED, "approximated"))
+    if fmap.kind == "change_phase" and "closed" in out:
+        issues.append(
+            make_issue(ref, ", ".join(el.selected), CHANGE_OUTCOMES_COLLAPSED, "approximated")
+        )
     if stat.origin == "file" and fmap.kind == "state_type" and out:
-        issues.append(make_issue(ref, ", ".join(el.selected), _FILE_IDS_REASON, "approximated"))
+        issues.append(
+            make_issue(ref, ", ".join(el.selected), _STATE_TYPE_IDS_REASON, "approximated")
+        )
     return out
 
 

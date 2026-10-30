@@ -23,6 +23,10 @@ ZNUNY_CHANGE_STATES: Final[Mapping[str, tuple[str, ...]]] = {
 }
 
 CHANGE_STATE_MAPPED: Final = "Znuny-Status wurden auf Tiqora-Phasen abgebildet."
+CHANGE_OUTCOMES_COLLAPSED: Final = (
+    "„successful“ und „failed“ fallen in Tiqora in die Phase „Abgeschlossen“; "
+    "der Bericht zählt beide Ergebnisse."
+)
 CHANGE_STATE_UNKNOWN: Final = "Diesen Change-Status gibt es in Tiqora nicht."
 
 

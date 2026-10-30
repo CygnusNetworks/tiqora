@@ -224,6 +224,19 @@ def test_change_history_fixed_closed_states_become_closed() -> None:
     )
     m = map_stat(stat, TIQORA, is_admin=False)
     assert _filter(m) == [("to_phase", "in", ["closed", "cancelled"])]
+    assert (
+        "UseAsRestriction.NewValues",
+        "„successful“ und „failed“ fallen in Tiqora in die Phase „Abgeschlossen“; "
+        "der Bericht zählt beide Ergebnisse.",
+    ) in _issues(m, "approximated")
+
+
+def test_change_history_shipped_selection_has_no_collapse_issue() -> None:
+    for name in (
+        "ITSMStats-402-ITSMChangeManagement.xml",
+        "ITSMStats-403-ITSMChangeManagement.xml",
+    ):
+        assert not any("beide Ergebnisse" in r for _, r in _issues(_fixture(name)))
 
 
 def test_changes_incidents_404() -> None:
