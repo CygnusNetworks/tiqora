@@ -75,7 +75,7 @@ describe("ImportRunReport", () => {
       "Anhänge",
       "Prioritätsmatrix",
       "Service-Angaben",
-      "Changes (nur gezählt)",
+      "Changes (Archiv)",
       "In Znuny gelöscht",
       "Vorfallstatus",
     ]) {

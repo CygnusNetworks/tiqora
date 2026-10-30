@@ -12,6 +12,7 @@ from sqlalchemy import text
 from tests._itsm_db import ITSM_PARAMS
 from tests._itsm_mode_helpers import itsm_url, make_factory
 from tests._itsm_setup_helpers import (
+    CHANGE_FIELDS,
     FIELDS,
     STATE,
     TYPES,
@@ -83,9 +84,9 @@ async def test_plan_on_plain_db_all_missing(request, dialect: str) -> None:
     url = cleaned_plain_url(request, dialect)
     items = await _plan(url)
     assert {i.status for i in items} == {"missing"}
-    assert len(items) == len(TYPES) + 1 + len(FIELDS)
+    assert len(items) == len(TYPES) + 1 + len(FIELDS) + len(CHANGE_FIELDS)
     by_group = {g: [i for i in items if i.group == g] for g in ("incident_problem", "change")}
-    assert [i.name for i in by_group["change"]] == ["Change", "Change::Task"]
+    assert [i.name for i in by_group["change"]] == ["Change", "Change::Task", *CHANGE_FIELDS]
     assert len(by_group["incident_problem"]) == 4 + 1 + len(FIELDS)
 
 
@@ -332,3 +333,155 @@ async def test_setup_routes_need_admin(request) -> None:
         assert (await client.get(BASE)).status_code in (401, 403)
         assert (await client.post(BASE, json={})).status_code in (401, 403)
     assert await _rows(url, "SELECT name FROM ticket_type WHERE name = 'Incident'") == []
+
+
+# --- change group: the two fixed dynamic fields --------------------------------------------
+
+CHANGE = {"change"}
+PHASES = (
+    "draft",
+    "submitted",
+    "assessment",
+    "approval",
+    "scheduled",
+    "implementing",
+    "review",
+    "closed",
+    "rejected",
+    "cancelled",
+)
+
+
+async def test_setup_plans_change_dfs(request, dialect: str) -> None:
+    url = cleaned_plain_url(request, dialect)
+    plan = await _plan(url)
+    change = [i for i in plan if i.group == "change"]
+    assert [(i.kind, i.name, i.status) for i in change] == [
+        ("ticket_type", "Change", "missing"),
+        ("ticket_type", "Change::Task", "missing"),
+        ("dynamic_field", "ITSMChangeType", "missing"),
+        ("dynamic_field", "ITSMChangePhase", "missing"),
+    ]
+    # the names are fixed: renaming the matrix fields or the types does not move them
+    renamed = ItsmSettings(change_type="Wandel", criticality_field="Kritikalitaet")
+    names = [i.name for i in await _plan(url, renamed) if i.group == "change"]
+    assert names == ["Wandel", "Change::Task", "ITSMChangeType", "ITSMChangePhase"]
+
+
+async def test_setup_never_changes_existing_df(request, dialect: str) -> None:
+    url = cleaned_plain_url(request, dialect)
+    engine, factory = session_factory(url)
+    try:
+        async with factory() as session:
+            await create_dynamic_field_row(
+                session,
+                name="ITSMChangeType",
+                label="Mine",
+                field_type="Text",
+                object_type="Ticket",
+                config={"DefaultValue": "x"},
+                field_order=911,
+                user_id=USER,
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+    sql = "SELECT * FROM dynamic_field WHERE name = 'ITSMChangeType'"
+    before = (await _rows(url, sql))[0]
+
+    plan = _by_name(await _plan(url))
+    assert plan["ITSMChangeType"].status == "conflict"
+    assert "Text" in (plan["ITSMChangeType"].detail or "")
+    after_items = _by_name(await _apply(url, CHANGE))
+    assert after_items["ITSMChangeType"].status == "conflict"
+    assert after_items["ITSMChangePhase"].status == "present"  # the rest was created
+    assert (await _rows(url, sql)) == [before]
+    # an incomplete group is not "complete"
+    engine, factory = session_factory(url)
+    try:
+        from tiqora.itsm.setup import setup_group_complete
+
+        async with factory() as session:
+            assert await setup_group_complete(session, ItsmSettings(), "change") is False
+    finally:
+        await engine.dispose()
+
+
+async def test_apply_setup_creates_dropdowns_like_admin(request, dialect: str) -> None:
+    """The rows equal what ``create_dynamic_field_row`` stores for the same input."""
+    url = cleaned_plain_url(request, dialect, fields=(*FIELDS, *CHANGE_FIELDS, "ITSMChangeRef94"))
+    items = _by_name(await _apply(url, CHANGE))
+    assert {items[n].status for n in (*CHANGE_FIELDS, "Change")} == {"present"}
+
+    expected = {
+        "ITSMChangeType": (
+            "Change Type",
+            {"standard": "Standard", "normal": "Normal", "emergency": "Emergency"},
+        ),
+        "ITSMChangePhase": (
+            "Change Phase",
+            {p: p.capitalize() for p in PHASES},
+        ),
+    }
+    engine, factory = session_factory(url)
+    try:
+        async with factory() as session:
+            for name, (label, values) in expected.items():
+                config = {
+                    "DefaultValue": "",
+                    "Link": "",
+                    "PossibleNone": 1,
+                    "PossibleValues": values,
+                    "TranslatableValues": 1,
+                }
+                await create_dynamic_field_row(
+                    session,
+                    name="ITSMChangeRef94",
+                    label=label,
+                    field_type="Dropdown",
+                    object_type="Ticket",
+                    config=config,
+                    field_order=950,
+                    valid_id=1,
+                    internal_field=1,
+                    user_id=USER,
+                )
+                await session.flush()
+                reference = dict(
+                    (
+                        await session.execute(
+                            text("SELECT * FROM dynamic_field WHERE name = 'ITSMChangeRef94'")
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+                await session.execute(
+                    text("DELETE FROM dynamic_field WHERE name = 'ITSMChangeRef94'")
+                )
+                mine = dict(
+                    (
+                        await session.execute(
+                            text("SELECT * FROM dynamic_field WHERE name = :n"), {"n": name}
+                        )
+                    )
+                    .mappings()
+                    .one()
+                )
+                for column in (
+                    "label",
+                    "field_type",
+                    "object_type",
+                    "config",
+                    "valid_id",
+                    "internal_field",
+                ):
+                    assert mine[column] == reference[column], (name, column)
+                assert mine["create_by"] == reference["create_by"] == USER
+                assert config_from_yaml(mine["config"])["PossibleValues"] == values
+            await session.commit()
+    finally:
+        await engine.dispose()
+    # every phase code of the machine is offered (Znuny stores the keys sorted)
+    row = (await _rows(url, "SELECT config FROM dynamic_field WHERE name = 'ITSMChangePhase'"))[0]
+    assert set(config_from_yaml(row["config"])["PossibleValues"]) == set(PHASES)

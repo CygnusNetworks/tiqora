@@ -11,6 +11,7 @@ import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
 import { demoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolveItsmData } from "./itsmMock";
+import { resolveChangeReply } from "./changeMock";
 import { resolveApprovalLink, resolveApprovalsData } from "./approvalsMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
@@ -151,8 +152,35 @@ export const handlers = [
   // ITSM: the CI list and service lookups filter on the query string, which resolveData never sees.
   http.get("*/api/v1/itsm/*", ({ request }) => {
     const url = new URL(request.url);
-    const out = resolveItsmData(url.pathname, "GET", url.search);
-    return out === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json(out as never);
+    // Explicit `!== undefined`: the ITSM mock answers some routes with `null` (e.g. recent-incident).
+    const itsm = resolveItsmData(url.pathname, "GET", url.search);
+    if (itsm !== undefined) return HttpResponse.json(itsm as never);
+    const change = resolveChangeReply(url.pathname, "GET", url.search);
+    return change === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((change.body ?? null) as never, { status: change.status });
+  }),
+  // The portal's maintenance schedule filters on the window, which resolveData never sees.
+  http.get("*/api/portal/change-schedule", ({ request }) => {
+    const url = new URL(request.url);
+    const reply = resolveChangeReply(url.pathname, "GET", url.search);
+    return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+  }),
+  // Creating a change, a phase step and "Als Change führen" are stateful (the list, the change page
+  // and the zoom show the result), so the body reaches the mock.
+  ...["*/api/v1/itsm/changes", "*/api/v1/itsm/changes/:id/transition", "*/api/v1/tickets/:id/change"].map((route) =>
+    http.post(route, async ({ request }) => {
+      const reply = resolveChangeReply(new URL(request.url).pathname, "POST", "", undefined, await request.json().catch(() => ({})));
+      return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+    }),
+  ),
+  // the change archive on the admin page: a dry run and a real run answer their own job
+  http.post("*/api/v1/admin/itsm/change/legacy-archive", async ({ request }) => {
+    const reply = resolveChangeReply(new URL(request.url).pathname, "POST", "", undefined, await request.json().catch(() => ({})));
+    return reply === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
+  }),
+  // the portal switch on the change page keeps its state
+  http.patch("*/api/v1/itsm/changes/:id", async ({ request }) => {
+    const reply = resolveChangeReply(new URL(request.url).pathname, "PATCH", "", undefined, await request.json().catch(() => ({})));
+    return reply === undefined ? undefined : HttpResponse.json((reply.body ?? null) as never, { status: reply.status });
   }),
   // jobs of the CMDB mock (bulk edit, export); any other job id falls through to the generic resolver
   http.get("*/api/v1/jobs/:id", ({ params }) => {

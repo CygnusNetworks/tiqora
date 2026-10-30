@@ -30,6 +30,8 @@ from tiqora.domain.settings_store import (
     KEY_GI_REQUESTER_ENABLED,
     KEY_GI_REQUESTER_INTERVAL_SECONDS,
     KEY_IDENTITY_METADATA_REFRESH_ENABLED,
+    KEY_ITSM_CHANGE_ENABLED,
+    KEY_ITSM_CHANGE_INTERVAL_SECONDS,
     KEY_NOTIFICATIONS_ENABLED,
     KEY_NOTIFICATIONS_INTERVAL_SECONDS,
     KEY_OUTBOX_ENABLED,
@@ -375,6 +377,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
         interval_settings_attr="webchat_sweep_interval_seconds",
+    ),
+    # Queues the refresh of the stored impact set of active changes.
+    DaemonService(
+        slug="itsm_change",
+        enabled_key=KEY_ITSM_CHANGE_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_ITSM_CHANGE_INTERVAL_SECONDS,
+        interval_settings_attr="itsm_change_interval_seconds",
     ),
     # Approval deadlines, reminders, escalation, invalid approvers and link clean-up.
     DaemonService(

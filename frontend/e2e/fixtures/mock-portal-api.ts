@@ -38,6 +38,17 @@ const openTicket = {
   until_time: 0,
 };
 
+// A maintenance window of the customer's service, as `GET /api/portal/change-schedule` answers it.
+const portalChange = {
+  tn: "20261012130",
+  title: "Wartung der Mail-Gateways",
+  change_type: "normal",
+  phase: "scheduled",
+  planned_start: "2026-07-22T20:00:00Z",
+  planned_end: "2026-07-23T00:00:00Z",
+  services: ["E-Mail"],
+};
+
 const closedTicket = {
   ...openTicket,
   id: 201,
@@ -271,6 +282,16 @@ export async function mockPortalApi(page: Page) {
         rendered: [
           { path: "hostname", label: "Hostname", type: "text", display: "mail.example.org", ref: null, children: [], portal: true },
         ],
+      });
+      return;
+    }
+
+    if (path.endsWith("/api/portal/change-schedule") && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "X-Schedule-Truncated": "false" },
+        body: JSON.stringify([portalChange]),
       });
       return;
     }

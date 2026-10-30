@@ -495,6 +495,17 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["verknüpfungstypen", "verknüpfung", "link types", "links", "linktyp", "itsm", "propagation"],
   },
   {
+    slug: "itsm-change",
+    route: "/admin/itsm/change",
+    group: "tickets",
+    nameKey: "admin.nav.itsmChange",
+    descriptionKey: "admin.pageDescriptions.itsmChange",
+    keywords: [
+      "change", "changes", "cab", "freeze", "sperrzeitraum", "vorlage", "risiko", "rfc", "änderung",
+      "risikofragen", "change-archiv", "standard-change",
+    ],
+  },
+  {
     slug: "itsm-import",
     route: "/admin/itsm-import",
     group: "tickets",
@@ -509,6 +520,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     nameKey: "admin.settings.itsm.title",
     descriptionKey: "admin.pageDescriptions.settingsItsm",
     keywords: ["itsm", "ticket-typ", "workaround", "bekannter fehler", "known error", "znuny-adresse"],
+  },
+  {
+    slug: "settings-itsm-change",
+    route: "/admin/settings/itsm_change",
+    group: "tickets",
+    nameKey: "admin.settings.itsmChange.title",
+    descriptionKey: "admin.pageDescriptions.settingsItsmChange",
+    keywords: ["change", "change-manager", "cab", "risikostufe", "freigabe", "notfall-change", "rfc"],
   },
   {
     slug: "approvals",

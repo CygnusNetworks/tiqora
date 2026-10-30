@@ -67,4 +67,15 @@ describe("MonthGrid", () => {
     expect(onSelectOccurrence).toHaveBeenCalledWith(occurrences[0]);
     expect(onSelectDay).not.toHaveBeenCalled();
   });
+
+  it("makes '+n more' open that day without selecting the day cell twice", () => {
+    const onSelectDay = vi.fn();
+    const onSelectMore = vi.fn();
+    const four = [1, 2, 3, 4].map((n) => ({ ...occurrences[0], appointment_id: 50 + n, title: `T${n}` }));
+    wrap(<MonthGrid anchor={new Date(2026, 2, 15)} occurrences={four} onSelectDay={onSelectDay} onSelectMore={onSelectMore} />);
+    const more = screen.getByTestId(`calendar-more-2026-03-05`);
+    fireEvent.click(more);
+    expect(onSelectMore).toHaveBeenCalledTimes(1);
+    expect(onSelectDay).not.toHaveBeenCalled();
+  });
 });

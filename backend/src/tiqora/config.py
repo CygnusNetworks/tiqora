@@ -52,6 +52,15 @@ class Settings(BaseSettings):
         default=DEFAULT_SECRET_KEY,
         validation_alias="TIQORA_SECRET_KEY",
     )
+    # Key of the GDPR tombstones in the archive of Znuny changes (erased customers never
+    # re-enter it). Empty: TIQORA_SECRET_KEY. After rotating TIQORA_SECRET_KEY set this to the
+    # previous TIQORA_SECRET_KEY: until then archive runs refuse, because the old tombstones would
+    # no longer match and erased customers would come back unredacted. Erasures are never blocked;
+    # one under a new key keeps archive runs refused for good.
+    itsm_legacy_erased_key: str = Field(
+        default="",
+        validation_alias="TIQORA_ITSM_LEGACY_ERASED_KEY",
+    )
 
     # Data stores
     database_url: str = Field(
@@ -619,6 +628,12 @@ class Settings(BaseSettings):
     # (default ON) switches it off; this is only the poll interval.
     webchat_sweep_interval_seconds: int = Field(
         default=15, validation_alias="TIQORA_WEBCHAT_SWEEP_INTERVAL"
+    )
+
+    # Change management: refresh of stale impact sets (``daemon.itsm_change.enabled``, default ON,
+    # switches it off; this is only the poll interval).
+    itsm_change_interval_seconds: int = Field(
+        default=3600, ge=60, le=86400, validation_alias="TIQORA_ITSM_CHANGE_INTERVAL"
     )
 
     # Approval sweeper (deadlines, reminders, escalation, invalid approvers, link purge).

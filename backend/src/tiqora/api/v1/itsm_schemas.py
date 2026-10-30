@@ -391,6 +391,28 @@ class TicketItsmDialogsOut(BaseModel):
     decision: bool
 
 
+class TicketChangeOut(BaseModel):
+    """Change facts of a change ticket (Mode B only)."""
+
+    change_type: str
+    phase: str
+    risk_level: str | None
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+
+
+class TicketChangeTaskOut(BaseModel):
+    """Task facts of a change task ticket (Mode B only)."""
+
+    change_ticket_id: int
+    #: ``None`` when the caller may not read the change ticket
+    change_tn: str | None
+    position: int
+    task_kind: str
+    planned_start: UtcDateTime | None
+    planned_end: UtcDateTime | None
+
+
 class TicketItsmOut(BaseModel):
     """``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up."""
 
@@ -415,6 +437,10 @@ class TicketItsmOut(BaseModel):
     known_error_category_configured: bool
     #: ``major_incident_customer_reply`` is on (the "Antwort an Kunden" update mode is offered)
     major_incident_customer_reply: bool
+    #: the ticket is a change (Mode B), else ``None``
+    change: TicketChangeOut | None
+    #: the ticket is a change task (Mode B), else ``None``
+    change_task: TicketChangeTaskOut | None
 
 
 class LinkGraphNodeOut(BaseModel):

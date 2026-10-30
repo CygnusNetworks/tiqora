@@ -84,6 +84,7 @@ import {
 } from "@/routes/portal/TicketListPage";
 import { NewTicketPage, type PortalNewTicketSearch } from "@/routes/portal/NewTicketPage";
 import { PortalCisPage } from "@/routes/portal/PortalCisPage";
+import { ChangeSchedulePage as PortalChangeSchedulePage } from "@/routes/portal/ChangeSchedulePage";
 import { PortalCiPage } from "@/routes/portal/PortalCiPage";
 import {
   NewProcessTicketPage as PortalNewProcessTicketPage,
@@ -127,6 +128,9 @@ import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { WebservicesPage } from "@/routes/admin/WebservicesPage";
 import { ItsmPage } from "@/routes/admin/ItsmPage";
+import { ChangeAdminPage } from "@/routes/admin/itsm/ChangeAdminPage";
+import { parseChangeAdminTab, type ChangeAdminTab } from "@/routes/admin/itsm/changeAdminTabs";
+import { ChangeTemplateEditorPage } from "@/routes/admin/itsm/ChangeTemplateEditorPage";
 import { ApprovalsOverviewPage } from "@/routes/admin/approvals/ApprovalsOverviewPage";
 import { ApprovalTemplatesPage } from "@/routes/admin/approvals/ApprovalTemplatesPage";
 import { ApprovalListsPage } from "@/routes/admin/approvals/ApprovalListsPage";
@@ -139,6 +143,14 @@ import { PortalApprovalPage } from "@/routes/portal/ApprovalPage";
 import { LinkTypesPage } from "@/routes/admin/LinkTypesPage";
 import { ItsmImportPage } from "@/routes/admin/ItsmImportPage";
 import { CiListPage } from "@/routes/agent/CiListPage";
+import { ChangeListPage } from "@/routes/agent/itsm/ChangeListPage";
+import { ChangeDetailPage } from "@/routes/agent/itsm/ChangeDetailPage";
+import { ChangeCalendarPage } from "@/routes/agent/itsm/ChangeCalendarPage";
+import { CabMeetingsPage } from "@/routes/agent/itsm/CabMeetingsPage";
+import { CabMeetingPage } from "@/routes/agent/itsm/CabMeetingPage";
+import { LegacyChangeListPage } from "@/routes/agent/itsm/LegacyChangeListPage";
+import { parseLegacyListSearch } from "@/components/itsm/change/changeUi";
+import { LegacyChangeDetailPage } from "@/routes/agent/itsm/LegacyChangeDetailPage";
 import { CiDetailPage } from "@/routes/agent/CiDetailPage";
 import { WebserviceDetailPage } from "@/routes/admin/WebserviceDetailPage";
 import { WEBSERVICE_TABS, type WebserviceTab } from "@/lib/webservicesApi";
@@ -395,6 +407,8 @@ const agentNewTicketRoute = createRoute({
     call_ended: epochMs(s.call_ended),
     owner_id: positiveInt(s.owner_id),
     from_call: s.from_call === true || s.from_call === 1 || s.from_call === "1" || s.from_call === "true" ? true : undefined,
+    from_change: positiveInt(s.from_change),
+    subject: typeof s.subject === "string" && s.subject !== "" ? s.subject.slice(0, 250) : undefined,
   }),
   component: AgentNewTicketPage,
 });
@@ -656,6 +670,51 @@ const agentItsmCiDetailRoute = createRoute({
   component: CiDetailPage,
 });
 
+// Change management (I19). Static segments before the param routes: "calendar" is never read as a ticket id.
+const agentChangesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/changes",
+  component: ChangeListPage,
+});
+
+const agentChangeCalendarRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/changes/calendar",
+  component: ChangeCalendarPage,
+});
+
+const agentChangeRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/changes/$ticketId",
+  component: ChangeDetailPage,
+});
+
+const agentCabMeetingsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/cab-meetings",
+  component: CabMeetingsPage,
+});
+
+const agentCabMeetingRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/cab-meetings/$meetingId",
+  component: CabMeetingPage,
+});
+
+const agentLegacyChangesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/legacy-changes",
+  // `?ticket_id=` comes from the ticket zoom in Mode A (changes linked to that ticket).
+  validateSearch: parseLegacyListSearch,
+  component: LegacyChangeListPage,
+});
+
+const agentLegacyChangeRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/legacy-changes/$changeId",
+  component: LegacyChangeDetailPage,
+});
+
 const agentCalendarRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/calendar",
@@ -859,6 +918,12 @@ const portalKbArticleRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/kb/$slug",
   component: KbArticlePage,
+});
+
+const portalChangeScheduleRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/change-schedule",
+  component: PortalChangeSchedulePage,
 });
 
 const portalPreferencesRoute = createRoute({
@@ -1111,6 +1176,23 @@ const adminItsmRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/itsm",
   component: ItsmPage,
+});
+
+const adminChangeRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm/change",
+  // The router JSON-parses search values: the page falls back to the first tab for anything unknown.
+  validateSearch: (s: Record<string, unknown>): { tab?: ChangeAdminTab } => {
+    const tab = parseChangeAdminTab(s.tab);
+    return { tab: tab === "templates" ? undefined : tab };
+  },
+  component: ChangeAdminPage,
+});
+
+const adminChangeTemplateRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm/change/templates/$templateId",
+  component: ChangeTemplateEditorPage,
 });
 
 const adminItsmLinkTypesRoute = createRoute({
@@ -1534,6 +1616,13 @@ const routeTree = rootRoute.addChildren([
     agentSearchViewRoute,
     agentItsmCisRoute,
     agentItsmCiDetailRoute,
+    agentChangesRoute,
+    agentChangeCalendarRoute,
+    agentChangeRoute,
+    agentCabMeetingsRoute,
+    agentCabMeetingRoute,
+    agentLegacyChangesRoute,
+    agentLegacyChangeRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,
@@ -1562,6 +1651,7 @@ const routeTree = rootRoute.addChildren([
     portalCmdbListRoute,
     portalCmdbDetailRoute,
     portalApprovalsRoute,
+    portalChangeScheduleRoute,
     portalApprovalRoute,
   ]),
   adminLayoutRoute.addChildren([
@@ -1599,6 +1689,8 @@ const routeTree = rootRoute.addChildren([
     adminWebhooksRoute,
     adminWebservicesRoute,
     adminItsmRoute,
+    adminChangeRoute,
+    adminChangeTemplateRoute,
     adminItsmLinkTypesRoute,
     adminItsmImportRoute,
     adminApprovalsRoute,

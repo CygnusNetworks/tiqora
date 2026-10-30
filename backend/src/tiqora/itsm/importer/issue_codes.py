@@ -8,7 +8,7 @@ from __future__ import annotations
 
 ISSUE_CODES: dict[str, str] = {
     "unsupported_object": (
-        "Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ, Change)"
+        "Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ)"
     ),
     "unknown_link_type": (
         "Der Verknüpfungstyp ist in Znuny nicht konfiguriert; die Verknüpfung wurde nicht "
@@ -67,7 +67,16 @@ ISSUE_CODES: dict[str, str] = {
         "Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden "
         "nicht übernommen"
     ),
-    "changes_not_imported": (
-        "Änderungen (Changes) von Znuny ITSM werden nicht übernommen, es wurden nur gezählt"
+    "not_archived": (
+        "Change-Vorlagen, Bedingungen und Benachrichtigungsregeln von Znuny werden nicht "
+        "übernommen, sie wurden nur gezählt"
+    ),
+    "archive_key_changed": (
+        "Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (TIQORA_SECRET_KEY "
+        "gewechselt); das Archiv wird nicht weiter aktualisiert, damit gelöschte Kunden nicht "
+        "zurückkommen, und bleibt lesbar und geschwärzt. Bisheriger Schlüssel vorhanden und seit "
+        "dem Wechsel keine Löschung: TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen "
+        "TIQORA_SECRET_KEY setzen. Sonst sind keine weiteren Archiv-Läufe möglich; Löschungen "
+        "funktionieren immer"
     ),
 }

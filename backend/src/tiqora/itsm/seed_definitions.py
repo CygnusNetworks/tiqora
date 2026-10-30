@@ -165,6 +165,52 @@ _SEED = SeedSet(
 )
 
 
+def _labelled_dropdown(values: dict[str, str]) -> dict[str, Any]:
+    return {
+        "DefaultValue": "",
+        "Link": "",
+        "PossibleNone": 1,
+        "PossibleValues": dict(values),
+        "TranslatableValues": 1,
+    }
+
+
+#: Tiqora's own change fields (Znuny ITSM ships none, so they are not part of the surveyed
+#: ``SeedSet``). Fixed names: the change record mirrors type and phase into them
+#: (``tiqora.itsm.change.service``); the setup creates them only when missing.
+TIQORA_CHANGE_DYNAMIC_FIELDS: tuple[SeedDynamicField, ...] = (
+    SeedDynamicField(
+        "ITSMChangeType",
+        "Change Type",
+        "Dropdown",
+        "Ticket",
+        10,
+        _labelled_dropdown({"standard": "Standard", "normal": "Normal", "emergency": "Emergency"}),
+    ),
+    SeedDynamicField(
+        "ITSMChangePhase",
+        "Change Phase",
+        "Dropdown",
+        "Ticket",
+        11,
+        _labelled_dropdown(
+            {
+                "draft": "Draft",
+                "submitted": "Submitted",
+                "assessment": "Assessment",
+                "approval": "Approval",
+                "scheduled": "Scheduled",
+                "implementing": "Implementing",
+                "review": "Review",
+                "closed": "Closed",
+                "rejected": "Rejected",
+                "cancelled": "Cancelled",
+            }
+        ),
+    ),
+)
+
+
 def for_profile(profile: str) -> SeedSet:
     """The seed rows of a schema profile (``itsm-6`` = Znuny 6.5, ``itsm-7`` = Znuny 7.3)."""
     if profile not in PROFILES:

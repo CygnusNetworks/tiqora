@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.config import Settings
 from tiqora.itsm.importer.mapstore import MapStore
 from tiqora.itsm.importer.ports import CmdbWritePort, Ports
 from tiqora.itsm.importer.report import ImportReport
@@ -32,6 +33,8 @@ class StepContext:
     user_id: int
     writer_for: Callable[[AsyncSession], CmdbWritePort]
     mapstore_for: Callable[[AsyncSession], MapStore]
+    #: the job's settings (the change archive keys its GDPR tombstones with them)
+    settings: Settings
     touched_ci_ids: set[int] = field(default_factory=set)
 
 

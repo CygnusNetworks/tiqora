@@ -17,6 +17,7 @@ import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
 import { resolveGiData } from "./giMock";
 import { resolveItsmData } from "./itsmMock";
+import { demoChangeTicketFields, resolveChangeData } from "./changeMock";
 import { resolveApprovalsData } from "./approvalsMock";
 import { resolveItsmImport } from "./itsmImportMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
@@ -248,7 +249,8 @@ const demoFreeTextFields = [
 ];
 
 function ticketDetailFor(id: number) {
-  const item = ticketById.get(id) ?? ticketItems[0];
+  // the change demo's tickets (130–146) reuse the first ticket's shape under their own number and title
+  const item = ticketById.get(id) ?? { ...ticketItems[0], ...demoChangeTicketFields(id) };
   return {
     ...item, type_id: 1, service_id: null, sla_id: null, responsible_user_id: 2,
     archive_flag: 0, create_by: 10, change_by: 1,
@@ -2435,6 +2437,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   const giData = resolveGiData(p, method); if (giData !== undefined) return giData;
   const importData = resolveItsmImport(p, method); if (importData !== undefined) return importData;
   const itsmData = resolveItsmData(p, method); if (itsmData !== undefined) return itsmData;
+  const changeData = resolveChangeData(p, method); if (changeData !== undefined) return changeData;
   const approvalsData = resolveApprovalsData(p, method); if (approvalsData !== undefined) return approvalsData;
   // Auth
   if (p.endsWith("/auth/methods")) return {

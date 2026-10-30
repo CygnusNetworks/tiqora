@@ -49,6 +49,8 @@ def _stmts(url: str) -> tuple[tuple[str, dict[str, Any]], ...]:
         ),
         ("DELETE FROM tiqora_gdpr_job WHERE actor = :a", {"a": ACTOR}),
         ("DELETE FROM tiqora_gdpr_audit WHERE actor = :a", {"a": ACTOR}),
+        # tombstones the erasure leaves for the change archive
+        ("DELETE FROM tiqora_itsm_legacy_erased", {}),
         *scim_cleanup_statements(slug_prefix="sc63p", login_like="sc63p.%"),
     )
 

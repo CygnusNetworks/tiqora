@@ -21,6 +21,7 @@ def register_core(registry: Registry) -> None:
     from tiqora.avatars.settings import AVATARS_SECTION
     from tiqora.cmdb.settings import CMDB_SECTION
     from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION
+    from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION
     from tiqora.itsm.settings import ITSM_SECTION
     from tiqora.jobs.settings import JOBS_SECTION
     from tiqora.reporting.settings import REPORTING_SECTION
@@ -32,6 +33,7 @@ def register_core(registry: Registry) -> None:
         PROCESS_DEPLOY_SECTION,
         REPORTING_SECTION,
         ITSM_SECTION,
+        ITSM_CHANGE_SECTION,
         CMDB_SECTION,
         APPROVALS_SECTION,
     ):
@@ -54,6 +56,9 @@ def register_core(registry: Registry) -> None:
     from tiqora.cmdb.transfer.export_job import CMDB_EXPORT_JOB
     from tiqora.cmdb.transfer.import_job import CMDB_IMPORT_JOB
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
+    from tiqora.itsm.change.impact import ITSM_CHANGE_IMPACT_JOB
+    from tiqora.itsm.change.legacy.archive import ITSM_LEGACY_CHANGE_ARCHIVE_JOB
+    from tiqora.itsm.change.tasks import ITSM_CHANGE_TASKS_JOB
     from tiqora.itsm.importer.jobs import ITSM_IMPORT_JOB, ITSM_SWITCH_JOB
     from tiqora.itsm.linked_articles import LINKED_ARTICLES_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
@@ -72,6 +77,9 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, TICKET_EXPORT_JOB)
     registry.add(JOB_HANDLERS, GI_MAIL_JOB)
     registry.add(JOB_HANDLERS, LINKED_ARTICLES_JOB)
+    registry.add(JOB_HANDLERS, ITSM_CHANGE_TASKS_JOB)
+    registry.add(JOB_HANDLERS, ITSM_CHANGE_IMPACT_JOB)
+    registry.add(JOB_HANDLERS, ITSM_LEGACY_CHANGE_ARCHIVE_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_SYNC_JOB)
     registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)
@@ -92,6 +100,11 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, PLUGIN_FETCH_JOB)
     registry.add(JOB_HANDLERS, APPROVAL_HOOK_JOB)
     registry.add(JOB_HANDLERS, APPROVAL_MAIL_JOB)
+
+    from tiqora.itsm.change.risk import CHANGE_RISK_CHECKS, core_risk_checks
+
+    for check in core_risk_checks():
+        registry.add(CHANGE_RISK_CHECKS, check)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
@@ -125,6 +138,13 @@ def register_core(registry: Registry) -> None:
     registry.add(APPROVAL_SUBJECT_TYPES, ticket_subject_type())
     for resolver in core_resolvers():
         registry.add(APPROVER_RESOLVERS, resolver)
+
+    # change management: CAB decisions through the approval engine (itsm-change Task 17)
+    from tiqora.itsm.change.approval_port import service_owner_resolver
+    from tiqora.itsm.change.transitions import change_subject_type
+
+    registry.add(APPROVAL_SUBJECT_TYPES, change_subject_type())
+    registry.add(APPROVER_RESOLVERS, service_owner_resolver())
 
 
 def get_registry() -> Registry:

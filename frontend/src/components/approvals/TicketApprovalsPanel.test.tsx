@@ -90,6 +90,21 @@ describe("TicketApprovalsPanel", () => {
     expect((cancel.mock.calls[0] as unknown as [{ body?: unknown } | undefined])[0]?.body).toBeUndefined();
   });
 
+  it("tells the embedding feature after a write (the change page reloads the change)", async () => {
+    const onChanged = vi.fn();
+    mockApi({
+      [LIST]: summaries,
+      [TICKET_PATH]: rw,
+      "GET /api/v1/approvals/501": () => demoDetail(501),
+      "POST /api/v1/approvals/501/cancel": () => ({ ...demoDetail(501), status: "cancelled" }),
+    });
+    renderApproval(<TicketApprovalsPanel ticketId={TICKET} onChanged={onChanged} />);
+    fireEvent.click(await screen.findByTestId("ticket-approval-cancel"));
+    expect(onChanged).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+  });
+
   it("shows the plain-language error when withdrawing fails", async () => {
     mockApi({
       [LIST]: summaries,

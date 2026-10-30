@@ -95,6 +95,16 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     # CMDB (Mode B) and the mode-agnostic ITSM API (CIs, status): one area "CMDB / ITSM".
     # Ticket sub-resources (/tickets/{id}/cis, …) stay ``tickets``; /admin/itsm stays ``admin``.
     ("/api/v1/cmdb", "cmdb"),
+    # Change management lists ticket titles (calendar, legacy links): a ``cmdb`` key must not see
+    # them, so every change prefix is ``tickets`` (first match wins, before the generic itsm).
+    ("/api/v1/itsm/changes", "tickets"),
+    ("/api/v1/itsm/change-tasks", "tickets"),
+    ("/api/v1/itsm/change-calendar", "tickets"),
+    ("/api/v1/itsm/change-templates", "tickets"),
+    ("/api/v1/itsm/cabs", "tickets"),
+    ("/api/v1/itsm/cab-meetings", "tickets"),
+    ("/api/v1/itsm/freeze-windows", "tickets"),
+    ("/api/v1/itsm/legacy-changes", "tickets"),
     ("/api/v1/itsm", "cmdb"),
     ("/api/v1/sse", "events"),
     ("/znuny-compat", "compat"),

@@ -29,7 +29,12 @@ from tiqora.domain.znuny_admin_writes import (
     create_ticket_state_row,
     create_ticket_type_row,
 )
-from tiqora.itsm.seed_definitions import SeedDynamicField, SeedSet, for_profile
+from tiqora.itsm.seed_definitions import (
+    TIQORA_CHANGE_DYNAMIC_FIELDS,
+    SeedDynamicField,
+    SeedSet,
+    for_profile,
+)
 from tiqora.itsm.settings import ItsmSettings
 
 SetupGroup = Literal["incident_problem", "change"]
@@ -96,6 +101,8 @@ def _wanted(settings: ItsmSettings, seed: SeedSet) -> list[_Want]:
         )
     for name in (settings.change_type, settings.change_task_type):
         wants.append(_Want("change", "ticket_type", name))
+    for field in TIQORA_CHANGE_DYNAMIC_FIELDS:
+        wants.append(_Want("change", "dynamic_field", field.name, seed_field=field))
 
     seen: set[tuple[str, str]] = set()
     unique: list[_Want] = []
@@ -302,3 +309,9 @@ async def setup_complete(session: AsyncSession, cfg: ItsmSettings) -> bool:
         and await present("ticket_state", {cfg.workaround_state})
         and await present("dynamic_field", {cfg.criticality_field, cfg.impact_field})
     )
+
+
+async def setup_group_complete(session: AsyncSession, cfg: ItsmSettings, group: SetupGroup) -> bool:
+    """Every item of *group* exists and is valid (no ``missing``, ``conflict`` or ``invalid``)."""
+    items = [i for i in await plan_setup(session, cfg) if i.group == group]
+    return bool(items) and all(i.status == "present" for i in items)

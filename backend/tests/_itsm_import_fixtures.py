@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.cmdb.seed import DEFAULT_CATALOG_ROWS
+from tiqora.config import get_settings
 from tiqora.itsm.ci_provider import CiUnavailable
 from tiqora.itsm.importer.facades import CmdbServiceReader, CmdbServiceWriter, ItsmModeFacade
 from tiqora.itsm.importer.mapstore import MapStore
@@ -526,6 +527,7 @@ def make_ctx(
         user_id=user_id,
         writer_for=writer_for,
         mapstore_for=lambda s: MapStore(s, run_id=run_id, read_only=dry_run),
+        settings=get_settings(),
     )
 
 

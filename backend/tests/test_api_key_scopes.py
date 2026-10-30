@@ -440,3 +440,31 @@ def test_cmdb_area_levels_and_legacy_expansion() -> None:
     assert expand_scopes(frozenset({"write"}))["cmdb"] == "rw"  # type: ignore[index]
     assert "cmdb:ro" in all_areas_read_only_scopes().split(",")
     assert normalize_scopes("CMDB:rw, tickets:ro") == "cmdb:rw,tickets:ro"
+
+
+def test_cab_prefixes_share_the_tickets_area_with_changes() -> None:
+    """CAB lists and meeting agendas show change titles: like ``/itsm/changes`` they need a
+    ``tickets`` key, a ``cmdb`` key does not reach them."""
+    for path in (
+        "/api/v1/itsm/cabs",
+        "/api/v1/itsm/cab-meetings",
+        "/api/v1/itsm/cab-meetings/3/agenda",
+    ):
+        assert path_to_area(path) == path_to_area("/api/v1/itsm/changes") == "tickets"
+        assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=path)
+        assert not scopes_allow(frozenset({"cmdb:rw"}), method="GET", path=path)
+        assert not scopes_allow(frozenset({"tickets:ro"}), method="PUT", path=path)
+
+
+def test_change_related_and_create_from_routes_need_tickets_scope() -> None:
+    """Related tickets and create-from show ticket titles and write links: ``tickets`` area."""
+    for method, path in (
+        ("GET", "/api/v1/itsm/changes/3/related"),
+        ("POST", "/api/v1/itsm/changes/3/related"),
+        ("DELETE", "/api/v1/itsm/changes/3/related/4"),
+        ("POST", "/api/v1/tickets/3/change/create-from"),
+    ):
+        assert path_to_area(path) == "tickets"
+        assert scopes_allow(frozenset({"tickets:rw"}), method=method, path=path)
+        assert not scopes_allow(frozenset({"cmdb:rw"}), method=method, path=path)
+        assert not scopes_allow(frozenset({"tickets:ro"}), method="POST", path=path)

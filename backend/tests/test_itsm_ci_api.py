@@ -443,9 +443,25 @@ async def test_unavailable_provider_maps_to_409_code(
 def test_routes_map_to_the_cmdb_and_tickets_areas() -> None:
     app = create_app(Settings(environment="test"))
     paths = set(app.openapi()["paths"])  # FastAPI wraps included routers
+    # change management lists ticket titles: every one of its prefixes is area ``tickets``
+    change_prefixes = (
+        "/api/v1/itsm/changes",
+        "/api/v1/itsm/change-tasks",
+        "/api/v1/itsm/change-calendar",
+        "/api/v1/itsm/change-templates",
+        "/api/v1/itsm/cabs",
+        "/api/v1/itsm/cab-meetings",
+        "/api/v1/itsm/freeze-windows",
+        "/api/v1/itsm/legacy-changes",
+    )
+    for prefix in change_prefixes:
+        assert path_to_area(prefix) == "tickets", prefix
+        assert path_to_area(f"{prefix}/12/x") == "tickets", prefix
     itsm = {p for p in paths if p.startswith("/api/v1/itsm/")}
+    change = {p for p in itsm if p.startswith(change_prefixes)}
+    assert {path_to_area(p) for p in change} <= {"tickets"}
     assert {"/api/v1/itsm/status", "/api/v1/itsm/cis", "/api/v1/itsm/cis/{source}/{ci_id}"} <= itsm
-    assert {path_to_area(p) for p in itsm} == {"cmdb"}
+    assert {path_to_area(p) for p in itsm - change} == {"cmdb"}
     assert "/api/v1/tickets/{ticket_id}/cis" in paths
     assert path_to_area("/api/v1/tickets/{ticket_id}/cis") == "tickets"
     assert path_to_area("/api/v1/tickets/12/cis/znuny/3") == "tickets"

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type QueueNode } from "@/lib/api";
 import { cmdbNavVisible, itsmApi, itsmKeys } from "@/lib/itsmApi";
+import { changeApi, changeKeys, changeNav } from "@/lib/changeApi";
 import { logoUrl } from "@/lib/assets";
 import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
@@ -24,6 +25,7 @@ import { effectiveTimeZone } from "@/lib/timeZone";
 import { useApprovalsCount } from "@/components/approvals/useApprovalsCount";
 import {
   AddressBookIcon,
+  BoltIcon,
   BookIcon,
   CalendarIcon,
   CheckIcon,
@@ -301,6 +303,14 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     staleTime: 5 * 60_000,
     retry: false,
   });
+  // Changes entry: the status route answers in every mode; a failure just hides the entry.
+  const changeStatusQ = useQuery({
+    queryKey: changeKeys.status(),
+    queryFn: ({ signal }) => changeApi.status(signal),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const changesNav = changeNav(changeStatusQ.data);
   const approvalsCount = useApprovalsCount().data?.pending ?? 0;
   const flat = flattenQueues(queuesQ.data ?? []);
   const totalOpen = flat.reduce((sum, q) => sum + (q.counts?.open ?? 0), 0);
@@ -428,6 +438,15 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               label={t("sidebar.cmdb")}
               icon={<StackIcon />}
               testId="agent-nav-cmdb"
+              onNavigate={onNavigate}
+            />
+          )}
+          {changesNav && (
+            <NavItem
+              to={changesNav.to}
+              label={t(changesNav.legacy ? "sidebar.changesLegacy" : "sidebar.changes")}
+              icon={<BoltIcon />}
+              testId="agent-nav-changes"
               onNavigate={onNavigate}
             />
           )}

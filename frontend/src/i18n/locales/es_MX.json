@@ -81,7 +81,9 @@
     "escalatedCount": "{{count}} escalados",
     "customers": "Customers",
     "searches": "Saved searches",
-    "approvals": "My approvals"
+    "approvals": "My approvals",
+    "changes": "Changes",
+    "changesLegacy": "Changes (Znuny)"
   },
   "views": {
     "mine": "Mis tickets",
@@ -1352,7 +1354,10 @@
       "answeredAt": "contestada {{time}}",
       "endedAt": "terminó {{time}}"
     },
-    "processLabel": "Start process"
+    "processLabel": "Start process",
+    "fromChange": "The new ticket is linked to the change (ticket #{{id}}).",
+    "changeLinkFailed": "The ticket was created but could not be linked to the change.",
+    "retryChangeLink": "Retry linking to the change"
   },
   "connection": {
     "live": "Conectado en vivo",
@@ -1378,7 +1383,8 @@
       "kb": "Artículos de ayuda",
       "preferences": "Preferencias",
       "cmdb": "Devices and systems",
-      "approvals": "Approvals"
+      "approvals": "Approvals",
+      "changes": "Maintenance"
     },
     "login": {
       "stepUp": {
@@ -1493,6 +1499,22 @@
         "add": "Add a device or system",
         "remove": "Remove {{name}}",
         "max": "You can select up to {{max}}."
+      }
+    },
+    "changes": {
+      "title": "Maintenance windows",
+      "intro": "Planned changes that affect your services.",
+      "prev": "Previous month",
+      "next": "Next month",
+      "truncated": "Not all maintenance windows of this month are shown.",
+      "unavailable": "The maintenance schedule is not available.",
+      "loadError": "The maintenance schedule could not be loaded.",
+      "empty": "No maintenance windows planned in this month.",
+      "noWindow": "No time window",
+      "phases": {
+        "scheduled": "Planned",
+        "implementing": "In progress",
+        "closed": "Completed"
       }
     }
   },
@@ -2250,7 +2272,8 @@
       "approvals": "Approvals",
       "approvalsTemplates": "Approval templates",
       "approvalsLists": "Approval groups",
-      "approvalsDelegations": "Delegations"
+      "approvalsDelegations": "Delegations",
+      "itsmChange": "Change management"
     },
     "table": {
       "id": "ID",
@@ -3482,6 +3505,10 @@
           "name": "Web chat housekeeping",
           "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."
         },
+        "itsm_change": {
+          "name": "Change impact refresh",
+          "description": "Queues a new calculation of the affected CIs and services for active changes whose impact is older than the configured number of hours."
+        },
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
@@ -3823,7 +3850,8 @@
       "rollbackTitle": "Confirmar reversión",
       "rollbackBody": "¿Restaurar copia de seguridad para el trabajo #{{id}}? Se sobrescribirá el estado actual.",
       "purgeTitle": "Purgar permanentemente la copia de seguridad",
-      "purgeBody": "¿Eliminar permanentemente la copia de seguridad del trabajo #{{id}}? La reversión ya no será posible."
+      "purgeBody": "¿Eliminar permanentemente la copia de seguridad del trabajo #{{id}}? La reversión ya no será posible.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Configuración de búsqueda y páginas",
@@ -3913,7 +3941,9 @@
       "approvalsTemplates": "Reusable approval flows with steps, rules and deadlines",
       "approvalsLists": "Groups of approvers such as a CAB, used in templates",
       "approvalsDelegations": "Who stands in for whom during absence",
-      "settingsApprovals": "Deadlines, reminders, decision links, customers as approvers and MCP voting"
+      "settingsApprovals": "Deadlines, reminders, decision links, customers as approvers and MCP voting",
+      "itsmChange": "Change templates, CAB, risk questions, freeze windows and the archive of Znuny changes.",
+      "settingsItsmChange": "Queues, change managers, approval and risk levels of changes."
     },
     "types": {
       "title_plural": "Tipos de ticket",
@@ -4483,6 +4513,151 @@
           "znuny_agent_url": {
             "label": "Znuny agent address",
             "help": "Address of the Znuny agent interface for “Edit in Znuny”. Empty derives it from the Znuny configuration. Must start with http:// or https://."
+          }
+        }
+      },
+      "itsmChange": {
+        "title": "ITSM changes",
+        "fields": {
+          "change_queue_id": {
+            "label": "Queue for new changes",
+            "help": "Queue id of new changes. 0 lets the agent pick the queue when creating."
+          },
+          "task_queue_id": {
+            "label": "Queue for change tasks",
+            "help": "Queue id of change tasks. 0 uses the queue of the change."
+          },
+          "manager_group": {
+            "label": "Change manager group",
+            "help": "Znuny group whose rw members manage changes. Empty: administrators only."
+          },
+          "default_cab_id": {
+            "label": "Default CAB",
+            "help": "CAB used for approvals. 0 means the CAB must be chosen on the change."
+          },
+          "emergency_cab_id": {
+            "label": "Emergency CAB",
+            "help": "CAB for emergency changes. 0 uses the default CAB."
+          },
+          "emergency_post_approval": {
+            "label": "Emergency changes: approve afterwards",
+            "help": "Emergency changes may start the implementation before the approval is decided."
+          },
+          "auto_approve_low_risk": {
+            "label": "Approve low-risk changes automatically",
+            "help": "Normal changes with a low risk skip the CAB when all checks pass."
+          },
+          "standard_requires_review": {
+            "label": "Standard changes need a review",
+            "help": "Standard changes also go through the review phase before they close."
+          },
+          "approval_due_hours": {
+            "label": "Approval due after (hours)",
+            "help": "Time the CAB has to decide before the timeout rule applies."
+          },
+          "approval_timeout": {
+            "label": "When the approval is overdue",
+            "help": "Notify only reminds the members; reject rejects the change."
+          },
+          "cab_allow_self_approval": {
+            "label": "Owner may vote on own change",
+            "help": "Allow the owner and the submitter of a change to vote in the CAB."
+          },
+          "state_open": {
+            "label": "Ticket state while open",
+            "help": "Ticket state of an open change."
+          },
+          "state_closed_successful": {
+            "label": "Ticket state: closed successfully",
+            "help": "Ticket state of a successfully closed change."
+          },
+          "state_closed_failed": {
+            "label": "Ticket state: closed unsuccessfully",
+            "help": "Ticket state of a failed or backed-out change."
+          },
+          "state_closed_cancelled": {
+            "label": "Ticket state: cancelled",
+            "help": "Ticket state of a cancelled change."
+          },
+          "related_link_type": {
+            "label": "Link type for incidents and problems",
+            "help": "Link type between a change and related incidents or problems."
+          },
+          "task_link_type": {
+            "label": "Link type for change tasks",
+            "help": "Link type between a change (parent) and its tasks."
+          },
+          "risk_medium_from": {
+            "label": "Risk medium from (points)",
+            "help": "Score from which the risk counts as medium."
+          },
+          "risk_high_from": {
+            "label": "Risk high from (points)",
+            "help": "Score from which the risk counts as high. Must be above medium."
+          },
+          "risk_very_high_from": {
+            "label": "Risk very high from (points)",
+            "help": "Score from which the risk counts as very high. Must be above high."
+          },
+          "weight_service_criticality": {
+            "label": "Weight: service criticality",
+            "help": "Points per level of criticality of an affected service."
+          },
+          "weight_ci_incident": {
+            "label": "Weight: affected CI with incident",
+            "help": "Points for an affected CI that currently has an incident."
+          },
+          "weight_open_incidents": {
+            "label": "Weight: open incidents",
+            "help": "Points for open incidents on the affected services."
+          },
+          "weight_overlap": {
+            "label": "Weight: overlapping changes",
+            "help": "Points for other changes in the same time window."
+          },
+          "weight_freeze": {
+            "label": "Weight: freeze window",
+            "help": "Points when the window touches a freeze window."
+          },
+          "weight_failed_history": {
+            "label": "Weight: failed changes before",
+            "help": "Points for failed changes on the same services."
+          },
+          "weight_emergency": {
+            "label": "Weight: emergency change",
+            "help": "Points added to every emergency change."
+          },
+          "weight_missing_backout": {
+            "label": "Weight: missing rollback plan",
+            "help": "Points when the rollback plan is empty."
+          },
+          "incident_lookback_days": {
+            "label": "Incident look-back (days)",
+            "help": "Incidents of the last days count as recent."
+          },
+          "failed_change_lookback_days": {
+            "label": "Failed-change look-back (days)",
+            "help": "Failed changes of the last days count in the risk."
+          },
+          "impact_refresh_hours": {
+            "label": "Refresh impact after (hours)",
+            "help": "Impact of planned changes is recomputed after this time."
+          },
+          "max_tasks": {
+            "label": "Maximum tasks per change",
+            "help": "Upper limit of change tasks, also for templates."
+          },
+          "calendar_id": {
+            "label": "Calendar for scheduled changes",
+            "help": "Znuny calendar that receives an appointment per scheduled change. 0 turns it off."
+          },
+          "portal_schedule_enabled": {
+            "label": "Show planned changes in the portal",
+            "help": "Customers see planned changes of their services in the portal."
+          },
+          "legacy_change_group": {
+            "label": "Group for former Znuny changes",
+            "help": "Members (ro) may read the changes of the Znuny ITSM change module. If the group does not exist, change managers and administrators may."
           }
         }
       },
@@ -5905,6 +6080,11 @@
           "service_not_found": "The service was not found.",
           "generic": "The ITSM data could not be saved."
         }
+      },
+      "changeCard": {
+        "title": "Change management",
+        "text": "Manage change templates, CAB, risk questions, freeze windows and the change archive.",
+        "link": "Open change management"
       }
     },
     "itsmImport": {
@@ -6000,7 +6180,7 @@
         "attachments": "Attachments",
         "priority_matrix": "Priority matrix",
         "service_meta": "Service details",
-        "changes": "Changes (counted only)",
+        "changes": "Changes (archive)",
         "deleted_in_znuny": "Deleted in Znuny",
         "incident_states": "Incident states"
       },
@@ -6015,6 +6195,231 @@
         "issues": "Issues ({{count}})",
         "truncated": "Showing the first {{shown}} of {{count}} issues.",
         "csv": "Full report (CSV)"
+      }
+    },
+    "itsmChange": {
+      "title": "Change management",
+      "settingsLink": "Change management settings",
+      "tabsLabel": "Areas of change management",
+      "tabs": {
+        "templates": "Templates",
+        "cab": "CAB",
+        "risk": "Risk questions",
+        "freeze": "Freeze windows",
+        "archive": "Change archive"
+      },
+      "loadFailed": "The data could not be loaded.",
+      "invalid": "Invalid",
+      "valid": "Valid",
+      "none": "No default",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "templates": {
+        "new": "New template",
+        "empty": "There are no change templates yet.",
+        "standard": "Pre-approved",
+        "broken": "Broken",
+        "brokenHint": "The template refers to something that no longer exists. Please open and save it again.",
+        "taskCount_one": "{{count}} task",
+        "taskCount_other": "{{count}} tasks",
+        "deleteTitle": "Delete template",
+        "deleteMessage": "Delete template “{{name}}”? Changes created from it are kept."
+      },
+      "editor": {
+        "titleNew": "New change template",
+        "titleEdit": "Edit change template",
+        "back": "Back to change management",
+        "name": "Name",
+        "description": "Description",
+        "changeType": "Change type",
+        "isStandard": "Pre-approved standard change",
+        "isStandardHint": "Standard changes only: changes from this template need no CAB approval.",
+        "defaults": "Defaults for new changes",
+        "defaultsHint": "What is entered when a change is created wins over these defaults.",
+        "defaultTitle": "Title",
+        "queue": "Queue",
+        "priority": "Priority",
+        "services": "Services",
+        "addService": "Add service",
+        "removeService": "Remove service {{name}}",
+        "cab": "CAB",
+        "duration": "Duration (minutes)",
+        "durationHint": "End = start + duration when only a start is given at creation.",
+        "portalVisible": "Show as maintenance in the customer portal",
+        "reason": "Reason",
+        "implementationPlan": "Implementation plan",
+        "backoutPlan": "Back-out plan",
+        "testPlan": "Test plan",
+        "riskAnswers": "Default answers of the risk assessment",
+        "riskAnswersEmpty": "There are no valid risk questions.",
+        "riskAnswersFailed": "The risk questions could not be loaded.",
+        "tasks": "Change tasks",
+        "tasksHint": "When a change is created from this template, these tasks become tickets of their own.",
+        "nameMissing": "Please enter a name.",
+        "durationInvalid": "The duration must be between 1 and 525600 minutes.",
+        "tasksInvalid": "Please check the marked tasks.",
+        "saved": "Saved.",
+        "notFound": "The template no longer exists.",
+        "riskAnswersStale": "Saving drops these default answers because their question or answer is no longer valid: {{list}}"
+      },
+      "tasks": {
+        "empty": "The template has no tasks.",
+        "add": "Add task",
+        "remove": "Remove task {{n}}",
+        "row": "Task {{n}}",
+        "key": "Key",
+        "title": "Title",
+        "kind": "Type",
+        "offset": "Start relative to the change (minutes)",
+        "duration": "Duration (minutes)",
+        "queue": "Queue",
+        "queueDefault": "Queue of the change",
+        "owner": "Owner",
+        "ownerNone": "No owner",
+        "clearOwner": "Remove owner",
+        "body": "Description",
+        "max": "At most {{max}} tasks.",
+        "problems": {
+          "key": "Key: only a–z, 0–9 and _ (at most 50 characters).",
+          "keyDuplicate": "This key is used more than once.",
+          "title": "Please enter a title.",
+          "offset": "The start must be between -43200 and 525600 minutes.",
+          "duration": "The duration must be between 1 and 525600 minutes."
+        }
+      },
+      "cab": {
+        "new": "New CAB",
+        "edit": "Edit CAB",
+        "empty": "There is no CAB yet.",
+        "emergency": "Emergency CAB",
+        "membersEmpty": "No members",
+        "emptyHint": "A CAB without members cannot request an approval.",
+        "missing": "missing",
+        "memberCount_one": "{{label}} ({{count}} person)",
+        "memberCount_other": "{{label}} ({{count}} people)",
+        "name": "Name",
+        "description": "Description",
+        "ruleLabel": "Decision rule",
+        "rule": {
+          "any": "One approval is enough",
+          "all": "Everyone must approve",
+          "majority": "Majority",
+          "quorum": "Minimum number of approvals"
+        },
+        "quorum": "Minimum number",
+        "quorumMissing": "Please enter a minimum number between 1 and 100.",
+        "isEmergency": "Emergency CAB (decides on emergency changes)",
+        "members": "Members",
+        "membersHint": "Agents, groups, roles, approval groups or rules; every member votes on their own. At most 50 entries.",
+        "membersIncomplete": "Please choose an entry for every member.",
+        "customersOff": "Customer users can be CAB members only after customers are allowed as approvers in the approval settings.",
+        "membersNotSaved": "The CAB was created, but its members are not saved yet.",
+        "deleteTitle": "Delete CAB",
+        "deleteMessage": "Delete CAB “{{name}}”?",
+        "quorumTooLarge": "The quorum is larger than the number of members. Add members or lower the minimum number.",
+        "ruleMismatch": "Decision rule, minimum number and members do not fit together.",
+        "boardSavedOnly": "Name and rule are saved, but the members are not.",
+        "memberInvalid": "A member is invalid or no longer exists.",
+        "membersSavedOnly": "The members are saved, but name and rule are not."
+      },
+      "risk": {
+        "new": "New question",
+        "edit": "Edit question",
+        "intro": "The points of the chosen answers count towards the risk assessment of every change.",
+        "empty": "There are no risk questions yet. Take over the example questions or create your own.",
+        "examples": "Take over example questions",
+        "examplesDone_one": "{{count}} example question added.",
+        "examplesDone_other": "{{count}} example questions added.",
+        "examplesNone": "All example questions already exist.",
+        "answerCount_one": "{{count}} answer",
+        "answerCount_other": "{{count}} answers",
+        "pointRange": "{{min}} to {{max}} points",
+        "key": "Key",
+        "keyImmutable": "The key cannot be changed after the question was created.",
+        "question": "Question",
+        "help": "Help text",
+        "answers": "Answers",
+        "answersHint": "2 to 10 answers. Negative points lower the risk.",
+        "answerKey": "Key of answer {{n}}",
+        "answerLabel": "Text of answer {{n}}",
+        "answerPoints": "Points of answer {{n}}",
+        "addAnswer": "Add answer",
+        "removeAnswer": "Remove answer {{n}}",
+        "deleteTitle": "Delete question",
+        "deleteMessage": "Delete question “{{question}}”? The answers changes gave to it are lost. Mark the question invalid to keep them.",
+        "problems": {
+          "key": "Key: a lower-case letter first, then a–z, 0–9 or _ (at most 50 characters).",
+          "question": "Please enter the question.",
+          "answers": "Every answer needs a unique key (as above), a text and points between -50 and 50.",
+          "answerCount": "Please give 2 to 10 answers."
+        }
+      },
+      "freeze": {
+        "new": "New freeze window",
+        "edit": "Edit freeze window",
+        "empty": "There are no freeze windows.",
+        "utc": "Times in UTC",
+        "name": "Name",
+        "note": "Note",
+        "enforcementLabel": "Effect",
+        "enforcement": {
+          "block": "Block changes",
+          "warn": "Warn only"
+        },
+        "allowEmergency": "Allow emergency changes (warning only)",
+        "scopeLabel": "Applies to",
+        "scope": {
+          "all": "All services",
+          "services": "Selected services"
+        },
+        "allServices": "all services",
+        "start": "Start (UTC)",
+        "end": "End (UTC)",
+        "recurrence": "Recurrence",
+        "recurrenceNone": "None",
+        "interval": "Interval",
+        "recurrenceEnd": "End of recurrence",
+        "endNever": "Never",
+        "endCount": "After a number",
+        "endUntil": "Until a date",
+        "count": "Number of occurrences",
+        "until": "Until (UTC)",
+        "recurs": "{{type}}, interval {{interval}}",
+        "deleteTitle": "Delete freeze window",
+        "deleteMessage": "Delete freeze window “{{name}}”?",
+        "problems": {
+          "name": "Please enter a name.",
+          "window": "Please enter start and end.",
+          "order": "The end must be after the start.",
+          "services": "Please choose at least one service.",
+          "interval": "The interval must be at least 1.",
+          "count": "The number must be at least 1.",
+          "until": "Please enter a date after the start."
+        }
+      },
+      "archive": {
+        "intro": "Copies the changes from Znuny (ITSMChangeManagement) read-only into the change archive. Znuny itself is not changed; another run only updates what changed.",
+        "searchHint": "Search in the archived changes matches number and title.",
+        "archived": "Archived changes: {{count}}",
+        "lastRun": "Last archived: {{time}} (UTC)",
+        "never": "Not archived yet.",
+        "dryRun": "Dry run",
+        "dryRunHint": "The dry run only counts and writes nothing.",
+        "run": "Archive",
+        "active": "A run is already active. You see its progress.",
+        "joined": "A run of this kind was already active. Instead of a new one you see its progress.",
+        "resultTitle": "Result",
+        "resultTitleDry": "Result of the dry run (nothing written)",
+        "created": "New",
+        "updated": "Updated",
+        "unchanged": "Unchanged",
+        "skipped": "Skipped",
+        "notArchived": "Stays in Znuny (not copied)",
+        "notArchivedKinds": {
+          "templates": "Change templates",
+          "conditions": "Conditions",
+          "notifications": "Notifications"
+        }
       }
     }
   },
@@ -6653,6 +7058,9 @@
         "cmdb_reindex": "Rebuild CMDB search",
         "itsm_linked_articles": "Note to linked tickets",
         "itsm_import": "Import Znuny ITSM data",
+        "itsm_change_tasks": "Create change tasks",
+        "itsm_change_impact": "Calculate change impact",
+        "itsm_legacy_change_archive": "Archive Znuny changes",
         "itsm_switch": "Switch ITSM to Tiqora",
         "approval_hook": "Approval follow-up",
         "approval_mail": "Approval e-mails"
@@ -9171,6 +9579,672 @@
     "newTicket": {
       "recentIncident": "This service already had an incident {{minutes}} minutes ago: #{{tn}} {{title}}. Is it the same problem?",
       "openTicket": "Open ticket"
+    },
+    "change": {
+      "phases": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "assessment": "Assessment",
+        "approval": "Approval",
+        "scheduled": "Scheduled",
+        "implementing": "Implementation",
+        "review": "Review",
+        "closed": "Closed",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "types": {
+        "standard": "Standard change",
+        "normal": "Normal change",
+        "emergency": "Emergency change"
+      },
+      "risk": {
+        "label": "Risk",
+        "none": "Not rated",
+        "levels": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "very_high": "Very high"
+        },
+        "title": "Risk assessment",
+        "evaluate": "Assess again",
+        "points_one": "{{count}} point",
+        "points_other": "{{count}} points",
+        "computed": "computed: {{level}}",
+        "thresholds": "Medium from {{medium}}, high from {{high}}, very high from {{veryHigh}} points",
+        "evaluatedAt": "Assessed on {{time}} (UTC)",
+        "notEvaluated": "Not assessed yet.",
+        "blocked": "A finding blocks the change.",
+        "incomplete": "The assessment is incomplete: a check failed or the impact is truncated.",
+        "questionnaire": "Questionnaire",
+        "answer_one": "{{label}} ({{count}} point)",
+        "answer_other": "{{label}} ({{count}} points)",
+        "unanswered": "Not answered",
+        "questionnaireOpen": "Please answer all questions.",
+        "saveAnswers": "Save answers",
+        "findingsTitle": "Findings",
+        "findingsEmpty": "No findings.",
+        "findings": {
+          "generic": "Finding of the check {{check}}",
+          "service_criticality": "Affected services with criticality {{criticality}} ({{services}} services)",
+          "ci_incident": "Affected CIs with an incident: {{incident}}, with a warning: {{warning}}",
+          "open_incidents_one": "{{count}} open incident on the affected services in the last {{lookback_days}} days",
+          "open_incidents_other": "{{count}} open incidents on the affected services in the last {{lookback_days}} days",
+          "overlap_one": "{{count}} other change in the same window",
+          "overlap_other": "{{count}} other changes in the same window",
+          "freeze_one": "The window lies in {{count}} freeze window",
+          "freeze_other": "The window lies in {{count}} freeze windows",
+          "freeze_truncated_one": "Many freeze windows in the window; not all could be checked",
+          "freeze_truncated_other": "Many freeze windows in the window; not all could be checked",
+          "failed_history_one": "{{count}} failed change on the same CIs or services in the last {{lookback_days}} days",
+          "failed_history_other": "{{count}} failed changes on the same CIs or services in the last {{lookback_days}} days",
+          "emergency": "Emergency change",
+          "missing_backout": "The back-out plan is missing",
+          "check_failed": "A check could not run; the score may be too low",
+          "overlap_truncated": "Many other changes in the same window; not all could be checked"
+        },
+        "override": {
+          "current": "Overridden to",
+          "open": "Override risk",
+          "level": "Risk level",
+          "none": "No override (computed level)",
+          "reason": "Reason"
+        },
+        "findingTruncated": "(list cut off, there may be more)"
+      },
+      "phaseBar": {
+        "label": "Phases of this change"
+      },
+      "pages": {
+        "list": "Changes",
+        "detail": "Change",
+        "calendar": "Change calendar",
+        "cabMeetings": "CAB meetings",
+        "cabMeeting": "CAB meeting",
+        "legacyList": "Changes (Znuny)",
+        "legacyDetail": "Znuny change",
+        "legacyArchive": "Changes (Znuny archive)",
+        "linksLabel": "More change pages"
+      },
+      "list": {
+        "create": "Create change",
+        "tabs": {
+          "all": "All",
+          "mine": "My changes",
+          "tasks": "My tasks",
+          "approval": "Approval"
+        },
+        "search": "Search",
+        "searchPlaceholder": "Number or title",
+        "phase": "Phase",
+        "allPhases": "All phases",
+        "type": "Type",
+        "allTypes": "All types",
+        "service": "Service",
+        "allServices": "All services",
+        "windowFrom": "Window from (UTC)",
+        "windowTo": "Window to (UTC)",
+        "openOnly": "Open tasks only",
+        "empty": "No changes found.",
+        "tasksEmpty": "No tasks found.",
+        "truncated": "The list is incomplete: more changes match than are searched. Narrow the search with a filter.",
+        "totalAtLeast": "at least {{count}} results",
+        "range": "{{from}}–{{to}} of {{total}}",
+        "prev": "Previous",
+        "next": "Next",
+        "noWindow": "No window",
+        "colChange": "Change",
+        "colType": "Type",
+        "colPhase": "Phase",
+        "colWindow": "Window (UTC)",
+        "colServices": "Services",
+        "colTask": "Task",
+        "colKind": "Kind",
+        "colState": "State",
+        "kinds": {
+          "workorder": "Work order",
+          "backout": "Back-out",
+          "decision": "Decision",
+          "pir": "Post-implementation review"
+        },
+        "windowInvalid": "The end of the window must not be before its start.",
+        "calendar": "Calendar",
+        "tasksTruncated": "Only the first 100 tasks are shown."
+      },
+      "create": {
+        "title": "Create change",
+        "submit": "Create",
+        "type": "Change type",
+        "typeHint": {
+          "standard": "Standard change: pre-approved, needs a standard template.",
+          "normal": "Normal change: assessed and approved by the CAB.",
+          "emergency": "Emergency change: no assessment, expedited approval."
+        },
+        "template": "Template (optional)",
+        "templateRequired": "Standard template",
+        "noTemplate": "No template",
+        "pickTemplate": "Choose a template",
+        "noStandardTemplates": "There is no valid standard template. Create one in the administration first.",
+        "titleLabel": "Title",
+        "queue": "Queue",
+        "defaultQueue": "Default queue from settings",
+        "services": "Affected services",
+        "addService": "Add service",
+        "cis": "Affected CIs",
+        "addCi": "Add CI",
+        "remove": "Remove",
+        "start": "Planned start (UTC)",
+        "end": "Planned end (UTC)",
+        "windowHint": "Times are UTC. The window can also be set later.",
+        "reason": "Reason",
+        "body": "Description",
+        "created": "Change {{tn}} was created.",
+        "tasksJob": "Creating the tasks from the template …",
+        "tasksFailed_one": "{{count}} task could not be created.",
+        "tasksFailed_other": "{{count}} tasks could not be created.",
+        "open": "Open change",
+        "warnings": {
+          "ci_refs_truncated": "Not all CIs were linked: the per-change limit is reached.",
+          "generic": "Creating the change produced a notice.",
+          "portal_visible_failed": "Showing it in the customer portal could not be set. You can switch it on on the change page."
+        }
+      },
+      "errors": {
+        "generic": "The action failed.",
+        "change_mode_a": "Change management is not available in mode A. You can only read the Znuny changes.",
+        "change_unavailable": "Change management is switched off.",
+        "change_setup_missing": "The setup is incomplete: the ticket type or state for changes is missing. Please tell your administration.",
+        "standard_needs_template": "A standard change needs a standard template.",
+        "template_type_mismatch": "The template does not match the chosen change type.",
+        "template_not_found": "The template no longer exists.",
+        "template_invalid": "The template is broken and cannot be used.",
+        "queue_required": "Please choose a queue: no default queue is set for changes.",
+        "queue_not_found": "The queue does not exist.",
+        "forbidden": "You lack the permissions for that.",
+        "service_not_found": "One of the services no longer exists.",
+        "cab_not_found": "The CAB does not exist.",
+        "cab_invalid": "The CAB is invalid.",
+        "ci_ref_invalid": "A CI reference is invalid.",
+        "ci_not_found": "One of the CIs no longer exists.",
+        "cmdb_unavailable": "The CMDB is not available; CIs cannot be linked.",
+        "invalid_window": "The end must be after the start.",
+        "window_invalid": "The end must be after the start.",
+        "change_priority_not_found": "The priority for changes does not exist.",
+        "change_state_not_found": "The initial state for changes is missing.",
+        "owner_invalid": "The owner is invalid.",
+        "vetoed": "A plugin refused to create the change.",
+        "invalid_input": "The input is invalid.",
+        "engineCode": "(code: {{code}})",
+        "change_not_found": "The change does not exist, or you may not see it.",
+        "change_final": "The change is closed or cancelled and can no longer be changed.",
+        "change_locked_in_approval": "While the CAB decides, type, window, plans and CAB are locked. Withdraw the approval or wait for the decision.",
+        "change_type_locked": "The change type can only be changed in the draft.",
+        "approval_request_failed": "The approval could not be requested.",
+        "cab_customer_members_disabled": "The CAB has customer users as members, but customers as approvers are switched off.",
+        "resolver_not_found": "An approver rule of the CAB no longer exists.",
+        "list_not_found": "An approver group of the CAB no longer exists.",
+        "not_a_change_ticket": "The ticket does not have the change ticket type.",
+        "change_exists": "The ticket is already a change.",
+        "process_ticket": "The ticket is a process ticket and cannot become a change.",
+        "ticket_closed": "The ticket is closed. Reopen it to make it a change.",
+        "task_not_found": "The task no longer exists.",
+        "max_tasks_reached": "The change already has the largest possible number of tasks.",
+        "order_invalid": "The order does not match the tasks. Please reload the page.",
+        "task_link_failed": "The task could not be linked to the change.",
+        "risk_override_reason_required": "Please give a reason for changing the risk level.",
+        "risk_override_reason_too_long": "The reason is too long (at most 1000 characters).",
+        "risk_level_invalid": "This risk level does not exist.",
+        "risk_question_unknown": "One of the questions no longer exists. Please reload the page.",
+        "risk_answer_unknown": "One of the answers no longer exists. Please reload the page.",
+        "forbidden_create": "You may not create changes in this queue.",
+        "ticket_not_found": "The change does not exist, or you may not see it.",
+        "validation": "The input is invalid (field: {{field}}).",
+        "template_name_exists": "A template with this name already exists.",
+        "template_standard_type": "Only a template for standard changes can be pre-approved.",
+        "template_too_many_tasks": "The template has too many tasks (at most {{max_tasks}}).",
+        "template_duplicate_task_key": "The key “{{key}}” is used by more than one task.",
+        "template_queue_not_found": "A chosen queue no longer exists.",
+        "template_priority_not_found": "The chosen priority no longer exists.",
+        "template_service_not_found": "A chosen service no longer exists.",
+        "template_cab_not_found": "The chosen CAB no longer exists.",
+        "template_owner_not_found": "A chosen owner is invalid or deleted.",
+        "template_risk_answer_invalid": "A default answer of the risk assessment no longer fits the risk questions.",
+        "cab_name_exists": "A CAB with this name already exists.",
+        "cab_too_many_members": "A CAB has at most {{max}} members.",
+        "cab_member_duplicate": "A member is listed twice.",
+        "cab_member_invalid": "A member is invalid.",
+        "cab_has_meetings": "The CAB has CAB meetings and cannot be deleted. Mark it invalid instead.",
+        "user_not_found": "An agent among the members is invalid or deleted.",
+        "group_not_found": "A group among the members is invalid or deleted.",
+        "role_not_found": "A role among the members is invalid or deleted.",
+        "risk_question_key_exists": "A question with this key already exists.",
+        "risk_question_key_immutable": "The key of a question cannot be changed.",
+        "risk_question_order_mismatch": "The order no longer fits the questions. Please reload the page.",
+        "risk_question_not_found": "The question no longer exists.",
+        "freeze_recurrence_invalid": "The end of the recurrence is before the start.",
+        "freeze_services_required": "Please choose at least one service.",
+        "freeze_not_found": "The freeze window no longer exists.",
+        "legacy_archive_mode_b_only": "The change archive runs on its own only in ITSM mode Tiqora; before that, the ITSM import copies the changes.",
+        "legacy_archive_no_tables": "The Znuny database has no change management (ITSMChangeManagement) installed.",
+        "validationMore_one": "The input is invalid (field: {{field}} and one more).",
+        "validationMore_other": "The input is invalid (field: {{field}} and {{count}} more).",
+        "meeting_not_found": "The CAB meeting does not exist.",
+        "meeting_not_planned": "The agenda can only be changed while the meeting is planned.",
+        "agenda_duplicate": "A change is on the agenda more than once.",
+        "agenda_too_long": "The agenda is too long.",
+        "change_not_open": "The change is in a phase in which it can no longer be put on the agenda.",
+        "range_invalid": "The time range is invalid.",
+        "range_too_large": "The time range is too large.",
+        "legacy_change_not_found": "The Znuny change does not exist.",
+        "legacy_forbidden": "You are not in the group that may see Znuny changes. Contact an administrator.",
+        "legacy_unavailable": "There are no Znuny changes to show: Znuny has no change management and there is no change archive.",
+        "search_too_broad": "The search is too broad. Please narrow it down.",
+        "standard_template_invalid": "The template of this standard change is missing, invalid or no longer a standard template, so the change is not pre-approved. Plan it as a normal change instead.",
+        "risk_question_in_use": "Changes have answered this question, so it cannot be deleted. Mark it invalid instead.",
+        "from_ticket_mismatch": "The change can only be created from the ticket you are on.",
+        "link_not_found": "The link does not exist any more.",
+        "related_self": "A change cannot be linked to itself.",
+        "related_is_task": "This ticket is a task of the change and is already linked to it.",
+        "link_refused": "The link could not be created."
+      },
+      "transition": {
+        "submit": "Go",
+        "reason": "Reason (optional, shown in the history)",
+        "reasonRequired": "Forcing a step needs a reason.",
+        "refused": "The step is not possible yet:",
+        "overrideHint": "As a change manager you can pass this check.",
+        "overrideReason": "Reason for passing the freeze window",
+        "force": "Continue anyway (pass open tasks or a withdrawn approval)",
+        "actions": {
+          "draft": "Back to draft",
+          "submitted": "Submit",
+          "assessment": "Start assessment",
+          "approval": "Request approval",
+          "scheduled": "Schedule",
+          "implementing": "Start implementation",
+          "review": "To review",
+          "closed": "Close",
+          "rejected": "Reject",
+          "cancelled": "Cancel change"
+        },
+        "pairs": {
+          "submitted_draft": "Back to requester",
+          "rejected_draft": "Rework",
+          "scheduled_draft": "Re-plan",
+          "assessment_scheduled": "Schedule without CAB (low risk)",
+          "draft_implementing": "Implement now (approval afterwards)"
+        },
+        "hints": {
+          "approval": "The approval is requested from the CAB; its members vote in the approvals section.",
+          "draft_implementing": "Implementation starts at once; the CAB approves the emergency change afterwards.",
+          "assessment_scheduled": "A low-risk change is scheduled without the CAB when the settings allow it.",
+          "scheduled_draft": "The change goes back to draft; a normal or emergency change then needs a new approval.",
+          "rejected_draft": "The change goes back to draft; the next approval is a new round.",
+          "cancelled": "The change is cancelled; a pending approval is withdrawn."
+        },
+        "failures": {
+          "generic": "A check failed ({{code}}).",
+          "window_missing": "The window is missing.",
+          "plans_missing": "Implementation and back-out plan are missing.",
+          "questionnaire_incomplete": "The risk questionnaire is not fully answered.",
+          "impact_pending": "The impact is not computed for the current state. Please recompute it.",
+          "block_conflict": "A freeze window blocks the change window.",
+          "tasks_open": "Tasks are still open.",
+          "outcome_missing": "Please choose the outcome.",
+          "pir_missing": "The post-implementation review is missing.",
+          "approval_pending": "The approval is not decided yet.",
+          "cab_missing": "No CAB is chosen and no default CAB is set.",
+          "cab_empty": "The CAB has no members.",
+          "reason_missing": "Forcing a step needs a reason.",
+          "transition_not_allowed": "This step is not possible for this change.",
+          "system_only": "Only the CAB's decision takes this step.",
+          "process_ticket": "The ticket is a process ticket; a change manager can only cancel the change.",
+          "auto_approval_not_eligible": "The change cannot be scheduled without the CAB (setting off, risk not low or assessment incomplete)."
+        }
+      },
+      "pir": {
+        "closeTitle": "Close change",
+        "reviewTitle": "To review",
+        "outcome": "Outcome",
+        "pickOutcome": "Choose outcome",
+        "outcomes": {
+          "successful": "Successful",
+          "failed": "Failed",
+          "backed_out": "Backed out"
+        },
+        "notes": "Post-implementation review (PIR)",
+        "notesRequired": "Please write the review before you close the change."
+      },
+      "plans": {
+        "title": "Plans and window",
+        "edit": "Edit",
+        "empty": "Not given",
+        "locked": "While the CAB decides, window and plans are locked.",
+        "start": "Planned start (UTC)",
+        "end": "Planned end (UTC)",
+        "windowHalf": "Please give start and end, or clear both.",
+        "window": "Window (UTC)",
+        "actual": "Actual (UTC)",
+        "since": "since {{time}}",
+        "fields": {
+          "reason": "Reason",
+          "implementation_plan": "Implementation plan",
+          "backout_plan": "Back-out plan",
+          "test_plan": "Test plan",
+          "pir_notes": "Post-implementation review (PIR)"
+        }
+      },
+      "tasks": {
+        "title": "Change tasks",
+        "add": "Add task",
+        "addSubmit": "Add",
+        "newTitle": "Task title",
+        "kind": "Kind",
+        "progress": "{{done}} of {{total}} done",
+        "empty": "The change has no tasks.",
+        "moveUp": "Move up",
+        "moveDown": "Move down"
+      },
+      "hiddenCount_one": "{{count}} more without read access",
+      "hiddenCount_other": "{{count}} more without read access",
+      "refs": {
+        "ticket": "Ticket #{{id}}",
+        "change": "Change #{{id}}",
+        "task": "Task #{{id}}",
+        "ci": "CI #{{id}}",
+        "service": "Service #{{id}}",
+        "freeze": "Freeze window #{{id}}"
+      },
+      "impact": {
+        "title": "Impact",
+        "recompute": "Recompute",
+        "computedAt": "Computed on {{time}} (UTC)",
+        "stale": "The impact is out of date. Please recompute it.",
+        "notComputed": "The impact has not been computed yet.",
+        "truncated": "The impact is cut off: more CIs are affected than are computed.",
+        "services": "Affected services",
+        "cis": "Affected CIs",
+        "incidents": "Open incidents on these services",
+        "none": "None",
+        "noIncidents": "No open incidents.",
+        "incidentsTruncated": "There are more open incidents.",
+        "direct": "direct",
+        "indirect": "through the CMDB",
+        "functionality": {
+          "operational": "Operational",
+          "warning": "Warning",
+          "incident": "Incident"
+        },
+        "computing": "The impact is being computed …"
+      },
+      "conflicts": {
+        "title": "Conflicts",
+        "empty": "No conflicts.",
+        "hidden": "Overlap with a change you cannot read",
+        "kinds": {
+          "freeze": "Freeze window",
+          "change_overlap": "Overlap with",
+          "task_outside": "Task outside the window",
+          "no_window": "No window set",
+          "freeze_truncated": "Too many freeze windows: not all were checked",
+          "overlap_truncated": "Too many changes in the period: not all were checked",
+          "freeze_unverified": "Freeze window for a service: not checked yet, the impact is still being calculated"
+        },
+        "severity": {
+          "info": "Note",
+          "warn": "Warning",
+          "block": "Blocks"
+        },
+        "sharedServices_one": "{{count}} shared service",
+        "sharedServices_other": "{{count}} shared services",
+        "sharedCis_one": "{{count}} shared CI",
+        "sharedCis_other": "{{count}} shared CIs"
+      },
+      "approval": {
+        "title": "Approval (CAB)",
+        "panelTitle": "CAB vote",
+        "cab": "CAB",
+        "defaultCab": "Default CAB from the settings",
+        "emergencyCab": "Emergency CAB",
+        "round": "Round {{round}}",
+        "votes_one": "{{approved}} of {{count}} approval",
+        "votes_other": "{{approved}} of {{count}} approvals",
+        "rejections_one": "{{count}} rejection",
+        "rejections_other": "{{count}} rejections",
+        "requestedAt": "Requested on {{time}} (UTC)",
+        "decidedAt": "decided on {{time}} (UTC)",
+        "noApprovers": "No valid CAB members: the CAB resolves to nobody. Please check its members.",
+        "via": {
+          "template": "Pre-approved by the standard template",
+          "risk": "Scheduled without CAB (low risk)",
+          "post": "Emergency change: approval afterwards"
+        },
+        "historyMissing": "Approval history no longer available",
+        "none": "No approval requested yet.",
+        "voteHint": "Vote in the approvals section",
+        "defaultEmergencyCab": "Emergency CAB from the settings",
+        "meetingsLink": "View CAB meetings"
+      },
+      "banners": {
+        "ticketClosed": "The ticket was closed ({{state}}), but the change is still in the phase \"{{phase}}\". Please close or cancel the change, or reopen the ticket.",
+        "drift": "The ticket fields no longer match the change: {{fields}}. They were edited outside Tiqora; the next step writes them again.",
+        "fields": {
+          "type_field": "type",
+          "phase_field": "phase"
+        },
+        "processTicket": "The ticket has become a process ticket. A change manager can only cancel the change."
+      },
+      "zoom": {
+        "title": "Change",
+        "openPage": "Open change page",
+        "modeA": "Changes are managed in Znuny (mode A). You can only read them here.",
+        "modeALink": "Changes (Znuny) of this ticket",
+        "adoptHint": "The ticket has the change ticket type but is not a change record yet.",
+        "adopt": "Make it a change",
+        "taskTitle": "Change task",
+        "taskOf": "Task of",
+        "taskParentHidden": "Change without read access",
+        "taskStep": "Step {{position}}"
+      },
+      "detail": {
+        "back": "All changes",
+        "openTicket": "Open ticket"
+      },
+      "portal": {
+        "label": "Show in the customer portal's maintenance schedule",
+        "help": "Once the change is scheduled, customers see its title, window and their affected services there, but no plans."
+      },
+      "incident": {
+        "hint": "The change is closed with the outcome \"{{outcome}}\".",
+        "create": "Create incident from this change",
+        "subject": "Incident after change {{tn}}: {{title}}",
+        "afterClose": "After closing you can choose \"Create incident from this change\"; the new ticket is linked to the change."
+      },
+      "events": {
+        "title": "Change history",
+        "empty": "No entries yet.",
+        "more": "Load older entries",
+        "system": "System",
+        "user": "User #{{id}}",
+        "phase": "Phase: {{from}} → {{to}}",
+        "phaseStart": "Phase: {{to}}",
+        "kinds": {
+          "created": "Change created",
+          "adopted": "Made a change",
+          "phase": "Phase changed",
+          "updated": "Edited",
+          "impact": "Impact computed",
+          "approval_requested": "Approval requested",
+          "approval_outcome": "Approval outcome",
+          "conflict_override": "Freeze window passed",
+          "forced": "Step forced",
+          "risk_override": "Risk overridden",
+          "task_added": "Task added",
+          "related_linked": "Ticket linked",
+          "related_unlinked": "Link removed"
+        },
+        "detail": {
+          "reason": "Reason",
+          "fields": "Fields",
+          "status": "Outcome",
+          "round": "Round",
+          "approval_id": "Approval",
+          "approval": "Approval",
+          "cab_id": "CAB",
+          "cab_entries": "CAB entries",
+          "block_conflicts": "Blocking conflicts",
+          "open_tasks": "Open tasks",
+          "from": "From",
+          "to": "To",
+          "via": "Route",
+          "ticket_id": "Ticket",
+          "link_type": "Link type",
+          "task_ticket_id": "Task",
+          "task_kind": "Kind",
+          "change_type": "Type",
+          "template_id": "Template",
+          "template_warnings": "Template notes",
+          "cis": "CIs",
+          "services": "Services",
+          "truncated": "Cut off"
+        }
+      },
+      "calendar": {
+        "views": {
+          "month": "Month",
+          "week": "Week",
+          "service": "By service"
+        },
+        "prev": "Previous",
+        "next": "Next",
+        "utcNote": "All times are UTC.",
+        "conflict": "Conflict",
+        "freeze": {
+          "block": "Freeze (blocking)",
+          "warn": "Freeze (warning)"
+        },
+        "noChanges": "No changes planned.",
+        "truncated": "Not all changes of this range are shown. Narrow the range with the service filter.",
+        "freezesTruncated": "Not all freeze windows of this range are shown.",
+        "serviceEmpty": "No service has a change or freeze window in this range.",
+        "colChanges": "Changes",
+        "colMinutes": "Affected",
+        "hoursMinutes": "{{hours}} h {{minutes}} min",
+        "minutesOnly": "{{minutes}} min",
+        "indirect": "indirectly affected"
+      },
+      "cab": {
+        "back": "Back to the CAB meetings",
+        "create": "Plan meeting",
+        "createSubmit": "Create meeting",
+        "utcHint": "All times in UTC.",
+        "prev": "Previous month",
+        "next": "Next month",
+        "empty": "There is no CAB meeting this month.",
+        "agendaCount_one": "{{count}} item",
+        "agendaCount_other": "{{count}} items",
+        "cab": "CAB",
+        "cabPlaceholder": "Choose a CAB",
+        "title": "Title",
+        "starts": "Start",
+        "ends": "End",
+        "location": "Location",
+        "status": {
+          "planned": "Planned",
+          "held": "Held",
+          "cancelled": "Cancelled"
+        },
+        "statusLabel": "Status",
+        "agenda": "Agenda",
+        "agendaEmpty": "The agenda is empty.",
+        "hiddenHint": "Items you may not read stay on the agenda and are never removed. They are listed last; their order cannot be changed.",
+        "hiddenItem": "Change without read access",
+        "noApproval": "No approval requested yet.",
+        "note": "Note for this item",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove from the agenda",
+        "saveAgenda": "Save agenda",
+        "discard": "Discard",
+        "suggestions": "Suggestions: changes waiting for this CAB's approval",
+        "suggestionsEmpty": "No other change is waiting for this CAB.",
+        "add": "Add",
+        "minutes": "Minutes",
+        "minutesHint": "The minutes are visible to all agents.",
+        "minutesEmpty": "There are no minutes yet.",
+        "saveMinutes": "Save minutes and status",
+        "unsaved": "Approval status visible after saving",
+        "position": "Position {{pos}} of {{count}}: {{title}}",
+        "dragHandle": "Drag to reorder: {{title}}",
+        "blockedLine": "The change {{tn}} is affected.",
+        "noCabs": "There is no CAB yet. An administrator creates one under Admin, Change management."
+      },
+      "legacy": {
+        "sourceLive": "Live from Znuny",
+        "sourceArchive": "Archive",
+        "readOnly": "Znuny changes are read only.",
+        "search": "Search",
+        "searchPlaceholder": "Number or title",
+        "searchScope": "The search covers only the number and the title.",
+        "ticketFilter": "Only changes of ticket #{{id}}",
+        "ticketFilterClear": "Remove filter",
+        "empty": "No Znuny changes found.",
+        "colChange": "Change",
+        "colState": "State",
+        "colWorkorders": "Work orders",
+        "back": "Back to the Znuny changes",
+        "editInZnuny": "Edit in Znuny",
+        "archiveHint": "Archived change: it can no longer be edited.",
+        "fields": {
+          "state": "State",
+          "category": "Category",
+          "impact": "Impact",
+          "priority": "Priority",
+          "manager": "Change manager",
+          "builder": "Change builder",
+          "requested": "Requested by",
+          "plannedStart": "Planned start",
+          "plannedEnd": "Planned end",
+          "actualStart": "Actual start",
+          "actualEnd": "Actual end",
+          "created": "Created",
+          "changed": "Changed",
+          "description": "Description",
+          "justification": "Justification"
+        },
+        "cab": "CAB",
+        "cabEmpty": "No CAB entered.",
+        "customerUser": "customer",
+        "workorders": "Work orders",
+        "workordersEmpty": "No work orders.",
+        "planned": "Planned",
+        "actual": "Actual",
+        "effort": "Effort {{planned}} h planned, {{accounted}} h booked",
+        "instruction": "Instruction",
+        "report": "Report",
+        "links": "Links",
+        "tickets": "Tickets",
+        "cis": "CIs",
+        "services": "Services",
+        "ofChange": "on the change",
+        "ofWorkorder": "on work order {{number}}",
+        "dynamicFields": "Dynamic fields",
+        "history": "History",
+        "historyEmpty": "No history.",
+        "searchScopeLive": "The search covers number, title, description and justification (from 3 characters)."
+      },
+      "warnings": {
+        "notFound": "{{kind}} {{ref}} no longer exists and was not taken over from the template.",
+        "riskAnswerStale": "The template's answer to the question “{{question}}” no longer fits and was not taken over.",
+        "kinds": {
+          "queue": "Queue",
+          "priority": "Priority",
+          "service": "Service",
+          "cab": "CAB",
+          "owner": "Owner"
+        }
+      }
     }
   },
   "approvals": {
@@ -9246,12 +10320,14 @@
       "retry": "Try again"
     },
     "subject": {
-      "ticket": "Ticket"
+      "ticket": "Ticket",
+      "itsm_change": "Change"
     },
     "resolver": {
       "ticket_customer_user": "Customer of the ticket",
       "ticket_owner": "Owner of the ticket",
-      "ticket_responsible": "Responsible agent of the ticket"
+      "ticket_responsible": "Responsible agent of the ticket",
+      "itsm_service_owner": "Owner of the affected services"
     },
     "rule": {
       "any": "One approval is enough",

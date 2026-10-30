@@ -51,6 +51,8 @@ export function makeItsm(over: Partial<TicketItsm> = {}): TicketItsm {
     dialogs: { itsm_fields: false, decision: false },
     known_error_category_configured: true,
     major_incident_customer_reply: false,
+    change: null,
+    change_task: null,
     ...over,
   };
 }

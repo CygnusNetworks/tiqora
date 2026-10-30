@@ -28,6 +28,7 @@ import type {
   TicketLinkTarget,
 } from "@/lib/itsmApi";
 import type { Job } from "@/lib/jobsApi";
+import { demoTicketChange } from "./changeMock";
 import { demoItsmMode, type DemoItsmMode } from "./itsmMode";
 
 const T0 = "2026-10-11T08:00:00Z";
@@ -163,7 +164,7 @@ function ticketItsm(id: number, mode: DemoItsmMode): TicketItsm {
     enabled: mode !== "off", mode, role: null, criticality: null, impact: null, matrix_priority_id: null,
     ci_count: LINKS.filter((l) => l.ticket_id === id).length, service: null, recent_incident: null,
     problem: null, major_incident: null, major_banner: null, dialogs: { itsm_fields: false, decision: false },
-    known_error_category_configured: true, major_incident_customer_reply: false,
+    known_error_category_configured: true, major_incident_customer_reply: false, change: null, change_task: null,
   };
   if (id === 100) {
     return {
@@ -179,7 +180,9 @@ function ticketItsm(id: number, mode: DemoItsmMode): TicketItsm {
       major_banner: { ticket_id: 100, tn: "20260701000", title: "Website nicht erreichbar", summary: MAJOR.summary ?? null, declared_at: T0 },
     };
   }
-  return base;
+  // change and change-task tickets of the change demo (`changeMock.ts`)
+  const change = demoTicketChange(id, mode);
+  return change ? { ...base, ...change } : base;
 }
 
 function graph(id: number): LinkGraph {
@@ -251,7 +254,7 @@ function resolveAdminItsm(path: string, method: string, mode: DemoItsmMode): unk
         { group: "incident_problem", kind: "ticket_type", name: "Incident", status: "present", detail: null },
         { group: "incident_problem", kind: "ticket_type", name: "Problem", status: "present", detail: null },
         { group: "incident_problem", kind: "dynamic_field", name: "ITSMCriticality", status: "present", detail: null },
-        { group: "change", kind: "ticket_type", name: "Change", status: "missing", detail: null },
+        { group: "change", kind: "ticket_type", name: "Change", status: "present", detail: null },
       ],
     };
   }

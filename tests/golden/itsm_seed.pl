@@ -6,6 +6,12 @@
 #     itsm94-sla-web with MinTimeBetweenIncidents
 #   * CIs in the default classes: Computer x2 (2 and 3 versions), Network x1 (incident state)
 #   * links CI->service (DependsOn), CI<->CI (DependsOn), ticket<->CI (RelevantTo)
+#   * change management (ITSMChangeManagement, wave-5 itsm-change Task 1): three changes
+#     (chg94 ...) with 2-3 work orders each (types workorder/backout/pir, one work order without
+#     times), a CAB with one agent and one customer user, change<->ticket, work order<->CI/service/
+#     ticket links, one change and one work order dynamic field, one change template. Skipped when
+#     the ITSMChangeManagement package is absent. The history comes from the package's event
+#     modules (never SQL).
 #
 # All names are *.example.org, addresses come from 192.0.2.0/24 (RFC 5737). Idempotent: when
 # the service already exists nothing is created. Prints one JSON line between
@@ -73,6 +79,228 @@ sub _NewCI {
     }
     my $CI = $CIObject->ConfigItemGet( ConfigItemID => $CIID );
     return { id => $CIID + 0, number => $CI->{Number}, name => $P{Name} };
+}
+
+sub _SeedChanges {
+    my ($Base) = @_;
+    my $ChangeObject = $Kernel::OM->Get('Kernel::System::ITSMChange');
+    my $WOObject     = $Kernel::OM->Get('Kernel::System::ITSMChange::ITSMWorkOrder');
+    my $TemplateObject = $Kernel::OM->Get('Kernel::System::ITSMChange::Template');
+    my $DFObject     = $Kernel::OM->Get('Kernel::System::DynamicField');
+    my $UserObject   = $Kernel::OM->Get('Kernel::System::User');
+    my $GroupObject  = $Kernel::OM->Get('Kernel::System::Group');
+    my $CustomerObject = $Kernel::OM->Get('Kernel::System::CustomerUser');
+
+    # Znuny rejects @example.org as "invalid" (CheckEmailInvalidAddress); the fixtures use it on purpose.
+    $Kernel::OM->Get('Kernel::Config')->Set( Key => 'CheckEmailAddresses', Value => 0 );
+
+    # --- people: one agent (CAB, change manager, work order agent), one customer user -------------
+    my $AgentLogin = 'chg94.agent';
+    my $AgentID    = $UserObject->UserLookup( UserLogin => $AgentLogin, Silent => 1 );
+    if ( !$AgentID ) {
+        $AgentID = $UserObject->UserAdd(
+            UserFirstname => 'Erika',
+            UserLastname  => 'Beispiel',
+            UserLogin     => $AgentLogin,
+            UserEmail     => 'chg94.agent@example.org',
+            UserPw        => 'chg94-not-a-password',
+            ValidID       => 1,
+            ChangeUserID  => 1,
+        ) or die 'UserAdd chg94.agent failed';
+    }
+    # a second agent in no group at all (the permission probe needs one that must be refused)
+    my $NoGroupLogin = 'chg94.nogroup';
+    if ( !$UserObject->UserLookup( UserLogin => $NoGroupLogin, Silent => 1 ) ) {
+        $UserObject->UserAdd(
+            UserFirstname => 'Hans',
+            UserLastname  => 'Beispiel',
+            UserLogin     => $NoGroupLogin,
+            UserEmail     => 'chg94.nogroup@example.org',
+            UserPw        => 'chg94-not-a-password',
+            ValidID       => 1,
+            ChangeUserID  => 1,
+        ) or die 'UserAdd chg94.nogroup failed';
+    }
+    for my $Group (qw(itsm-change itsm-change-builder itsm-change-manager)) {
+        my $GroupID = $GroupObject->GroupLookup( Group => $Group ) or die "group $Group missing";
+        $GroupObject->PermissionGroupUserAdd(
+            GID => $GroupID, UID => $AgentID, Permission => { ro => 1, rw => 1 }, UserID => 1,
+        ) or die "PermissionGroupUserAdd $Group failed";
+    }
+    my $CustomerLogin = 'chg94-cust@example.org';
+    my %Customer      = $CustomerObject->CustomerUserDataGet( User => $CustomerLogin );
+    if ( !%Customer ) {
+        $CustomerObject->CustomerUserAdd(
+            Source         => 'CustomerUser',
+            UserFirstname  => 'Max',
+            UserLastname   => 'Mustermann',
+            UserCustomerID => 'chg94-customer',
+            UserLogin      => $CustomerLogin,
+            UserEmail      => $CustomerLogin,
+            ValidID        => 1,
+            UserID         => 1,
+        ) or die 'CustomerUserAdd failed';
+    }
+
+    # --- dynamic fields of the two object types -------------------------------------------------
+    my %DF;
+    for my $Def ( [ chg94ChangeRef => 'ITSMChange' ], [ chg94WorkOrderRef => 'ITSMWorkOrder' ] ) {
+        # DynamicFieldGet answers an empty (but true) hash for an unknown name
+        my $Existing = $DFObject->DynamicFieldGet( Name => $Def->[0] );
+        $DF{ $Def->[0] } = ( $Existing && $Existing->{ID} ) ? $Existing->{ID} : $DFObject->DynamicFieldAdd(
+            Name       => $Def->[0],
+            Label      => $Def->[0],
+            FieldOrder => 9000,
+            FieldType  => 'Text',
+            ObjectType => $Def->[1],
+            Config     => { DefaultValue => '' },
+            ValidID    => 1,
+            UserID     => 1,
+        ) or die "DynamicFieldAdd $Def->[0] failed";
+    }
+
+    my $Out = { agent_id => $AgentID + 0, customer_login => $CustomerLogin, dynamic_fields => \%DF, changes => {} };
+
+    my @Specs = (
+        {
+            key     => 'mail',
+            title   => 'chg94 Mail server replacement',
+            state   => 'in progress',
+            cab     => 1,
+            ref     => 'CHG-94-MAIL',
+            update  => {
+                Description   => '<p>Replace the <b>mail</b> server mail01.example.org</p>',
+                Justification => '<p>Old hardware out of support</p>',
+                Category      => '3 normal',
+                Impact        => '4 high',
+                RequestedTime => '2026-11-01 00:00:00',
+            },
+            workorders => [
+                {
+                    title => 'chg94 install mail02', type => 'workorder', state => 'closed',
+                    agent => $AgentID, ref => 'WO-94-1',
+                    instruction => '<p>Install <i>mail02.example.org</i></p>', report => '<p>done</p>',
+                    planned => [ '2026-11-02 08:00:00', '2026-11-02 12:00:00' ],
+                    actual  => [ '2026-11-02 08:05:00', '2026-11-02 12:30:00' ],
+                    effort => 4, accounted => 4.5,
+                    links => [ [ ITSMConfigItem => $Base->{cis}{web01}{id}, 'DependsOn' ], [ Service => $Base->{service_id}, 'Normal' ] ],
+                },
+                {
+                    title => 'chg94 backout mail', type => 'backout', state => 'created', agent => $AgentID,
+                    planned => [ '2026-11-02 12:00:00', '2026-11-02 14:00:00' ],
+                    links => [ [ Ticket => $Base->{ticket_id}, 'Normal' ] ],
+                },
+                { title => 'chg94 review mail', type => 'pir', state => 'created' },
+            ],
+        },
+        {
+            key     => 'firmware',
+            title   => 'chg94 Switch firmware rollout',
+            state   => 'requested',
+            cab     => 0,
+            ref     => '',
+            update  => { Description => 'Plain text description', Justification => 'Security fix', Category => '2 low', Impact => '2 low' },
+            workorders => [
+                {
+                    title => 'chg94 flash switches', type => 'workorder', state => 'ready',
+                    planned => [ '2026-11-09 18:00:00', '2026-11-09 20:00:00' ],
+                },
+                {
+                    title => 'chg94 backout firmware', type => 'backout', state => 'created',
+                    planned => [ '2026-11-09 20:00:00', '2026-11-09 21:00:00' ],
+                },
+            ],
+        },
+        {
+            key     => 'database',
+            title   => 'chg94 Database migration',
+            state   => 'successful',
+            cab     => 0,
+            ref     => '',
+            update  => { Description => '<p>Move db01.example.org to new storage</p>', Justification => '<p>Capacity</p>', Category => '4 high', Impact => '3 normal' },
+            workorders => [
+                {
+                    title => 'chg94 migrate db', type => 'workorder', state => 'closed',
+                    planned => [ '2026-10-05 08:00:00', '2026-10-05 10:00:00' ],
+                    actual  => [ '2026-10-05 08:05:00', '2026-10-05 10:30:00' ],
+                    links => [ [ ITSMConfigItem => $Base->{cis}{db01}{id}, 'DependsOn' ] ],
+                },
+                {
+                    title => 'chg94 review db', type => 'pir', state => 'closed',
+                    planned => [ '2026-10-06 09:00:00', '2026-10-06 10:00:00' ],
+                    actual  => [ '2026-10-06 09:00:00', '2026-10-06 09:45:00' ],
+                },
+            ],
+        },
+    );
+
+    for my $Spec (@Specs) {
+        my $Found = $ChangeObject->ChangeSearch( ChangeTitle => $Spec->{title}, UserID => 1 ) || [];
+        my $ChangeID = $Found->[0];
+        if ( !$ChangeID ) {
+            $ChangeID = $ChangeObject->ChangeAdd( ChangeTitle => $Spec->{title}, ChangeBuilderID => 1, UserID => 1 )
+                or die "ChangeAdd $Spec->{title} failed";
+            $ChangeObject->ChangeUpdate(
+                ChangeID => $ChangeID,
+                %{ $Spec->{update} },
+                ChangeManagerID => $AgentID,
+                ( $Spec->{ref} ? ( DynamicField_chg94ChangeRef => $Spec->{ref} ) : () ),
+                # only the CAB change gets members; the others keep the empty CAB
+                ( $Spec->{cab} ? ( CABAgents => [$AgentID], CABCustomers => [$CustomerLogin] ) : () ),
+                UserID => 1,
+            ) or die "ChangeUpdate $Spec->{title} failed";
+            my %WOIDs;
+            for my $WO ( @{ $Spec->{workorders} } ) {
+                my $WOID = $WOObject->WorkOrderAdd(
+                    ChangeID => $ChangeID, WorkOrderTitle => $WO->{title}, WorkOrderType => $WO->{type},
+                    ( $WO->{instruction} ? ( Instruction => $WO->{instruction} ) : () ),
+                    ( $WO->{agent} ? ( WorkOrderAgentID => $WO->{agent} ) : () ),
+                    ( $WO->{planned} ? ( PlannedStartTime => $WO->{planned}[0], PlannedEndTime => $WO->{planned}[1] ) : () ),
+                    ( $WO->{effort} ? ( PlannedEffort => $WO->{effort} ) : () ),
+                    ( $WO->{ref} ? ( DynamicField_chg94WorkOrderRef => $WO->{ref} ) : () ),
+                    UserID => 1,
+                ) or die "WorkOrderAdd $WO->{title} failed";
+                if ( $WO->{state} ne 'created' ) {
+                    $WOObject->WorkOrderUpdate(
+                        WorkOrderID => $WOID, WorkOrderState => $WO->{state}, BypassStateMachine => 1,
+                        ( $WO->{report} ? ( Report => $WO->{report} ) : () ),
+                        ( $WO->{accounted} ? ( AccountedTime => $WO->{accounted} ) : () ),
+                        ( $WO->{actual} ? ( ActualStartTime => $WO->{actual}[0], ActualEndTime => $WO->{actual}[1] ) : () ),
+                        UserID => 1,
+                    ) or die "WorkOrderUpdate $WO->{title} failed";
+                }
+                for my $L ( @{ $WO->{links} || [] } ) {
+                    _Link( SourceObject => 'ITSMWorkOrder', SourceKey => $WOID, TargetObject => $L->[0], TargetKey => $L->[1], Type => $L->[2] );
+                }
+                $WOIDs{ $WO->{title} } = $WOID + 0;
+            }
+            $ChangeObject->ChangeUpdate(
+                ChangeID => $ChangeID, ChangeState => $Spec->{state}, BypassStateMachine => 1, UserID => 1,
+            ) or die "ChangeUpdate state $Spec->{title} failed";
+        }
+        if ( $Spec->{key} eq 'mail' ) {
+            my $Linked = $Kernel::OM->Get('Kernel::System::LinkObject')->LinkList(
+                Object => 'ITSMChange', Key => $ChangeID, State => 'Valid', UserID => 1,
+            ) || {};
+            _Link( SourceObject => 'ITSMChange', SourceKey => $ChangeID, TargetObject => 'Ticket', TargetKey => $Base->{ticket_id}, Type => 'Normal' )
+                if !$Linked->{Ticket};
+        }
+        $Out->{changes}{ $Spec->{key} } = { id => $ChangeID + 0 };
+    }
+
+    # --- one change template (content is a Data::Dumper string, not parsed by Tiqora) -------------
+    my $TemplateName = 'chg94 template firmware';
+    my $Templates = $TemplateObject->TemplateSearch( TemplateName => $TemplateName, UserID => 1 ) || [];
+    if ( !@{$Templates} ) {
+        my $Content = $TemplateObject->TemplateSerialize(
+            TemplateType => 'ITSMChange', ChangeID => $Out->{changes}{firmware}{id}, StateReset => 1, UserID => 1,
+        ) or die 'TemplateSerialize failed';
+        $TemplateObject->TemplateAdd(
+            Name => $TemplateName, Comment => 'chg94 template', TemplateType => 'ITSMChange',
+            Content => $Content, ValidID => 1, UserID => 1,
+        ) or die 'TemplateAdd failed';
+    }
+    return $Out;
 }
 
 my %Result;
@@ -220,6 +448,11 @@ else {
         ticket_id  => $TicketID + 0,
         cis        => { web01 => $Web01, db01 => $Db01, net01 => $Net01 },
     );
+}
+
+# only when the ITSMChangeManagement package is installed (its tables exist)
+if ( $Kernel::OM->Get('Kernel::System::DB')->Prepare( SQL => 'SELECT 1 FROM change_item', Limit => 1 ) ) {
+    %Result = ( %Result, changes => _SeedChanges( \%Result ) );
 }
 
 print "GOLDEN_ITSM_SEED_BEGIN\n" . $JSON->Encode( Data => \%Result ) . "\nGOLDEN_ITSM_SEED_END\n";

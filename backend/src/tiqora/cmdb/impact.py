@@ -12,6 +12,7 @@ there is no JOIN between ``tiqora_*`` and Znuny tables (collation, error 1267).
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Final
 
 from sqlalchemy import and_, bindparam, or_, select, text
@@ -493,6 +494,83 @@ async def _affected_services(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class AffectedSet:
+    """What an incident at any of several root CIs would reach (system scope, no permissions)."""
+
+    #: reach of every root CI, the roots included
+    ci_ids: frozenset[int]
+    #: services the incident travels to (the same rule as :func:`affected`)
+    service_ids: frozenset[int]
+    truncated: bool
+
+
+async def affected_set(
+    session: AsyncSession, ci_ids: Sequence[int], *, settings: CmdbSettings
+) -> AffectedSet:
+    """Union of the reach of every root CI under one shared ``propagation_node_cap``.
+
+    There is no permission filter: this is the system view (change impact is stored once and
+    filtered per caller when it is read). Roots that no longer exist are dropped. A root that an
+    earlier root already reaches is skipped, since reach is transitive.
+    """
+    cap = int(settings.propagation_node_cap)
+    roots = sorted(set((await _ci_rows(session, {int(c) for c in ci_ids})).keys()))
+    reach: set[int] = set()
+    truncated = False
+    for index, root in enumerate(roots):
+        if root in reach:
+            continue
+        found, cut = await _reach(session, root, cap)
+        reach |= found
+        truncated = truncated or cut
+        if len(reach) >= cap:
+            # the cap is shared: roots still to come would only be cut again; they stay in the
+            # set (the trim below keeps roots first), their own reach is not followed
+            rest = {r for r in roots[index + 1 :] if r not in reach}
+            reach |= rest
+            truncated = truncated or bool(rest)
+            break
+    if len(reach) > cap:
+        # the roots stay, the rest is cut in id order
+        kept = [r for r in roots if r in reach]
+        kept += sorted(reach - set(kept))
+        reach = set(kept[:cap])
+        truncated = True
+    props = await LinkTypeService(session).propagating()
+    services = await _affected_services(session, sorted(reach), props)
+    return AffectedSet(
+        ci_ids=frozenset(reach),
+        service_ids=frozenset(int(r.id) for r in services),
+        truncated=truncated,
+    )
+
+
+async def services_reached_from(session: AsyncSession, ci_ids: Iterable[int]) -> frozenset[int]:
+    """Services an incident at any of ``ci_ids`` travels to (the rule of :func:`affected`), no
+    permission filter: the caller decides which CIs to pass."""
+    props = await LinkTypeService(session).propagating()
+    found = await _affected_services(session, sorted(set(ci_ids)), props)
+    return frozenset(int(r.id) for r in found)
+
+
+async def services_reached_per_ci(
+    session: AsyncSession, ci_ids: Iterable[int]
+) -> dict[int, frozenset[int]]:
+    """Per CI the services an incident at it travels to (the rule of :func:`affected`, one hop),
+    in one batched read. The reach of a set of CIs is the union of these, so callers can answer
+    for many subsets without a query each. No permission filter."""
+    props = await LinkTypeService(session).propagating()
+    out: dict[int, set[int]] = {}
+    for ci, svc, name, ci_is_source in await _service_links(session, sorted(set(ci_ids))):
+        ltype = props.get(name)
+        if ltype is not None and counts_for_service(
+            ltype.propagation, ltype.pointed, service_is_source=not ci_is_source
+        ):
+            out.setdefault(ci, set()).add(svc)
+    return {ci: frozenset(v) for ci, v in out.items()}
+
+
 async def _linked_customers(session: AsyncSession, ci_ids: Sequence[int]) -> list[CmdbNamedRefOut]:
     users: set[str] = set()
     companies: set[str] = set()
@@ -578,4 +656,11 @@ async def affected(
     )
 
 
-__all__ = ["affected", "impact_graph", "tickets_for_ci"]
+__all__ = [
+    "AffectedSet",
+    "affected",
+    "affected_set",
+    "impact_graph",
+    "services_reached_from",
+    "tickets_for_ci",
+]

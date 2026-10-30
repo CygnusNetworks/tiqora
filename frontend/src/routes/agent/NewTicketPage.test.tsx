@@ -87,6 +87,12 @@ vi.mock("@/lib/refineApi", async () => {
   return { ...actual, refineApi: { refine, refineAvailability } };
 });
 
+const { addRelated } = vi.hoisted(() => ({ addRelated: vi.fn() }));
+vi.mock("@/lib/changeApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
+  return { ...actual, changeApi: { ...actual.changeApi, addRelated } };
+});
+
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
   useSearch: () => searchParams.current,
@@ -1413,5 +1419,75 @@ describe("NewTicketPage ITSM", () => {
     fireEvent.click(await screen.findByTestId("new-ticket-service-panel-option-8"));
     await waitFor(() => expect(itsmRecent).toHaveBeenCalled());
     expect(screen.queryByTestId("new-ticket-recent-incident")).toBeNull();
+  });
+});
+
+describe("NewTicketPage from a failed change", () => {
+  beforeEach(() => {
+    navigate.mockReset();
+    listQueues.mockReset().mockResolvedValue([queue]);
+    listReferencePriorities.mockReset().mockResolvedValue(priorities);
+    listReferenceStates.mockReset().mockResolvedValue(states);
+    searchReferenceCustomers.mockReset().mockResolvedValue([customer]);
+    getComposeContext.mockReset().mockResolvedValue(composeContext);
+    createTicket.mockReset().mockResolvedValue({ ticket_id: 42 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 1 });
+    callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
+    getCustomer.mockReset();
+    defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
+    suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
+    screenDynamicFields.mockReset().mockResolvedValue([]);
+    addRelated.mockReset().mockResolvedValue([]);
+    searchParams.current = { from_change: 132, subject: "Incident nach Change 20261012132: Firewall-Regel" };
+    window.localStorage.clear();
+  });
+
+  async function submit() {
+    await renderReady();
+    await pickCustomer();
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Rückfall nötig." } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+  }
+
+  it("starts with the subject, says it links the change and links the new ticket before opening it", async () => {
+    await submit();
+    expect(screen.getByTestId("new-ticket-from-change")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-subject")).toHaveValue("Incident nach Change 20261012132: Firewall-Regel");
+    await waitFor(() => expect(addRelated).toHaveBeenCalledWith(132, 42));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }));
+  });
+
+  it("stays with a link to the new ticket when the link to the change fails", async () => {
+    addRelated.mockRejectedValue(new Error("link_refused"));
+    await submit();
+    const error = await screen.findByTestId("new-ticket-error");
+    expect(error).toHaveTextContent(i18n.t("newTicket.changeLinkFailed"));
+    expect(error.querySelector("a")?.getAttribute("href")).toContain("42");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("retries only the link after a failed link: no second ticket, the create button stays disabled", async () => {
+    addRelated.mockRejectedValueOnce(new Error("link_refused"));
+    await submit();
+    await screen.findByTestId("new-ticket-error");
+    expect(createTicket).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
+    await waitFor(() => expect(addRelated).toHaveBeenCalledTimes(2));
+    expect(addRelated).toHaveBeenLastCalledWith(132, 42);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }));
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps offering the retry when the link fails again", async () => {
+    addRelated.mockRejectedValue(new Error("link_refused"));
+    await submit();
+    await screen.findByTestId("new-ticket-retry-link");
+    fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
+    await waitFor(() => expect(addRelated).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("new-ticket-retry-link")).toBeInTheDocument();
+    expect(createTicket).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

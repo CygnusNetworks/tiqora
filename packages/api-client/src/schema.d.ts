@@ -770,6 +770,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/change-schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Schedule
+         * @description The body stays a list; ``X-Schedule-Truncated: true`` says the scan cap bit.
+         */
+        get: operations["get_change_schedule_api_portal_change_schedule_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/config-items": {
         parameters: {
             query?: never;
@@ -4418,6 +4438,279 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/cabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cabs
+         * @description All CABs with their members, valid or not.
+         */
+        get: operations["get_cabs_api_v1_admin_itsm_change_cabs_get"];
+        put?: never;
+        /**
+         * Post Cab
+         * @description A new CAB without members; add them with ``PUT /cabs/{id}/members``.
+         */
+        post: operations["post_cab_api_v1_admin_itsm_change_cabs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/cabs/{cab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Cab
+         * @description Replace name, rule and flags; the members stay and must fit the rule.
+         */
+        put: operations["put_cab_api_v1_admin_itsm_change_cabs__cab_id__put"];
+        post?: never;
+        /**
+         * Delete Cab Route
+         * @description Delete the CAB; refused (409 ``cab_has_meetings``) while it has meetings.
+         */
+        delete: operations["delete_cab_route_api_v1_admin_itsm_change_cabs__cab_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/cabs/{cab_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Cab Members
+         * @description Replace the members (at most 50). Kinds: user, group, role (ids), list (approval list id),
+         *     customer_user (login; only while customers may approve, else 422
+         *     ``cab_customer_members_disabled``), resolver (key); users, groups, roles, lists and
+         *     resolvers must exist.
+         */
+        put: operations["put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/freeze-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Freeze Windows
+         * @description All freeze windows (Sperrzeiträume), valid or not; times are UTC.
+         */
+        get: operations["get_freeze_windows_api_v1_admin_itsm_change_freeze_windows_get"];
+        put?: never;
+        /** Post Freeze Window */
+        post: operations["post_freeze_window_api_v1_admin_itsm_change_freeze_windows_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/freeze-windows/{freeze_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Freeze Window */
+        get: operations["get_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__get"];
+        /**
+         * Put Freeze Window
+         * @description Replace the window.
+         */
+        put: operations["put_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__put"];
+        post?: never;
+        /** Delete Freeze Window */
+        delete: operations["delete_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/legacy-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Legacy Archive
+         * @description How many Znuny changes are archived, and whether the archive job can start now.
+         */
+        get: operations["get_legacy_archive_api_v1_admin_itsm_change_legacy_archive_get"];
+        put?: never;
+        /**
+         * Post Legacy Archive
+         * @description Archive the Znuny changes again in the background (Mode B only; 409
+         *     ``legacy_archive_mode_b_only`` / ``legacy_archive_no_tables`` otherwise). An active archive
+         *     job of the same kind (dry run or real run) is answered instead of a second one. Poll
+         *     ``GET /api/v1/jobs/{job_id}``.
+         */
+        post: operations["post_legacy_archive_api_v1_admin_itsm_change_legacy_archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Questions
+         * @description The risk questionnaire in order, valid or not.
+         */
+        get: operations["get_risk_questions_api_v1_admin_itsm_change_risk_questions_get"];
+        put?: never;
+        /** Post Risk Question */
+        post: operations["post_risk_question_api_v1_admin_itsm_change_risk_questions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions/examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Risk Question Examples
+         * @description Insert the four example questions whose keys do not exist yet.
+         */
+        post: operations["post_risk_question_examples_api_v1_admin_itsm_change_risk_questions_examples_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Risk Question Order
+         * @description Put the questions in the given order (every question exactly once).
+         */
+        put: operations["put_risk_question_order_api_v1_admin_itsm_change_risk_questions_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/risk-questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Risk Question
+         * @description Replace the question; its key stays.
+         */
+        put: operations["put_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__put"];
+        post?: never;
+        /**
+         * Delete Risk Question
+         * @description Delete a question nobody has answered; once answered, 409 ``risk_question_in_use``
+         *     (mark it invalid instead, which keeps the answers).
+         */
+        delete: operations["delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Templates
+         * @description All templates, valid or not.
+         */
+        get: operations["get_templates_api_v1_admin_itsm_change_templates_get"];
+        put?: never;
+        /** Post Template */
+        post: operations["post_template_api_v1_admin_itsm_change_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/change/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template Detail */
+        get: operations["get_template_detail_api_v1_admin_itsm_change_templates__template_id__get"];
+        /**
+         * Put Template
+         * @description Replace the template. Changes created from it earlier keep what they got.
+         */
+        put: operations["put_template_api_v1_admin_itsm_change_templates__template_id__put"];
+        post?: never;
+        /**
+         * Delete Template Route
+         * @description Delete the template; changes created from it stay (their ``template_id`` becomes empty).
+         */
+        delete: operations["delete_template_route_api_v1_admin_itsm_change_templates__template_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -9850,6 +10143,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/cab-meetings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cab Meetings
+         * @description Meetings that overlap ``[start, end)``, without their agenda lines and minutes (both on
+         *     ``GET /cab-meetings/{id}``); times are UTC.
+         */
+        get: operations["get_cab_meetings_api_v1_itsm_cab_meetings_get"];
+        put?: never;
+        /**
+         * Post Cab Meeting
+         * @description Plan a meeting (change managers).
+         */
+        post: operations["post_cab_meeting_api_v1_itsm_cab_meetings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cab-meetings/{meeting_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cab Meeting
+         * @description Meeting with agenda and minutes; lines of unreadable changes are ``hidden``.
+         */
+        get: operations["get_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Cab Meeting
+         * @description Title, time, place, status and minutes of a meeting (change managers).
+         */
+        patch: operations["patch_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/itsm/cab-meetings/{meeting_id}/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Cab Meeting Agenda
+         * @description Replace the agenda of a planned meeting (change managers).
+         */
+        put: operations["put_cab_meeting_agenda_api_v1_itsm_cab_meetings__meeting_id__agenda_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cab-meetings/{meeting_id}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cab Meeting Suggestions
+         * @description Readable changes waiting for this meeting's CAB to decide.
+         */
+        get: operations["get_cab_meeting_suggestions_api_v1_itsm_cab_meetings__meeting_id__suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cabs
+         * @description Valid CABs with their members (for the change's CAB choice and the meeting pages).
+         */
+        get: operations["get_cabs_api_v1_itsm_cabs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/catalog": {
         parameters: {
             query?: never;
@@ -9864,6 +10266,474 @@ export interface paths {
         get: operations["get_catalog_api_v1_itsm_catalog_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Calendar
+         * @description Changes, tasks and freeze windows of a range of at most 92 days, with conflict flags.
+         */
+        get: operations["get_change_calendar_api_v1_itsm_change_calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-calendar/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Calendar Services
+         * @description Projected service availability: planned change and freeze windows per service.
+         */
+        get: operations["get_change_calendar_services_api_v1_itsm_change_calendar_services_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-tasks/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Change Tasks
+         * @description Change tasks the caller owns (by default only unfinished ones of live changes), at most
+         *     ``MY_TASKS_LIMIT`` (100); the body stays a list, ``X-Tasks-Truncated: true`` says more
+         *     exist.
+         */
+        get: operations["get_my_change_tasks_api_v1_itsm_change_tasks_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/change-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Templates
+         * @description Valid change templates for the create dialog (Mode B).
+         */
+        get: operations["get_change_templates_api_v1_itsm_change_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Changes
+         * @description Changes the caller may read; ``q`` matches the number or the title. Times are UTC.
+         */
+        get: operations["get_changes_api_v1_itsm_changes_get"];
+        put?: never;
+        /**
+         * Post Change
+         * @description Create a change ticket with its record in phase ``draft``.
+         */
+        post: operations["post_change_api_v1_itsm_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Status
+         * @description Whether changes are available and what the caller may do. Answers in every mode.
+         */
+        get: operations["get_change_status_api_v1_itsm_changes_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Detail
+         * @description A change the caller may read (404 without ``ro`` on the ticket).
+         */
+        get: operations["get_change_detail_api_v1_itsm_changes__ticket_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Change
+         * @description Edit fields of the change. The phase is not a field: it moves only by transition.
+         */
+        patch: operations["patch_change_api_v1_itsm_changes__ticket_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Approval
+         * @description The CAB approval of the current round as the approval engine sees it; votes are cast in
+         *     the approvals section. ``history_missing`` when the approval set was erased.
+         */
+        get: operations["get_change_approval_api_v1_itsm_changes__ticket_id__approval_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Conflicts
+         * @description Freeze windows, overlapping changes and tasks off the window, from stored data only.
+         *
+         *     An overlapping change the caller cannot read is listed as ``hidden`` with its window and
+         *     counts, without a reference.
+         */
+        get: operations["get_change_conflicts_api_v1_itsm_changes__ticket_id__conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Events
+         * @description Timeline of the change, newest first; ``before_id`` pages backwards.
+         */
+        get: operations["get_change_events_api_v1_itsm_changes__ticket_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Impact
+         * @description The stored impact set: CIs and services of the change and the open incidents on them.
+         *
+         *     Only what the caller may read: CIs of classes without ``ro`` are counted, not named.
+         */
+        get: operations["get_change_impact_api_v1_itsm_changes__ticket_id__impact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/impact/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Change Impact Recompute
+         * @description Compute the impact set again in the background; poll ``GET /api/v1/jobs/{job_id}``.
+         */
+        post: operations["post_change_impact_recompute_api_v1_itsm_changes__ticket_id__impact_recompute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Related
+         * @description Incidents, problems and other tickets linked to the change (tasks and unreadable
+         *     tickets left out).
+         */
+        get: operations["get_change_related_api_v1_itsm_changes__ticket_id__related_get"];
+        put?: never;
+        /**
+         * Post Change Related
+         * @description Link another ticket to the change (``rw`` on the change, ``ro`` on the other).
+         */
+        post: operations["post_change_related_api_v1_itsm_changes__ticket_id__related_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/related/{other_ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Change Related
+         * @description Remove the link between the change and another ticket.
+         */
+        delete: operations["delete_change_related_api_v1_itsm_changes__ticket_id__related__other_ticket_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Risk
+         * @description Questionnaire, answers and the stored risk evaluation; references the caller cannot read
+         *     are left out of the findings and only counted.
+         */
+        get: operations["get_change_risk_api_v1_itsm_changes__ticket_id__risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Change Risk Answers
+         * @description Replace the questionnaire answers (needs ``rw``) and evaluate the risk again.
+         */
+        put: operations["put_change_risk_answers_api_v1_itsm_changes__ticket_id__risk_answers_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Change Risk Evaluate
+         * @description Evaluate the risk again from stored data only (needs ``rw``).
+         */
+        post: operations["post_change_risk_evaluate_api_v1_itsm_changes__ticket_id__risk_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/risk/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Change Risk Override
+         * @description A change manager sets or removes the risk level by hand; the reason is required.
+         */
+        put: operations["put_change_risk_override_api_v1_itsm_changes__ticket_id__risk_override_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Change Tasks
+         * @description The change's tasks in order; task tickets the caller cannot read are left out.
+         */
+        get: operations["get_change_tasks_api_v1_itsm_changes__ticket_id__tasks_get"];
+        put?: never;
+        /**
+         * Post Change Task
+         * @description Add a task ticket under the change (child ticket, position last unless given).
+         */
+        post: operations["post_change_task_api_v1_itsm_changes__ticket_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/tasks/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Change Task Order
+         * @description Put the caller's tasks in the given order (every readable task exactly once).
+         */
+        put: operations["put_change_task_order_api_v1_itsm_changes__ticket_id__tasks_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/tasks/{task_ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Change Task
+         * @description Kind, planned/actual window, effort and owner of one task.
+         */
+        patch: operations["patch_change_task_api_v1_itsm_changes__ticket_id__tasks__task_ticket_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/itsm/changes/{ticket_id}/transition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Change Transition
+         * @description Move the change to another phase (needs ``rw``). Guard failures answer 409
+         *     ``transition_refused`` with ``failures: [{code, overridable}]``; a manager passes block
+         *     conflicts with ``override_reason`` and open tasks with ``force`` plus ``reason``.
+         */
+        post: operations["post_change_transition_api_v1_itsm_changes__ticket_id__transition_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9944,6 +10814,71 @@ export interface paths {
          * @description The version history of one CI, newest first.
          */
         get: operations["get_ci_versions_api_v1_itsm_cis__source___ci_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/freeze-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Freeze Windows
+         * @description Occurrences of the valid freeze windows that overlap ``[start, end)``; times are UTC.
+         */
+        get: operations["get_freeze_windows_api_v1_itsm_freeze_windows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/legacy-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Legacy Changes
+         * @description Znuny changes (Mode A: live from Znuny), newest change first, for members of the legacy
+         *     change group. ``q`` matches number, title, description and justification; ``ticket_id`` /
+         *     ``ci`` (``znuny:<id>``) keep the changes linked to that ticket / CI and answer an empty page
+         *     when the caller cannot read it; a text search over its time limit answers 409
+         *     ``search_too_broad``. Times are UTC.
+         */
+        get: operations["get_legacy_changes_api_v1_itsm_legacy_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/legacy-changes/{znuny_change_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Legacy Change
+         * @description One Znuny change with work orders, CAB, history and links; linked tickets and CIs the
+         *     caller cannot read are left out (``hidden_links`` counts them).
+         */
+        get: operations["get_legacy_change_api_v1_itsm_legacy_changes__znuny_change_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13025,6 +13960,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Ticket Change
+         * @description Make an existing ticket of the change type a change (phase ``draft``).
+         */
+        post: operations["post_ticket_change_api_v1_tickets__ticket_id__change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/change/create-from": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Ticket Change Create From
+         * @description A new change from this ticket (``ro``): service, CIs and customer are prefilled and the
+         *     two are linked.
+         */
+        post: operations["post_ticket_change_create_from_api_v1_tickets__ticket_id__change_create_from_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/chat": {
         parameters: {
             query?: never;
@@ -14357,6 +15333,14 @@ export interface components {
             /** State Name */
             state_name: string;
         };
+        /** AdoptIn */
+        AdoptIn: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+        };
         /** AffectedOut */
         AffectedOut: {
             /** Ci Count */
@@ -14375,6 +15359,45 @@ export interface components {
             services: components["schemas"]["CmdbNamedRefOut"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * AgendaEntryOut
+         * @description ``hidden`` lines carry nothing but their ``position``.
+         */
+        AgendaEntryOut: {
+            approval: components["schemas"]["ApprovalSnapshotOut"] | null;
+            /** Change Ticket Id */
+            change_ticket_id: number | null;
+            /** Change Type */
+            change_type: ("standard" | "normal" | "emergency") | null;
+            /** Hidden */
+            hidden: boolean;
+            /** Note */
+            note: string | null;
+            /** Phase */
+            phase: ("draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled") | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Title */
+            title: string | null;
+            /** Tn */
+            tn: string | null;
+        };
+        /** AgendaIn */
+        AgendaIn: {
+            /** Items */
+            items?: components["schemas"]["AgendaItemIn"][];
+        };
+        /** AgendaItemIn */
+        AgendaItemIn: {
+            /** Change Ticket Id */
+            change_ticket_id: number;
+            /** Note */
+            note?: string | null;
         };
         /**
          * AgentCustomerCreateOut
@@ -15944,6 +16967,40 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * ApprovalSnapshotOut
+         * @description The engine's view of one CAB approval round (vote counts ``None`` until it exposes them).
+         */
+        ApprovalSnapshotOut: {
+            /** Approval Id */
+            approval_id: number;
+            /** Approval Key */
+            approval_key: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Stage */
+            current_stage: number | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Round */
+            round: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "cancelled";
+            /** Votes Approved */
+            votes_approved: number | null;
+            /** Votes Rejected */
+            votes_rejected: number | null;
+            /** Votes Total */
+            votes_total: number | null;
+        };
         /** ApprovalStepOut */
         ApprovalStepOut: {
             /** Approved Count */
@@ -17076,6 +18133,162 @@ export interface components {
              */
             target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
         };
+        /**
+         * CabChangeItemOut
+         * @description An agenda suggestion: the list item of the change.
+         */
+        CabChangeItemOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /** Outcome */
+            outcome: string | null;
+            /** Owner Id */
+            owner_id: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CabIn */
+        CabIn: {
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Emergency
+             * @default false
+             */
+            is_emergency: boolean;
+            /** Name */
+            name: string;
+            /** Quorum */
+            quorum?: number | null;
+            /**
+             * Rule
+             * @default majority
+             * @enum {string}
+             */
+            rule: "any" | "all" | "majority" | "quorum";
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** CabMemberIn */
+        CabMemberIn: {
+            /**
+             * Member Kind
+             * @enum {string}
+             */
+            member_kind: "user" | "group" | "role" | "list" | "customer_user" | "resolver";
+            /** Member Ref */
+            member_ref: string;
+        };
+        /** CabOut */
+        CabOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Customer Members Allowed */
+            customer_members_allowed: boolean;
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Emergency */
+            is_emergency: boolean;
+            /** Members */
+            members: components["schemas"]["ResolvedMemberOut"][];
+            /** Name */
+            name: string;
+            /** Quorum */
+            quorum: number | null;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "any" | "all" | "majority" | "quorum";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+            /** Valid */
+            valid: boolean;
+        };
+        /** CalendarChangeOut */
+        CalendarChangeOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /** Conflict Kinds */
+            conflict_kinds: string[];
+            /** Conflict Severity */
+            conflict_severity: ("info" | "warn" | "block") | null;
+            /** Outcome */
+            outcome: string | null;
+            /** Owner Id */
+            owner_id: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** CalendarOut */
         CalendarOut: {
             /** Color */
@@ -17373,6 +18586,530 @@ export interface components {
             sort?: number | null;
             /** Valid */
             valid?: boolean | null;
+        };
+        /** ChangeApprovalOut */
+        ChangeApprovalOut: {
+            /** Approval Id */
+            approval_id: number | null;
+            /** Approval Round */
+            approval_round: number;
+            /** Approval Via */
+            approval_via: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** History Missing */
+            history_missing: boolean;
+            snapshot: components["schemas"]["ApprovalSnapshotOut"] | null;
+        };
+        /** ChangeCalendarOut */
+        ChangeCalendarOut: {
+            /** Changes */
+            changes: components["schemas"]["CalendarChangeOut"][];
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Freezes */
+            freezes: components["schemas"]["FreezeOccurrenceOut"][];
+            /** Freezes Truncated */
+            freezes_truncated: boolean;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /** Tasks */
+            tasks: components["schemas"]["TaskListItemOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** ChangeCreateIn */
+        ChangeCreateIn: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Cab Id */
+            cab_id?: number | null;
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /** Ci Refs */
+            ci_refs?: string[];
+            /** Customer User Id */
+            customer_user_id?: string | null;
+            /** From Ticket Id */
+            from_ticket_id?: number | null;
+            /** Planned End */
+            planned_end?: string | null;
+            /** Planned Start */
+            planned_start?: string | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Service Id */
+            service_id?: number | null;
+            /** Service Ids */
+            service_ids?: number[];
+            /** Template Id */
+            template_id?: number | null;
+            /** Title */
+            title: string;
+        };
+        /** ChangeCreatedOut */
+        ChangeCreatedOut: {
+            change: components["schemas"]["ChangeOut"];
+            /** Tasks Job Id */
+            tasks_job_id: number | null;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** ChangeEventOut */
+        ChangeEventOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            } | null;
+            /** Event */
+            event: string;
+            /** From Phase */
+            from_phase: string | null;
+            /** Id */
+            id: number;
+            /** To Phase */
+            to_phase: string | null;
+        };
+        /** ChangeImpactOut */
+        ChangeImpactOut: {
+            /** Cis */
+            cis: components["schemas"]["ImpactCiOut"][];
+            /** Computed At */
+            computed_at: string | null;
+            /** Hidden Ci Count */
+            hidden_ci_count: number;
+            /** Hidden Service Count */
+            hidden_service_count: number;
+            /** Incidents */
+            incidents: components["schemas"]["ImpactIncidentOut"][];
+            /** Incidents Truncated */
+            incidents_truncated: boolean;
+            /** Requested At */
+            requested_at: string | null;
+            /** Services */
+            services: components["schemas"]["ImpactServiceOut"][];
+            /** Stale */
+            stale: boolean;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** ChangeListItemOut */
+        ChangeListItemOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /** Outcome */
+            outcome: string | null;
+            /** Owner Id */
+            owner_id: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ChangeOut */
+        ChangeOut: {
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Allowed Targets */
+            allowed_targets: ("draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled")[];
+            /** Approval Round */
+            approval_round: number;
+            /** Approval Via */
+            approval_via: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Backout Plan */
+            backout_plan: string | null;
+            /** Cab Id */
+            cab_id: number | null;
+            /** Can Manage */
+            can_manage: boolean;
+            /** Can Write */
+            can_write: boolean;
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Drift */
+            drift: string[];
+            /** Effective Risk Level */
+            effective_risk_level: string | null;
+            /** Impact Computed At */
+            impact_computed_at: string | null;
+            /** Impact Truncated */
+            impact_truncated: boolean;
+            /** Implementation Plan */
+            implementation_plan: string | null;
+            /** Outcome */
+            outcome: string | null;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
+            /** Pir Notes */
+            pir_notes: string | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Portal Visible */
+            portal_visible: boolean;
+            /** Process Ticket */
+            process_ticket: boolean;
+            /** Queue Id */
+            queue_id: number;
+            /** Reason */
+            reason: string | null;
+            /** Risk Level */
+            risk_level: string | null;
+            /** Risk Override Level */
+            risk_override_level: string | null;
+            /** Risk Override Reason */
+            risk_override_reason: string | null;
+            /** Risk Score */
+            risk_score: number | null;
+            /** Service Ids */
+            service_ids: number[];
+            /** Template Id */
+            template_id: number | null;
+            /** Test Plan */
+            test_plan: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket State */
+            ticket_state: string;
+            /** Ticket State Type */
+            ticket_state_type: string;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+        };
+        /** ChangePageOut */
+        ChangePageOut: {
+            /** Items */
+            items: components["schemas"]["ChangeListItemOut"][];
+            /** Total */
+            total: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** ChangeRiskAnswerDef */
+        ChangeRiskAnswerDef: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Points
+             * @default 0
+             */
+            points: number;
+        };
+        /** ChangeRiskAnswersIn */
+        ChangeRiskAnswersIn: {
+            /** Answers */
+            answers?: {
+                [key: string]: string;
+            };
+        };
+        /** ChangeRiskExamplesOut */
+        ChangeRiskExamplesOut: {
+            /** Created */
+            created: string[];
+        };
+        /** ChangeRiskFindingOut */
+        ChangeRiskFindingOut: {
+            /** Check Key */
+            check_key: string;
+            /** Hidden Ref Count */
+            hidden_ref_count: number;
+            /** Message Key */
+            message_key: string;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Points */
+            points: number;
+            /** Refs */
+            refs: string[];
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warn" | "block";
+        };
+        /** ChangeRiskOut */
+        ChangeRiskOut: {
+            /** Answer Points */
+            answer_points: number;
+            /** Answers */
+            answers: {
+                [key: string]: string;
+            };
+            /** Blocked */
+            blocked: boolean;
+            /** Can Answer */
+            can_answer: boolean;
+            /** Can Override */
+            can_override: boolean;
+            /** Effective Level */
+            effective_level: string | null;
+            /** Evaluated At */
+            evaluated_at: string | null;
+            /** Findings */
+            findings: components["schemas"]["ChangeRiskFindingOut"][];
+            /** Incomplete */
+            incomplete: boolean;
+            /** Level */
+            level: string | null;
+            /** Override Level */
+            override_level: string | null;
+            /** Override Reason */
+            override_reason: string | null;
+            /** Questionnaire Complete */
+            questionnaire_complete: boolean;
+            /** Questions */
+            questions: components["schemas"]["ChangeRiskQuestionOut"][];
+            /** Score */
+            score: number | null;
+            thresholds: components["schemas"]["ChangeRiskThresholdsOut"];
+        };
+        /** ChangeRiskOverrideIn */
+        ChangeRiskOverrideIn: {
+            /** Level */
+            level?: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /** ChangeRiskQuestionIn */
+        ChangeRiskQuestionIn: {
+            /** Answers */
+            answers: components["schemas"]["ChangeRiskAnswerDef"][];
+            /** Help */
+            help?: string | null;
+            /** Question */
+            question: string;
+            /** Question Key */
+            question_key: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** ChangeRiskQuestionOrderIn */
+        ChangeRiskQuestionOrderIn: {
+            /** Order */
+            order: number[];
+        };
+        /** ChangeRiskQuestionOut */
+        ChangeRiskQuestionOut: {
+            /** Answers */
+            answers: components["schemas"]["ChangeRiskAnswerDef"][];
+            /** Help */
+            help: string | null;
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
+            /** Question */
+            question: string;
+            /** Question Key */
+            question_key: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /** ChangeRiskThresholdsOut */
+        ChangeRiskThresholdsOut: {
+            /** High From */
+            high_from: number;
+            /** Medium From */
+            medium_from: number;
+            /** Very High From */
+            very_high_from: number;
+        };
+        /** ChangeStatusOut */
+        ChangeStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Can Manage */
+            can_manage: boolean;
+            /** Can See Legacy */
+            can_see_legacy: boolean;
+            /**
+             * Legacy
+             * @enum {string}
+             */
+            legacy: "none" | "live" | "archive";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "znuny_readthrough" | "tiqora";
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "ok" | "itsm_off" | "mode_a" | "setup_missing";
+            /** Setup Complete Change */
+            setup_complete_change: boolean;
+        };
+        /** ChangeTemplateOut */
+        ChangeTemplateOut: {
+            /** Broken */
+            broken: boolean;
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            defaults: components["schemas"]["TemplateDefaults"];
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Standard */
+            is_standard: boolean;
+            /** Name */
+            name: string;
+            /** Tasks */
+            tasks: components["schemas"]["TemplateTask"][];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+            /** Valid */
+            valid: boolean;
+        };
+        /**
+         * ChangeTemplateSummaryOut
+         * @description What the create dialog needs from a valid template (no task texts).
+         */
+        ChangeTemplateSummaryOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            defaults: components["schemas"]["TemplateDefaults"];
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Standard */
+            is_standard: boolean;
+            /** Name */
+            name: string;
+            /** Task Count */
+            task_count: number;
+        };
+        /**
+         * ChangeUpdateIn
+         * @description PATCH body. There is no ``phase``: unknown fields are refused (422), so a phase can only
+         *     change through the phase machine.
+         */
+        ChangeUpdateIn: {
+            /** Backout Plan */
+            backout_plan?: string | null;
+            /** Cab Id */
+            cab_id?: number | null;
+            /** Change Type */
+            change_type?: ("standard" | "normal" | "emergency") | null;
+            /**
+             * Clear Window
+             * @default false
+             */
+            clear_window: boolean;
+            /** Implementation Plan */
+            implementation_plan?: string | null;
+            /** Planned End */
+            planned_end?: string | null;
+            /** Planned Start */
+            planned_start?: string | null;
+            /** Portal Visible */
+            portal_visible?: boolean | null;
+            /** Reason */
+            reason?: string | null;
+            /** Service Ids */
+            service_ids?: number[] | null;
+            /** Test Plan */
+            test_plan?: string | null;
         };
         /** ChannelConfigOut */
         ChannelConfigOut: {
@@ -18819,6 +20556,35 @@ export interface components {
             op: "eq" | "neq" | "in" | "not_in" | "contains" | "starts_with" | "is_empty" | "is_not_empty" | "lt" | "lte" | "gt" | "gte" | "between" | "before" | "after" | "within_last" | "older_than" | "is_true" | "is_false";
             /** Value */
             value?: unknown;
+        };
+        /** ConflictOut */
+        ConflictOut: {
+            /** End */
+            end: string | null;
+            /** Hidden */
+            hidden: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "freeze" | "change_overlap" | "task_outside" | "no_window" | "freeze_truncated" | "overlap_truncated" | "freeze_unverified";
+            /** Ref */
+            ref: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warn" | "block";
+            /** Shared Ci Count */
+            shared_ci_count: number;
+            /** Shared Cis */
+            shared_cis: number[];
+            /** Shared Service Count */
+            shared_service_count: number;
+            /** Shared Services */
+            shared_services: number[];
+            /** Start */
+            start: string | null;
         };
         /**
          * ContainerOut
@@ -21003,6 +22769,150 @@ export interface components {
             /** To Address */
             to_address: string;
         };
+        /**
+         * FreezeIn
+         * @description Body of the admin create/update.
+         */
+        FreezeIn: {
+            /**
+             * Allow Emergency
+             * @default true
+             */
+            allow_emergency: boolean;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Enforcement
+             * @default block
+             * @enum {string}
+             */
+            enforcement: "block" | "warn";
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            recurrence?: components["schemas"]["RecurrenceIn"] | null;
+            /**
+             * Scope
+             * @default all
+             * @enum {string}
+             */
+            scope: "all" | "services";
+            /** Service Ids */
+            service_ids?: number[];
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** FreezeOccurrenceOut */
+        FreezeOccurrenceOut: {
+            /** Allow Emergency */
+            allow_emergency: boolean;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * Enforcement
+             * @enum {string}
+             */
+            enforcement: "block" | "warn";
+            /** Freeze Id */
+            freeze_id: number;
+            /** Name */
+            name: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "all" | "services";
+            /** Service Ids */
+            service_ids: number[];
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+        };
+        /** FreezeOccurrencesOut */
+        FreezeOccurrencesOut: {
+            /** Items */
+            items: components["schemas"]["FreezeOccurrenceOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** FreezeRecurrenceOut */
+        FreezeRecurrenceOut: {
+            /** Count */
+            count: number | null;
+            /** Interval */
+            interval: number;
+            /** Type */
+            type: string;
+            /** Until */
+            until: string | null;
+        };
+        /** FreezeWindowOut */
+        FreezeWindowOut: {
+            /** Allow Emergency */
+            allow_emergency: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Enforcement
+             * @enum {string}
+             */
+            enforcement: "block" | "warn";
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string | null;
+            recurrence: components["schemas"]["FreezeRecurrenceOut"] | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "all" | "services";
+            /** Service Ids */
+            service_ids: number[];
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+            /** Valid */
+            valid: boolean;
+        };
         /** GdprCustomerRecordPreviewOut */
         GdprCustomerRecordPreviewOut: {
             /** Delete Summary */
@@ -21750,6 +23660,27 @@ export interface components {
             /** Test Id */
             test_id: string;
         };
+        /** ImpactCiOut */
+        ImpactCiOut: {
+            /** Ci Id */
+            ci_id: number;
+            /** Class Key */
+            class_key: string;
+            /** Class Name */
+            class_name: string;
+            /** Direct */
+            direct: boolean;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Incident State */
+            incident_state: string | null;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+            /** Ref */
+            ref: string;
+        };
         /** ImpactEdgeOut */
         ImpactEdgeOut: {
             /** Link Type */
@@ -21771,6 +23702,21 @@ export interface components {
             root: string;
             /** Truncated */
             truncated: boolean;
+        };
+        /** ImpactIncidentOut */
+        ImpactIncidentOut: {
+            /** Queue Id */
+            queue_id: number;
+            /** Service Id */
+            service_id: number | null;
+            /** State */
+            state: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /**
          * ImpactNodeOut
@@ -21798,6 +23744,17 @@ export interface components {
             name?: string | null;
             /** Number */
             number?: string | null;
+        };
+        /** ImpactServiceOut */
+        ImpactServiceOut: {
+            /** Direct */
+            direct: boolean;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Name */
+            name: string;
+            /** Service Id */
+            service_id: number;
         };
         /** ImportIssueOut */
         ImportIssueOut: {
@@ -22600,6 +24557,190 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** LegacyArchiveStartIn */
+        LegacyArchiveStartIn: {
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+        };
+        /**
+         * LegacyArchiveStatusOut
+         * @description The Znuny change archive: can the job start now, what is stored, is a job active.
+         */
+        LegacyArchiveStatusOut: {
+            /** Active Job Id */
+            active_job_id: number | null;
+            /** Archived */
+            archived: number;
+            /** Blocked Code */
+            blocked_code: string | null;
+            /** Blocked Message */
+            blocked_message: string | null;
+            /** Can Start */
+            can_start: boolean;
+            /** Last Archived At */
+            last_archived_at: string | null;
+        };
+        /** LegacyCabMemberOut */
+        LegacyCabMemberOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "customer_user";
+            /** Login */
+            login: string;
+        };
+        /** LegacyChangeOut */
+        LegacyChangeOut: {
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Builder Login */
+            builder_login: string | null;
+            /** Cab */
+            cab: components["schemas"]["LegacyCabMemberOut"][];
+            /** Category */
+            category: string | null;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Cis */
+            cis: components["schemas"]["LegacyCiLinkOut"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string | null;
+            /** Dynamic Fields */
+            dynamic_fields: {
+                [key: string]: string[];
+            };
+            /** Hidden Links */
+            hidden_links: number;
+            /** History */
+            history: components["schemas"]["LegacyHistoryOut"][];
+            /** Impact */
+            impact: string | null;
+            /** Justification */
+            justification: string | null;
+            /** Manager Login */
+            manager_login: string | null;
+            /** Number */
+            number: string;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Priority */
+            priority: string | null;
+            /** Requested Time */
+            requested_time: string | null;
+            /** Services */
+            services: components["schemas"]["LegacyServiceLinkOut"][];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "live" | "archive";
+            /** State */
+            state: string | null;
+            /** Tickets */
+            tickets: components["schemas"]["LegacyTicketLinkOut"][];
+            /** Title */
+            title: string | null;
+            /** Workorders */
+            workorders: components["schemas"]["LegacyWorkOrderOut"][];
+            /** Znuny Change Id */
+            znuny_change_id: number;
+            /** Znuny Url */
+            znuny_url: string | null;
+        };
+        /** LegacyChangePageOut */
+        LegacyChangePageOut: {
+            /** Items */
+            items: components["schemas"]["LegacyChangeSummaryOut"][];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "live" | "archive";
+            /** Total */
+            total: number;
+        };
+        /** LegacyChangeSummaryOut */
+        LegacyChangeSummaryOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Number */
+            number: string;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** State */
+            state: string | null;
+            /** Title */
+            title: string | null;
+            /** Workorder Count */
+            workorder_count: number;
+            /** Znuny Change Id */
+            znuny_change_id: number;
+        };
+        /** LegacyCiLinkOut */
+        LegacyCiLinkOut: {
+            /** Class Name */
+            class_name: string | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** Name */
+            name: string | null;
+            /** Number */
+            number: string | null;
+            /** Ref */
+            ref: string;
+            /** Workorder Number */
+            workorder_number: number;
+        };
+        /** LegacyHistoryOut */
+        LegacyHistoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Field */
+            field: string | null;
+            /** History Type */
+            history_type: string;
+            /** New */
+            new: string | null;
+            /** New Display */
+            new_display: string | null;
+            /** Old */
+            old: string | null;
+            /** Old Display */
+            old_display: string | null;
+            /** User Login */
+            user_login: string | null;
+            /** Workorder Number */
+            workorder_number: number;
+        };
         /**
          * LegacySchemaOut
          * @description Detected OTRS/Znuny schema profile for the connected database.
@@ -22630,6 +24771,75 @@ export interface components {
             state_priority_has_color: boolean;
             /** Supported */
             supported: boolean;
+        };
+        /** LegacyServiceLinkOut */
+        LegacyServiceLinkOut: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** Name */
+            name: string | null;
+            /** Service Id */
+            service_id: number;
+            /** Workorder Number */
+            workorder_number: number;
+        };
+        /** LegacyTicketLinkOut */
+        LegacyTicketLinkOut: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** State */
+            state: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /** Workorder Number */
+            workorder_number: number;
+        };
+        /** LegacyWorkOrderOut */
+        LegacyWorkOrderOut: {
+            /** Accounted Time */
+            accounted_time: number;
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Agent Login */
+            agent_login: string | null;
+            /** Dynamic Fields */
+            dynamic_fields: {
+                [key: string]: string[];
+            };
+            /** Instruction */
+            instruction: string | null;
+            /** Number */
+            number: number;
+            /** Planned Effort */
+            planned_effort: number;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Report */
+            report: string | null;
+            /** State */
+            state: string | null;
+            /** Title */
+            title: string | null;
+            /** Work Order Type */
+            work_order_type: string | null;
         };
         /** LinkDecideIn */
         LinkDecideIn: {
@@ -23856,6 +26066,139 @@ export interface components {
         MeasureRef: {
             /** Key */
             key: string;
+        };
+        /** MeetingIn */
+        MeetingIn: {
+            /** Cab Id */
+            cab_id: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Location */
+            location?: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * MeetingListItemOut
+         * @description A meeting of the list: no agenda lines and no minutes (the minutes are on the meeting
+         *     itself, ``GET /itsm/cab-meetings/{id}``).
+         */
+        MeetingListItemOut: {
+            /** Agenda Count */
+            agenda_count: number;
+            /** Cab Id */
+            cab_id: number;
+            /** Cab Name */
+            cab_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Id */
+            id: number;
+            /** Location */
+            location: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "held" | "cancelled";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+        };
+        /** MeetingOut */
+        MeetingOut: {
+            /** Agenda */
+            agenda: components["schemas"]["AgendaEntryOut"][];
+            /** Agenda Count */
+            agenda_count: number;
+            /** Cab Id */
+            cab_id: number;
+            /** Cab Name */
+            cab_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Id */
+            id: number;
+            /** Location */
+            location: string | null;
+            /** Minutes */
+            minutes: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "held" | "cancelled";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
+        };
+        /**
+         * MeetingUpdateIn
+         * @description Only the fields that are sent change; the CAB of a meeting stays.
+         */
+        MeetingUpdateIn: {
+            /** Ends At */
+            ends_at?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Minutes */
+            minutes?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Status */
+            status?: ("planned" | "held" | "cancelled") | null;
+            /** Title */
+            title?: string | null;
         };
         /** MentionCreate */
         MentionCreate: {
@@ -25470,6 +27813,29 @@ export interface components {
              */
             webauthn: boolean;
         };
+        /** PortalChangeOut */
+        PortalChangeOut: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "scheduled" | "implementing" | "closed";
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Services */
+            services: string[];
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
         /** PortalCiDetailOut */
         PortalCiDetailOut: {
             /** Class Name */
@@ -26623,6 +28989,33 @@ export interface components {
              */
             kind: "ci" | "service" | "customer_user" | "customer_company" | "attachment" | "queue" | "agent" | "url";
         };
+        /** RelatedLinkIn */
+        RelatedLinkIn: {
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /** RelatedTicketOut */
+        RelatedTicketOut: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target";
+            /** Link Type */
+            link_type: string;
+            /** Role */
+            role: string | null;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
         /** RelativeTimeRange */
         RelativeTimeRange: {
             /** Count */
@@ -27322,6 +29715,22 @@ export interface components {
             label: string | null;
             /** Url */
             url: string | null;
+        };
+        /** ResolvedMemberOut */
+        ResolvedMemberOut: {
+            /** Count */
+            count: number | null;
+            /** Label */
+            label: string;
+            /**
+             * Member Kind
+             * @enum {string}
+             */
+            member_kind: "user" | "group" | "role" | "list" | "customer_user" | "resolver";
+            /** Member Ref */
+            member_ref: string;
+            /** Missing */
+            missing: boolean;
         };
         /** ResolverOptionOut */
         ResolverOptionOut: {
@@ -28129,6 +30538,19 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** ServiceAvailabilityOut */
+        ServiceAvailabilityOut: {
+            /** Change Count */
+            change_count: number;
+            /** Minutes Affected */
+            minutes_affected: number;
+            /** Service Id */
+            service_id: number;
+            /** Service Name */
+            service_name: string;
+            /** Windows */
+            windows: components["schemas"]["ServiceWindowOut"][];
+        };
         /** ServiceCreate */
         ServiceCreate: {
             /** Comments */
@@ -28241,6 +30663,38 @@ export interface components {
             sla_ids?: number[] | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** ServiceWindowOut */
+        ServiceWindowOut: {
+            /** Change Type */
+            change_type: string | null;
+            /** Direct */
+            direct: boolean | null;
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /** Enforcement */
+            enforcement: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "change" | "freeze";
+            /** Phase */
+            phase: string | null;
+            /** Ref Id */
+            ref_id: number;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string | null;
         };
         /** SettingsSectionOut */
         SettingsSectionOut: {
@@ -29213,6 +31667,133 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** TaskIn */
+        TaskIn: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Planned Effort Minutes */
+            planned_effort_minutes?: number | null;
+            /** Planned End */
+            planned_end?: string | null;
+            /** Planned Start */
+            planned_start?: string | null;
+            /** Position */
+            position?: number | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /**
+             * Task Kind
+             * @default workorder
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Title */
+            title: string;
+        };
+        /** TaskListItemOut */
+        TaskListItemOut: {
+            /** Change Ticket Id */
+            change_ticket_id: number;
+            /** Change Title */
+            change_title: string | null;
+            /** Change Tn */
+            change_tn: string | null;
+            /** Finished */
+            finished: boolean;
+            /** Owner Id */
+            owner_id: number;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Queue Id */
+            queue_id: number;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /**
+             * Task Kind
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
+        /** TaskOrderIn */
+        TaskOrderIn: {
+            /** Order */
+            order: number[];
+        };
+        /** TaskOut */
+        TaskOut: {
+            /** Actual End */
+            actual_end: string | null;
+            /** Actual Start */
+            actual_start: string | null;
+            /** Finished */
+            finished: boolean;
+            /** Owner Id */
+            owner_id: number;
+            /** Planned Effort Minutes */
+            planned_effort_minutes: number | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Queue Id */
+            queue_id: number;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /**
+             * Task Kind
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Template Task Key */
+            template_task_key: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
+        /**
+         * TaskUpdateIn
+         * @description Only the fields that are sent change; ``null`` clears a time or the effort.
+         */
+        TaskUpdateIn: {
+            /** Actual End */
+            actual_end?: string | null;
+            /** Actual Start */
+            actual_start?: string | null;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Planned Effort Minutes */
+            planned_effort_minutes?: number | null;
+            /** Planned End */
+            planned_end?: string | null;
+            /** Planned Start */
+            planned_start?: string | null;
+            /** Task Kind */
+            task_kind?: ("workorder" | "backout" | "decision" | "pir") | null;
+        };
         /** TelegramButtonIn */
         TelegramButtonIn: {
             /**
@@ -29303,6 +31884,41 @@ export interface components {
             attachment_ids: number[];
         };
         /**
+         * TemplateDefaults
+         * @description What a change created from the template starts with (all optional, plain text).
+         */
+        TemplateDefaults: {
+            /** Backout Plan */
+            backout_plan?: string | null;
+            /** Cab Id */
+            cab_id?: number | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Implementation Plan */
+            implementation_plan?: string | null;
+            /**
+             * Portal Visible
+             * @default false
+             */
+            portal_visible: boolean;
+            /** Priority Id */
+            priority_id?: number | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Risk Answers */
+            risk_answers?: {
+                [key: string]: string;
+            };
+            /** Service Ids */
+            service_ids?: number[];
+            /** Test Plan */
+            test_plan?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /**
          * TemplateEditorsOut
          * @description Who may edit a Standard Template (per-template ACL: groups + users).
          */
@@ -29325,6 +31941,34 @@ export interface components {
              */
             user_ids: number[];
         };
+        /**
+         * TemplateIn
+         * @description Body of the admin create/update.
+         */
+        TemplateIn: {
+            /**
+             * Change Type
+             * @enum {string}
+             */
+            change_type: "standard" | "normal" | "emergency";
+            defaults?: components["schemas"]["TemplateDefaults"];
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Standard
+             * @default false
+             */
+            is_standard: boolean;
+            /** Name */
+            name: string;
+            /** Tasks */
+            tasks?: components["schemas"]["TemplateTask"][];
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
         /** TemplateOut */
         TemplateOut: {
             /** Content Type */
@@ -29337,6 +31981,40 @@ export interface components {
             template_type?: string | null;
             /** Text */
             text: string;
+        };
+        /** TemplateTask */
+        TemplateTask: {
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Key */
+            key: string;
+            /**
+             * Offset Minutes
+             * @default 0
+             */
+            offset_minutes: number;
+            /** Owner Id */
+            owner_id?: number | null;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            /** Queue Id */
+            queue_id?: number | null;
+            /**
+             * Task Kind
+             * @default workorder
+             * @enum {string}
+             */
+            task_kind: "workorder" | "backout" | "decision" | "pir";
+            /** Title */
+            title: string;
         };
         /** TemplateUpdateApplyIn */
         TemplateUpdateApplyIn: {
@@ -29426,6 +32104,40 @@ export interface components {
             filename?: string | null;
             /** Priority */
             priority?: number | null;
+        };
+        /**
+         * TicketChangeOut
+         * @description Change facts of a change ticket (Mode B only).
+         */
+        TicketChangeOut: {
+            /** Change Type */
+            change_type: string;
+            /** Phase */
+            phase: string;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Risk Level */
+            risk_level: string | null;
+        };
+        /**
+         * TicketChangeTaskOut
+         * @description Task facts of a change task ticket (Mode B only).
+         */
+        TicketChangeTaskOut: {
+            /** Change Ticket Id */
+            change_ticket_id: number;
+            /** Change Tn */
+            change_tn: string | null;
+            /** Planned End */
+            planned_end: string | null;
+            /** Planned Start */
+            planned_start: string | null;
+            /** Position */
+            position: number;
+            /** Task Kind */
+            task_kind: string;
         };
         /**
          * TicketChatOut
@@ -29849,6 +32561,8 @@ export interface components {
          * @description ``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up.
          */
         TicketItsmOut: {
+            change: components["schemas"]["TicketChangeOut"] | null;
+            change_task: components["schemas"]["TicketChangeTaskOut"] | null;
             /** Ci Count */
             ci_count: number | null;
             /** Criticality */
@@ -30388,6 +33102,27 @@ export interface components {
              * @default false
              */
             rows: boolean;
+        };
+        /** TransitionIn */
+        TransitionIn: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /** Outcome */
+            outcome?: ("successful" | "failed" | "backed_out") | null;
+            /** Override Reason */
+            override_reason?: string | null;
+            /** Pir Notes */
+            pir_notes?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * To
+             * @enum {string}
+             */
+            to: "draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled";
         };
         /** TypeRefOut */
         TypeRefOut: {
@@ -32797,6 +35532,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_schedule_api_portal_change_schedule_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalChangeOut"][];
                 };
             };
             /** @description Validation Error */
@@ -42487,6 +45256,819 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ItsmAdminOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cabs_api_v1_admin_itsm_change_cabs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_cab_api_v1_admin_itsm_change_cabs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_cab_api_v1_admin_itsm_change_cabs__cab_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cab_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"];
+                };
+            };
+            /** @description Validation error, or `{"detail": {"code": "cab_invalid", "reason": ..., "message": ...}}`: the approval engine refuses the CAB's step. `reason` is `quorum_exceeds_members` (only users / customer users as members and fewer of them than the quorum), `invalid_definition` (another engine rule) or `invalid_member`; `message` is the engine's English text. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_cab_route_api_v1_admin_itsm_change_cabs__cab_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cab_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_cab_members_api_v1_admin_itsm_change_cabs__cab_id__members_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                cab_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CabMemberIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"];
+                };
+            };
+            /** @description Validation error, or `{"detail": {"code": "cab_invalid", "reason": ..., "message": ...}}`: the approval engine refuses the CAB's step. `reason` is `quorum_exceeds_members` (only users / customer users as members and fewer of them than the quorum), `invalid_definition` (another engine rule) or `invalid_member`; `message` is the engine's English text. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_freeze_windows_api_v1_admin_itsm_change_freeze_windows_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_freeze_window_api_v1_admin_itsm_change_freeze_windows_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreezeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                freeze_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                freeze_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreezeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_freeze_window_api_v1_admin_itsm_change_freeze_windows__freeze_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                freeze_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_legacy_archive_api_v1_admin_itsm_change_legacy_archive_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyArchiveStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_legacy_archive_api_v1_admin_itsm_change_legacy_archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LegacyArchiveStartIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_questions_api_v1_admin_itsm_change_risk_questions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_risk_question_api_v1_admin_itsm_change_risk_questions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskQuestionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_risk_question_examples_api_v1_admin_itsm_change_risk_questions_examples_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskExamplesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_risk_question_order_api_v1_admin_itsm_change_risk_questions_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskQuestionOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                question_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskQuestionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskQuestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                question_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_templates_api_v1_admin_itsm_change_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_template_api_v1_admin_itsm_change_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_detail_api_v1_admin_itsm_change_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_template_api_v1_admin_itsm_change_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_route_api_v1_admin_itsm_change_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -56588,6 +60170,260 @@ export interface operations {
             };
         };
     };
+    get_cab_meetings_api_v1_itsm_cab_meetings_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingListItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_cab_meeting_api_v1_itsm_cab_meetings_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_cab_meeting_api_v1_itsm_cab_meetings__meeting_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_cab_meeting_agenda_api_v1_itsm_cab_meetings__meeting_id__agenda_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgendaIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cab_meeting_suggestions_api_v1_itsm_cab_meetings__meeting_id__suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                meeting_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabChangeItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cabs_api_v1_itsm_cabs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CabOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_catalog_api_v1_itsm_catalog_get: {
         parameters: {
             query?: never;
@@ -56608,6 +60444,965 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_calendar_api_v1_itsm_change_calendar_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                service_id?: number[] | null;
+                include_tasks?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeCalendarOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_calendar_services_api_v1_itsm_change_calendar_services_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceAvailabilityOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_change_tasks_api_v1_itsm_change_tasks_mine_get: {
+        parameters: {
+            query?: {
+                open_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskListItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_templates_api_v1_itsm_change_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeTemplateSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_changes_api_v1_itsm_changes_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                phase?: ("draft" | "submitted" | "assessment" | "approval" | "scheduled" | "implementing" | "review" | "closed" | "rejected" | "cancelled")[] | null;
+                change_type?: ("standard" | "normal" | "emergency")[] | null;
+                service_id?: number | null;
+                ci_id?: number | null;
+                window_start?: string | null;
+                window_end?: string | null;
+                mine?: "" | "owned" | "created";
+                order?: "planned_start" | "updated";
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangePageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_api_v1_itsm_changes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_status_api_v1_itsm_changes_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_detail_api_v1_itsm_changes__ticket_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_change_api_v1_itsm_changes__ticket_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_approval_api_v1_itsm_changes__ticket_id__approval_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_conflicts_api_v1_itsm_changes__ticket_id__conflicts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_events_api_v1_itsm_changes__ticket_id__events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_impact_api_v1_itsm_changes__ticket_id__impact_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeImpactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_impact_recompute_api_v1_itsm_changes__ticket_id__impact_recompute_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_related_api_v1_itsm_changes__ticket_id__related_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedTicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_related_api_v1_itsm_changes__ticket_id__related_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelatedLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedTicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_change_related_api_v1_itsm_changes__ticket_id__related__other_ticket_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                other_ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedTicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_risk_api_v1_itsm_changes__ticket_id__risk_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_change_risk_answers_api_v1_itsm_changes__ticket_id__risk_answers_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskAnswersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_risk_evaluate_api_v1_itsm_changes__ticket_id__risk_evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_change_risk_override_api_v1_itsm_changes__ticket_id__risk_override_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRiskOverrideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_change_tasks_api_v1_itsm_changes__ticket_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_task_api_v1_itsm_changes__ticket_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_change_task_order_api_v1_itsm_changes__ticket_id__tasks_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_change_task_api_v1_itsm_changes__ticket_id__tasks__task_ticket_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                task_ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_change_transition_api_v1_itsm_changes__ticket_id__transition_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
                 };
             };
             /** @description Validation Error */
@@ -56764,6 +61559,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CiVersionPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_freeze_windows_api_v1_itsm_freeze_windows_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeOccurrencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_legacy_changes_api_v1_itsm_legacy_changes_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                ticket_id?: number | null;
+                ci?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyChangePageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_legacy_change_api_v1_itsm_legacy_changes__znuny_change_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                znuny_change_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyChangeOut"];
                 };
             };
             /** @description Validation Error */
@@ -63003,6 +67908,84 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ticket_change_api_v1_tickets__ticket_id__change_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdoptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ticket_change_create_from_api_v1_tickets__ticket_id__change_create_from_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeCreatedOut"];
+                };
             };
             /** @description Validation Error */
             422: {

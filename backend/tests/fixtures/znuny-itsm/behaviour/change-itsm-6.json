@@ -1,0 +1,2575 @@
+{
+ "packages": {
+  "change": "ITSMChangeManagement-6.5.2",
+  "core": "ITSMCore-6.5.5"
+ },
+ "peer": {
+  "captured_with": "tests/golden/itsm_survey.py --change-behaviour (tests/golden/itsm_seed.pl, tests/golden/itsm_change_probe.pl)",
+  "peer": "znuny-6.5-itsm",
+  "results": {
+   "probe": {
+    "dynamic_field_object_types": {
+     "ITSMChange": [
+      "chg94ChangeRef"
+     ],
+     "ITSMWorkOrder": [
+      "chg94WorkOrderRef"
+     ]
+    },
+    "groups": {
+     "itsm-change": 1,
+     "itsm-change-builder": 1,
+     "itsm-change-manager": 1
+    },
+    "history": {
+     "database": [
+      {
+       "content_new": "3",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeAdd",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "chg94 Database migration",
+       "content_old": "",
+       "fieldname": "ChangeTitle",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "4 high",
+       "content_old": "3 normal",
+       "fieldname": "Category",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "102",
+       "content_old": "101",
+       "fieldname": "CategoryID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": "ChangeManagerID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<p>Move db01.example.org to new storage</p>",
+       "content_old": "",
+       "fieldname": "Description",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<p>Capacity</p>",
+       "content_old": "",
+       "fieldname": "Justification",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "6",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "2026-10-05 10:00:00",
+       "content_old": "",
+       "fieldname": "PlannedEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "2026-10-05 08:00:00",
+       "content_old": "",
+       "fieldname": "PlannedStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "chg94 migrate db",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "2026-10-05 10:30:00",
+       "content_old": "",
+       "fieldname": "ActualEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "2026-10-05 08:05:00",
+       "content_old": "",
+       "fieldname": "ActualStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "closed",
+       "content_old": "created",
+       "fieldname": "WorkOrderState",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "128",
+       "content_old": "124",
+       "fieldname": "WorkOrderStateID",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "ITSMConfigItem%%2",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderLinkAdd",
+       "workorder_id": 6
+      },
+      {
+       "content_new": "7",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "2026-10-06 10:00:00",
+       "content_old": "",
+       "fieldname": "PlannedEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "2026-10-06 09:00:00",
+       "content_old": "",
+       "fieldname": "PlannedStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "chg94 review db",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "2026-10-06 09:45:00",
+       "content_old": "",
+       "fieldname": "ActualEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "2026-10-06 09:00:00",
+       "content_old": "",
+       "fieldname": "ActualStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "closed",
+       "content_old": "created",
+       "fieldname": "WorkOrderState",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "128",
+       "content_old": "124",
+       "fieldname": "WorkOrderStateID",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 7
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "successful",
+       "content_old": "requested",
+       "fieldname": "ChangeState",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "120",
+       "content_old": "114",
+       "fieldname": "ChangeStateID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      }
+     ],
+     "firmware": [
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeAdd",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "chg94 Switch firmware rollout",
+       "content_old": "",
+       "fieldname": "ChangeTitle",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2 low",
+       "content_old": "3 normal",
+       "fieldname": "Category",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "100",
+       "content_old": "101",
+       "fieldname": "CategoryID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": "ChangeManagerID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "Plain text description",
+       "content_old": "",
+       "fieldname": "Description",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2 low",
+       "content_old": "3 normal",
+       "fieldname": "Impact",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "105",
+       "content_old": "106",
+       "fieldname": "ImpactID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "Security fix",
+       "content_old": "",
+       "fieldname": "Justification",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "4",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "2026-11-09 20:00:00",
+       "content_old": "",
+       "fieldname": "PlannedEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "2026-11-09 18:00:00",
+       "content_old": "",
+       "fieldname": "PlannedStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "chg94 flash switches",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "ready",
+       "content_old": "created",
+       "fieldname": "WorkOrderState",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "126",
+       "content_old": "124",
+       "fieldname": "WorkOrderStateID",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 4
+      },
+      {
+       "content_new": "5",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 5
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 5
+      },
+      {
+       "content_new": "2026-11-09 21:00:00",
+       "content_old": "",
+       "fieldname": "PlannedEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 5
+      },
+      {
+       "content_new": "2026-11-09 20:00:00",
+       "content_old": "",
+       "fieldname": "PlannedStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 5
+      },
+      {
+       "content_new": "chg94 backout firmware",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 5
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      }
+     ],
+     "mail": [
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeAdd",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "chg94 Mail server replacement",
+       "content_old": "",
+       "fieldname": "ChangeTitle",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": "CABAgents",
+       "type": "ChangeCABUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "chg94-cust@example.org",
+       "content_old": "",
+       "fieldname": "CABCustomers",
+       "type": "ChangeCABUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": "ChangeManagerID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<p>Replace the <b>mail</b> server mail01.example.org</p>",
+       "content_old": "",
+       "fieldname": "Description",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "CHG-94-MAIL",
+       "content_old": "",
+       "fieldname": "DynamicField_chg94ChangeRef",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "4 high",
+       "content_old": "3 normal",
+       "fieldname": "Impact",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "107",
+       "content_old": "106",
+       "fieldname": "ImpactID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<p>Old hardware out of support</p>",
+       "content_old": "",
+       "fieldname": "Justification",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "2026-11-01 00:00:00",
+       "content_old": "",
+       "fieldname": "RequestedTime",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "WO-94-1",
+       "content_old": "",
+       "fieldname": "DynamicField_chg94WorkOrderRef",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<p>Install <i>mail02.example.org</i></p>",
+       "content_old": "",
+       "fieldname": "Instruction",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "4",
+       "content_old": "0.00",
+       "fieldname": "PlannedEffort",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "2026-11-02 12:00:00",
+       "content_old": "",
+       "fieldname": "PlannedEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "2026-11-02 08:00:00",
+       "content_old": "",
+       "fieldname": "PlannedStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": "WorkOrderAgentID",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "chg94 install mail02",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "4.50",
+       "content_old": "0.00",
+       "fieldname": "AccountedTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "2026-11-02 12:30:00",
+       "content_old": "",
+       "fieldname": "ActualEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "2026-11-02 08:05:00",
+       "content_old": "",
+       "fieldname": "ActualStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<p>done</p>",
+       "content_old": "",
+       "fieldname": "Report",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "closed",
+       "content_old": "created",
+       "fieldname": "WorkOrderState",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "128",
+       "content_old": "124",
+       "fieldname": "WorkOrderStateID",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "ITSMConfigItem%%1",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderLinkAdd",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "Service%%1",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderLinkAdd",
+       "workorder_id": 1
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "2026-11-02 14:00:00",
+       "content_old": "",
+       "fieldname": "PlannedEndTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "2026-11-02 12:00:00",
+       "content_old": "",
+       "fieldname": "PlannedStartTime",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "2",
+       "content_old": "",
+       "fieldname": "WorkOrderAgentID",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "chg94 backout mail",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "Ticket%%2",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderLinkAdd",
+       "workorder_id": 2
+      },
+      {
+       "content_new": "3",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderAdd",
+       "workorder_id": 3
+      },
+      {
+       "content_new": "<recipient>%%WorkOrderAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "WorkOrderNotificationSent",
+       "workorder_id": 3
+      },
+      {
+       "content_new": "chg94 review mail",
+       "content_old": "",
+       "fieldname": "WorkOrderTitle",
+       "type": "WorkOrderUpdate",
+       "workorder_id": 3
+      },
+      {
+       "content_new": "1",
+       "content_old": "",
+       "fieldname": "BypassStateMachine",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "in progress",
+       "content_old": "requested",
+       "fieldname": "ChangeState",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "118",
+       "content_old": "114",
+       "fieldname": "ChangeStateID",
+       "type": "ChangeUpdate",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeUpdate",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "Ticket%%2",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeLinkAdd",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeLinkAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      },
+      {
+       "content_new": "<recipient>%%ChangeLinkAdd",
+       "content_old": "",
+       "fieldname": null,
+       "type": "ChangeNotificationSent",
+       "workorder_id": null
+      }
+     ]
+    },
+    "links": {
+     "change_to_ci_link_add_succeeded": 0,
+     "possible_objects": [
+      "Ticket"
+     ],
+     "possible_objects_wo": [
+      "ITSMConfigItem",
+      "Service",
+      "Ticket"
+     ],
+     "possible_types": {
+      "ITSMChange/ITSMChange": [],
+      "ITSMChange/ITSMConfigItem": [],
+      "ITSMChange/ITSMWorkOrder": [],
+      "ITSMChange/Service": [],
+      "ITSMChange/Ticket": [
+       "Normal"
+      ],
+      "ITSMWorkOrder/ITSMConfigItem": [
+       "DependsOn",
+       "Normal"
+      ],
+      "ITSMWorkOrder/ITSMWorkOrder": [],
+      "ITSMWorkOrder/Service": [
+       "DependsOn",
+       "Normal"
+      ],
+      "ITSMWorkOrder/Ticket": [
+       "Normal"
+      ]
+     }
+    },
+    "permission": {
+     "agent_without_group_ro": 0,
+     "root_ro": 1
+    },
+    "template": {
+     "content_is_perl_dumper": 1,
+     "content_is_storable": 0,
+     "content_length_positive": 1,
+     "content_prefix": "$VAR1 = {\n  'ChangeAdd' => {\n    'CABAgents' => [],\n    'CABCustomers' => [],\n    'CategoryID' => 100,\n    'ChangeBuilde",
+     "type": "ITSMChange"
+    },
+    "texts": {
+     "database": {
+      "cab_agents": [],
+      "cab_customers": [],
+      "description": "<p>Move db01.example.org to new storage</p>",
+      "description_plain": "\nMove db01.example.org to new storage\n\n",
+      "dynamic_fields": {
+       "DynamicField_chg94ChangeRef": ""
+      },
+      "justification": "<p>Capacity</p>",
+      "justification_plain": "\nCapacity\n\n"
+     },
+     "firmware": {
+      "cab_agents": [],
+      "cab_customers": [],
+      "description": "Plain text description",
+      "description_plain": "Plain text description",
+      "dynamic_fields": {
+       "DynamicField_chg94ChangeRef": ""
+      },
+      "justification": "Security fix",
+      "justification_plain": "Security fix"
+     },
+     "mail": {
+      "cab_agents": [
+       2
+      ],
+      "cab_customers": [
+       "chg94-cust@example.org"
+      ],
+      "description": "<p>Replace the <b>mail</b> server mail01.example.org</p>",
+      "description_plain": "\nReplace the mail server mail01.example.org\n\n",
+      "dynamic_fields": {
+       "DynamicField_chg94ChangeRef": "CHG-94-MAIL"
+      },
+      "justification": "<p>Old hardware out of support</p>",
+      "justification_plain": "\nOld hardware out of support\n\n"
+     },
+     "workorder": {
+      "dynamic_fields": {
+       "DynamicField_chg94WorkOrderRef": "WO-94-1"
+      },
+      "instruction": "<p>Install <i>mail02.example.org</i></p>",
+      "instruction_plain": "\nInstall mail02.example.org\n\n",
+      "report": "<p>done</p>",
+      "report_plain": "\ndone\n\n"
+     }
+    },
+    "times": {
+     "database": {
+      "accounted_time": "0.00",
+      "actual_end": "2026-10-06 09:45:00",
+      "actual_start": "2026-10-05 08:05:00",
+      "planned_effort": "0.00",
+      "planned_end": "2026-10-06 10:00:00",
+      "planned_start": "2026-10-05 08:00:00",
+      "raw_min_max": {
+       "max_actual_end": "2026-10-06 09:45:00",
+       "max_planned_end": "2026-10-06 10:00:00",
+       "min_actual_start": "2026-10-05 08:05:00",
+       "min_planned_start": "2026-10-05 08:00:00"
+      },
+      "state": "successful",
+      "workorder_count": 2,
+      "workorders": [
+       {
+        "actual_end": "2026-10-05 10:30:00",
+        "actual_start": "2026-10-05 08:05:00",
+        "number": 1,
+        "planned_end": "2026-10-05 10:00:00",
+        "planned_start": "2026-10-05 08:00:00",
+        "state": "closed",
+        "type": "workorder"
+       },
+       {
+        "actual_end": "2026-10-06 09:45:00",
+        "actual_start": "2026-10-06 09:00:00",
+        "number": 2,
+        "planned_end": "2026-10-06 10:00:00",
+        "planned_start": "2026-10-06 09:00:00",
+        "state": "closed",
+        "type": "pir"
+       }
+      ]
+     },
+     "firmware": {
+      "accounted_time": "0.00",
+      "actual_end": "",
+      "actual_start": "",
+      "planned_effort": "0.00",
+      "planned_end": "2026-11-09 21:00:00",
+      "planned_start": "2026-11-09 18:00:00",
+      "raw_min_max": {
+       "max_actual_end": "9999-01-01 00:00:00",
+       "max_planned_end": "2026-11-09 21:00:00",
+       "min_actual_start": "9999-01-01 00:00:00",
+       "min_planned_start": "2026-11-09 18:00:00"
+      },
+      "state": "requested",
+      "workorder_count": 2,
+      "workorders": [
+       {
+        "actual_end": "",
+        "actual_start": "",
+        "number": 1,
+        "planned_end": "2026-11-09 20:00:00",
+        "planned_start": "2026-11-09 18:00:00",
+        "state": "ready",
+        "type": "workorder"
+       },
+       {
+        "actual_end": "",
+        "actual_start": "",
+        "number": 2,
+        "planned_end": "2026-11-09 21:00:00",
+        "planned_start": "2026-11-09 20:00:00",
+        "state": "created",
+        "type": "backout"
+       }
+      ]
+     },
+     "mail": {
+      "accounted_time": "4.50",
+      "actual_end": "",
+      "actual_start": "2026-11-02 08:05:00",
+      "planned_effort": "4.00",
+      "planned_end": "",
+      "planned_start": "",
+      "raw_min_max": {
+       "max_actual_end": "9999-01-01 00:00:00",
+       "max_planned_end": "9999-01-01 00:00:00",
+       "min_actual_start": "2026-11-02 08:05:00",
+       "min_planned_start": "2026-11-02 08:00:00"
+      },
+      "state": "in progress",
+      "workorder_count": 3,
+      "workorders": [
+       {
+        "actual_end": "2026-11-02 12:30:00",
+        "actual_start": "2026-11-02 08:05:00",
+        "number": 1,
+        "planned_end": "2026-11-02 12:00:00",
+        "planned_start": "2026-11-02 08:00:00",
+        "state": "closed",
+        "type": "workorder"
+       },
+       {
+        "actual_end": "",
+        "actual_start": "",
+        "number": 2,
+        "planned_end": "2026-11-02 14:00:00",
+        "planned_start": "2026-11-02 12:00:00",
+        "state": "created",
+        "type": "backout"
+       },
+       {
+        "actual_end": "",
+        "actual_start": "",
+        "number": 3,
+        "planned_end": "",
+        "planned_start": "",
+        "state": "created",
+        "type": "pir"
+       }
+      ]
+     }
+    }
+   },
+   "seed": {
+    "agent_id": 2,
+    "changes": {
+     "database": {
+      "id": 3
+     },
+     "firmware": {
+      "id": 2
+     },
+     "mail": {
+      "id": 1
+     }
+    },
+    "customer_login": "chg94-cust@example.org",
+    "dynamic_fields": {
+     "chg94ChangeRef": 14,
+     "chg94WorkOrderRef": 15
+    }
+   },
+   "stored": {
+    "counts": {
+     "change_cab": 2,
+     "change_cip_allocate": 25,
+     "change_condition": 0,
+     "change_history": 116,
+     "change_history_type": 42,
+     "change_item": 3,
+     "change_notification": 27,
+     "change_notification_grps": 13,
+     "change_notification_message": 216,
+     "change_notification_rec": 65,
+     "change_number_counter": 3,
+     "change_state_machine": 33,
+     "change_template": 1,
+     "change_template_type": 4,
+     "change_workorder": 7,
+     "condition_action": 0,
+     "condition_attribute": 21,
+     "condition_expression": 0,
+     "condition_object": 2,
+     "condition_operator": 14
+    },
+    "rows": {
+     "change_cab": [
+      {
+       "change_id": 1,
+       "customer_user_id": null,
+       "id": 1,
+       "user_id": 2
+      },
+      {
+       "change_id": 1,
+       "customer_user_id": "chg94-cust@example.org",
+       "id": 2,
+       "user_id": null
+      }
+     ],
+     "change_history_by_type": [
+      {
+       "fieldname": null,
+       "n": 3,
+       "type": "ChangeAdd"
+      },
+      {
+       "fieldname": "CABAgents",
+       "n": 1,
+       "type": "ChangeCABUpdate"
+      },
+      {
+       "fieldname": "CABCustomers",
+       "n": 1,
+       "type": "ChangeCABUpdate"
+      },
+      {
+       "fieldname": null,
+       "n": 1,
+       "type": "ChangeLinkAdd"
+      },
+      {
+       "fieldname": null,
+       "n": 10,
+       "type": "ChangeNotificationSent"
+      },
+      {
+       "fieldname": "BypassStateMachine",
+       "n": 3,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "Category",
+       "n": 2,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "CategoryID",
+       "n": 2,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "ChangeManagerID",
+       "n": 3,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "ChangeState",
+       "n": 2,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "ChangeStateID",
+       "n": 2,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "ChangeTitle",
+       "n": 3,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "Description",
+       "n": 3,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "DynamicField_chg94ChangeRef",
+       "n": 1,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "Impact",
+       "n": 2,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "ImpactID",
+       "n": 2,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "Justification",
+       "n": 3,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": "RequestedTime",
+       "n": 1,
+       "type": "ChangeUpdate"
+      },
+      {
+       "fieldname": null,
+       "n": 7,
+       "type": "WorkOrderAdd"
+      },
+      {
+       "fieldname": null,
+       "n": 4,
+       "type": "WorkOrderLinkAdd"
+      },
+      {
+       "fieldname": null,
+       "n": 16,
+       "type": "WorkOrderNotificationSent"
+      },
+      {
+       "fieldname": "AccountedTime",
+       "n": 1,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "ActualEndTime",
+       "n": 3,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "ActualStartTime",
+       "n": 3,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "BypassStateMachine",
+       "n": 4,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "DynamicField_chg94WorkOrderRef",
+       "n": 1,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "Instruction",
+       "n": 1,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "PlannedEffort",
+       "n": 1,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "PlannedEndTime",
+       "n": 6,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "PlannedStartTime",
+       "n": 6,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "Report",
+       "n": 1,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "WorkOrderAgentID",
+       "n": 2,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "WorkOrderState",
+       "n": 4,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "WorkOrderStateID",
+       "n": 4,
+       "type": "WorkOrderUpdate"
+      },
+      {
+       "fieldname": "WorkOrderTitle",
+       "n": 7,
+       "type": "WorkOrderUpdate"
+      }
+     ],
+     "change_history_type": [
+      {
+       "id": 1,
+       "name": "ChangeAdd"
+      },
+      {
+       "id": 2,
+       "name": "ChangeUpdate"
+      },
+      {
+       "id": 3,
+       "name": "ChangeDelete"
+      },
+      {
+       "id": 4,
+       "name": "ChangeCABUpdate"
+      },
+      {
+       "id": 5,
+       "name": "ChangeCABDelete"
+      },
+      {
+       "id": 6,
+       "name": "ChangeLinkAdd"
+      },
+      {
+       "id": 7,
+       "name": "ChangeLinkDelete"
+      },
+      {
+       "id": 8,
+       "name": "ChangeAttachmentAdd"
+      },
+      {
+       "id": 9,
+       "name": "ChangeAttachmentDelete"
+      },
+      {
+       "id": 10,
+       "name": "WorkOrderAdd"
+      },
+      {
+       "id": 11,
+       "name": "WorkOrderUpdate"
+      },
+      {
+       "id": 12,
+       "name": "WorkOrderDelete"
+      },
+      {
+       "id": 13,
+       "name": "WorkOrderLinkAdd"
+      },
+      {
+       "id": 14,
+       "name": "WorkOrderLinkDelete"
+      },
+      {
+       "id": 15,
+       "name": "WorkOrderAttachmentAdd"
+      },
+      {
+       "id": 16,
+       "name": "WorkOrderAttachmentDelete"
+      },
+      {
+       "id": 17,
+       "name": "WorkOrderReportAttachmentAdd"
+      },
+      {
+       "id": 18,
+       "name": "WorkOrderReportAttachmentDelete"
+      },
+      {
+       "id": 19,
+       "name": "ChangePlannedStartTimeReached"
+      },
+      {
+       "id": 20,
+       "name": "ChangePlannedEndTimeReached"
+      },
+      {
+       "id": 21,
+       "name": "ChangeActualStartTimeReached"
+      },
+      {
+       "id": 22,
+       "name": "ChangeActualEndTimeReached"
+      },
+      {
+       "id": 23,
+       "name": "WorkOrderPlannedStartTimeReached"
+      },
+      {
+       "id": 24,
+       "name": "WorkOrderPlannedEndTimeReached"
+      },
+      {
+       "id": 25,
+       "name": "WorkOrderActualStartTimeReached"
+      },
+      {
+       "id": 26,
+       "name": "WorkOrderActualEndTimeReached"
+      },
+      {
+       "id": 27,
+       "name": "ChangeRequestedTimeReached"
+      },
+      {
+       "id": 28,
+       "name": "ConditionAdd"
+      },
+      {
+       "id": 29,
+       "name": "ConditionUpdate"
+      },
+      {
+       "id": 30,
+       "name": "ConditionDelete"
+      },
+      {
+       "id": 31,
+       "name": "ConditionDeleteAll"
+      },
+      {
+       "id": 32,
+       "name": "ExpressionAdd"
+      },
+      {
+       "id": 33,
+       "name": "ExpressionUpdate"
+      },
+      {
+       "id": 34,
+       "name": "ExpressionDelete"
+      },
+      {
+       "id": 35,
+       "name": "ExpressionDeleteAll"
+      },
+      {
+       "id": 36,
+       "name": "ActionAdd"
+      },
+      {
+       "id": 37,
+       "name": "ActionUpdate"
+      },
+      {
+       "id": 38,
+       "name": "ActionDelete"
+      },
+      {
+       "id": 39,
+       "name": "ActionDeleteAll"
+      },
+      {
+       "id": 40,
+       "name": "ActionExecute"
+      },
+      {
+       "id": 41,
+       "name": "ChangeNotificationSent"
+      },
+      {
+       "id": 42,
+       "name": "WorkOrderNotificationSent"
+      }
+     ],
+     "change_item": [
+      {
+       "category_id": 101,
+       "change_builder_id": 1,
+       "change_manager_id": 2,
+       "change_state_id": 118,
+       "description": "<p>Replace the <b>mail</b> server mail01.example.org</p>",
+       "description_plain": "\nReplace the mail server mail01.example.org\n\n",
+       "id": 1,
+       "impact_id": 107,
+       "justification": "<p>Old hardware out of support</p>",
+       "justification_plain": "\nOld hardware out of support\n\n",
+       "priority_id": 111,
+       "requested_time": "2026-11-01 00:00:00",
+       "title": "chg94 Mail server replacement"
+      },
+      {
+       "category_id": 100,
+       "change_builder_id": 1,
+       "change_manager_id": 2,
+       "change_state_id": 114,
+       "description": "Plain text description",
+       "description_plain": "Plain text description",
+       "id": 2,
+       "impact_id": 105,
+       "justification": "Security fix",
+       "justification_plain": "Security fix",
+       "priority_id": 111,
+       "requested_time": null,
+       "title": "chg94 Switch firmware rollout"
+      },
+      {
+       "category_id": 102,
+       "change_builder_id": 1,
+       "change_manager_id": 2,
+       "change_state_id": 120,
+       "description": "<p>Move db01.example.org to new storage</p>",
+       "description_plain": "\nMove db01.example.org to new storage\n\n",
+       "id": 3,
+       "impact_id": 106,
+       "justification": "<p>Capacity</p>",
+       "justification_plain": "\nCapacity\n\n",
+       "priority_id": 111,
+       "requested_time": null,
+       "title": "chg94 Database migration"
+      }
+     ],
+     "change_template": [
+      {
+       "content_length": 2319,
+       "content_prefix": "$VAR1 = {\n  'ChangeAdd' ",
+       "id": 1,
+       "name": "chg94 template firmware",
+       "type_id": 1
+      }
+     ],
+     "change_template_type": [
+      {
+       "id": 1,
+       "name": "ITSMChange"
+      },
+      {
+       "id": 2,
+       "name": "ITSMWorkOrder"
+      },
+      {
+       "id": 3,
+       "name": "CAB"
+      },
+      {
+       "id": 4,
+       "name": "ITSMCondition"
+      }
+     ],
+     "change_workorder": [
+      {
+       "accounted_time": "4.50",
+       "actual_end_time": "2026-11-02 12:30:00",
+       "actual_start_time": "2026-11-02 08:05:00",
+       "change_id": 1,
+       "id": 1,
+       "instruction": "<p>Install <i>mail02.example.org</i></p>",
+       "instruction_plain": "\nInstall mail02.example.org\n\n",
+       "planned_effort": "4.00",
+       "planned_end_time": "2026-11-02 12:00:00",
+       "planned_start_time": "2026-11-02 08:00:00",
+       "report": "<p>done</p>",
+       "report_plain": "\ndone\n\n",
+       "title": "chg94 install mail02",
+       "workorder_agent_id": 2,
+       "workorder_number": 1,
+       "workorder_state_id": 128,
+       "workorder_type_id": 131
+      },
+      {
+       "accounted_time": "0.00",
+       "actual_end_time": "9999-01-01 00:00:00",
+       "actual_start_time": "9999-01-01 00:00:00",
+       "change_id": 1,
+       "id": 2,
+       "instruction": null,
+       "instruction_plain": null,
+       "planned_effort": "0.00",
+       "planned_end_time": "2026-11-02 14:00:00",
+       "planned_start_time": "2026-11-02 12:00:00",
+       "report": null,
+       "report_plain": null,
+       "title": "chg94 backout mail",
+       "workorder_agent_id": 2,
+       "workorder_number": 2,
+       "workorder_state_id": 124,
+       "workorder_type_id": 132
+      },
+      {
+       "accounted_time": "0.00",
+       "actual_end_time": "9999-01-01 00:00:00",
+       "actual_start_time": "9999-01-01 00:00:00",
+       "change_id": 1,
+       "id": 3,
+       "instruction": null,
+       "instruction_plain": null,
+       "planned_effort": "0.00",
+       "planned_end_time": "9999-01-01 00:00:00",
+       "planned_start_time": "9999-01-01 00:00:00",
+       "report": null,
+       "report_plain": null,
+       "title": "chg94 review mail",
+       "workorder_agent_id": null,
+       "workorder_number": 3,
+       "workorder_state_id": 124,
+       "workorder_type_id": 134
+      },
+      {
+       "accounted_time": "0.00",
+       "actual_end_time": "9999-01-01 00:00:00",
+       "actual_start_time": "9999-01-01 00:00:00",
+       "change_id": 2,
+       "id": 4,
+       "instruction": null,
+       "instruction_plain": null,
+       "planned_effort": "0.00",
+       "planned_end_time": "2026-11-09 20:00:00",
+       "planned_start_time": "2026-11-09 18:00:00",
+       "report": null,
+       "report_plain": null,
+       "title": "chg94 flash switches",
+       "workorder_agent_id": null,
+       "workorder_number": 1,
+       "workorder_state_id": 126,
+       "workorder_type_id": 131
+      },
+      {
+       "accounted_time": "0.00",
+       "actual_end_time": "9999-01-01 00:00:00",
+       "actual_start_time": "9999-01-01 00:00:00",
+       "change_id": 2,
+       "id": 5,
+       "instruction": null,
+       "instruction_plain": null,
+       "planned_effort": "0.00",
+       "planned_end_time": "2026-11-09 21:00:00",
+       "planned_start_time": "2026-11-09 20:00:00",
+       "report": null,
+       "report_plain": null,
+       "title": "chg94 backout firmware",
+       "workorder_agent_id": null,
+       "workorder_number": 2,
+       "workorder_state_id": 124,
+       "workorder_type_id": 132
+      },
+      {
+       "accounted_time": "0.00",
+       "actual_end_time": "2026-10-05 10:30:00",
+       "actual_start_time": "2026-10-05 08:05:00",
+       "change_id": 3,
+       "id": 6,
+       "instruction": null,
+       "instruction_plain": null,
+       "planned_effort": "0.00",
+       "planned_end_time": "2026-10-05 10:00:00",
+       "planned_start_time": "2026-10-05 08:00:00",
+       "report": null,
+       "report_plain": null,
+       "title": "chg94 migrate db",
+       "workorder_agent_id": null,
+       "workorder_number": 1,
+       "workorder_state_id": 128,
+       "workorder_type_id": 131
+      },
+      {
+       "accounted_time": "0.00",
+       "actual_end_time": "2026-10-06 09:45:00",
+       "actual_start_time": "2026-10-06 09:00:00",
+       "change_id": 3,
+       "id": 7,
+       "instruction": null,
+       "instruction_plain": null,
+       "planned_effort": "0.00",
+       "planned_end_time": "2026-10-06 10:00:00",
+       "planned_start_time": "2026-10-06 09:00:00",
+       "report": null,
+       "report_plain": null,
+       "title": "chg94 review db",
+       "workorder_agent_id": null,
+       "workorder_number": 2,
+       "workorder_state_id": 128,
+       "workorder_type_id": 134
+      }
+     ],
+     "dynamic_field_value": [
+      {
+       "name": "chg94ChangeRef",
+       "object_id": 1,
+       "object_type": "ITSMChange",
+       "value_text": "CHG-94-MAIL"
+      },
+      {
+       "name": "chg94WorkOrderRef",
+       "object_id": 1,
+       "object_type": "ITSMWorkOrder",
+       "value_text": "WO-94-1"
+      }
+     ],
+     "general_catalog": [
+      {
+       "class": "ITSM::ChangeManagement::Category",
+       "name": "1 very low"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Category",
+       "name": "2 low"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Category",
+       "name": "3 normal"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Category",
+       "name": "4 high"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Category",
+       "name": "5 very high"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Impact",
+       "name": "1 very low"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Impact",
+       "name": "2 low"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Impact",
+       "name": "3 normal"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Impact",
+       "name": "4 high"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Impact",
+       "name": "5 very high"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Priority",
+       "name": "1 very low"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Priority",
+       "name": "2 low"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Priority",
+       "name": "3 normal"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Priority",
+       "name": "4 high"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Priority",
+       "name": "5 very high"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "requested"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "pending approval"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "rejected"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "approved"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "in progress"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "pending pir"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "successful"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "failed"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "canceled"
+      },
+      {
+       "class": "ITSM::ChangeManagement::Change::State",
+       "name": "retracted"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::State",
+       "name": "created"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::State",
+       "name": "accepted"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::State",
+       "name": "ready"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::State",
+       "name": "in progress"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::State",
+       "name": "closed"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::State",
+       "name": "canceled"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::Type",
+       "name": "approval"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::Type",
+       "name": "workorder"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::Type",
+       "name": "backout"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::Type",
+       "name": "decision"
+      },
+      {
+       "class": "ITSM::ChangeManagement::WorkOrder::Type",
+       "name": "pir"
+      }
+     ],
+     "link_relation": [
+      {
+       "link_state": "Valid",
+       "link_type": "Normal",
+       "source_key": "1",
+       "source_object": "ITSMChange",
+       "target_key": "2",
+       "target_object": "Ticket"
+      },
+      {
+       "link_state": "Valid",
+       "link_type": "DependsOn",
+       "source_key": "1",
+       "source_object": "ITSMWorkOrder",
+       "target_key": "1",
+       "target_object": "ITSMConfigItem"
+      },
+      {
+       "link_state": "Valid",
+       "link_type": "Normal",
+       "source_key": "1",
+       "source_object": "ITSMWorkOrder",
+       "target_key": "1",
+       "target_object": "Service"
+      },
+      {
+       "link_state": "Valid",
+       "link_type": "Normal",
+       "source_key": "2",
+       "source_object": "ITSMWorkOrder",
+       "target_key": "2",
+       "target_object": "Ticket"
+      },
+      {
+       "link_state": "Valid",
+       "link_type": "DependsOn",
+       "source_key": "6",
+       "source_object": "ITSMWorkOrder",
+       "target_key": "2",
+       "target_object": "ITSMConfigItem"
+      }
+     ]
+    }
+   }
+  },
+  "znuny_version": "6.5.22"
+ },
+ "profile": "itsm-6",
+ "questions": {
+  "1": {
+   "answer": "The link objects are named ITSMChange and ITSMWorkOrder (link_object.name; the LinkObject back ends Kernel::System::LinkObject::ITSMChange / ::ITSMWorkOrder pass exactly these names to the core). The allowed link types are NOT defined by the ITSMChangeManagement package but by LinkObject::PossibleLink###34xx in ITSMCore.xml: ITSMChange <-> Ticket: Normal only; ITSMWorkOrder <-> Ticket: Normal; ITSMWorkOrder <-> ITSMConfigItem: Normal and DependsOn; ITSMWorkOrder <-> Service: Normal and DependsOn. There is NO type for ITSMChange <-> ITSMConfigItem, ITSMChange <-> Service, ITSMChange <-> ITSMChange or ITSMChange <-> ITSMWorkOrder: LinkObject::LinkAdd refuses it ('Not possible to create a ... link', the peer probe returns false), so a Znuny change is linked to configuration items and services only through its work orders. The source object of a stored relation is the change / work order (the seeded rows read ITSMChange:1 -> Ticket:33 Normal, ITSMWorkOrder:1 -> ITSMConfigItem DependsOn). The core LinkObject accepts both directions of the possible pair, so importers must read link_relation for the change as source or target.",
+   "consequence": "The plan's 'change <-> CI' link does not exist in Znuny: Tiqora's change <-> CI relation is its own (tiqora_*), and the importer (Task 19) reads the CI links of the work orders, not of the change. The change <-> ticket link is a plain Normal link with the change as source.",
+   "expected": {
+    "change_to_ci_link_possible": false,
+    "link_objects": {
+     "change": "ITSMChange",
+     "workorder": "ITSMWorkOrder"
+    },
+    "peer_checks": [
+     {
+      "path": "probe.links.possible_objects",
+      "value": [
+       "Ticket"
+      ]
+     },
+     {
+      "path": "probe.links.change_to_ci_link_add_succeeded",
+      "value": 0
+     },
+     {
+      "path": "probe.links.possible_types.ITSMWorkOrder/ITSMConfigItem",
+      "value": [
+       "DependsOn",
+       "Normal"
+      ]
+     }
+    ],
+    "possible_types": {
+     "ITSMChange/ITSMChange": [],
+     "ITSMChange/ITSMConfigItem": [],
+     "ITSMChange/ITSMWorkOrder": [],
+     "ITSMChange/Service": [],
+     "ITSMChange/Ticket": [
+      "Normal"
+     ],
+     "ITSMWorkOrder/ITSMConfigItem": [
+      "DependsOn",
+      "Normal"
+     ],
+     "ITSMWorkOrder/ITSMWorkOrder": [],
+     "ITSMWorkOrder/Service": [
+      "DependsOn",
+      "Normal"
+     ],
+     "ITSMWorkOrder/Ticket": [
+      "Normal"
+     ]
+    }
+   },
+   "resolves": [
+    "Task 18 (live view links)",
+    "Task 19 (importer links)"
+   ],
+   "source": [
+    "ITSMCore-6.5.5/Kernel/Config/Files/XML/ITSMCore.xml:324-390",
+    "ITSMChangeManagement-6.5.2/Kernel/System/LinkObject/ITSMChange.pm:114-114",
+    "ITSMChangeManagement-6.5.2/Kernel/System/LinkObject/ITSMWorkOrder.pm:133-133",
+    "znuny-6.5.22/Kernel/System/LinkObject.pm:372-386"
+   ],
+   "title": "Link objects and allowed link types of changes and work orders"
+  },
+  "10": {
+   "answer": "workorder_number is a 1-based sequence per change (not a global number); WorkOrderNumberCalc renumbers after updates/deletes. Actual times are partly automatic: when a work order enters a state listed in ITSMWorkOrder::ActualStartTimeSet::States (default: 'in progress') and has no actual start, WorkOrderActualTimesSet sets ActualStartTime = now; when it reaches a state without successors in the state machine (closed, canceled) it sets ActualEndTime = now + 1 second (and the start when missing). Explicit values passed in the same update win. The change number comes from ITSMChange::NumberGenerator (default DateChecksum: <year><month><day>1<counter><checksum>, e.g. 2026102710000015).",
+   "consequence": "Imported work orders keep their number as 'position'; Tiqora tasks do not derive actual times automatically from a state change unless Task 12 chooses to.",
+   "expected": {
+    "actual_end_rule": "state without successor in change state machine: now + 1 second",
+    "actual_start_states": [
+     "in progress"
+    ],
+    "number_generator": "Kernel::System::ITSMChange::Number::DateChecksum",
+    "peer_checks": [
+     {
+      "path": "probe.times.mail.workorders.0.number",
+      "value": 1
+     },
+     {
+      "path": "probe.times.mail.workorders.2.number",
+      "value": 3
+     }
+    ],
+    "workorder_number": "per_change_from_1"
+   },
+   "resolves": [
+    "Task 18",
+    "Task 19"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder/Event/WorkOrderActualTimesSet.pm:64-104",
+    "ITSMChangeManagement-6.5.2/Kernel/Config/Files/XML/ITSMChangeManagement.xml:2498-2508",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder/Event/WorkOrderNumberCalc.pm:30-50"
+   ],
+   "title": "Work order numbers and automatic actual times"
+  },
+  "2": {
+   "answer": "change_item has no planned/actual columns (only requested_time, NULL when unset). ChangeGet merges WorkOrderChangeTimeGet: SELECT MIN(planned_start_time), MAX(planned_end_time), MIN(actual_start_time), MAX(actual_end_time) over the change's work orders. An unset time of a work order is NOT NULL but the sentinel '9999-01-01 00:00:00' (column default). Because the sentinel is the largest value, the MIN columns ignore it (unless all work orders are unset) while the MAX columns are dominated by it: ONE work order without a planned end blanks the change's planned end, ONE unfinished work order blanks the change's actual end. The code maps the sentinel to '' and additionally blanks PlannedStartTime when any work order has the sentinel as planned start (count query), so the planned start/end of a change exist only when EVERY work order has both. ActualStartTime is the earliest start of any started work order. The same call also sums PlannedEffort and AccountedTime. A change without work orders has no times (MIN/MAX of no rows). The expected-value of the plan ('min/max ignoring the sentinel') is therefore only true for the MIN columns.",
+   "consequence": "Tiqora stores change times as the work-order extremes under exactly these rules (Mode A live view, importer, and the new change model): NULL for 'not set', never the sentinel; a change shows planned start/end only when all its work orders have them. Task 2's schema keeps planned/actual times on the change as a derived cache of its tasks, not as free input.",
+   "expected": {
+    "cases": [
+     {
+      "actual_end": "",
+      "actual_start": "2026-11-02 08:05:00",
+      "change": "mail",
+      "planned_end": "",
+      "planned_start": ""
+     },
+     {
+      "actual_end": "",
+      "actual_start": "",
+      "change": "firmware",
+      "planned_end": "2026-11-09 21:00:00",
+      "planned_start": "2026-11-09 18:00:00"
+     },
+     {
+      "actual_end": "2026-10-06 09:45:00",
+      "actual_start": "2026-10-05 08:05:00",
+      "change": "database",
+      "planned_end": "2026-10-06 10:00:00",
+      "planned_start": "2026-10-05 08:00:00"
+     }
+    ],
+    "peer_checks": [
+     {
+      "path": "probe.times.mail.planned_start",
+      "value": ""
+     },
+     {
+      "path": "probe.times.mail.planned_end",
+      "value": ""
+     },
+     {
+      "path": "probe.times.mail.actual_start",
+      "value": "2026-11-02 08:05:00"
+     },
+     {
+      "path": "probe.times.mail.actual_end",
+      "value": ""
+     },
+     {
+      "path": "probe.times.mail.raw_min_max.max_planned_end",
+      "value": "9999-01-01 00:00:00"
+     },
+     {
+      "path": "probe.times.firmware.planned_start",
+      "value": "2026-11-09 18:00:00"
+     },
+     {
+      "path": "probe.times.firmware.planned_end",
+      "value": "2026-11-09 21:00:00"
+     },
+     {
+      "path": "probe.times.database.actual_end",
+      "value": "2026-10-06 09:45:00"
+     },
+     {
+      "path": "probe.times.mail.planned_effort",
+      "value": "4.00"
+     },
+     {
+      "path": "probe.times.mail.accounted_time",
+      "value": "4.50"
+     }
+    ],
+    "rules": {
+     "actual_end": "max(actual_end); empty while any work order has no actual end",
+     "actual_start": "min(actual_start) over the started work orders; empty when none started",
+     "efforts": "planned_effort and accounted_time are summed",
+     "no_workorders": "all four empty",
+     "planned_end": "max(planned_end); empty when any work order has no planned end (sentinel is the maximum)",
+     "planned_start": "min(planned_start) over all work orders; empty when any work order has no planned start"
+    },
+    "sentinel": "9999-01-01 00:00:00"
+   },
+   "resolves": [
+    "Task 2 (columns)",
+    "Task 18 (live view)",
+    "Task 19 (importer)"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder.pm:1797-1925",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:774-786",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder.pm:778-781",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder.pm:550-550",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.mysql.sql:197-219",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.mysql.sql:162-170"
+   ],
+   "title": "Planned and actual start/end of a change (derived from the work orders)"
+  },
+  "3": {
+   "answer": "42 history types are installed (change_history_type, ids 1..42, names below). The event module HistoryAdd writes one row per event: *Add: content_new = the new id, no fieldname. *Update: one row per CHANGED parameter, fieldname = the Perl parameter name (ChangeTitle, ChangeStateID, ChangeState, CategoryID, Category, ChangeManagerID, Description, Justification, RequestedTime, PlannedStartTime, WorkOrderStateID, BypassStateMachine, ...), content_old / content_new = the raw old/new value (ids for *ID fields, empty string for 'was unset'); the _Plain columns, UserID and NoNumberCalc are never tracked, and a state change writes two rows (ChangeState and ChangeStateID). ChangeCABUpdate/Delete: fieldname CABAgents / CABCustomers, values joined with '%%' (user ids / customer logins). *Delete: content_new = the deleted id; a WorkOrderDelete detaches the work order's earlier rows (workorder_id NULL). Link rows: content_new = '<Object>%%<Key>' of the other end. Attachment rows: content_new = file name. *TimeReached: content_new = '<id>%%Notification Sent'. *NotificationSent: content_new = '<recipient address>%%<event type>' (so the history of a real system contains e-mail addresses). Condition*/Expression*/Action* rows carry the object id (or 'id%%value') and a fieldname. workorder_id is set on work-order events and NULL on change events; a work order's history is part of its change's history (change_id always set). Deleting a change deletes its history (event HistoryDelete).",
+   "consequence": "The importer maps the 42 types by name (never by id) and keeps content as text; NotificationSent rows hold recipient addresses and are not imported verbatim. The live view shows ChangeUpdate rows as 'field: old -> new' and resolves the *ID fields (state, category, impact, priority, manager) through general_catalog / users.",
+   "expected": {
+    "content_shapes": {
+     "ChangeActualEndTimeReached": "content_new = '<id>%%Notification Sent'",
+     "ChangeAdd": "content_new = change id",
+     "ChangeCABUpdate": "fieldname CABAgents|CABCustomers, values joined by '%%'",
+     "ChangeLinkAdd": "content_new = '<Object>%%<Key>'",
+     "ChangeNotificationSent": "content_new = '<recipient>%%<event>'",
+     "ChangeUpdate": "fieldname = parameter name, content_old/content_new raw",
+     "WorkOrderAdd": "content_new = work order id, workorder_id set",
+     "WorkOrderLinkAdd": "content_new = '<Object>%%<Key>', workorder_id set",
+     "WorkOrderUpdate": "fieldname = parameter name, workorder_id set"
+    },
+    "history_types": [
+     "ChangeAdd",
+     "ChangeUpdate",
+     "ChangeDelete",
+     "ChangeCABUpdate",
+     "ChangeCABDelete",
+     "ChangeLinkAdd",
+     "ChangeLinkDelete",
+     "ChangeAttachmentAdd",
+     "ChangeAttachmentDelete",
+     "WorkOrderAdd",
+     "WorkOrderUpdate",
+     "WorkOrderDelete",
+     "WorkOrderLinkAdd",
+     "WorkOrderLinkDelete",
+     "WorkOrderAttachmentAdd",
+     "WorkOrderAttachmentDelete",
+     "WorkOrderReportAttachmentAdd",
+     "WorkOrderReportAttachmentDelete",
+     "ChangePlannedStartTimeReached",
+     "ChangePlannedEndTimeReached",
+     "ChangeActualStartTimeReached",
+     "ChangeActualEndTimeReached",
+     "WorkOrderPlannedStartTimeReached",
+     "WorkOrderPlannedEndTimeReached",
+     "WorkOrderActualStartTimeReached",
+     "WorkOrderActualEndTimeReached",
+     "ChangeRequestedTimeReached",
+     "ConditionAdd",
+     "ConditionUpdate",
+     "ConditionDelete",
+     "ConditionDeleteAll",
+     "ExpressionAdd",
+     "ExpressionUpdate",
+     "ExpressionDelete",
+     "ExpressionDeleteAll",
+     "ActionAdd",
+     "ActionUpdate",
+     "ActionDelete",
+     "ActionDeleteAll",
+     "ActionExecute",
+     "ChangeNotificationSent",
+     "WorkOrderNotificationSent"
+    ],
+    "untracked_fields": [
+     "UserID",
+     "JustificationPlain",
+     "DescriptionPlain",
+     "ReportPlain",
+     "InstructionPlain",
+     "NoNumberCalc",
+     "CABAgents",
+     "CABCustomers"
+    ],
+    "update_fieldnames_observed": [
+     "BypassStateMachine",
+     "Category",
+     "CategoryID",
+     "ChangeManagerID",
+     "ChangeState",
+     "ChangeStateID",
+     "ChangeTitle",
+     "Description",
+     "DynamicField_chg94ChangeRef",
+     "Impact",
+     "ImpactID",
+     "Justification",
+     "RequestedTime"
+    ],
+    "workorder_update_fieldnames_observed": [
+     "AccountedTime",
+     "ActualEndTime",
+     "ActualStartTime",
+     "BypassStateMachine",
+     "DynamicField_chg94WorkOrderRef",
+     "Instruction",
+     "PlannedEffort",
+     "PlannedEndTime",
+     "PlannedStartTime",
+     "Report",
+     "WorkOrderAgentID",
+     "WorkOrderState",
+     "WorkOrderStateID",
+     "WorkOrderTitle"
+    ]
+   },
+   "resolves": [
+    "Task 18 (history)",
+    "Task 19 (importer history)"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/Event/HistoryAdd.pm:31-396",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/History.pm:1001-1013",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/initial_insert.sql:701-742",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.mysql.sql:262-276"
+   ],
+   "title": "change_history types, fieldname and content_old/content_new"
+  },
+  "4": {
+   "answer": "The package registers two dynamic field object types, 'ITSMChange' and 'ITSMWorkOrder' (DynamicFields::ObjectType###, prio 450 / 460). A dynamic field of such a type is a normal dynamic_field row with object_type = 'ITSMChange' | 'ITSMWorkOrder'; its values live in the core table dynamic_field_value with object_id = change_item.id (ITSMChange) or change_workorder.id (ITSMWorkOrder) - the two id spaces are separate and only the field's object_type tells them apart (the seeded rows have object_id 1 for both). ChangeGet / WorkOrderGet expose them as DynamicField_<Name>. A fresh installation defines no such field.",
+   "consequence": "Mode A reads change dynamic fields through dynamic_field + dynamic_field_value filtered by object_type (never by name prefix); the importer carries the values into the change's own custom fields keyed by the field name.",
+   "expected": {
+    "object_id_refers_to": {
+     "ITSMChange": "change_item.id",
+     "ITSMWorkOrder": "change_workorder.id"
+    },
+    "object_types": [
+     "ITSMChange",
+     "ITSMWorkOrder"
+    ],
+    "observed": [
+     {
+      "name": "chg94ChangeRef",
+      "object_id": 1,
+      "object_type": "ITSMChange",
+      "value_text": "CHG-94-MAIL"
+     },
+     {
+      "name": "chg94WorkOrderRef",
+      "object_id": 1,
+      "object_type": "ITSMWorkOrder",
+      "value_text": "WO-94-1"
+     }
+    ],
+    "peer_checks": [
+     {
+      "path": "probe.dynamic_field_object_types.ITSMChange",
+      "value": [
+       "chg94ChangeRef"
+      ]
+     },
+     {
+      "path": "probe.dynamic_field_object_types.ITSMWorkOrder",
+      "value": [
+       "chg94WorkOrderRef"
+      ]
+     }
+    ],
+    "shipped_fields": 0,
+    "value_table": "dynamic_field_value"
+   },
+   "resolves": [
+    "Task 18 (live view fields)",
+    "Task 19 (importer fields)"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/Config/Files/XML/ITSMChangeManagement.xml:2644-2666",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:680-706",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder.pm:804-804",
+    "ITSMChangeManagement-6.5.2/Kernel/System/DynamicField/ObjectType/ITSMChange.pm:41-61"
+   ],
+   "title": "Dynamic field object types of changes and work orders"
+  },
+  "5": {
+   "answer": "The CAB is per change (no named CAB board). change_cab has one row per member: an agent has user_id set and customer_user_id NULL, a customer user has customer_user_id (the customer login) set and user_id NULL. ChangeCABUpdate replaces the agent part and the customer part independently (DELETE ... WHERE user_id IS NOT NULL / customer_user_id IS NOT NULL, then one INSERT per unique id); passing an empty list clears that part. The unique index (change_id, user_id, customer_user_id) does not prevent duplicates on its own (NULLs compare unequal), the code de-duplicates. ChangeGet returns CABAgents (sorted user ids) and CABCustomers (sorted logins). CAB membership has no vote, decision or order: the CAB 'decides' by a work order of type approval/decision.",
+   "consequence": "Mode A and the importer keep the CAB as 'members of this change' (agents by user, customers by login); Tiqora's named CAB boards are a different concept, a legacy CAB is shown/imported per change and never merged into a board.",
+   "expected": {
+    "dedupe": "in_code",
+    "observed": [
+     {
+      "change": "mail",
+      "customer_user_id": null,
+      "user_id": "<agent>"
+     },
+     {
+      "change": "mail",
+      "customer_user_id": "chg94-cust@example.org",
+      "user_id": null
+     }
+    ],
+    "peer_checks": [
+     {
+      "path": "probe.texts.mail.cab_customers",
+      "value": [
+       "chg94-cust@example.org"
+      ]
+     },
+     {
+      "path": "probe.texts.firmware.cab_customers",
+      "value": []
+     },
+     {
+      "path": "probe.texts.firmware.cab_agents",
+      "value": []
+     }
+    ],
+    "row_shapes": {
+     "agent": {
+      "customer_user_id": null,
+      "user_id": "int"
+     },
+     "customer": {
+      "customer_user_id": "login",
+      "user_id": null
+     }
+    },
+    "scope": "per_change"
+   },
+   "resolves": [
+    "Task 13 (CAB model)",
+    "Task 18",
+    "Task 19"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:809-944",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:945-1045",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.mysql.sql:235-244"
+   ],
+   "title": "change_cab: one row per agent or customer user"
+  },
+  "6": {
+   "answer": "Change: description and justification are stored exactly as submitted (an HTML fragment when entered in the rich text editor, a plain string otherwise); description_plain / justification_plain are HTMLUtils::ToAscii(...) of that value, computed on every ChangeAdd/ChangeUpdate. A string without markup is unchanged; a block element gets line breaks, and the amount differs between the lines: on 6.5 '<p>done</p>' becomes '\\ndone\\n\\n' (leading newline, two trailing), so consumers must trim the plain column. Work order: instruction/report with instruction_plain/report_plain, same rule. The *_plain columns are what ChangeSearch / WorkOrderSearch match against and the history ignores them. The columns are NULL-able but ChangeGet returns '' for NULL.",
+   "consequence": "Tiqora keeps change/task texts as plain text (global rule: rendered as text). Importer and live view use the *_plain column, strip surrounding whitespace, and fall back to stripping the HTML column only when *_plain is NULL/empty; HTML is never rendered.",
+   "expected": {
+    "cases": [
+     {
+      "html": "<p>Replace the <b>mail</b> server mail01.example.org</p>",
+      "plain": "\nReplace the mail server mail01.example.org\n\n"
+     },
+     {
+      "html": "<p>Capacity</p>",
+      "plain": "\nCapacity\n\n"
+     },
+     {
+      "html": "Plain text description",
+      "plain": "Plain text description"
+     },
+     {
+      "html": "<p>done</p>",
+      "plain": "\ndone\n\n"
+     }
+    ],
+    "peer_checks": [
+     {
+      "path": "probe.texts.mail.description_plain",
+      "value": "\nReplace the mail server mail01.example.org\n\n"
+     },
+     {
+      "path": "probe.texts.firmware.description_plain",
+      "value": "Plain text description"
+     },
+     {
+      "path": "probe.texts.workorder.report_plain",
+      "value": "\ndone\n\n"
+     },
+     {
+      "path": "probe.texts.workorder.instruction_plain",
+      "value": "\nInstall mail02.example.org\n\n"
+     }
+    ],
+    "plain_of": "HTMLUtils::ToAscii",
+    "searched_column": "description_plain",
+    "trim_before_use": true
+   },
+   "resolves": [
+    "F25 (plain text)",
+    "Task 18",
+    "Task 19"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:146-158",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:486-487",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange.pm:1722-1723",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/ITSMWorkOrder.pm:542-543"
+   ],
+   "title": "description / justification / instruction / report: HTML and *_plain"
+  },
+  "7": {
+   "answer": "content (LONGBLOB) is a Data::Dumper text, NOT Storable/YAML/JSON: TemplateSerialize returns the dump of a hash and TemplateDeSerialize evaluates it with Perl eval (`$VAR1 = <content>; 1`). A change template starts with '$VAR1 = {' and has the top level keys ChangeAdd (all change attributes incl. CABAgents/CABCustomers by id, CategoryID/ImpactID/PriorityID/ChangeStateID as catalog ids, planned times) and Children (a list of { WorkOrderAdd => {...} } with WorkOrderTypeID, WorkOrderStateID, WorkOrderAgentID, times and effort). The template type (change_template.type_id -> change_template_type) is ITSMChange, ITSMWorkOrder, CAB or ITSMCondition. The content embeds ids of the source installation (users, catalog ids, change id) and a creation stamp.",
+   "consequence": "Tiqora stores a legacy template as opaque text and never evaluates it (eval of database content is code execution); a future import (D10) needs a safe parser of the Dumper subset and an id remapping.",
+   "expected": {
+    "format": "perl_data_dumper",
+    "peer_checks": [
+     {
+      "path": "probe.template.content_is_perl_dumper",
+      "value": 1
+     },
+     {
+      "path": "probe.template.content_is_storable",
+      "value": 0
+     },
+     {
+      "path": "probe.template.type",
+      "value": "ITSMChange"
+     }
+    ],
+    "prefix": "$VAR1 = {",
+    "storable": false,
+    "template_types": [
+     "ITSMChange",
+     "ITSMWorkOrder",
+     "CAB",
+     "ITSMCondition"
+    ],
+    "top_level_keys_change_template": [
+     "ChangeAdd",
+     "Children"
+    ]
+   },
+   "resolves": [
+    "D10 (templates import)",
+    "Task 19"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/Template.pm:1081-1121",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/Template/ITSMChange.pm:247-255",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.mysql.sql:296-308",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/initial_insert.sql:744-747"
+   ],
+   "title": "change_template.content format"
+  },
+  "8": {
+   "answer": "The package creates three permission groups: itsm-change, itsm-change-builder and itsm-change-manager (initial_insert of permission_groups; the peer checks that they exist). Every agent change screen is registered with an EMPTY Group and the group in GroupRo, so access needs the 'ro' privilege of the named group: itsm-change for the overview, zoom, search, edit, work orders, CAB/PSA/PIR/schedule/condition screens; itsm-change-manager for AgentITSMChangeAdd, ...Delete and ...Manager (the manager overview); itsm-change-builder for AgentITSMChangeReset; builder OR manager for 'my changes', templates and add-from-template. Admin screens (CIP matrix, notifications, state machine) need the 'admin' group. On top, the Permission checks (ChangeAgentCheck/ChangeBuilderCheck/ChangeManagerCheck) decide per change with the same group names; an agent without any of the groups gets no access (the peer probe: golden.agent without groups -> 0, root -> 1).",
+   "consequence": "Mode A change reads require the caller to hold itsm-change (ro); writes would need itsm-change-manager / -builder. Mode B names its own groups (settings) and reuses these names as the defaults when the Znuny groups exist.",
+   "expected": {
+    "admin_screens": {
+     "AdminITSMChangeCIPAllocate": [
+      "admin"
+     ],
+     "AdminITSMChangeNotification": [
+      "admin"
+     ],
+     "AdminITSMStateMachine": [
+      "admin"
+     ]
+    },
+    "groups": [
+     "itsm-change",
+     "itsm-change-builder",
+     "itsm-change-manager"
+    ],
+    "peer_checks": [
+     {
+      "path": "probe.groups.itsm-change",
+      "value": 1
+     },
+     {
+      "path": "probe.groups.itsm-change-builder",
+      "value": 1
+     },
+     {
+      "path": "probe.groups.itsm-change-manager",
+      "value": 1
+     },
+     {
+      "path": "probe.permission.root_ro",
+      "value": 1
+     },
+     {
+      "path": "probe.permission.agent_without_group_ro",
+      "value": 0
+     }
+    ],
+    "permission_checks": {
+     "ChangeAgentCheck": "itsm-change",
+     "ChangeBuilderCheck": "itsm-change-builder",
+     "ChangeManagerCheck": "itsm-change-manager"
+    },
+    "screens_group_ro": {
+     "AgentITSMChange": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeAdd": [
+      "itsm-change-manager"
+     ],
+     "AgentITSMChangeAddFromTemplate": [
+      "itsm-change-builder",
+      "itsm-change-manager"
+     ],
+     "AgentITSMChangeCondition": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeDelete": [
+      "itsm-change-manager"
+     ],
+     "AgentITSMChangeEdit": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeManager": [
+      "itsm-change-manager"
+     ],
+     "AgentITSMChangeMyCAB": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeMyChanges": [
+      "itsm-change-builder",
+      "itsm-change-manager"
+     ],
+     "AgentITSMChangeMyWorkOrders": [
+      "itsm-change"
+     ],
+     "AgentITSMChangePIR": [
+      "itsm-change"
+     ],
+     "AgentITSMChangePSA": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeReset": [
+      "itsm-change-builder"
+     ],
+     "AgentITSMChangeSchedule": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeSearch": [
+      "itsm-change"
+     ],
+     "AgentITSMChangeZoom": [
+      "itsm-change"
+     ],
+     "AgentITSMTemplateEdit": [
+      "itsm-change-builder",
+      "itsm-change-manager"
+     ],
+     "AgentITSMTemplateOverview": [
+      "itsm-change-builder",
+      "itsm-change-manager"
+     ],
+     "AgentITSMWorkOrderAdd": [
+      "itsm-change"
+     ],
+     "AgentITSMWorkOrderEdit": [
+      "itsm-change"
+     ],
+     "AgentITSMWorkOrderReport": [
+      "itsm-change"
+     ],
+     "AgentITSMWorkOrderTake": [
+      "itsm-change"
+     ],
+     "AgentITSMWorkOrderZoom": [
+      "itsm-change"
+     ]
+    }
+   },
+   "resolves": [
+    "Task 3 (permissions)",
+    "Task 18 (group gate)"
+   ],
+   "source": [
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/Permission/ChangeAgentCheck.pm:79-79",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/Permission/ChangeBuilderCheck.pm:78-78",
+    "ITSMChangeManagement-6.5.2/Kernel/System/ITSMChange/Permission/ChangeManagerCheck.pm:76-76",
+    "ITSMChangeManagement-6.5.2/Kernel/Config/Files/XML/ITSMChangeManagement.xml:324-336",
+    "ITSMChangeManagement-6.5.2/Kernel/Config/Files/XML/ITSMChangeManagement.xml:1250-1262"
+   ],
+   "title": "Groups that gate the change screens"
+  },
+  "9": {
+   "answer": "The CREATE TABLE statements of all 15 change_* tables (change_cab, change_cip_allocate, change_condition, change_history, change_history_type, change_item, change_notification, change_notification_grps, change_notification_message, change_notification_rec, change_number_counter, change_state_machine, change_template, change_template_type, change_workorder) and 5 condition_* tables (condition_action, condition_attribute, condition_expression, condition_object, condition_operator) are byte-identical in the itsm-6 (ITSMChangeManagement 6.5.2) and itsm-7 (7.3.4) fixtures for MariaDB and PostgreSQL (random unique index names normalised); the only difference between the profiles in the whole ITSM schema is general_catalog_preferences (auto-increment id in 7.x).",
+   "consequence": "One reader/importer for both Znuny lines; no per-profile branch for the change tables.",
+   "expected": {
+    "dialects": [
+     "mysql",
+     "postgresql"
+    ],
+    "identical_across_profiles": true,
+    "profile_differences_outside_change": [
+     "general_catalog_preferences"
+    ],
+    "tables": [
+     "change_cab",
+     "change_cip_allocate",
+     "change_condition",
+     "change_history",
+     "change_history_type",
+     "change_item",
+     "change_notification",
+     "change_notification_grps",
+     "change_notification_message",
+     "change_notification_rec",
+     "change_number_counter",
+     "change_state_machine",
+     "change_template",
+     "change_template_type",
+     "change_workorder",
+     "condition_action",
+     "condition_attribute",
+     "condition_expression",
+     "condition_object",
+     "condition_operator"
+    ]
+   },
+   "resolves": [
+    "Task 18",
+    "Task 19"
+   ],
+   "source": [
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.mysql.sql:235",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/schema.postgresql.sql:529",
+    "backend/tests/fixtures/znuny-itsm/itsm-6/tables.md:127"
+   ],
+   "title": "DDL of the 20 change_* / condition_* tables in both profiles"
+  }
+ },
+ "znuny_core": "znuny-6.5.22"
+}

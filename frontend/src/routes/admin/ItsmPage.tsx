@@ -241,7 +241,23 @@ function MatrixCard() {
   );
 }
 
-/** `/admin/itsm`: mode, setup, priority matrix. */
+/** Change management has its own admin page (Mode B: the changes are Tiqora's). */
+function ChangeCard() {
+  const { t } = useTranslation();
+  return (
+    <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-hairline bg-surface p-4" data-testid="itsm-change-card">
+      <div className="min-w-0 space-y-1">
+        <h2 className="text-base font-semibold text-ink">{t("admin.itsm.changeCard.title")}</h2>
+        <p className="text-sm text-muted">{t("admin.itsm.changeCard.text")}</p>
+      </div>
+      <Link to="/admin/itsm/change" className="text-sm text-accent hover:underline" data-testid="itsm-change-link">
+        {t("admin.itsm.changeCard.link")}
+      </Link>
+    </section>
+  );
+}
+
+/** `/admin/itsm`: mode, setup, priority matrix, the link to change management. */
 export function ItsmPage() {
   const { t } = useTranslation();
   const admin = useQuery({ queryKey: itsmKeys.admin(), queryFn: ({ signal }) => itsmApi.admin.get(signal) });
@@ -272,6 +288,7 @@ export function ItsmPage() {
             <>
               <SetupCard />
               <MatrixCard />
+              {admin.data.mode === "tiqora" && <ChangeCard />}
             </>
           )}
         </>

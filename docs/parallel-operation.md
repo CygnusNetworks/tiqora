@@ -1047,6 +1047,10 @@ What the mode means for the integration surfaces that exist next to the UI:
 Details: [compatibility.md](compatibility.md#configitem-operations) and
 [process-management.md](process-management.md).
 
+Changes: Znuny's ITSMChangeManagement keeps its own `change_*` tables, which Tiqora only reads (live
+in Mode A, as a read-only archive in Mode B); Tiqora's own change management (Mode B) keeps changes as
+tickets plus `tiqora_itsm_change*` rows. See [itsm.md](itsm.md#8-change-management) (in German).
+
 ## Schema ownership
 
 When parallel operation ends:

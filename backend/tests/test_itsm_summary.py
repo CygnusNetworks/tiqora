@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -24,6 +24,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
+from tests._change_fixtures import Q_A, Q_B, U_FULL, URL_FIXTURES, ChangeWorld, change_world
 from tests._itsm_adapter_helpers import count_statements, itsm_session, seed_service
 from tests._itsm_db import ITSM_PARAMS
 from tests._itsm_fake_provider import INCIDENT, OPERATIONAL, FakeCiProvider
@@ -40,10 +41,13 @@ from tiqora.domain.api_key_scopes import path_to_area
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.ticket_write_service import link_objects
 from tiqora.extensions import Registry, set_registry_for_tests
+from tiqora.itsm.change.service import ChangeCreateIn, create_change
+from tiqora.itsm.change.tasks import TaskIn, add_task
 from tiqora.itsm.mode import SETTING_MODE
 from tiqora.itsm.models import TiqoraItsmMajorIncident, TiqoraItsmProblem
 from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
 from tiqora.itsm.settings import ITSM_SECTION, ItsmSettings
+from tiqora.itsm.setup import apply_setup
 from tiqora.itsm.summary import TicketNotReadable, ticket_itsm_summary
 from tiqora.itsm.znuny_adapter.detect import clear_detect_cache
 from tiqora.itsm.znuny_adapter.provider import ZnunyCiProvider
@@ -429,3 +433,94 @@ async def test_mode_a_summary_and_graph_end_to_end(
     finally:
         clear_detect_cache()
         set_registry_for_tests(None)
+
+
+# --- change and task facts (Task 21, Mode B) ------------------------------------------------
+
+
+@asynccontextmanager
+async def _change_summary_world(
+    request: pytest.FixtureRequest, url_fixture: str
+) -> AsyncIterator[tuple[ChangeWorld, int, int]]:
+    """A Mode B change world with one change and one task; seed band 947800-947899 (users and
+    queues come from ``tests._change_fixtures``)."""
+    async with change_world(request, url_fixture) as cw:
+        # the summary stays disabled until the incident/problem setup (matrix fields) exists too
+        await apply_setup(cw.session, ItsmSettings(), groups={"incident_problem"}, user_id=1)
+        view, _ = await create_change(
+            cw.session,
+            Settings(environment="test"),
+            SysConfig(cw.session),
+            data=ChangeCreateIn.model_validate(
+                {
+                    "title": "Switch-Tausch",
+                    "change_type": "emergency",
+                    "queue_id": Q_A,
+                    "planned_start": datetime(2026, 11, 10, 8),
+                    "planned_end": datetime(2026, 11, 10, 12),
+                }
+            ),
+            user_id=U_FULL,
+            session_factory=cw.factory,
+        )
+        change = view.record.ticket_id
+        task = await add_task(
+            cw.session,
+            Settings(environment="test"),
+            SysConfig(cw.session),
+            change_ticket_id=change,
+            data=TaskIn.model_validate({"title": "Kabel ziehen", "owner_id": U_FULL}),
+            user_id=U_FULL,
+            session_factory=cw.factory,
+        )
+        yield cw, change, task.ticket_id
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_summary_has_change_ref_for_change_ticket(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with _change_summary_world(request, url_fixture) as (cw, change, task):
+        got = await ticket_itsm_summary(cw.session, change, user_id=U_FULL, cfg=ItsmSettings())
+        assert got.enabled and got.mode == "tiqora" and got.role == "change"
+        assert got.change is not None and got.change_task is None
+        assert (got.change.change_type, got.change.phase) == ("emergency", "draft")
+        assert got.change.planned_start == datetime(2026, 11, 10, 8)
+        plain = await ticket_itsm_summary(cw.session, task, user_id=U_FULL, cfg=ItsmSettings())
+        assert plain.change is None
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_summary_has_task_ref_for_task_ticket(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with _change_summary_world(request, url_fixture) as (cw, change, task):
+        got = await ticket_itsm_summary(cw.session, task, user_id=U_FULL, cfg=ItsmSettings())
+        assert got.role == "change_task" and got.change is None
+        assert got.change_task is not None
+        assert got.change_task.change_ticket_id == change
+        # the caller may read the change ticket, so its number is named (needs user_id passed on)
+        assert got.change_task.change_tn is not None
+        assert got.change_task.task_kind == "workorder"
+
+
+async def test_summary_change_none_in_mode_a(w: World) -> None:
+    got = await w.summary()
+    assert got.enabled and got.mode == "znuny_readthrough"
+    assert got.change is None and got.change_task is None
+    body = await w.get()
+    assert body["change"] is None and body["change_task"] is None
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_summary_task_hides_number_of_unreadable_change(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with _change_summary_world(request, url_fixture) as (cw, change, task):
+        # the change moves to a queue the caller cannot read; the task stays readable
+        await cw.session.execute(
+            text("UPDATE ticket SET queue_id = :q WHERE id = :t"), {"q": Q_B, "t": change}
+        )
+        got = await ticket_itsm_summary(cw.session, task, user_id=U_FULL, cfg=ItsmSettings())
+        assert got.change_task is not None
+        assert got.change_task.change_ticket_id == change and got.change_task.change_tn is None

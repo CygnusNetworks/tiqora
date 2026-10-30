@@ -8,6 +8,7 @@ from tiqora.approvals import models as _approvals_models  # noqa: F401
 from tiqora.db.tiqora.base import TiqoraBase, tiqora_metadata
 from tiqora.db.tiqora.models import TiqoraApiKey, TiqoraMailLog, TiqoraMailOutbound, TiqoraSettings
 from tiqora.itsm import models as _itsm_models  # noqa: F401
+from tiqora.itsm.change import models as _itsm_change_models  # noqa: F401
 from tiqora.kb import models as _kb_models  # noqa: F401
 
 __all__ = [

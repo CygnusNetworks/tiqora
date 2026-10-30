@@ -119,7 +119,7 @@ def test_issue_codes_have_explanations() -> None:
         "class_without_group",
         "changed_in_tiqora",
         "deleted_in_znuny",
-        "changes_not_imported",
+        "not_archived",
         "definition_key_invalid",
         "definition_attribute_key_unknown",
     ):

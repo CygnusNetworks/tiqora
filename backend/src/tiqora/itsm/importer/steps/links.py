@@ -7,7 +7,9 @@ run needs no map listing) the links with one of the CIs at either end are read, 
 * the CI ends become Tiqora CI ids (map kind ``ci``; a CI that is not in the map - deleted in
   Znuny or skipped by pass 1 - gives ``unresolved_reference``),
 * ticket and service keys are kept (both live in Znuny's tables with their own ids),
-* every other object (``FAQ``, ``ITSMChangeManagement`` ...) is ``unsupported_object``,
+* links with a change or work order end (``ITSMChange`` / ``ITSMWorkOrder``) are left out
+  silently: the change archive (step ``changes``) carries them as refs of the change,
+* every other object (``FAQ`` ...) is ``unsupported_object``,
 * links whose Znuny state is not ``Valid`` are skipped.
 
 The link types come from SysConfig through itsm1's ``sync_link_type_rows`` (``ensure_link_types``,
@@ -41,6 +43,8 @@ ZNUNY_OBJECT_KINDS: Final[dict[str, str]] = {
     "Ticket": "ticket",
     "Service": "service",
 }
+#: link objects of Znuny's change management: archived with the change, not imported here
+CHANGE_OBJECTS: Final = frozenset({"ITSMChange", "ITSMWorkOrder"})
 _VALID_STATE = "Valid"
 _SHOWN = 80
 
@@ -100,6 +104,9 @@ async def _links_page(
     for link in links:
         if link.map_key in refused or link.map_key in seen:
             continue  # seen from the other end's page before
+        if CHANGE_OBJECTS & {link.source_object, link.target_object}:
+            refused.add(link.map_key)  # step ``changes`` archives it: no count, no issue
+            continue
         if link.state_name != _VALID_STATE:
             refused.add(link.map_key)
             ctx.report.count(STEP, "skipped")

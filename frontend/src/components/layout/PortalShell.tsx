@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { portalApi } from "@/lib/portalApi";
 import { usePortalCis } from "@/components/cmdb/usePortalCmdb";
 import { usePortalApprovalsAvailable } from "@/components/approvals/usePortalApprovalsAvailable";
+import { usePortalChangeScheduleAvailable } from "@/components/itsm/change/usePortalChangeSchedule";
 import { PortalWebchat } from "@/components/portal/PortalWebchat";
 
 /** Header language switch: apply locally, store as the customer's UserLanguage. */
@@ -28,6 +29,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const cmdb = usePortalCis();
   const approvals = usePortalApprovalsAvailable();
+  const changes = usePortalChangeScheduleAvailable();
 
   const currentLang = resolveLocaleCode(i18n.language);
   const languageItems = localePickerItems();
@@ -143,6 +145,16 @@ export function PortalShell({ children }: { children: ReactNode }) {
               data-testid="portal-nav-approvals"
             >
               {t("portal.nav.approvals")}
+            </Link>
+          )}
+          {changes.available && (
+            <Link
+              to="/portal/change-schedule"
+              className="rounded px-2.5 py-1.5 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
+              activeProps={{ className: "bg-surface-subtle text-accent" }}
+              data-testid="portal-nav-changes"
+            >
+              {t("portal.nav.changes")}
             </Link>
           )}
           <Link

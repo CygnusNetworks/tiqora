@@ -24,6 +24,12 @@ from typing import Final, Literal
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.itsm.change.read import (
+    ChangeRef,
+    ChangeTaskRef,
+    change_refs_for_tickets,
+    task_refs_for_tickets,
+)
 from tiqora.itsm.ci_provider import CiUnavailable
 from tiqora.itsm.link_graph import TicketNotReadable
 from tiqora.itsm.linked_articles import linked_ticket_ids
@@ -99,6 +105,9 @@ class TicketItsm:
     ci_count: int | None = None
     recent_incident: RecentIncident | None = None
     dialogs: Dialogs = field(default_factory=Dialogs)
+    #: Mode B only: the ticket is a change / a change task
+    change: ChangeRef | None = None
+    change_task: ChangeTaskRef | None = None
 
 
 def role_of(type_name: str | None, cfg: ItsmSettings) -> Role | None:
@@ -266,6 +275,15 @@ async def ticket_itsm_summary(
         except CiUnavailable:
             out.ci_count = None
     out.dialogs = await _dialogs(session)
+    if (
+        state.mode == "tiqora"
+    ):  # both readers are empty outside Mode B: skip them (and the mode read)
+        out.change = (await change_refs_for_tickets(session, [ticket_id], mode_b=True)).get(
+            ticket_id
+        )
+        out.change_task = (
+            await task_refs_for_tickets(session, [ticket_id], user_id=user_id, mode_b=True)
+        ).get(ticket_id)
     return out
 
 

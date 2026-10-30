@@ -17,7 +17,8 @@
 > `/api/v1/itsm`; the admin endpoints (`/api/v1/admin/cmdb`) need the `admin` area; the MCP tools
 > need `mcp:ro` (or higher) and optionally a `tool:<name>` allowlist.
 >
-> **Not included (wave 5):** reporting and statistics over CIs, change management and workorders.
+> **Not included (wave 5):** reporting and statistics over CIs. Change management (Mode B) uses the
+> CMDB for the impact of a change, see [itsm.md](itsm.md) chapter 8.
 
 ## Was die CMDB ist
 
@@ -382,7 +383,8 @@ einem Zugriffsfehler. Schlüssel ohne `tool:`-Eintrag dürfen alle Werkzeuge.
 ## Nicht enthalten (Welle 5)
 
 Berichte und Statistiken über CIs (Reporting-Quelle) sind für Welle 5 vorgesehen; im
-Reporting gibt es derzeit keine CMDB-Quelle. Nicht
-übernommen werden außerdem Änderungsmanagement (Change) und Workorders.
+Reporting gibt es derzeit keine CMDB-Quelle. Das Change-Management mit Arbeitsaufträgen
+(Change-Aufgaben) beschreibt [itsm.md](itsm.md) in Kapitel 8; es nutzt die CMDB für die
+Auswirkung eines Changes.
 
 Beispieldaten in diesem Dokument verwenden ausschließlich `example.org`.

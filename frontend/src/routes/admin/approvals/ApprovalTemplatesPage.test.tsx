@@ -109,8 +109,7 @@ describe("ApprovalTemplatesPage", () => {
     fireEvent.click(await screen.findByTestId("template-new"));
     const ticket = await screen.findByTestId("template-subject-ticket");
     expect(ticket.closest("label")).toHaveTextContent("Ticket");
-    // A type whose title has no translation shows its raw key.
-    expect(screen.getByTestId("template-subject-itsm.change").closest("label")).toHaveTextContent("itsm.change");
+    expect(screen.getByTestId("template-subject-itsm.change").closest("label")).toHaveTextContent("Change");
     fireEvent.click(ticket);
     fireEvent.click(screen.getByTestId("template-subject-itsm.change"));
     await waitFor(() => {
@@ -119,6 +118,21 @@ describe("ApprovalTemplatesPage", () => {
     });
     const lastTwo = validate.mock.calls.slice(-2).map((c) => (c as unknown as [{ body: { subject_type: string } }])[0].body.subject_type);
     expect(lastTwo.sort()).toEqual(["itsm.change", "ticket"]);
+  });
+
+  it("labels a subject type without a title text with its raw key", async () => {
+    mockApi({
+      [TEMPLATES]: () => [],
+      [VALIDATE]: () => ({ errors: [], warnings: [] }),
+      "GET /api/v1/admin/approvals/subject-types": () => [
+        { key: "ticket", title_key: "approvals.subject.ticket" },
+        { key: "plugin.example", title_key: "approvals.subject.plugin_example" },
+      ],
+    });
+    renderApproval(<ApprovalTemplatesPage />);
+    fireEvent.click(await screen.findByTestId("template-new"));
+    expect((await screen.findByTestId("template-subject-ticket")).closest("label")).toHaveTextContent("Ticket");
+    expect(screen.getByTestId("template-subject-plugin.example").closest("label")).toHaveTextContent("plugin.example");
   });
 
   it("asks before discarding changes and requires a key for a new template", async () => {

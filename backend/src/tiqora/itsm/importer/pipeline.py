@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.config import Settings
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.facades import CmdbServiceWriter
 from tiqora.itsm.importer.mapstore import MapStore
@@ -66,6 +67,7 @@ async def run_import(
     page_size: int,
     progress: Callable[[int, int | None, str], Awaitable[None]],
     check_cancelled: Callable[[], Awaitable[None]],
+    settings: Settings,
 ) -> ImportReport:
     """Run all steps; raises :class:`ImportBlocked` when Znuny's ITSM is missing or unsupported."""
     dry_writer = DryRunWriter()
@@ -96,6 +98,7 @@ async def run_import(
         user_id=user_id,
         writer_for=writer_for,
         mapstore_for=lambda s: MapStore(s, run_id=run_id, read_only=dry_run),
+        settings=settings,
     )
     for name in STEP_ORDER:  # every step shows up, in order, even when it counts nothing
         ctx.report.start_step(name)

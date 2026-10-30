@@ -47,6 +47,7 @@ and never commit real credentials.
 | `MEILI_URL` | `http://meilisearch:7700` | |
 | `MEILI_MASTER_KEY` | strong secret | Production required |
 | `TIQORA_SECRET_KEY` | random 32+ bytes | Cookie/session material |
+| `TIQORA_ITSM_LEGACY_ERASED_KEY` | *(empty)* | Optional. Key of the GDPR tombstones in the archive of Znuny changes; empty means `TIQORA_SECRET_KEY`. After rotating `TIQORA_SECRET_KEY`, set it to the **previous** `TIQORA_SECRET_KEY` while no erasure has run since (see below). Secret like the others; never logged. |
 | `TIQORA_LOG_LEVEL` | `INFO` | |
 | `TIQORA_CORS_ORIGINS` | `https://helpdesk.example.com` | Comma-separated |
 | `TIQORA_SESSION_TTL` | `3600` | Session lifetime in seconds (1h). **Sliding** — renewed on every authenticated request, so effectively the max idle time. SSO/Kerberos agents re-auth transparently on expiry. Also governs customer-portal sessions. |
@@ -594,6 +595,33 @@ runs) use the job system, so the same one-worker and 90 s nginx notes apply.
 - **Znuny stats import** needs no configuration; it reads `xml_storage` read-only and runs
   inline within the 75 s budget.
 - **Migration.** `20261010_0074` adds the schedule and run tables (`tiqora migrate upgrade`).
+
+## ITSM change management
+
+Change management (ITSM Mode B, see [itsm.md](itsm.md) chapter 8) needs no extra container and no
+proxy change: all routes sit under `/api/`, and everything that can take long runs as a background job
+in the `worker` (`core.itsm_change_tasks`, `core.itsm_change_impact`, and
+`core.itsm_legacy_change_archive` in the lane `itsm_import`, one ITSM bulk job at a time).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TIQORA_ITSM_CHANGE_INTERVAL` | `3600` (60-86400) | Seconds between two ticks of the worker service `itsm_change` ("Change-Auswirkung aktualisieren"). A tick queues the impact job for active changes whose stored impact is older than `itsm_change.impact_refresh_hours` (default 24), at most 200 per tick. The Dienste page can override the interval (`daemon.itsm_change.interval_seconds`) and switch the service off (`daemon.itsm_change.enabled`, default on). Outside Mode B a tick does nothing. |
+
+The legacy change archive stores hashes of erased customers keyed with `TIQORA_ITSM_LEGACY_ERASED_KEY`, or
+`TIQORA_SECRET_KEY` while that is empty, plus a check value of the key. After a rotation of
+`TIQORA_SECRET_KEY` the archive job fails and the import step `changes` reports `archive_key_changed`; nothing
+more is written, so no erased customer reappears (a run under way stops before its next batch, finished pages
+stay). GDPR erasures keep working under any key: they redact the archive
+without it, write their hashes and a check value under the current key, and warn (`legacy_archive_key_changed`
+in the job counts, a warning line in the CLI output).
+
+- Old key available and no erasure since the rotation: set `TIQORA_ITSM_LEGACY_ERASED_KEY` to the previous
+  `TIQORA_SECRET_KEY` on API and worker, and archive runs resume.
+- Old key lost, or erasures ran meanwhile (hashes under two keys): no further archive runs. The existing archive
+  stays readable and redacted, and erasures work.
+
+Rolling back an erasure is refused in this state only when it restores archive rows and hashes of other erasures
+remain, because the restored rows could not be redacted against them. See [itsm-import.md](itsm-import.md).
 
 ## Upgrading to v0.19.0 (wave 4)
 

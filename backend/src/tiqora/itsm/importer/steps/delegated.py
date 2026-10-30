@@ -1,10 +1,13 @@
-"""Small steps of the pipeline (D5 steps 6-10): priority matrix, service meta, change counts,
+"""Small steps of the pipeline (D5 steps 6-10): priority matrix, service meta, change archive,
 CIs deleted in Znuny and the closing incident-state / search-index pass.
 
 ``priority_matrix`` and ``service_meta`` copy ITSMCore data (``cip_allocate`` and the ITSM columns
 of ``service``) through itsm1's import functions (facades); they work without the CMDB package. A
-dry run only counts the source rows (``skipped``). ``changes`` counts Change Management objects
-and reports that they are not imported (phase 3). ``deleted_in_znuny`` only reports: a CI that was
+dry run only counts the source rows (``skipped``). ``changes`` archives Znuny's changes with their
+work orders read-only into Tiqora (``tiqora.itsm.change.legacy.archive``; created / updated /
+unchanged per change) and reports the templates, conditions and notification rules it leaves in
+Znuny (``not_archived``); under a changed tombstone key it archives nothing and reports
+``archive_key_changed``. ``deleted_in_znuny`` only reports: a CI that was
 imported and is gone from Znuny stays in Tiqora. ``incident_states`` runs cmdb's ``finish_import``
 (search index, class counters, derived incident states) for every CI marked unfinished (map kind
 ``finish``): new versions or new CI links of this run or of an earlier run that ended early.
@@ -15,6 +18,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from tiqora.db.tiqora.models import TiqoraCmdbCi
+from tiqora.itsm.change.legacy.archive import ArchiveReport, ErasedKeyChanged, archive_changes
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.mapstore import fingerprint
 from tiqora.itsm.importer.steps import KIND_FINISH, StepContext
@@ -30,7 +34,11 @@ KIND_SERVICE_META = "service_meta"
 KIND_CI = "ci"
 FINISH_BATCH = 500
 _SHOWN = 80
-_CHANGE_LABELS = {"change": "Changes", "workorder": "Arbeitsaufträge"}
+_NOT_ARCHIVED_LABELS = {
+    "templates": "Change-Vorlagen",
+    "conditions": "Bedingungen",
+    "notifications": "Benachrichtigungsregeln",
+}
 
 
 async def run_priority_matrix(ctx: StepContext) -> None:
@@ -106,24 +114,47 @@ async def run_service_meta(ctx: StepContext) -> None:
 
 
 async def run_changes(ctx: StepContext) -> None:
-    """Count Changes and work orders; nothing is imported (phase 3), the report says so."""
+    """Archive the Znuny changes (read-only in Tiqora); a Znuny without Change Management counts
+    nothing."""
     ctx.report.start_step(STEP_CHANGES)
     await ctx.check_cancelled()
-    async with ctx.session_factory() as session:
-        counts = await ctx.ports_for(session).source.change_counts()
-    for kind in sorted(counts):
-        n = counts[kind]
-        if n <= 0:
-            continue
-        label = _CHANGE_LABELS.get(kind, kind[:_SHOWN])
+    try:
+        archived = await archive_changes(
+            ctx.session_factory,
+            run_id=ctx.run_id,
+            dry_run=ctx.dry_run,
+            page_size=ctx.page_size,
+            progress=ctx.progress,
+            check_cancelled=ctx.check_cancelled,
+            report=ArchiveReport(),
+            settings=ctx.settings,
+        )
+    except ErasedKeyChanged:
+        # nothing more is written (a run under way keeps its finished pages); the other steps
+        # of the run go on
         ctx.report.issue(
             STEP_CHANGES,
-            "changes_not_imported",
-            kind,
-            f"{n} {label} in Znuny werden nicht übernommen (kommt mit Phase 3); sie wurden nur "
-            "gezählt",
+            "archive_key_changed",
+            "TIQORA_ITSM_LEGACY_ERASED_KEY",
+            "Change-Archiv nicht aktualisiert: der Schlüssel für gelöschte Kunden hat sich "
+            "geändert. Bisheriger Schlüssel vorhanden und seit dem Wechsel keine Löschung: "
+            "setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY. "
+            "Sonst sind keine weiteren Archiv-Läufe möglich; das Archiv bleibt lesbar",
         )
-        ctx.report.count(STEP_CHANGES, "skipped", n)
+        ctx.report.count(STEP_CHANGES, "problems")
+        await ctx.progress(1, 1, STEP_CHANGES)
+        return
+    for name in ("created", "updated", "unchanged", "skipped"):
+        ctx.report.count(STEP_CHANGES, name, getattr(archived, name))
+    for kind in sorted(archived.not_archived):
+        label = _NOT_ARCHIVED_LABELS.get(kind, kind[:_SHOWN])
+        ctx.report.issue(
+            STEP_CHANGES,
+            "not_archived",
+            kind,
+            f"{archived.not_archived[kind]} {label} in Znuny werden nicht übernommen; sie wurden "
+            "nur gezählt",
+        )
     await ctx.progress(1, 1, STEP_CHANGES)
 
 

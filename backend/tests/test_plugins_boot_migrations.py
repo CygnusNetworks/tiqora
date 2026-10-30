@@ -32,7 +32,7 @@ from tiqora.plugins.migrations import SAFE_MODE_MIGRATIONS_MESSAGE, run_boot_mig
 
 pytestmark = pytest.mark.db
 
-CORE_HEAD = "20261010_0083"
+CORE_HEAD = "20261010_0084"
 TABLES_ID = "org.example.tables"
 BAD_ID = "org.example.badmig"
 T0 = datetime(2026, 10, 10, 8, 0)

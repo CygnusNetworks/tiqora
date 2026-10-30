@@ -15,7 +15,10 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
+import { resolveChangeReply } from "../../src/demo/changeMock";
 import { approvalsStore, bodyOf, fulfillAnswer } from "./approvals-store";
+import { SERVICES as DEMO_CHANGE_SERVICES } from "../../src/demo/changeMock";
+import { changeStore } from "./change-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
@@ -692,7 +695,7 @@ export async function mockApi(page: Page) {
 
     // Approvals (inbox, detail, ticket panel, delegations, public link): stateful per test, see approvals-store.ts.
     if (/\/api\/v1\/(approvals|approval-links)(\/|$)|\/api\/v1\/reference\/(roles|agents)$|\/api\/v1\/tickets\/\d+\/approvals$/.test(path)) {
-      const out = approvalsStore().handle(path, method, url.search, bodyOf(req));
+      const out = changeStore().approvalsOf(path, method) ?? approvalsStore().handle(path, method, url.search, bodyOf(req));
       if (out) {
         await fulfillAnswer(route, out);
         return;
@@ -1056,6 +1059,15 @@ export async function mockApi(page: Page) {
         return;
       }
     }
+    // Service pickers (change dialogs, freeze windows, calendar filter): ids and names of the ITSM demo.
+    if (path.endsWith("/api/v1/reference/services") && method === "GET") {
+      await json(
+        route,
+        200,
+        Object.entries(DEMO_CHANGE_SERVICES).map(([id, name]) => ({ id: Number(id), name })),
+      );
+      return;
+    }
     if (path.endsWith("/api/v1/reference/share-groups") && method === "GET") {
       await json(route, 200, DEMO_SHARE_GROUPS);
       return;
@@ -1244,7 +1256,7 @@ export async function mockApi(page: Page) {
     // ITSM core: the stateful store answers the routes the e2e flows write to and read back; the demo
     // resolver answers the rest (read-only Mode A data). The mode comes from the page's localStorage
     // (default "tiqora").
-    if (/\/api\/v1\/(itsm\/|admin\/itsm|admin\/priorities|jobs\/|tickets\/(search$|\d+\/(cis|itsm|links|link-graph|problem|major-incident|linked-articles)))/.test(path)) {
+    if (/\/api\/v1\/(itsm\/|admin\/itsm|admin\/priorities|jobs\/|tickets\/(search$|\d+\/(cis|itsm|links|link-graph|problem|major-incident|linked-articles|change(\/create-from)?$)))|\/api\/portal\/change-schedule$/.test(path)) {
       // the ITSM import page (admin/itsm/import/*, its demo job): the demo resolver, read and write
       const imported = resolveItsmImport(path, method);
       if (imported !== undefined) {
@@ -1266,6 +1278,20 @@ export async function mockApi(page: Page) {
           await json(route, 200, itsm);
           return;
         }
+      }
+      // Change management: the changes a test creates live in the change store (backend rules, state);
+      // the fixtures and everything else come from the demo resolver. Mode A / off answer 409 / 404 like the backend.
+      const changeBody = hasBody ? (req.postDataJSON() as Record<string, unknown>) : undefined;
+      const owned = changeStore().handle(path, method, url.search, changeBody, mode);
+      if (owned) {
+        await fulfillAnswer(route, owned);
+        return;
+      }
+      const change = resolveChangeReply(path, method, url.search, mode, changeBody);
+      if (change) {
+        if (change.status === 204) await route.fulfill({ status: 204, body: "" });
+        else await json(route, change.status, change.body ?? null);
+        return;
       }
     }
 

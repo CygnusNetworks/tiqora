@@ -60,6 +60,24 @@ cd backend && GOLDEN_PEER=znuny-6.5-itsm uv run python ../tests/golden/itsm_surv
 
 Same for `znuny-7.3-itsm`. `test_itsm_behaviour_vectors.py` compares both halves.
 
+### Change management vectors (`behaviour/change-itsm-6.json`, `change-itsm-7.json`)
+
+Same layout for the ITSMChangeManagement package (wave-5 itsm-change, Task 1): nine answers per
+profile (link objects, derived change times, history rows, dynamic field object types, CAB rows,
+HTML vs plain text, template format, gating groups, DDL identity) and, under `peer.results`, what
+the package stored and answered after `tests/golden/itsm_seed.pl` created three `chg94` changes
+(`seed`, `probe`, `stored`). The `questions` part is maintained by hand from the sources; the
+`peer` part is generated and never edited:
+
+```sh
+just golden-itsm-fetch znuny-6.5-itsm
+GOLDEN_PEER=znuny-6.5-itsm just golden-up
+cd backend && GOLDEN_PEER=znuny-6.5-itsm uv run python ../tests/golden/itsm_survey.py znuny-6.5-itsm \
+    --change-behaviour --out tests/fixtures/znuny-itsm/behaviour/
+```
+
+Same for `znuny-7.3-itsm`. `test_itsm_change_vectors.py` compares both halves.
+
 ## Origin and licence (NOTICE)
 
 - **Upstream:** the Znuny ITSM packages (`https://download.znuny.org/releases/itsm/`), installed on a

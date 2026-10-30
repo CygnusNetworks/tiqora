@@ -19,6 +19,7 @@ from tiqora.deployed.watcher import run_deploy_watch_tick
 from tiqora.domain.settings_store import (
     KEY_APPROVALS_INTERVAL_SECONDS,
     KEY_GI_REQUESTER_INTERVAL_SECONDS,
+    KEY_ITSM_CHANGE_INTERVAL_SECONDS,
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
     KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
     KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS,
@@ -38,6 +39,7 @@ from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
 from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
 from tiqora.worker.generic_agent import run_generic_agent_tick
 from tiqora.worker.gi_debug_cleanup import run_gi_debug_cleanup
+from tiqora.worker.itsm_change import run_itsm_change_tick
 from tiqora.worker.notifications import run_notifications_tick
 from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.pending_check import run_pending_check_tick
@@ -199,6 +201,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def webchat_sweep_tick() -> dict[str, int]:
         return await run_webchat_worker_tick(settings)
 
+    async def itsm_change_tick() -> dict[str, int]:
+        return await run_itsm_change_tick(settings)
+
     async def approvals_tick() -> dict[str, int]:
         return await run_approvals_sweep_worker_tick(settings)
 
@@ -342,6 +347,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             webchat_sweep_tick,
             settings.webchat_sweep_interval_seconds,
             KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
+            stop,
+        ),
+        _interval_loop(
+            "itsm_change",
+            itsm_change_tick,
+            settings.itsm_change_interval_seconds,
+            KEY_ITSM_CHANGE_INTERVAL_SECONDS,
             stop,
         ),
         _interval_loop(

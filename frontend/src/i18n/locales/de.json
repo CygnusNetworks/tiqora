@@ -81,7 +81,9 @@
     "escalatedCount": "{{count}} eskaliert",
     "customers": "Kunden",
     "searches": "Gespeicherte Suchen",
-    "approvals": "Meine Freigaben"
+    "approvals": "Meine Freigaben",
+    "changes": "Changes",
+    "changesLegacy": "Changes (Znuny)"
   },
   "views": {
     "mine": "Meine Tickets",
@@ -1352,7 +1354,10 @@
       "answeredAt": "{{time}} angenommen",
       "endedAt": "beendet {{time}}"
     },
-    "processLabel": "Prozess starten"
+    "processLabel": "Prozess starten",
+    "fromChange": "Das neue Ticket wird mit dem Change (Ticket #{{id}}) verknüpft.",
+    "changeLinkFailed": "Das Ticket wurde angelegt, konnte aber nicht mit dem Change verknüpft werden.",
+    "retryChangeLink": "Verknüpfung erneut versuchen"
   },
   "connection": {
     "live": "Live verbunden",
@@ -1378,7 +1383,8 @@
       "kb": "Hilfeartikel",
       "preferences": "Einstellungen",
       "cmdb": "Meine Geräte und Systeme",
-      "approvals": "Freigaben"
+      "approvals": "Freigaben",
+      "changes": "Wartungsfenster"
     },
     "login": {
       "stepUp": {
@@ -1493,6 +1499,22 @@
         "add": "Gerät oder System hinzufügen",
         "remove": "{{name}} entfernen",
         "max": "Sie können bis zu {{max}} auswählen."
+      }
+    },
+    "changes": {
+      "title": "Wartungsfenster",
+      "intro": "Geplante Änderungen, die Ihre Services betreffen.",
+      "prev": "Voriger Monat",
+      "next": "Nächster Monat",
+      "truncated": "Es werden nicht alle Wartungsfenster dieses Monats angezeigt.",
+      "unavailable": "Die Wartungsfenster sind nicht verfügbar.",
+      "loadError": "Die Wartungsfenster konnten nicht geladen werden.",
+      "empty": "In diesem Monat sind keine Wartungsfenster geplant.",
+      "noWindow": "Kein Zeitfenster",
+      "phases": {
+        "scheduled": "Geplant",
+        "implementing": "Läuft",
+        "closed": "Abgeschlossen"
       }
     }
   },
@@ -2250,7 +2272,8 @@
       "approvals": "Freigaben",
       "approvalsTemplates": "Freigabevorlagen",
       "approvalsLists": "Freigabegruppen",
-      "approvalsDelegations": "Vertretungen"
+      "approvalsDelegations": "Vertretungen",
+      "itsmChange": "Change-Management"
     },
     "table": {
       "id": "ID",
@@ -3490,6 +3513,10 @@
           "name": "Web-Chat aufräumen",
           "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."
         },
+        "itsm_change": {
+          "name": "Change-Auswirkung aktualisieren",
+          "description": "Stößt für aktive Changes, deren Auswirkung älter ist als die eingestellte Stundenzahl, eine neue Berechnung der betroffenen CIs und Services an."
+        },
         "deploy_watch": {
           "name": "Bereitstellung beobachten",
           "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
@@ -3831,7 +3858,8 @@
       "rollbackTitle": "Rollback bestätigen",
       "rollbackBody": "Backup von Auftrag #{{id}} wiederherstellen? Der aktuelle Zustand wird überschrieben.",
       "purgeTitle": "Backup unwiderruflich löschen",
-      "purgeBody": "Backup von Auftrag #{{id}} endgültig löschen? Rollback ist danach nicht mehr möglich."
+      "purgeBody": "Backup von Auftrag #{{id}} endgültig löschen? Rollback ist danach nicht mehr möglich.",
+      "legacyArchiveKeyChanged": "Der Schlüssel für das Change-Archiv wurde geändert. Die Löschung ist erfolgt, weitere Archivläufe bleiben aber gesperrt. Details finden Sie in der Betriebsdokumentation."
     },
     "commandPalette": {
       "title": "Einstellungen & Seiten suchen",
@@ -3921,7 +3949,9 @@
       "approvalsTemplates": "Wiederverwendbare Freigabe-Abläufe mit Schritten, Regeln und Fristen",
       "approvalsLists": "Gruppen von Freigebern, zum Beispiel ein CAB, für den Einsatz in Vorlagen",
       "approvalsDelegations": "Wer wen bei Abwesenheit vertritt",
-      "settingsApprovals": "Fristen, Erinnerungen, Entscheidungslinks, Kunden als Freigeber und Abstimmen über MCP"
+      "settingsApprovals": "Fristen, Erinnerungen, Entscheidungslinks, Kunden als Freigeber und Abstimmen über MCP",
+      "itsmChange": "Change-Vorlagen, CAB, Risikofragen, Sperrzeiträume und das Archiv der Znuny-Changes.",
+      "settingsItsmChange": "Queues, Change-Manager, Freigabe und Risikostufen der Changes."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4491,6 +4521,151 @@
           "znuny_agent_url": {
             "label": "Znuny-Agentenadresse",
             "help": "Adresse der Znuny-Agentenoberfläche für „In Znuny bearbeiten“. Leer: aus der Znuny-Konfiguration ableiten. Muss mit http:// oder https:// beginnen."
+          }
+        }
+      },
+      "itsmChange": {
+        "title": "ITSM-Changes",
+        "fields": {
+          "change_queue_id": {
+            "label": "Queue für neue Changes",
+            "help": "Queue-ID neuer Changes. 0 lässt die Agentin oder den Agenten die Queue beim Anlegen wählen."
+          },
+          "task_queue_id": {
+            "label": "Queue für Change-Aufgaben",
+            "help": "Queue-ID der Change-Aufgaben. 0 verwendet die Queue des Changes."
+          },
+          "manager_group": {
+            "label": "Gruppe der Change-Manager",
+            "help": "Znuny-Gruppe, deren rw-Mitglieder Changes verwalten. Leer: nur Administratoren."
+          },
+          "default_cab_id": {
+            "label": "Standard-CAB",
+            "help": "CAB für die Freigabe. 0 bedeutet, dass das CAB am Change gewählt werden muss."
+          },
+          "emergency_cab_id": {
+            "label": "Notfall-CAB",
+            "help": "CAB für Notfall-Changes. 0 verwendet das Standard-CAB."
+          },
+          "emergency_post_approval": {
+            "label": "Notfall-Changes: nachträgliche Freigabe",
+            "help": "Notfall-Changes dürfen mit der Umsetzung beginnen, bevor die Freigabe entschieden ist."
+          },
+          "auto_approve_low_risk": {
+            "label": "Risikoarme Changes automatisch freigeben",
+            "help": "Normale Changes mit niedrigem Risiko überspringen das CAB, wenn alle Prüfungen bestanden sind."
+          },
+          "standard_requires_review": {
+            "label": "Standard-Changes brauchen eine Nachbetrachtung",
+            "help": "Standard-Changes durchlaufen vor dem Abschluss ebenfalls die Nachbetrachtung."
+          },
+          "approval_due_hours": {
+            "label": "Freigabe fällig nach (Stunden)",
+            "help": "Zeit, die das CAB für die Entscheidung hat, bevor die Regel für Zeitüberschreitung greift."
+          },
+          "approval_timeout": {
+            "label": "Wenn die Freigabe überfällig ist",
+            "help": "Nur erinnern benachrichtigt die Mitglieder; Ablehnen lehnt den Change ab."
+          },
+          "cab_allow_self_approval": {
+            "label": "Eigene Changes selbst freigeben",
+            "help": "Erlaubt Besitzer und Antragsteller eines Changes, im CAB mitzustimmen."
+          },
+          "state_open": {
+            "label": "Ticket-Status solange offen",
+            "help": "Ticket-Status eines offenen Changes."
+          },
+          "state_closed_successful": {
+            "label": "Ticket-Status: erfolgreich abgeschlossen",
+            "help": "Ticket-Status eines erfolgreich abgeschlossenen Changes."
+          },
+          "state_closed_failed": {
+            "label": "Ticket-Status: erfolglos abgeschlossen",
+            "help": "Ticket-Status eines gescheiterten oder zurückgerollten Changes."
+          },
+          "state_closed_cancelled": {
+            "label": "Ticket-Status: abgebrochen",
+            "help": "Ticket-Status eines abgebrochenen Changes."
+          },
+          "related_link_type": {
+            "label": "Verknüpfungstyp für Störungen und Probleme",
+            "help": "Verknüpfungstyp zwischen einem Change und zugehörigen Störungen oder Problemen."
+          },
+          "task_link_type": {
+            "label": "Verknüpfungstyp für Change-Aufgaben",
+            "help": "Verknüpfungstyp zwischen einem Change (übergeordnet) und seinen Aufgaben."
+          },
+          "risk_medium_from": {
+            "label": "Risiko mittel ab (Punkte)",
+            "help": "Punktzahl, ab der das Risiko als mittel gilt."
+          },
+          "risk_high_from": {
+            "label": "Risiko hoch ab (Punkte)",
+            "help": "Punktzahl, ab der das Risiko als hoch gilt. Muss über mittel liegen."
+          },
+          "risk_very_high_from": {
+            "label": "Risiko sehr hoch ab (Punkte)",
+            "help": "Punktzahl, ab der das Risiko als sehr hoch gilt. Muss über hoch liegen."
+          },
+          "weight_service_criticality": {
+            "label": "Gewicht: Service-Kritikalität",
+            "help": "Punkte je Kritikalitätsstufe eines betroffenen Services."
+          },
+          "weight_ci_incident": {
+            "label": "Gewicht: betroffenes CI mit Störung",
+            "help": "Punkte für ein betroffenes CI, das aktuell eine Störung hat."
+          },
+          "weight_open_incidents": {
+            "label": "Gewicht: offene Störungen",
+            "help": "Punkte für offene Störungen an den betroffenen Services."
+          },
+          "weight_overlap": {
+            "label": "Gewicht: überlappende Changes",
+            "help": "Punkte für andere Changes im selben Zeitfenster."
+          },
+          "weight_freeze": {
+            "label": "Gewicht: Sperrzeitraum",
+            "help": "Punkte, wenn das Zeitfenster einen Sperrzeitraum berührt."
+          },
+          "weight_failed_history": {
+            "label": "Gewicht: frühere gescheiterte Changes",
+            "help": "Punkte für gescheiterte Changes an denselben Services."
+          },
+          "weight_emergency": {
+            "label": "Gewicht: Notfall-Change",
+            "help": "Punkte, die jeder Notfall-Change zusätzlich erhält."
+          },
+          "weight_missing_backout": {
+            "label": "Gewicht: fehlender Rückfallplan",
+            "help": "Punkte, wenn der Rückfallplan leer ist."
+          },
+          "incident_lookback_days": {
+            "label": "Rückblick Störungen (Tage)",
+            "help": "Störungen der letzten Tage gelten als aktuell."
+          },
+          "failed_change_lookback_days": {
+            "label": "Rückblick gescheiterte Changes (Tage)",
+            "help": "Gescheiterte Changes der letzten Tage fließen in das Risiko ein."
+          },
+          "impact_refresh_hours": {
+            "label": "Auswirkung aktualisieren nach (Stunden)",
+            "help": "Die Auswirkung geplanter Changes wird nach dieser Zeit neu berechnet."
+          },
+          "max_tasks": {
+            "label": "Höchstzahl Aufgaben je Change",
+            "help": "Obergrenze für Change-Aufgaben, auch bei Vorlagen."
+          },
+          "calendar_id": {
+            "label": "Kalender für geplante Changes",
+            "help": "Znuny-Kalender, der pro geplantem Change einen Termin erhält. 0 schaltet ihn ab."
+          },
+          "portal_schedule_enabled": {
+            "label": "Geplante Changes im Portal zeigen",
+            "help": "Kundinnen und Kunden sehen geplante Changes ihrer Services im Portal."
+          },
+          "legacy_change_group": {
+            "label": "Gruppe für frühere Znuny-Changes",
+            "help": "Mitglieder (ro) dürfen die Changes des Znuny-ITSM-Change-Moduls lesen. Existiert die Gruppe nicht, dürfen es Change-Manager und Administratoren."
           }
         }
       },
@@ -5913,6 +6088,11 @@
           "service_not_found": "Der Service wurde nicht gefunden.",
           "generic": "Die ITSM-Daten konnten nicht gespeichert werden."
         }
+      },
+      "changeCard": {
+        "title": "Change-Management",
+        "text": "Change-Vorlagen, CAB, Risikofragen, Sperrzeiträume und das Change-Archiv verwalten.",
+        "link": "Change-Management öffnen"
       }
     },
     "itsmImport": {
@@ -6008,7 +6188,7 @@
         "attachments": "Anhänge",
         "priority_matrix": "Prioritätsmatrix",
         "service_meta": "Service-Angaben",
-        "changes": "Changes (nur gezählt)",
+        "changes": "Changes (Archiv)",
         "deleted_in_znuny": "In Znuny gelöscht",
         "incident_states": "Vorfallstatus"
       },
@@ -6023,6 +6203,231 @@
         "issues": "Auffälligkeiten ({{count}})",
         "truncated": "Es werden die ersten {{shown}} von {{count}} Auffälligkeiten angezeigt.",
         "csv": "Vollständiger Bericht (CSV)"
+      }
+    },
+    "itsmChange": {
+      "title": "Change-Management",
+      "settingsLink": "Einstellungen Change-Management",
+      "tabsLabel": "Bereiche des Change-Managements",
+      "tabs": {
+        "templates": "Vorlagen",
+        "cab": "CAB",
+        "risk": "Risikofragen",
+        "freeze": "Sperrzeiträume",
+        "archive": "Change-Archiv"
+      },
+      "loadFailed": "Die Daten konnten nicht geladen werden.",
+      "invalid": "Ungültig",
+      "valid": "Gültig",
+      "none": "Keine Vorgabe",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "templates": {
+        "new": "Neue Vorlage",
+        "empty": "Es gibt noch keine Change-Vorlagen.",
+        "standard": "Vorab freigegeben",
+        "broken": "Fehlerhaft",
+        "brokenHint": "Die Vorlage verweist auf etwas, das es nicht mehr gibt. Bitte öffnen und speichern Sie sie neu.",
+        "taskCount_one": "{{count}} Aufgabe",
+        "taskCount_other": "{{count}} Aufgaben",
+        "deleteTitle": "Vorlage löschen",
+        "deleteMessage": "Vorlage „{{name}}“ löschen? Changes, die aus ihr erstellt wurden, bleiben erhalten."
+      },
+      "editor": {
+        "titleNew": "Neue Change-Vorlage",
+        "titleEdit": "Change-Vorlage bearbeiten",
+        "back": "Zurück zum Change-Management",
+        "name": "Name",
+        "description": "Beschreibung",
+        "changeType": "Art des Changes",
+        "isStandard": "Vorab freigegebener Standard-Change",
+        "isStandardHint": "Nur bei Standard-Changes: Changes aus dieser Vorlage brauchen keine CAB-Freigabe.",
+        "defaults": "Vorgaben für neue Changes",
+        "defaultsHint": "Was beim Anlegen angegeben wird, hat Vorrang vor diesen Vorgaben.",
+        "defaultTitle": "Titel",
+        "queue": "Queue",
+        "priority": "Priorität",
+        "services": "Services",
+        "addService": "Service hinzufügen",
+        "removeService": "Service {{name}} entfernen",
+        "cab": "CAB",
+        "duration": "Dauer (Minuten)",
+        "durationHint": "Ende = Beginn + Dauer, wenn beim Anlegen nur ein Beginn angegeben wird.",
+        "portalVisible": "Im Kundenportal bei den Wartungsfenstern anzeigen",
+        "reason": "Begründung",
+        "implementationPlan": "Umsetzungsplan",
+        "backoutPlan": "Rückfallplan",
+        "testPlan": "Testplan",
+        "riskAnswers": "Vorgegebene Antworten der Risikobewertung",
+        "riskAnswersEmpty": "Es gibt keine gültigen Risikofragen.",
+        "riskAnswersFailed": "Die Risikofragen konnten nicht geladen werden.",
+        "tasks": "Change-Aufgaben",
+        "tasksHint": "Beim Anlegen eines Changes aus dieser Vorlage entstehen diese Aufgaben als eigene Tickets.",
+        "nameMissing": "Bitte geben Sie einen Namen ein.",
+        "durationInvalid": "Die Dauer muss zwischen 1 und 525600 Minuten liegen.",
+        "tasksInvalid": "Bitte prüfen Sie die markierten Aufgaben.",
+        "saved": "Gespeichert.",
+        "notFound": "Die Vorlage gibt es nicht mehr.",
+        "riskAnswersStale": "Beim Speichern entfallen diese vorgegebenen Antworten, weil Frage oder Antwort nicht mehr gültig ist: {{list}}"
+      },
+      "tasks": {
+        "empty": "Die Vorlage hat keine Aufgaben.",
+        "add": "Aufgabe hinzufügen",
+        "remove": "Aufgabe {{n}} entfernen",
+        "row": "Aufgabe {{n}}",
+        "key": "Schlüssel",
+        "title": "Titel",
+        "kind": "Typ",
+        "offset": "Beginn relativ zum Change (Minuten)",
+        "duration": "Dauer (Minuten)",
+        "queue": "Queue",
+        "queueDefault": "Queue des Changes",
+        "owner": "Besitzer",
+        "ownerNone": "Kein Besitzer",
+        "clearOwner": "Besitzer entfernen",
+        "body": "Beschreibung",
+        "max": "Höchstens {{max}} Aufgaben.",
+        "problems": {
+          "key": "Schlüssel: nur a–z, 0–9 und _ (höchstens 50 Zeichen).",
+          "keyDuplicate": "Dieser Schlüssel kommt mehrfach vor.",
+          "title": "Bitte geben Sie einen Titel ein.",
+          "offset": "Der Beginn muss zwischen -43200 und 525600 Minuten liegen.",
+          "duration": "Die Dauer muss zwischen 1 und 525600 Minuten liegen."
+        }
+      },
+      "cab": {
+        "new": "Neues CAB",
+        "edit": "CAB bearbeiten",
+        "empty": "Es gibt noch kein CAB.",
+        "emergency": "Notfall-CAB",
+        "membersEmpty": "Keine Mitglieder",
+        "emptyHint": "Ein CAB ohne Mitglieder kann keine Freigabe anfordern.",
+        "missing": "fehlt",
+        "memberCount_one": "{{label}} ({{count}} Person)",
+        "memberCount_other": "{{label}} ({{count}} Personen)",
+        "name": "Name",
+        "description": "Beschreibung",
+        "ruleLabel": "Entscheidungsregel",
+        "rule": {
+          "any": "Eine Zustimmung genügt",
+          "all": "Alle müssen zustimmen",
+          "majority": "Mehrheit",
+          "quorum": "Mindestzahl an Zustimmungen"
+        },
+        "quorum": "Mindestzahl",
+        "quorumMissing": "Bitte geben Sie eine Mindestzahl zwischen 1 und 100 ein.",
+        "isEmergency": "Notfall-CAB (entscheidet über Notfall-Changes)",
+        "members": "Mitglieder",
+        "membersHint": "Agenten, Gruppen, Rollen, Freigabegruppen oder Regeln; jedes Mitglied stimmt einzeln ab. Höchstens 50 Einträge.",
+        "membersIncomplete": "Bitte wählen Sie für jedes Mitglied einen Eintrag aus.",
+        "customersOff": "Kundenbenutzer als CAB-Mitglieder sind erst möglich, wenn Kunden in den Freigabe-Einstellungen als Freigeber erlaubt sind.",
+        "membersNotSaved": "Das CAB ist angelegt, die Mitglieder sind aber noch nicht gespeichert.",
+        "deleteTitle": "CAB löschen",
+        "deleteMessage": "CAB „{{name}}“ löschen?",
+        "quorumTooLarge": "Das Quorum ist größer als die Zahl der Mitglieder. Fügen Sie Mitglieder hinzu oder senken Sie die Mindestzahl.",
+        "ruleMismatch": "Entscheidungsregel, Mindestzahl und Mitglieder passen nicht zusammen.",
+        "boardSavedOnly": "Name und Regel sind gespeichert, die Mitglieder aber nicht.",
+        "memberInvalid": "Ein Mitglied ist ungültig oder existiert nicht mehr.",
+        "membersSavedOnly": "Die Mitglieder sind gespeichert, Name und Regel jedoch nicht."
+      },
+      "risk": {
+        "new": "Neue Frage",
+        "edit": "Frage bearbeiten",
+        "intro": "Die Punkte der gewählten Antworten zählen zur Risikobewertung jedes Changes.",
+        "empty": "Es gibt noch keine Risikofragen. Übernehmen Sie die Beispielfragen oder legen Sie eigene an.",
+        "examples": "Beispielfragen übernehmen",
+        "examplesDone_one": "{{count}} Beispielfrage übernommen.",
+        "examplesDone_other": "{{count}} Beispielfragen übernommen.",
+        "examplesNone": "Alle Beispielfragen sind schon vorhanden.",
+        "answerCount_one": "{{count}} Antwort",
+        "answerCount_other": "{{count}} Antworten",
+        "pointRange": "{{min}} bis {{max}} Punkte",
+        "key": "Schlüssel",
+        "keyImmutable": "Der Schlüssel lässt sich nach dem Anlegen nicht mehr ändern.",
+        "question": "Frage",
+        "help": "Hilfetext",
+        "answers": "Antworten",
+        "answersHint": "2 bis 10 Antworten. Negative Punkte senken das Risiko.",
+        "answerKey": "Schlüssel der Antwort {{n}}",
+        "answerLabel": "Text der Antwort {{n}}",
+        "answerPoints": "Punkte der Antwort {{n}}",
+        "addAnswer": "Antwort hinzufügen",
+        "removeAnswer": "Antwort {{n}} entfernen",
+        "deleteTitle": "Frage löschen",
+        "deleteMessage": "Frage „{{question}}“ löschen? Die Antworten, die Changes darauf gegeben haben, gehen verloren. Setzen Sie die Frage auf ungültig, um sie zu behalten.",
+        "problems": {
+          "key": "Schlüssel: am Anfang ein Kleinbuchstabe, dann a–z, 0–9 oder _ (höchstens 50 Zeichen).",
+          "question": "Bitte geben Sie die Frage ein.",
+          "answers": "Jede Antwort braucht einen eindeutigen Schlüssel (wie oben), einen Text und Punkte zwischen -50 und 50.",
+          "answerCount": "Bitte geben Sie 2 bis 10 Antworten an."
+        }
+      },
+      "freeze": {
+        "new": "Neuer Sperrzeitraum",
+        "edit": "Sperrzeitraum bearbeiten",
+        "empty": "Es gibt keine Sperrzeiträume.",
+        "utc": "Zeiten in UTC",
+        "name": "Name",
+        "note": "Notiz",
+        "enforcementLabel": "Wirkung",
+        "enforcement": {
+          "block": "Changes sperren",
+          "warn": "Nur warnen"
+        },
+        "allowEmergency": "Notfall-Changes zulassen (nur Warnung)",
+        "scopeLabel": "Gilt für",
+        "scope": {
+          "all": "Alle Services",
+          "services": "Bestimmte Services"
+        },
+        "allServices": "alle Services",
+        "start": "Beginn (UTC)",
+        "end": "Ende (UTC)",
+        "recurrence": "Wiederholung",
+        "recurrenceNone": "Keine",
+        "interval": "Intervall",
+        "recurrenceEnd": "Ende der Wiederholung",
+        "endNever": "Nie",
+        "endCount": "Nach Anzahl",
+        "endUntil": "Bis Datum",
+        "count": "Anzahl der Termine",
+        "until": "Bis (UTC)",
+        "recurs": "{{type}}, Intervall {{interval}}",
+        "deleteTitle": "Sperrzeitraum löschen",
+        "deleteMessage": "Sperrzeitraum „{{name}}“ löschen?",
+        "problems": {
+          "name": "Bitte geben Sie einen Namen ein.",
+          "window": "Bitte geben Sie Beginn und Ende an.",
+          "order": "Das Ende muss nach dem Beginn liegen.",
+          "services": "Bitte wählen Sie mindestens einen Service.",
+          "interval": "Das Intervall muss mindestens 1 sein.",
+          "count": "Die Anzahl muss mindestens 1 sein.",
+          "until": "Bitte geben Sie ein Datum nach dem Beginn an."
+        }
+      },
+      "archive": {
+        "intro": "Übernimmt die Changes aus Znuny (ITSMChangeManagement) schreibgeschützt ins Change-Archiv. Znuny selbst wird dabei nicht verändert; ein erneuter Lauf aktualisiert nur, was sich geändert hat.",
+        "searchHint": "Die Suche in den archivierten Changes findet Nummer und Titel.",
+        "archived": "Archivierte Changes: {{count}}",
+        "lastRun": "Zuletzt archiviert: {{time}} (UTC)",
+        "never": "Noch nicht archiviert.",
+        "dryRun": "Probelauf",
+        "dryRunHint": "Der Probelauf zählt nur und schreibt nichts.",
+        "run": "Archivieren",
+        "active": "Ein Lauf ist bereits aktiv. Sie sehen seinen Fortschritt.",
+        "joined": "Es lief bereits ein Lauf dieser Art. Statt eines neuen sehen Sie dessen Fortschritt.",
+        "resultTitle": "Ergebnis",
+        "resultTitleDry": "Ergebnis des Probelaufs (nichts geschrieben)",
+        "created": "Neu",
+        "updated": "Aktualisiert",
+        "unchanged": "Unverändert",
+        "skipped": "Übersprungen",
+        "notArchived": "Bleibt in Znuny (nicht übernommen)",
+        "notArchivedKinds": {
+          "templates": "Change-Vorlagen",
+          "conditions": "Bedingungen",
+          "notifications": "Benachrichtigungen"
+        }
       }
     }
   },
@@ -6661,6 +7066,9 @@
         "cmdb_reindex": "CMDB-Suche neu aufbauen",
         "itsm_linked_articles": "Notiz an verknüpfte Tickets",
         "itsm_import": "Znuny-ITSM-Daten importieren",
+        "itsm_change_tasks": "Change-Aufgaben anlegen",
+        "itsm_change_impact": "Auswirkung eines Changes berechnen",
+        "itsm_legacy_change_archive": "Znuny-Changes archivieren",
         "itsm_switch": "ITSM auf Tiqora umstellen",
         "approval_hook": "Freigabe-Nachbearbeitung",
         "approval_mail": "Freigabe-Benachrichtigungen"
@@ -9179,6 +9587,672 @@
     "newTicket": {
       "recentIncident": "Für diesen Service gab es bereits vor {{minutes}} Minuten einen Vorfall: #{{tn}} {{title}}. Handelt es sich um dasselbe Problem?",
       "openTicket": "Ticket öffnen"
+    },
+    "change": {
+      "phases": {
+        "draft": "Entwurf",
+        "submitted": "Eingereicht",
+        "assessment": "Bewertung",
+        "approval": "Freigabe",
+        "scheduled": "Geplant",
+        "implementing": "Umsetzung",
+        "review": "Nachbetrachtung",
+        "closed": "Abgeschlossen",
+        "rejected": "Abgelehnt",
+        "cancelled": "Abgebrochen"
+      },
+      "types": {
+        "standard": "Standard-Change",
+        "normal": "Normaler Change",
+        "emergency": "Notfall-Change"
+      },
+      "risk": {
+        "label": "Risiko",
+        "none": "Nicht bewertet",
+        "levels": {
+          "low": "Niedrig",
+          "medium": "Mittel",
+          "high": "Hoch",
+          "very_high": "Sehr hoch"
+        },
+        "title": "Risikobewertung",
+        "evaluate": "Neu bewerten",
+        "points_one": "{{count}} Punkt",
+        "points_other": "{{count}} Punkte",
+        "computed": "berechnet: {{level}}",
+        "thresholds": "Mittel ab {{medium}}, Hoch ab {{high}}, Sehr hoch ab {{veryHigh}} Punkten",
+        "evaluatedAt": "Bewertet am {{time}} (UTC)",
+        "notEvaluated": "Noch nicht bewertet.",
+        "blocked": "Ein Befund blockiert den Change.",
+        "incomplete": "Die Bewertung ist unvollständig: Eine Prüfung schlug fehl oder die Auswirkung ist abgeschnitten.",
+        "questionnaire": "Fragebogen",
+        "answer_one": "{{label}} ({{count}} Punkt)",
+        "answer_other": "{{label}} ({{count}} Punkte)",
+        "unanswered": "Nicht beantwortet",
+        "questionnaireOpen": "Bitte beantworten Sie alle Fragen.",
+        "saveAnswers": "Antworten speichern",
+        "findingsTitle": "Befunde",
+        "findingsEmpty": "Keine Befunde.",
+        "findings": {
+          "generic": "Befund der Prüfung {{check}}",
+          "service_criticality": "Betroffene Services mit Kritikalität {{criticality}} ({{services}} Services)",
+          "ci_incident": "Betroffene CIs mit Störung: {{incident}}, mit Warnung: {{warning}}",
+          "open_incidents_one": "{{count}} offener Incident auf den betroffenen Services in den letzten {{lookback_days}} Tagen",
+          "open_incidents_other": "{{count}} offene Incidents auf den betroffenen Services in den letzten {{lookback_days}} Tagen",
+          "overlap_one": "{{count}} anderer Change im selben Zeitfenster",
+          "overlap_other": "{{count}} andere Changes im selben Zeitfenster",
+          "freeze_one": "Das Zeitfenster liegt in {{count}} Sperrzeitraum",
+          "freeze_other": "Das Zeitfenster liegt in {{count}} Sperrzeiträumen",
+          "freeze_truncated_one": "Viele Sperrzeiträume im Zeitfenster; nicht alle konnten geprüft werden",
+          "freeze_truncated_other": "Viele Sperrzeiträume im Zeitfenster; nicht alle konnten geprüft werden",
+          "failed_history_one": "{{count}} fehlgeschlagener Change an denselben CIs oder Services in den letzten {{lookback_days}} Tagen",
+          "failed_history_other": "{{count}} fehlgeschlagene Changes an denselben CIs oder Services in den letzten {{lookback_days}} Tagen",
+          "emergency": "Notfall-Change",
+          "missing_backout": "Der Rückfallplan fehlt",
+          "check_failed": "Eine Prüfung konnte nicht laufen; die Punktzahl kann zu niedrig sein",
+          "overlap_truncated": "Viele andere Changes im selben Zeitfenster; nicht alle konnten geprüft werden"
+        },
+        "override": {
+          "current": "Übersteuert auf",
+          "open": "Risiko übersteuern",
+          "level": "Risikostufe",
+          "none": "Keine Übersteuerung (berechnete Stufe)",
+          "reason": "Begründung"
+        },
+        "findingTruncated": "(Liste abgeschnitten, es können mehr sein)"
+      },
+      "phaseBar": {
+        "label": "Phasen dieses Changes"
+      },
+      "pages": {
+        "list": "Changes",
+        "detail": "Change",
+        "calendar": "Change-Kalender",
+        "cabMeetings": "CAB-Sitzungen",
+        "cabMeeting": "CAB-Sitzung",
+        "legacyList": "Changes (Znuny)",
+        "legacyDetail": "Znuny-Change",
+        "legacyArchive": "Changes (Znuny-Archiv)",
+        "linksLabel": "Weitere Seiten des Change-Managements"
+      },
+      "list": {
+        "create": "Change anlegen",
+        "tabs": {
+          "all": "Alle",
+          "mine": "Meine Changes",
+          "tasks": "Meine Aufgaben",
+          "approval": "Freigabe"
+        },
+        "search": "Suche",
+        "searchPlaceholder": "Nummer oder Titel",
+        "phase": "Phase",
+        "allPhases": "Alle Phasen",
+        "type": "Art",
+        "allTypes": "Alle Arten",
+        "service": "Service",
+        "allServices": "Alle Services",
+        "windowFrom": "Zeitfenster ab (UTC)",
+        "windowTo": "Zeitfenster bis (UTC)",
+        "openOnly": "Nur offene Aufgaben",
+        "empty": "Keine Changes gefunden.",
+        "tasksEmpty": "Keine Aufgaben gefunden.",
+        "truncated": "Die Liste ist unvollständig: Es gibt mehr Treffer, als durchsucht werden. Bitte grenzen Sie die Suche mit einem Filter ein.",
+        "totalAtLeast": "mindestens {{count}} Treffer",
+        "range": "{{from}}–{{to}} von {{total}}",
+        "prev": "Zurück",
+        "next": "Weiter",
+        "noWindow": "Kein Zeitfenster",
+        "colChange": "Change",
+        "colType": "Art",
+        "colPhase": "Phase",
+        "colWindow": "Zeitfenster (UTC)",
+        "colServices": "Services",
+        "colTask": "Aufgabe",
+        "colKind": "Typ",
+        "colState": "Status",
+        "kinds": {
+          "workorder": "Arbeitsauftrag",
+          "backout": "Rückfall",
+          "decision": "Entscheidung",
+          "pir": "Nachbetrachtung"
+        },
+        "windowInvalid": "Das Ende des Zeitfensters darf nicht vor dem Beginn liegen.",
+        "calendar": "Kalender",
+        "tasksTruncated": "Es werden nur die ersten 100 Aufgaben angezeigt."
+      },
+      "create": {
+        "title": "Change anlegen",
+        "submit": "Anlegen",
+        "type": "Art des Changes",
+        "typeHint": {
+          "standard": "Standard-Change: vorab genehmigt, braucht eine Standard-Vorlage.",
+          "normal": "Normaler Change: wird bewertet und vom CAB freigegeben.",
+          "emergency": "Notfall-Change: ohne Bewertung, mit beschleunigter Freigabe."
+        },
+        "template": "Vorlage (optional)",
+        "templateRequired": "Standard-Vorlage",
+        "noTemplate": "Ohne Vorlage",
+        "pickTemplate": "Vorlage wählen",
+        "noStandardTemplates": "Es gibt keine gültige Standard-Vorlage. Bitte legen Sie zuerst in der Administration eine an.",
+        "titleLabel": "Titel",
+        "queue": "Queue",
+        "defaultQueue": "Standard-Queue laut Einstellungen",
+        "services": "Betroffene Services",
+        "addService": "Service hinzufügen",
+        "cis": "Betroffene CIs",
+        "addCi": "CI hinzufügen",
+        "remove": "Entfernen",
+        "start": "Geplanter Beginn (UTC)",
+        "end": "Geplantes Ende (UTC)",
+        "windowHint": "Zeiten in UTC. Das Zeitfenster kann auch später gesetzt werden.",
+        "reason": "Begründung",
+        "body": "Beschreibung",
+        "created": "Change {{tn}} wurde angelegt.",
+        "tasksJob": "Aufgaben aus der Vorlage werden angelegt …",
+        "tasksFailed_one": "{{count}} Aufgabe konnte nicht angelegt werden.",
+        "tasksFailed_other": "{{count}} Aufgaben konnten nicht angelegt werden.",
+        "open": "Change öffnen",
+        "warnings": {
+          "ci_refs_truncated": "Es wurden nicht alle CIs verknüpft: Die Obergrenze je Change ist erreicht.",
+          "generic": "Beim Anlegen gab es einen Hinweis.",
+          "portal_visible_failed": "Die Anzeige im Kundenportal konnte nicht gesetzt werden. Sie können sie auf der Change-Seite einschalten."
+        }
+      },
+      "errors": {
+        "generic": "Die Aktion ist fehlgeschlagen.",
+        "change_mode_a": "Change-Management ist im Modus A nicht verfügbar. Die Znuny-Changes können Sie nur lesen.",
+        "change_unavailable": "Change-Management ist nicht eingeschaltet.",
+        "change_setup_missing": "Die Einrichtung ist unvollständig: Ticket-Typ oder Status für Changes fehlen. Bitte informieren Sie Ihre Administration.",
+        "standard_needs_template": "Ein Standard-Change braucht eine Standard-Vorlage.",
+        "template_type_mismatch": "Die Vorlage passt nicht zur gewählten Art des Changes.",
+        "template_not_found": "Die Vorlage gibt es nicht mehr.",
+        "template_invalid": "Die Vorlage ist fehlerhaft und kann nicht verwendet werden.",
+        "queue_required": "Bitte wählen Sie eine Queue: Es ist keine Standard-Queue für Changes eingestellt.",
+        "queue_not_found": "Die Queue gibt es nicht.",
+        "forbidden": "Dafür fehlen Ihnen die Rechte.",
+        "service_not_found": "Einen der Services gibt es nicht mehr.",
+        "cab_not_found": "Das CAB gibt es nicht.",
+        "cab_invalid": "Das CAB ist ungültig.",
+        "ci_ref_invalid": "Eine CI-Angabe ist ungültig.",
+        "ci_not_found": "Eines der CIs gibt es nicht mehr.",
+        "cmdb_unavailable": "Die CMDB ist nicht verfügbar; CIs können nicht verknüpft werden.",
+        "invalid_window": "Das Ende muss nach dem Beginn liegen.",
+        "window_invalid": "Das Ende muss nach dem Beginn liegen.",
+        "change_priority_not_found": "Die Priorität für Changes gibt es nicht.",
+        "change_state_not_found": "Ein Ticket-Status für Changes fehlt in den Einstellungen.",
+        "owner_invalid": "Der Besitzer ist ungültig.",
+        "vetoed": "Ein Plugin hat die Aktion abgelehnt.",
+        "invalid_input": "Die Eingabe ist ungültig.",
+        "engineCode": "(Code: {{code}})",
+        "change_not_found": "Den Change gibt es nicht, oder Sie dürfen ihn nicht sehen.",
+        "change_final": "Der Change ist abgeschlossen oder abgebrochen und kann nicht mehr geändert werden.",
+        "change_locked_in_approval": "Während der Freigabe sind Art, Zeitfenster, Pläne und CAB gesperrt. Ziehen Sie die Freigabe zurück oder warten Sie die Entscheidung ab.",
+        "change_type_locked": "Die Art des Changes lässt sich nur im Entwurf ändern.",
+        "approval_request_failed": "Die Freigabe konnte nicht angefordert werden.",
+        "cab_customer_members_disabled": "Das CAB enthält Kundenbenutzer, aber Kunden als Freigeber sind ausgeschaltet.",
+        "resolver_not_found": "Eine Freigeber-Regel des CAB gibt es nicht mehr.",
+        "list_not_found": "Eine Freigabegruppe des CAB gibt es nicht mehr.",
+        "not_a_change_ticket": "Das Ticket hat nicht den Ticket-Typ für Changes.",
+        "change_exists": "Das Ticket wird schon als Change geführt.",
+        "process_ticket": "Das Ticket ist ein Prozess-Ticket und kann nicht als Change geführt werden.",
+        "ticket_closed": "Das Ticket ist geschlossen. Öffnen Sie es wieder, um es als Change zu führen.",
+        "task_not_found": "Die Aufgabe gibt es nicht mehr.",
+        "max_tasks_reached": "Der Change hat schon die größte mögliche Zahl an Aufgaben.",
+        "order_invalid": "Die Reihenfolge passt nicht zu den Aufgaben. Bitte laden Sie die Seite neu.",
+        "task_link_failed": "Die Aufgabe konnte nicht mit dem Change verknüpft werden.",
+        "risk_override_reason_required": "Bitte begründen Sie die Änderung der Risikostufe.",
+        "risk_override_reason_too_long": "Die Begründung ist zu lang (höchstens 1000 Zeichen).",
+        "risk_level_invalid": "Diese Risikostufe gibt es nicht.",
+        "risk_question_unknown": "Eine der Fragen gibt es nicht mehr. Bitte laden Sie die Seite neu.",
+        "risk_answer_unknown": "Eine der Antworten gibt es nicht mehr. Bitte laden Sie die Seite neu.",
+        "forbidden_create": "Sie dürfen in dieser Queue keine Changes anlegen.",
+        "ticket_not_found": "Den Change gibt es nicht, oder Sie dürfen ihn nicht sehen.",
+        "validation": "Die Eingabe ist ungültig (Feld: {{field}}).",
+        "template_name_exists": "Es gibt schon eine Vorlage mit diesem Namen.",
+        "template_standard_type": "Nur eine Vorlage für Standard-Changes kann vorab freigegeben sein.",
+        "template_too_many_tasks": "Die Vorlage hat zu viele Aufgaben (höchstens {{max_tasks}}).",
+        "template_duplicate_task_key": "Der Schlüssel „{{key}}“ kommt bei den Aufgaben mehrfach vor.",
+        "template_queue_not_found": "Eine gewählte Queue gibt es nicht mehr.",
+        "template_priority_not_found": "Die gewählte Priorität gibt es nicht mehr.",
+        "template_service_not_found": "Einen gewählten Service gibt es nicht mehr.",
+        "template_cab_not_found": "Das gewählte CAB gibt es nicht mehr.",
+        "template_owner_not_found": "Ein gewählter Besitzer ist ungültig oder gelöscht.",
+        "template_risk_answer_invalid": "Eine vorgegebene Antwort der Risikobewertung passt nicht mehr zu den Risikofragen.",
+        "cab_name_exists": "Es gibt schon ein CAB mit diesem Namen.",
+        "cab_too_many_members": "Ein CAB hat höchstens {{max}} Mitglieder.",
+        "cab_member_duplicate": "Ein Mitglied ist doppelt eingetragen.",
+        "cab_member_invalid": "Ein Mitglied ist ungültig.",
+        "cab_has_meetings": "Das CAB hat CAB-Sitzungen und kann nicht gelöscht werden. Setzen Sie es stattdessen auf ungültig.",
+        "user_not_found": "Ein Agent unter den Mitgliedern ist ungültig oder gelöscht.",
+        "group_not_found": "Eine Gruppe unter den Mitgliedern ist ungültig oder gelöscht.",
+        "role_not_found": "Eine Rolle unter den Mitgliedern ist ungültig oder gelöscht.",
+        "risk_question_key_exists": "Es gibt schon eine Frage mit diesem Schlüssel.",
+        "risk_question_key_immutable": "Der Schlüssel einer Frage lässt sich nicht ändern.",
+        "risk_question_order_mismatch": "Die Reihenfolge passt nicht mehr zu den Fragen. Bitte laden Sie die Seite neu.",
+        "risk_question_not_found": "Die Frage gibt es nicht mehr.",
+        "freeze_recurrence_invalid": "Das Ende der Wiederholung liegt vor dem Beginn.",
+        "freeze_services_required": "Bitte wählen Sie mindestens einen Service.",
+        "freeze_not_found": "Den Sperrzeitraum gibt es nicht mehr.",
+        "legacy_archive_mode_b_only": "Das Change-Archiv wird nur im ITSM-Modus Tiqora eigenständig übernommen; vorher übernimmt der ITSM-Import die Changes.",
+        "legacy_archive_no_tables": "In der Znuny-Datenbank ist kein Change-Management (ITSMChangeManagement) installiert.",
+        "validationMore_one": "Die Eingabe ist ungültig (Feld: {{field}} und ein weiteres).",
+        "validationMore_other": "Die Eingabe ist ungültig (Feld: {{field}} und {{count}} weitere).",
+        "meeting_not_found": "Die CAB-Sitzung gibt es nicht.",
+        "meeting_not_planned": "Die Tagesordnung lässt sich nur bei einer geplanten Sitzung ändern.",
+        "agenda_duplicate": "Ein Change steht mehrfach auf der Tagesordnung.",
+        "agenda_too_long": "Die Tagesordnung ist zu lang.",
+        "change_not_open": "Der Change ist in einer Phase, in der er nicht mehr auf die Tagesordnung kann.",
+        "range_invalid": "Der Zeitraum ist ungültig.",
+        "range_too_large": "Der Zeitraum ist zu groß.",
+        "legacy_change_not_found": "Den Znuny-Change gibt es nicht.",
+        "legacy_forbidden": "Sie gehören nicht zur Gruppe, die Znuny-Changes sehen darf. Wenden Sie sich an einen Administrator.",
+        "legacy_unavailable": "Es gibt keine Znuny-Changes zum Anzeigen: Znuny hat kein Change-Management, und ein Change-Archiv gibt es nicht.",
+        "search_too_broad": "Die Suche ist zu breit. Bitte grenzen Sie sie ein.",
+        "standard_template_invalid": "Die Vorlage dieses Standard-Changes fehlt, ist ungültig oder keine Standard-Vorlage mehr; der Change ist deshalb nicht vorab freigegeben. Planen Sie ihn als normalen Change.",
+        "risk_question_in_use": "Changes haben diese Frage beantwortet, deshalb kann sie nicht gelöscht werden. Setzen Sie sie stattdessen auf ungültig.",
+        "from_ticket_mismatch": "Der Change kann nur aus dem Ticket angelegt werden, in dem Sie sind.",
+        "link_not_found": "Die Verknüpfung gibt es nicht mehr.",
+        "related_self": "Ein Change kann nicht mit sich selbst verknüpft werden.",
+        "related_is_task": "Dieses Ticket ist eine Aufgabe des Changes und schon mit ihm verknüpft.",
+        "link_refused": "Die Verknüpfung konnte nicht angelegt werden."
+      },
+      "transition": {
+        "submit": "Ausführen",
+        "reason": "Begründung (optional, erscheint im Verlauf)",
+        "reasonRequired": "Wer einen Schritt erzwingt, muss ihn begründen.",
+        "refused": "Der Schritt ist noch nicht möglich:",
+        "overrideHint": "Als Change-Manager können Sie diese Prüfung übergehen.",
+        "overrideReason": "Begründung für das Übergehen des Sperrzeitraums",
+        "force": "Trotzdem fortfahren (offene Aufgaben bzw. zurückgezogene Freigabe übergehen)",
+        "actions": {
+          "draft": "Zurück in den Entwurf",
+          "submitted": "Einreichen",
+          "assessment": "Bewertung beginnen",
+          "approval": "Freigabe anfordern",
+          "scheduled": "Einplanen",
+          "implementing": "Umsetzung starten",
+          "review": "Zur Nachbetrachtung",
+          "closed": "Abschließen",
+          "rejected": "Ablehnen",
+          "cancelled": "Change abbrechen"
+        },
+        "pairs": {
+          "submitted_draft": "Zurück an Antragsteller",
+          "rejected_draft": "Überarbeiten",
+          "scheduled_draft": "Neu planen",
+          "assessment_scheduled": "Ohne CAB einplanen (geringes Risiko)",
+          "draft_implementing": "Sofort umsetzen (Freigabe nachträglich)"
+        },
+        "hints": {
+          "approval": "Die Freigabe wird beim CAB angefordert; die Mitglieder stimmen im Abschnitt Freigaben ab.",
+          "draft_implementing": "Die Umsetzung beginnt sofort; das CAB gibt den Notfall-Change nachträglich frei.",
+          "assessment_scheduled": "Ein Change mit geringem Risiko wird ohne CAB eingeplant, wenn die Einstellungen das erlauben.",
+          "scheduled_draft": "Der Change geht zurück in den Entwurf; ein normaler oder Notfall-Change braucht danach eine neue Freigabe.",
+          "rejected_draft": "Der Change geht zurück in den Entwurf; die nächste Freigabe ist eine neue Runde.",
+          "cancelled": "Der Change wird abgebrochen; eine laufende Freigabe wird zurückgezogen."
+        },
+        "failures": {
+          "generic": "Eine Prüfung ist fehlgeschlagen ({{code}}).",
+          "window_missing": "Das Zeitfenster fehlt.",
+          "plans_missing": "Umsetzungs- und Rückfallplan fehlen.",
+          "questionnaire_incomplete": "Der Risiko-Fragebogen ist nicht vollständig beantwortet.",
+          "impact_pending": "Die Auswirkung ist nicht aktuell berechnet. Bitte berechnen Sie sie neu.",
+          "block_conflict": "Ein Sperrzeitraum blockiert das Zeitfenster.",
+          "tasks_open": "Es sind noch Aufgaben offen.",
+          "outcome_missing": "Bitte wählen Sie das Ergebnis.",
+          "pir_missing": "Die Nachbetrachtung fehlt.",
+          "approval_pending": "Die Freigabe ist noch nicht entschieden.",
+          "cab_missing": "Es ist kein CAB gewählt, und es ist kein Standard-CAB eingestellt.",
+          "cab_empty": "Das CAB hat keine Mitglieder.",
+          "reason_missing": "Wer einen Schritt erzwingt, muss ihn begründen.",
+          "transition_not_allowed": "Dieser Schritt ist für diesen Change nicht möglich.",
+          "system_only": "Diesen Schritt nimmt nur die Freigabe-Entscheidung des CAB.",
+          "process_ticket": "Das Ticket ist ein Prozess-Ticket; ein Change-Manager kann den Change nur noch abbrechen.",
+          "auto_approval_not_eligible": "Der Change ist nicht für eine Einplanung ohne CAB geeignet (Einstellung aus, Risiko nicht niedrig oder Bewertung unvollständig)."
+        }
+      },
+      "pir": {
+        "closeTitle": "Change abschließen",
+        "reviewTitle": "Zur Nachbetrachtung",
+        "outcome": "Ergebnis",
+        "pickOutcome": "Ergebnis wählen",
+        "outcomes": {
+          "successful": "Erfolgreich",
+          "failed": "Fehlgeschlagen",
+          "backed_out": "Zurückgerollt"
+        },
+        "notes": "Nachbetrachtung (PIR)",
+        "notesRequired": "Bitte schreiben Sie die Nachbetrachtung, bevor Sie den Change abschließen."
+      },
+      "plans": {
+        "title": "Pläne und Zeitfenster",
+        "edit": "Bearbeiten",
+        "empty": "Nicht angegeben",
+        "locked": "Während der Freigabe sind Zeitfenster und Pläne gesperrt.",
+        "start": "Geplanter Beginn (UTC)",
+        "end": "Geplantes Ende (UTC)",
+        "windowHalf": "Bitte geben Sie Beginn und Ende an oder leeren Sie beide.",
+        "window": "Zeitfenster (UTC)",
+        "actual": "Tatsächlich (UTC)",
+        "since": "seit {{time}}",
+        "fields": {
+          "reason": "Begründung",
+          "implementation_plan": "Umsetzungsplan",
+          "backout_plan": "Rückfallplan",
+          "test_plan": "Testplan",
+          "pir_notes": "Nachbetrachtung (PIR)"
+        }
+      },
+      "tasks": {
+        "title": "Change-Aufgaben",
+        "add": "Aufgabe hinzufügen",
+        "addSubmit": "Hinzufügen",
+        "newTitle": "Titel der Aufgabe",
+        "kind": "Typ",
+        "progress": "{{done}} von {{total}} erledigt",
+        "empty": "Der Change hat keine Aufgaben.",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten"
+      },
+      "hiddenCount_one": "{{count}} weitere ohne Leserecht",
+      "hiddenCount_other": "{{count}} weitere ohne Leserecht",
+      "refs": {
+        "ticket": "Ticket #{{id}}",
+        "change": "Change #{{id}}",
+        "task": "Aufgabe #{{id}}",
+        "ci": "CI #{{id}}",
+        "service": "Service #{{id}}",
+        "freeze": "Sperrzeitraum #{{id}}"
+      },
+      "impact": {
+        "title": "Auswirkung",
+        "recompute": "Neu berechnen",
+        "computedAt": "Berechnet am {{time}} (UTC)",
+        "stale": "Die Auswirkung ist nicht mehr aktuell. Bitte berechnen Sie sie neu.",
+        "notComputed": "Die Auswirkung ist noch nicht berechnet.",
+        "truncated": "Die Auswirkung ist abgeschnitten: Es sind mehr CIs betroffen, als berechnet werden.",
+        "services": "Betroffene Services",
+        "cis": "Betroffene CIs",
+        "incidents": "Offene Incidents auf diesen Services",
+        "none": "Keine",
+        "noIncidents": "Keine offenen Incidents.",
+        "incidentsTruncated": "Es gibt weitere offene Incidents.",
+        "direct": "direkt",
+        "indirect": "über die CMDB",
+        "functionality": {
+          "operational": "Betriebsbereit",
+          "warning": "Warnung",
+          "incident": "Störung"
+        },
+        "computing": "Die Auswirkung wird berechnet …"
+      },
+      "conflicts": {
+        "title": "Konflikte",
+        "empty": "Keine Konflikte.",
+        "hidden": "Überschneidung mit einem Change ohne Leserecht",
+        "kinds": {
+          "freeze": "Sperrzeitraum",
+          "change_overlap": "Überschneidung mit",
+          "task_outside": "Außerhalb des Zeitfensters:",
+          "no_window": "Kein Zeitfenster gesetzt",
+          "freeze_truncated": "Zu viele Sperrzeiträume: nicht alle wurden geprüft",
+          "overlap_truncated": "Zu viele Changes im Zeitraum: nicht alle wurden geprüft",
+          "freeze_unverified": "Sperrzeitraum für einen Service: noch nicht geprüft, die Auswirkung wird noch berechnet"
+        },
+        "severity": {
+          "info": "Hinweis",
+          "warn": "Warnung",
+          "block": "Blockiert"
+        },
+        "sharedServices_one": "{{count}} gemeinsamer Service",
+        "sharedServices_other": "{{count}} gemeinsame Services",
+        "sharedCis_one": "{{count}} gemeinsames CI",
+        "sharedCis_other": "{{count}} gemeinsame CIs"
+      },
+      "approval": {
+        "title": "Freigabe (CAB)",
+        "panelTitle": "Abstimmung des CAB",
+        "cab": "CAB",
+        "defaultCab": "Standard-CAB laut Einstellungen",
+        "emergencyCab": "Notfall-CAB",
+        "round": "Runde {{round}}",
+        "votes_one": "{{approved}} von {{count}} Zustimmung",
+        "votes_other": "{{approved}} von {{count}} Zustimmungen",
+        "rejections_one": "{{count}} Ablehnung",
+        "rejections_other": "{{count}} Ablehnungen",
+        "requestedAt": "Angefordert am {{time}} (UTC)",
+        "decidedAt": "entschieden am {{time}} (UTC)",
+        "noApprovers": "Keine gültigen CAB-Mitglieder: Das CAB löst auf niemanden auf. Bitte prüfen Sie die Mitglieder.",
+        "via": {
+          "template": "Vorab genehmigt durch die Standard-Vorlage",
+          "risk": "Ohne CAB eingeplant (geringes Risiko)",
+          "post": "Notfall-Change: Freigabe nachträglich"
+        },
+        "historyMissing": "Freigabeverlauf nicht mehr vorhanden",
+        "none": "Noch keine Freigabe angefordert.",
+        "voteHint": "Abstimmen im Abschnitt Freigaben",
+        "defaultEmergencyCab": "Notfall-CAB laut Einstellungen",
+        "meetingsLink": "CAB-Sitzungen ansehen"
+      },
+      "banners": {
+        "ticketClosed": "Das Ticket wurde geschlossen ({{state}}), der Change steht aber noch in der Phase „{{phase}}“. Bitte schließen Sie den Change ab oder brechen Sie ihn ab, oder öffnen Sie das Ticket wieder.",
+        "drift": "Die Ticket-Felder passen nicht mehr zum Change: {{fields}}. Sie wurden außerhalb von Tiqora geändert; der nächste Schritt schreibt sie neu.",
+        "fields": {
+          "type_field": "Art",
+          "phase_field": "Phase"
+        },
+        "processTicket": "Das Ticket ist inzwischen ein Prozess-Ticket. Ein Change-Manager kann den Change nur noch abbrechen."
+      },
+      "zoom": {
+        "title": "Change",
+        "openPage": "Change-Seite öffnen",
+        "modeA": "Changes werden in Znuny geführt (Modus A). Sie können sie hier nur lesen.",
+        "modeALink": "Changes (Znuny) zu diesem Ticket",
+        "adoptHint": "Das Ticket hat den Ticket-Typ für Changes, wird aber noch nicht als Change geführt.",
+        "adopt": "Als Change führen",
+        "taskTitle": "Change-Aufgabe",
+        "taskOf": "Aufgabe von",
+        "taskParentHidden": "Change ohne Leserecht",
+        "taskStep": "Schritt {{position}}"
+      },
+      "detail": {
+        "back": "Alle Changes",
+        "openTicket": "Ticket öffnen"
+      },
+      "portal": {
+        "label": "Im Kundenportal bei den Wartungsfenstern anzeigen",
+        "help": "Sobald der Change eingeplant ist, sehen Kunden dort Titel, Zeitfenster und ihre betroffenen Services, aber keine Pläne."
+      },
+      "incident": {
+        "hint": "Der Change ist abgeschlossen mit dem Ergebnis „{{outcome}}“.",
+        "create": "Incident aus diesem Change erstellen",
+        "subject": "Incident nach Change {{tn}}: {{title}}",
+        "afterClose": "Nach dem Abschließen können Sie „Incident aus diesem Change erstellen“ wählen; das neue Ticket wird mit dem Change verknüpft."
+      },
+      "events": {
+        "title": "Verlauf des Changes",
+        "empty": "Noch keine Einträge.",
+        "more": "Ältere Einträge laden",
+        "system": "System",
+        "user": "Benutzer #{{id}}",
+        "phase": "Phase: {{from}} → {{to}}",
+        "phaseStart": "Phase: {{to}}",
+        "kinds": {
+          "created": "Change angelegt",
+          "adopted": "Als Change geführt",
+          "phase": "Phase geändert",
+          "updated": "Geändert",
+          "impact": "Auswirkung berechnet",
+          "approval_requested": "Freigabe angefordert",
+          "approval_outcome": "Ergebnis der Freigabe",
+          "conflict_override": "Sperrzeitraum übergangen",
+          "forced": "Schritt erzwungen",
+          "risk_override": "Risiko übersteuert",
+          "task_added": "Aufgabe hinzugefügt",
+          "related_linked": "Ticket verknüpft",
+          "related_unlinked": "Verknüpfung gelöst"
+        },
+        "detail": {
+          "reason": "Begründung",
+          "fields": "Felder",
+          "status": "Ergebnis",
+          "round": "Runde",
+          "approval_id": "Freigabe",
+          "approval": "Freigabe",
+          "cab_id": "CAB",
+          "cab_entries": "CAB-Einträge",
+          "block_conflicts": "Blockierende Konflikte",
+          "open_tasks": "Offene Aufgaben",
+          "from": "Von",
+          "to": "Auf",
+          "via": "Weg",
+          "ticket_id": "Ticket",
+          "link_type": "Verknüpfungsart",
+          "task_ticket_id": "Aufgabe",
+          "task_kind": "Typ",
+          "change_type": "Art",
+          "template_id": "Vorlage",
+          "template_warnings": "Hinweise der Vorlage",
+          "cis": "CIs",
+          "services": "Services",
+          "truncated": "Abgeschnitten"
+        }
+      },
+      "calendar": {
+        "views": {
+          "month": "Monat",
+          "week": "Woche",
+          "service": "Nach Service"
+        },
+        "prev": "Zurück",
+        "next": "Weiter",
+        "utcNote": "Alle Zeiten in UTC.",
+        "conflict": "Konflikt",
+        "freeze": {
+          "block": "Sperrzeitraum (blockiert)",
+          "warn": "Sperrzeitraum (Warnung)"
+        },
+        "noChanges": "Keine Changes geplant.",
+        "truncated": "Es werden nicht alle Changes dieses Zeitraums angezeigt. Grenzen Sie den Zeitraum mit dem Service-Filter ein.",
+        "freezesTruncated": "Es werden nicht alle Sperrzeiträume dieses Zeitraums angezeigt.",
+        "serviceEmpty": "Für keinen Service gibt es in diesem Zeitraum ein Change- oder Sperrfenster.",
+        "colChanges": "Changes",
+        "colMinutes": "Betroffen",
+        "hoursMinutes": "{{hours}} Std. {{minutes}} Min.",
+        "minutesOnly": "{{minutes}} Min.",
+        "indirect": "indirekt betroffen"
+      },
+      "cab": {
+        "back": "Zurück zu den CAB-Sitzungen",
+        "create": "Sitzung planen",
+        "createSubmit": "Sitzung anlegen",
+        "utcHint": "Alle Zeiten in UTC.",
+        "prev": "Vorheriger Monat",
+        "next": "Nächster Monat",
+        "empty": "In diesem Monat gibt es keine CAB-Sitzung.",
+        "agendaCount_one": "{{count}} Punkt",
+        "agendaCount_other": "{{count}} Punkte",
+        "cab": "CAB",
+        "cabPlaceholder": "CAB wählen",
+        "title": "Titel",
+        "starts": "Beginn",
+        "ends": "Ende",
+        "location": "Ort",
+        "status": {
+          "planned": "Geplant",
+          "held": "Durchgeführt",
+          "cancelled": "Abgesagt"
+        },
+        "statusLabel": "Status",
+        "agenda": "Tagesordnung",
+        "agendaEmpty": "Die Tagesordnung ist leer.",
+        "hiddenHint": "Punkte, für die Sie kein Leserecht haben, bleiben auf der Tagesordnung erhalten und werden nie entfernt. Sie stehen am Ende; ihre Reihenfolge lässt sich nicht ändern.",
+        "hiddenItem": "Change ohne Leserecht",
+        "noApproval": "Noch keine Freigabe angefordert.",
+        "note": "Notiz zum Punkt",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten",
+        "remove": "Von der Tagesordnung entfernen",
+        "saveAgenda": "Tagesordnung speichern",
+        "discard": "Verwerfen",
+        "suggestions": "Vorschläge: Changes in der Freigabe dieses CAB",
+        "suggestionsEmpty": "Keine weiteren Changes warten auf dieses CAB.",
+        "add": "Hinzufügen",
+        "minutes": "Protokoll",
+        "minutesHint": "Das Protokoll ist für alle Agenten sichtbar.",
+        "minutesEmpty": "Es gibt noch kein Protokoll.",
+        "saveMinutes": "Protokoll und Status speichern",
+        "unsaved": "Freigabestand nach dem Speichern sichtbar",
+        "position": "Position {{pos}} von {{count}}: {{title}}",
+        "dragHandle": "Zum Verschieben ziehen: {{title}}",
+        "blockedLine": "Betroffen ist der Change {{tn}}.",
+        "noCabs": "Es gibt noch kein CAB. Ein Administrator legt es unter Admin, Change-Management an."
+      },
+      "legacy": {
+        "sourceLive": "Live aus Znuny",
+        "sourceArchive": "Archiv",
+        "readOnly": "Znuny-Changes sind schreibgeschützt.",
+        "search": "Suche",
+        "searchPlaceholder": "Nummer oder Titel",
+        "searchScope": "Die Suche erfasst nur die Nummer und den Titel.",
+        "ticketFilter": "Nur Changes zu Ticket #{{id}}",
+        "ticketFilterClear": "Filter entfernen",
+        "empty": "Keine Znuny-Changes gefunden.",
+        "colChange": "Change",
+        "colState": "Status",
+        "colWorkorders": "Arbeitsaufträge",
+        "back": "Zurück zu den Znuny-Changes",
+        "editInZnuny": "In Znuny bearbeiten",
+        "archiveHint": "Archivierter Change: Er kann nicht mehr bearbeitet werden.",
+        "fields": {
+          "state": "Status",
+          "category": "Kategorie",
+          "impact": "Auswirkung",
+          "priority": "Priorität",
+          "manager": "Change-Manager",
+          "builder": "Change-Builder",
+          "requested": "Gewünscht bis",
+          "plannedStart": "Geplanter Beginn",
+          "plannedEnd": "Geplantes Ende",
+          "actualStart": "Tatsächlicher Beginn",
+          "actualEnd": "Tatsächliches Ende",
+          "created": "Angelegt",
+          "changed": "Geändert",
+          "description": "Beschreibung",
+          "justification": "Begründung"
+        },
+        "cab": "CAB",
+        "cabEmpty": "Kein CAB eingetragen.",
+        "customerUser": "Kunde",
+        "workorders": "Arbeitsaufträge",
+        "workordersEmpty": "Keine Arbeitsaufträge.",
+        "planned": "Geplant",
+        "actual": "Tatsächlich",
+        "effort": "Aufwand {{planned}} h geplant, {{accounted}} h gebucht",
+        "instruction": "Anweisung",
+        "report": "Bericht",
+        "links": "Verknüpfungen",
+        "tickets": "Tickets",
+        "cis": "CIs",
+        "services": "Services",
+        "ofChange": "am Change",
+        "ofWorkorder": "am Arbeitsauftrag {{number}}",
+        "dynamicFields": "Dynamische Felder",
+        "history": "Verlauf",
+        "historyEmpty": "Kein Verlauf vorhanden.",
+        "searchScopeLive": "Die Suche erfasst Nummer, Titel, Beschreibung und Begründung (ab drei Zeichen)."
+      },
+      "warnings": {
+        "notFound": "{{kind}} {{ref}} gibt es nicht mehr; die Angabe wurde nicht aus der Vorlage übernommen.",
+        "riskAnswerStale": "Die Antwort der Vorlage auf die Frage „{{question}}“ passt nicht mehr und wurde nicht übernommen.",
+        "kinds": {
+          "queue": "Queue",
+          "priority": "Priorität",
+          "service": "Service",
+          "cab": "CAB",
+          "owner": "Bearbeiter"
+        }
+      }
     }
   },
   "approvals": {
@@ -9254,12 +10328,14 @@
       "retry": "Erneut versuchen"
     },
     "subject": {
-      "ticket": "Ticket"
+      "ticket": "Ticket",
+      "itsm_change": "Change"
     },
     "resolver": {
       "ticket_customer_user": "Kunde des Tickets",
       "ticket_owner": "Besitzer des Tickets",
-      "ticket_responsible": "Verantwortlicher des Tickets"
+      "ticket_responsible": "Verantwortlicher des Tickets",
+      "itsm_service_owner": "Verantwortliche der betroffenen Services"
     },
     "rule": {
       "any": "Eine Freigabe genügt",

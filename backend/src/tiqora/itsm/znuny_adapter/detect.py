@@ -17,7 +17,7 @@ from tiqora.itsm.znuny_adapter.profiles import select_profile
 CACHE_SECONDS: Final = 60.0
 
 _CMDB_TABLES: Final = ("configitem", "configitem_version", "configitem_definition")
-_CHANGE_TABLES: Final = ("change_item",)
+_CHANGE_TABLES: Final = ("change_item", "change_workorder")
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class ZnunyItsmInfo:
     packages: Mapping[str, str]  # install_status "installed": name -> version
     core_installed: bool  # all of ZNUNY_ITSM_MARKER_TABLES present (the one predicate)
     cmdb_installed: bool  # configitem + configitem_version + configitem_definition present
-    change_installed: bool  # change_item present (survey only; unused in phase 1)
+    change_installed: bool  # change_item + change_workorder present (legacy change view)
     profile: str | None  # select_profile(...) name, None when unknown
     unsupported_reason: str | None  # e.g. "ITSMConfigurationManagement 7.4.0 not surveyed"
 

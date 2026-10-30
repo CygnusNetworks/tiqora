@@ -243,6 +243,27 @@ def _fresh_detect_cache() -> None:
     clear_detect_cache()
 
 
+_DELETE_TICKETS = r"""
+my @IDs = $TicketObject->TicketSearch(
+    Result => 'ARRAY', Title => 'itsm28 *', UserID => 1, Limit => 1000,
+    StateType => [ 'new', 'open', 'closed', 'removed', 'pending reminder', 'pending auto' ],
+);
+$TicketObject->TicketDelete( TicketID => $_, UserID => 1 ) or die "TicketDelete $_ failed" for @IDs;
+Emit({ deleted => scalar @IDs });
+"""
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _module_tickets() -> Generator[None, None, None]:
+    """The tickets the cases create (``NewTicket('itsm28 ...')``) are removed with
+    ``TicketDelete`` (links, history and articles with them), also leftovers of an aborted run."""
+    znuny_json(_DELETE_TICKETS)
+    try:
+        yield
+    finally:
+        znuny_json(_DELETE_TICKETS)
+
+
 async def _commit(
     factory: SessionFactory,
     action: Callable[[AsyncSession, ZnunyCiProvider], Awaitable[Any]],
@@ -1208,8 +1229,9 @@ async def test_setup_on_itsm_peer_is_noop(
     """On a site with Znuny ITSM the setup finds everything, creates nothing, and the seed
     definitions equal the rows the packages created (ids aside).
 
-    The ``change`` group (types ``Change`` / ``Change::Task``) is Tiqora's own addition: the
-    packages do not create those types, so it stays ``missing`` and is never applied here. The
+    The ``change`` group (types ``Change`` / ``Change::Task``, dynamic fields ``ITSMChangeType`` /
+    ``ITSMChangePhase``) is Tiqora's own addition: the packages create none of it, so it stays
+    ``missing`` and is never applied here (``test_itsm_change_legacy.py`` applies it). The
     plain-peer counterpart is ``test_setup_on_plain_peer_equals_itsm_packages``.
     """
     from tiqora.itsm.setup import apply_setup, plan_setup, setup_complete
@@ -1225,7 +1247,10 @@ async def test_setup_on_itsm_peer_is_noop(
         by_group = {g: [i for i in plan if i.group == g] for g in ("incident_problem", "change")}
         assert by_group["incident_problem"], "the plan lists the incident / problem rows"
         assert {i.status for i in by_group["incident_problem"]} == {"present"}
-        assert {(i.kind, i.status) for i in by_group["change"]} == {("ticket_type", "missing")}
+        assert {(i.kind, i.status) for i in by_group["change"]} == {
+            ("ticket_type", "missing"),
+            ("dynamic_field", "missing"),
+        }
         assert await setup_complete(session, settings) is True
         after_plan = await apply_setup(
             session, settings, groups={"incident_problem"}, user_id=USER_ID

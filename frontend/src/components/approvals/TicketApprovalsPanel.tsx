@@ -176,10 +176,13 @@ export function TicketApprovalsPanel({
   ticketId,
   filter,
   title,
+  onChanged,
 }: {
   ticketId: number;
   filter?: TicketApprovalsFilter;
   title?: string;
+  /** after a vote, withdrawal or refresh here: the embedding feature reloads what depends on it */
+  onChanged?: () => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -200,6 +203,7 @@ export function TicketApprovalsPanel({
   const changed = () => {
     void qc.invalidateQueries({ queryKey: approvalsKeys.ticket(ticketId) });
     void qc.invalidateQueries({ queryKey: approvalsKeys.all() });
+    onChanged?.();
   };
 
   const all = (q.data ?? [])

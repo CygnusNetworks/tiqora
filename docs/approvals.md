@@ -35,7 +35,7 @@ Wofür Tiqora Freigaben nutzt:
 | Einsatz | Stand |
 |---|---|
 | **Ad hoc am Ticket**: Ein Agent mit Schreibrecht klickt im Ticket auf „Freigabe anfordern“, wählt eine Vorlage oder nennt die Freigeber selbst. | verfügbar |
-| **Changes und CAB**: Die ITSM-Änderungsverwaltung baut auf dieser Engine auf (Freigabegruppe als CAB, Regel „Mehrheit“). | folgt mit der Änderungsverwaltung, siehe [itsm.md](itsm.md) |
+| **Changes und CAB**: Das Change-Management des ITSM fordert die CAB-Freigabe über diese Engine an (Gegenstandstyp `itsm.change`, Schlüssel `change_cab`). | verfügbar (ITSM Modus B), siehe [itsm.md](itsm.md#8-change-management) |
 | **Service-Anfragen** (Katalog) | noch nicht verfügbar, Kapitel 10 |
 | **Prozessschritte** (Prozessaktion „ApprovalRequest“) | noch nicht verfügbar, Kapitel 10 |
 

@@ -1596,6 +1596,13 @@ async def change_service(
         user_id=user_id,
     )
     await invalidate_ticket_cache(session, ticket_id)
+    # a change ticket gets a new impact set (lazy: the change module imports this one). Lock
+    # order: this writes the ticket first and the change row second, the change transitions the
+    # other way round; on MariaDB a concurrent transition of the same change can deadlock with
+    # this edit (rare; one side gets an error and may retry).
+    from tiqora.itsm.change.impact import enqueue_impact_if_change
+
+    await enqueue_impact_if_change(session, ticket_id)
     await _emit_legacy_notification(session, "NotificationServiceUpdate", ticket_id)
     await _emit_event(session, "TicketServiceUpdate", ticket_id, {"service_id": new_service_id})
 
@@ -1680,6 +1687,13 @@ async def change_title(
         user_id=user_id,
     )
     await invalidate_ticket_cache(session, ticket_id)
+    # the mirrored change appointment carries the title (lazy: the change module imports this one).
+    # Lock order: ticket first, change row second (``calendar_appointment_id``), the change
+    # transitions the other way round; a concurrent transition of the same change can deadlock
+    # with this edit on MariaDB (rare; one side gets an error and may retry).
+    from tiqora.itsm.change.calendar_mirror import resync_after_title_edit
+
+    await resync_after_title_edit(session, ticket_id=ticket_id, user_id=user_id)
     await _emit_event(session, "TicketTitleUpdate", ticket_id, {"title": title_truncated})
 
 

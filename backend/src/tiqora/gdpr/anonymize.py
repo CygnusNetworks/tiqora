@@ -11,7 +11,11 @@ customer_user under that company), this replaces:
 * ``tiqora_avatar``: uploaded photos of these customers are deleted (they are
   keyed by the old address, and a photo is PII in itself);
 * ``customer_company`` (optional, ``anonymize_company=True`` — off by
-  default since a company may have other, non-anonymized customer_users).
+  default since a company may have other, non-anonymized customer_users);
+* the archive of Znuny changes (``tiqora_itsm_legacy_change``): the customer in CABs, history
+  values and notification recipients, plus a tombstone per login and address so a later archive
+  run never brings them back (:func:`tiqora.itsm.change.legacy.archive.
+  erase_legacy_change_customers`; this path has no rollback, so the tombstones are permanent).
 
 Tickets themselves (title, queue, state, timestamps, and ``customer_id`` /
 ``customer_user_id``) are left untouched — they remain intact for analytics.
@@ -41,6 +45,12 @@ from tiqora.db.tiqora.models import TiqoraAvatar
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
+from tiqora.itsm.change.legacy.archive import (
+    KEY_CHANGED_WARNING,
+    erase_legacy_change_customers,
+    erased_key_changed,
+)
+from tiqora.itsm.change.legacy.redact import erased_key
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.reporting.dirty import mark_tickets_dirty
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -59,6 +69,7 @@ class CustomerAnonymizeResult:
     avatars: int = 0
     articles: int = 0
     tickets_touched: int = 0
+    legacy_changes: int = 0
     progress: list[str] = field(default_factory=list)
 
     def render(self) -> str:
@@ -70,6 +81,7 @@ class CustomerAnonymizeResult:
             f"tiqora_avatar rows deleted:     {self.avatars}",
             f"article_data_mime rows updated: {self.articles}",
             f"tickets touched:                {self.tickets_touched}",
+            f"archived Znuny changes updated: {self.legacy_changes}",
         ]
         return "\n".join(lines)
 
@@ -80,16 +92,25 @@ class CustomerAnonymizeResult:
             "tiqora_avatar": self.avatars,
             "article_data_mime": self.articles,
             "tickets_touched": self.tickets_touched,
+            "tiqora_itsm_legacy_change": self.legacy_changes,
         }
 
 
-async def _has_avatar_table(session: AsyncSession) -> bool:
+async def _has_table(session: AsyncSession, table: str) -> bool:
     row = (
         await session.execute(
-            text("SELECT 1 FROM information_schema.tables WHERE table_name = 'tiqora_avatar'")
+            text("SELECT 1 FROM information_schema.tables WHERE table_name = :t"), {"t": table}
         )
     ).first()
     return row is not None
+
+
+async def _has_avatar_table(session: AsyncSession) -> bool:
+    return await _has_table(session, "tiqora_avatar")
+
+
+async def _no_backup(_table: str, _pk: dict[str, object], _row: dict[str, object]) -> None:
+    """This path keeps no backups (no rollback)."""
 
 
 async def anonymize_customer(
@@ -138,12 +159,15 @@ async def anonymize_customer(
     avatar_keys = sorted({email_key(c.email) for c in customers if (c.email or "").strip()})
 
     # --- customer_user PII ---
+    login_to_new: dict[str, str] = {}
+    key_changed = False
     async with session_factory() as session, session.begin():
         for cust in customers:
             new_first = mapper.map_value(cust.first_name, "first_name")
             new_last = mapper.map_value(cust.last_name, "last_name")
             new_email = mapper.map_value(cust.email, "email")
             new_login = mapper.map_value(cust.login, "login")
+            login_to_new[cust.login] = str(new_login or cust.login)
             new_phone = mapper.map_value(cust.phone, "phone")
             new_fax = mapper.map_value(cust.fax, "phone")
             new_mobile = mapper.map_value(cust.mobile, "phone")
@@ -182,7 +206,21 @@ async def anonymize_customer(
                 )
             )
             result.avatars = int(getattr(deleted, "rowcount", 0) or 0)
+        if await _has_table(session, "tiqora_itsm_legacy_erased"):
+            erased = await erase_legacy_change_customers(
+                session,
+                replacements=login_to_new,
+                emails=[c.email for c in customers if (c.email or "").strip()],
+                add_backup=_no_backup,
+                settings=settings,
+                job_id=None,
+            )
+            result.legacy_changes = erased["tiqora_itsm_legacy_change"]
+            key_changed = await erased_key_changed(session, erased_key(settings))
     progress.append(f"customer_user: {result.customer_users} rows updated")
+    if key_changed:
+        logger.warning("gdpr_legacy_archive_key_changed", job_id=None)
+        progress.append(KEY_CHANGED_WARNING)
     if avatar_keys:
         await forget_cached(settings.redis_url, [cache_key(EMAIL, key) for key in avatar_keys])
         progress.append(f"tiqora_avatar: {result.avatars} rows deleted")

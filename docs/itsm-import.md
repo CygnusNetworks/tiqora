@@ -9,8 +9,10 @@
 > `/api/v1/admin/itsm/import` (API-key area `admin`) and the `tiqora itsm import|status` commands. The
 > importer only reads Znuny, writes only `tiqora_*` tables, can run any number of times and runs
 > before the switch to Tiqora; the admin page and API also require Mode A (the CLI checks only the
-> switch and a running job). Changes and workorders are counted, not
-> imported. Operational steps are in [itsm.md](itsm.md), chapter 7.
+> switch and a running job). Changes and work orders go into a read-only change archive (step
+> `changes`; templates, conditions and notification rules are only counted); Tiqora never writes
+> Znuny's `change_*` tables. Operational steps are in [itsm.md](itsm.md), chapter 7; change
+> management itself in chapter 8.
 
 Dieses Dokument beschreibt, wie Znuny sein ITSM speichert, und ist die Grundlage für den Adapter
 im Mode A (Znuny führt das ITSM, Tiqora liest) und für den Importer in den Mode B (Tiqora führt das
@@ -249,7 +251,7 @@ in 18 Klassen aus. Für Tiqora relevant:
 | `ITSM::Core::IncidentState` | Operational, Warning, Incident | Präferenz `Functionality` = `operational`, `warning`, `incident` |
 | `ITSM::Service::Type`, `ITSM::SLA::Type` | Typen für Service und SLA | Spalte `service.type_id` / `sla.type_id` |
 | `ITSM::ConfigItem::*::Type`, `ITSM::ConfigItem::YesNo`, `ITSM::ConfigItem::Software::LicenceType` | Auswahllisten der Klassendefinitionen | von `Input.Type: GeneralCatalog` referenziert |
-| `ITSM::ChangeManagement::*` | Change-Verwaltung | im Import nur dokumentiert |
+| `ITSM::ChangeManagement::*` | Change-Verwaltung | nicht in den Katalog übernommen; das Change-Archiv speichert die Namen (Status, Kategorie, Auswirkung, Priorität, Arbeitsauftrags-Status und -Typ) als Text am Change |
 
 Die Kritikalitäts- und Auswirkungsliste (`ITSM::Core::Criticality`/`Impact`) ist ab 6.5 **leer**; diese
 Werte sind Auswahlwerte der Dynamischen Felder `ITSMCriticality` und `ITSMImpact` (`1 very low` bis
@@ -259,7 +261,8 @@ Werte sind Auswahlwerte der Dynamischen Felder `ITSMCriticality` und `ITSMImpact
 
 25 Zeilen (5 Kritikalitäten x 5 Auswirkungen) mit `criticality`, `impact` (jeweils Text wie
 `3 normal`) und `priority_id` (Kernpriorität 1 bis 5). `change_cip_allocate` ist die entsprechende
-Matrix der Change-Verwaltung (ebenfalls 25 Zeilen, nur dokumentiert).
+Matrix der Change-Verwaltung (ebenfalls 25 Zeilen); sie wird nicht übernommen, Tiqoras Changes
+tragen die Priorität ihres Tickets.
 
 ### Speicher der Attribute: `xml_storage` (beide Profile)
 
@@ -357,12 +360,89 @@ Die ITSM-Typen sind `AlternativeTo`, `ConnectedTo`, `DependsOn` (Quelle "Depends
 `ITSM::Core::IncidentLinkTypeDirection` (Vorgabe `DependsOn: Both`) bestimmt, welche Typen den
 Vorfallstatus in welche Richtung weitergeben.
 
-### Tabellen der Change-Verwaltung und des Import/Export-Pakets (nur dokumentiert)
+### Change-Verwaltung: Schema und Verhalten
 
-Tiqora liest und schreibt sie nicht, und der Importer übernimmt sie nicht. Sie werden nur gezählt, damit
-Zuordnungsbericht und "Umstellen ohne CI-Daten" wissen, was bei Znuny zurückbleibt:
+Die Change-Verwaltung (Paket ITSMChangeManagement 6.5.2 / 7.3.4) legt 20 Tabellen an: 15 `change_*` und 5
+`condition_*`. Die Tabellendefinitionen sind in beiden Profilen für MariaDB und PostgreSQL **identisch**
+(Unterschied der ITSM-Pakete insgesamt: nur `general_catalog_preferences`, siehe oben). Das Verhalten ist in
+`backend/tests/fixtures/znuny-itsm/behaviour/change-itsm-6.json` und `change-itsm-7.json` festgehalten: je neun
+Antworten mit Quelle (Datei:Zeile) und die Ergebnisse, die eine echte Znuny-Instanz geliefert hat
+(`tests/golden/itsm_survey.py --change-behaviour`; Test `test_itsm_change_vectors.py`).
 
-* Change-Verwaltung (20 Tabellen): `change_item`, `change_workorder`, `change_cab`, `change_history_type`, `change_history`, `change_template_type`, `change_template`, `change_cip_allocate`, `change_state_machine`, `condition_object`, `condition_attribute`, `condition_operator`, `change_condition`, `condition_expression`, `condition_action`, `change_notification`, `change_notification_message`, `change_notification_grps`, `change_notification_rec`, `change_number_counter`;
+| Tabellen | Inhalt |
+|---|---|
+| `change_item` | der Change: `change_number`, `title`, `description`/`description_plain`, `justification`/`justification_plain`, Status, Kategorie, Auswirkung und Priorität als `general_catalog`-Ids, `change_manager_id` (kann leer sein), `change_builder_id`, `requested_time` (NULL, wenn nicht gesetzt) |
+| `change_workorder` | Arbeitsauftrag eines Changes: `workorder_number` (ab 1 je Change), `instruction`/`report` (je mit `*_plain`), Status und Typ als Katalog-Ids, `workorder_agent_id`, geplante und tatsächliche Zeiten, `planned_effort`, `accounted_time` |
+| `change_cab` | ein Mitglied je Zeile, entweder `user_id` (Agent) oder `customer_user_id` (Kundenbenutzer, Login) |
+| `change_history`, `change_history_type` | Verlauf (42 Typen) |
+| `change_template`, `change_template_type` | Vorlagen für Change, Arbeitsauftrag, CAB und Bedingung |
+| `change_cip_allocate` | Prioritätsmatrix (Kategorie x Auswirkung, 25 Zeilen) |
+| `change_state_machine` | erlaubte Statusübergänge (33 Zeilen) |
+| `change_condition`, `condition_*` | Bedingungen und Aktionen |
+| `change_notification*`, `change_number_counter` | Benachrichtigungsregeln und Nummernzähler |
+
+Status, Kategorie, Auswirkung, Priorität sowie Arbeitsauftrags-Status und -Typ stehen im Allgemeinen Katalog
+(`ITSM::ChangeManagement::Change::State`, `::Category`, `::Impact`, `::Priority`, `::WorkOrder::State`,
+`::WorkOrder::Type`). Arbeitsauftragstypen: `approval`, `workorder`, `backout`, `decision`, `pir`.
+
+**Was das Paket tatsächlich tut** (Antworten 1 bis 9 der Vektoren):
+
+1. **Verknüpfungen.** Die Objektnamen sind `ITSMChange` und `ITSMWorkOrder`. Erlaubt sind (aus ITSMCore, nicht aus dem
+   Change-Paket): Change zu Ticket `Normal`; Arbeitsauftrag zu Ticket `Normal`, zu CI und zu Service `Normal` und
+   `DependsOn`. **Change zu CI, zu Service, zu Change oder zu Arbeitsauftrag ist nicht erlaubt**: ein Change hängt nur
+   über seine Arbeitsaufträge an CIs und Services. Quelle der gespeicherten Beziehung ist der Change bzw. der Arbeitsauftrag.
+2. **Zeiten.** `change_item` hat keine Zeitspalten außer `requested_time`. Geplanter und tatsächlicher Beginn/Ende eines
+   Changes werden aus den Arbeitsaufträgen abgeleitet (MIN/MAX). Nicht gesetzte Zeiten eines Arbeitsauftrags stehen als
+   `9999-01-01 00:00:00` in der Tabelle, nie als NULL. Weil dieser Wert der größte ist, ignorieren die MIN-Spalten ihn, die
+   MAX-Spalten dagegen nicht: **ein** Arbeitsauftrag ohne geplantes Ende lässt das geplante Ende des Changes leer, **ein**
+   unfertiger Arbeitsauftrag das tatsächliche Ende. Der geplante Beginn ist nur gesetzt, wenn jeder Arbeitsauftrag einen hat.
+   Aufwand und gebuchte Zeit werden summiert. Ein Change ohne Arbeitsaufträge hat keine Zeiten.
+3. **Verlauf.** `change_history.type_id` verweist auf `change_history_type`. Bei `*Add` steht die neue Id in `content_new`,
+   bei `*Update` je geänderter Eingabe eine Zeile (`fieldname` = Name des Parameters, z. B. `ChangeTitle`, `ChangeStateID`,
+   `WorkOrderStateID`; `content_old`/`content_new` die Rohwerte, bei `*ID`-Feldern also Ids). Ein Statuswechsel erzeugt zwei
+   Zeilen (`ChangeState` und `ChangeStateID`). CAB-Änderungen: `CABAgents`/`CABCustomers` mit Werten, die durch `%%`
+   getrennt sind. Verknüpfungen: `<Objekt>%%<Schlüssel>`. Benachrichtigungen (`*NotificationSent`) enthalten
+   `<Empfängeradresse>%%<Ereignis>`: der Verlauf einer echten Instanz enthält also E-Mail-Adressen. Zeilen von
+   Arbeitsauftrags-Ereignissen haben `workorder_id`, zugleich immer `change_id`.
+4. **Dynamische Felder.** Objekttypen `ITSMChange` und `ITSMWorkOrder`; die Werte stehen in `dynamic_field_value` mit
+   `object_id` = `change_item.id` bzw. `change_workorder.id` (getrennte Id-Räume, der Objekttyp des Feldes unterscheidet sie).
+   Das Paket liefert kein solches Feld aus.
+5. **CAB.** Pro Change, nicht als benannte Liste. Agenten und Kundenbenutzer werden getrennt ersetzt; doppelte Einträge
+   verhindert der Code, nicht der Unique-Index (NULL-Werte gelten als verschieden).
+6. **Texte.** `description`, `justification`, `instruction`, `report` stehen so, wie sie eingegeben wurden (HTML oder
+   Text); die `*_plain`-Spalten sind `HTMLUtils::ToAscii` davon und werden gesucht. Text ohne Markup bleibt unverändert,
+   bei einem Absatz fügt **6.5** vorn einen und hinten zwei Zeilenumbrüche ein, **7.3** nur hinten einen. Lesen Sie die
+   `*_plain`-Spalte daher immer mit entfernten Leerzeichen am Rand.
+7. **Vorlagen.** `change_template.content` ist **kein** Storable und kein JSON, sondern ein Perl-`Data::Dumper`-Text
+   (`$VAR1 = {` ... `}`), den Znuny mit `eval` ausführt. Ein Change hat die Schlüssel `ChangeAdd` und `Children` (Liste von
+   `WorkOrderAdd`); Benutzer, Katalog-Ids und Change-Id der Quellinstanz stecken darin. Tiqora führt diesen Text nie aus.
+8. **Gruppen.** `itsm-change` (lesen, bearbeiten, Arbeitsaufträge, CAB, Terminübersicht), `itsm-change-manager` (anlegen,
+   löschen, Manager-Übersicht), `itsm-change-builder` (zurücksetzen); Vorlagen und "Meine Changes" verlangen Builder oder
+   Manager. Alle Agentenmasken tragen die Gruppe in `GroupRo`; die Administrationsmasken (Prioritätsmatrix,
+   Benachrichtigungen, Statusautomat) verlangen `admin`.
+9. **Schema.** In beiden Profilen gleich, siehe oben.
+
+Außerdem (Antwort 10): Arbeitsauftragsnummern zählen je Change ab 1; beim Wechsel in einen Status der Einstellung
+`ITSMWorkOrder::ActualStartTimeSet::States` (Vorgabe `in progress`) setzt Znuny den tatsächlichen Beginn, beim Wechsel in
+einen Status ohne Folgestatus das tatsächliche Ende (jetzt + 1 Sekunde). Die Changenummer kommt aus
+`ITSMChange::NumberGenerator` (Vorgabe `DateChecksum`).
+
+**Was Tiqora damit tut:** Modus A zeigt Changes und Arbeitsaufträge live und lesend in Tiqora („Changes (Znuny)“); es
+werden nie Zeilen der 20 Tabellen geschrieben, und alles SQL auf ihnen steht in einem Modul
+(`tiqora/itsm/change/legacy/reader.py`). Der Importer (Schritt `changes`) und der eigenständige Archiv-Lauf in Modus B
+übernehmen Changes, Arbeitsaufträge, CAB, Verlauf, Dynamische Felder und Verknüpfungen lesend in das Change-Archiv
+(`tiqora_itsm_legacy_change`, `tiqora_itsm_legacy_change_ref`): Zeiten nach obigen Regeln, ohne den Sentinel; CI- und
+Service-Verknüpfungen hängen wie in Znuny an den Arbeitsaufträgen und werden dem Change zugeordnet; die Texte sind die
+`*_plain`-Spalten ohne Leerzeichen am Rand. Vorlagen, Bedingungen und Benachrichtigungsregeln werden nur gezählt, der
+Vorlagentext wird nie gelesen oder ausgeführt (Punkt 7). Die Verlaufszeilen `*NotificationSent` enthalten
+Empfängeradressen (Punkt 3); Tiqora behandelt sie als personenbezogene Daten: Sie stehen in keinem Protokoll, in den
+Test-Vektoren nur als `example.org`-Adressen, und die DSGVO-Löschung eines Kunden entfernt sie aus dem Archiv (Abschnitt
+„Schritt `changes`: Change-Archiv“). Die Bedienung beschreibt [itsm.md](itsm.md), Kapitel 8.
+
+### Tabellen des Import/Export-Pakets (nur dokumentiert)
+
+Tiqora liest und schreibt sie nicht, und der Importer übernimmt sie nicht:
+
 * Import/Export (7 Tabellen): `imexport_template`, `imexport_object`, `imexport_format`, `imexport_mapping`, `imexport_mapping_object`, `imexport_mapping_format`, `imexport_search`.
 
 Die Zeilen der Auslieferung stehen in `initial_insert.sql` (z. B. 42 `change_history_type`,
@@ -611,11 +691,12 @@ der Wechsel in den Mode B selbst (Schreibsperre in Znuny, Umstellung, Rückweg) 
 | Versionen mit `xml_storage`-Attributen | CI-Versionen mit Attributen als Schlüssel-Wert-Struktur | Datums- und Verweiswerte werden umgerechnet; Verweise auf andere CIs und Katalogeinträge werden aufgelöst |
 | Verknüpfungen CI mit CI | CI-Verknüpfungen | Verknüpfungstypen kommen aus der Znuny-Konfiguration |
 | Verknüpfungen CI mit Ticket oder Service | CI-Verknüpfungen mit Ticket oder Service | Die Ticket- und Service-Schlüssel sind in beiden Systemen dieselben |
-| Verknüpfungen CI mit anderen Objekten (FAQ, Change, Arbeitsauftrag) | nicht übernommen | Bericht: `unsupported_object` |
+| Verknüpfungen Arbeitsauftrag oder Change mit CI | im Change-Archiv beim Change | Kein eigener Eintrag im Schritt Verknüpfungen; der Schritt Changes übernimmt sie mit dem Change |
+| Verknüpfungen CI mit anderen Objekten (z. B. FAQ) | nicht übernommen | Bericht: `unsupported_object` |
 | Anhänge der Versionen | Anhänge der CI-Versionen | Nur aus der Datenbank, höchstens 50 MB je Datei |
 | Prioritätsmatrix (`cip_allocate`) | Prioritätsmatrix | Ersetzt die vorhandene Matrix als Ganzes |
 | ITSM-Angaben der Services (Typ, Kritikalität) | ITSM-Angaben des Services | Nur für Services, die es in Tiqora gibt |
-| Changes und Arbeitsaufträge | nicht übernommen | Nur gezählt (Bericht: `changes_not_imported`) |
+| Changes und Arbeitsaufträge | Change-Archiv (nur lesen) | Vorlagen, Bedingungen und Benachrichtigungsregeln werden nur gezählt (Bericht: `not_archived`) |
 
 Die Reihenfolge der Schritte im Bericht ist: Katalog, Klassen, CIs (Durchgang 1: Köpfe, Durchgang 2:
 Versionen), Verknüpfungen, Anhänge, Prioritätsmatrix, Service-Angaben, Changes, in Znuny gelöschte CIs und
@@ -631,7 +712,7 @@ abgeleitete Zustände. Die Schlüssel und Namen auf der Seite sind:
 | `attachments` | „Anhänge“ | |
 | `priority_matrix` | „Prioritätsmatrix“ | |
 | `service_meta` | „Service-Angaben“ | |
-| `changes` | „Changes (nur gezählt)“ | |
+| `changes` | „Changes (Archiv)“ | archiviert die Changes (Abschnitt unten) |
 | `deleted_in_znuny` | „In Znuny gelöscht“ | läuft nur mit installiertem CMDB-Paket |
 | `incident_states` | „Vorfallstatus“ | |
 
@@ -639,6 +720,43 @@ Je Schritt zählt der Bericht „Neu“, „Aktualisiert“, „Unverändert“,
 der Zusammenfassung des Laufs stehen höchstens die ersten 200 Meldungen (mit dem Hinweis „Es werden
 die ersten … von … Auffälligkeiten angezeigt“); die CSV-Datei enthält alle. Ohne installiertes CMDB-Paket (nur ITSMCore) erscheinen die Klassen- und CI-Schritte
 mit Zählern von 0; Katalog, Matrix und Service-Angaben werden trotzdem übernommen.
+
+### Schritt `changes`: Change-Archiv
+
+Der Schritt kopiert jeden Change aus Znunys Change-Verwaltung lesend ins Change-Archiv, in Seiten von
+`--page-size` Changes (eine Transaktion je Seite). Ohne ITSMChangeManagement in Znuny zählt er nichts. Seine
+Zähler gelten je Change:
+
+| Zähler | Bedeutung |
+|---|---|
+| Neu (`created`) | Der Change war noch nicht im Archiv |
+| Aktualisiert (`updated`) | Der Change hat sich in Znuny geändert (andere Prüfsumme), oder seit dem letzten Lauf wurde ein Kunde gelöscht, der darin vorkommt, oder eine solche Löschung wurde zurückgenommen |
+| Unverändert (`unchanged`) | Prüfsumme und Löschstand sind gleich; nichts wird geschrieben |
+| Übersprungen (`skipped`) | Der Change stand in der Liste, war beim Lesen aber nicht mehr da (in Znuny gelöscht, während der Lauf lief) |
+
+Dazu meldet er je Art eine Meldung `not_archived` mit der Zahl der Change-Vorlagen, Bedingungen und
+Benachrichtigungsregeln, die in Znuny bleiben. Ein Probelauf zählt genauso und schreibt nichts.
+
+- **Wiederholen.** Ein zweiter Lauf ohne Änderungen in Znuny meldet alle Changes als „unverändert“. Die Prüfsumme
+  wird über die gespeicherte Form gebildet: Ein CI, das ein späterer Lauf übernommen hat, macht aus dem Verweis
+  `znuny:<Id>` ein `tiqora:<Id>` und zählt den Change dann als „aktualisiert“. Changes, die in Znuny gelöscht wurden,
+  bleiben im Archiv.
+- **Nach der Umstellung** läuft derselbe Schritt als eigener Auftrag (`core.itsm_legacy_change_archive`, Admin,
+  „Change-Management“, Reiter „Change-Archiv“), nur in Modus B; er teilt sich mit dem Import die Spur `itsm_import`,
+  es läuft also immer nur ein ITSM-Massenauftrag.
+- **Datenschutz.** Wird ein Kunde gelöscht, ersetzt Tiqora seinen Login (CAB, Verlauf, Texte) durch das Pseudonym
+  seiner Tickets und seine Adresse durch „[gelöscht]“ und hinterlegt einen geschlüsselten Hash (HMAC mit
+  `TIQORA_ITSM_LEGACY_ERASED_KEY`, ohne diese Variable mit `TIQORA_SECRET_KEY`; nie den Wert selbst). Jeder spätere
+  Lauf schreibt gegen diese Hashes geschwärzt, auch einen Change, der erst danach ins Archiv kommt. Mit dem ersten
+  Hash speichert Tiqora einen Prüfwert des Schlüssels. Wird `TIQORA_SECRET_KEY` gewechselt, passt der Prüfwert nicht
+  mehr: Der Schritt schreibt dann nichts mehr und meldet `archive_key_changed` (der eigenständige Archiv-Auftrag schlägt
+  mit derselben Meldung fehl; ein laufender Lauf stoppt vor dem nächsten Abschnitt, fertige Seiten bleiben), statt gelöschte Kunden wieder ungeschwärzt zu speichern. Löschungen laufen trotzdem:
+  Sie schwärzen das Archiv unabhängig vom Schlüssel, schreiben ihre Hashes mit dem aktuellen Schlüssel und melden das.
+  Haben Sie den bisherigen Schlüssel noch und lief seit dem Wechsel keine Löschung, setzen Sie
+  `TIQORA_ITSM_LEGACY_ERASED_KEY` auf den bisherigen `TIQORA_SECRET_KEY`, und die Läufe gehen weiter. Ist er verloren
+  oder liefen inzwischen Löschungen (Hashes zweier Schlüssel), gibt es keine weiteren Archiv-Läufe; das Archiv bleibt
+  lesbar und geschwärzt. Die Rücknahme einer Löschung wird nur abgelehnt, wenn sie Archiv-Zeilen wiederherstellt und
+  noch Hashes anderer Löschungen bestehen. Znunys Tabellen `change_*` ändert die Löschung nie.
 
 ### Wiederholen und Abgleich
 
@@ -660,7 +778,7 @@ einen Text. Die Codes bedeuten:
 
 | Code | Bedeutung |
 |---|---|
-| `unsupported_object` | Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ, Change); die Verknüpfung wurde nicht übernommen |
+| `unsupported_object` | Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ); die Verknüpfung wurde nicht übernommen |
 | `unknown_link_type` | Der Verknüpfungstyp ist in Znuny nicht konfiguriert; die Verknüpfung wurde nicht übernommen |
 | `attachment_in_filesystem` | Der Anhang liegt im Dateisystem von Znuny und konnte nicht aus der Datenbank gelesen werden; kopieren Sie ihn bei Bedarf von Hand |
 | `attachment_too_large` | Der Anhang überschreitet die zulässige Größe (50 MB) und wurde nicht übernommen |
@@ -677,7 +795,8 @@ einen Text. Die Codes bedeuten:
 | `deleted_in_znuny` | Das Konfigurationselement existiert in Znuny nicht mehr; in Tiqora bleibt es unverändert bestehen |
 | `priority_matrix_invalid` | Die Prioritätsmatrix von Znuny verweist auf eine Priorität, die es nicht gibt; die Matrix wurde nicht übernommen |
 | `service_unknown` | Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden nicht übernommen |
-| `changes_not_imported` | Changes und Arbeitsaufträge von Znuny ITSM werden nicht übernommen, es wurden nur gezählt |
+| `not_archived` | Change-Vorlagen, Bedingungen und Benachrichtigungsregeln von Znuny werden nicht übernommen, sie wurden nur gezählt |
+| `archive_key_changed` | Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (`TIQORA_SECRET_KEY` gewechselt); der Schritt schreibt nichts mehr, damit gelöschte Kunden nicht zurückkommen. Bisheriger Schlüssel vorhanden und seit dem Wechsel keine Löschung: Setzen Sie `TIQORA_ITSM_LEGACY_ERASED_KEY` auf den bisherigen `TIQORA_SECRET_KEY` und wiederholen Sie den Import. Sonst sind keine weiteren Archiv-Läufe möglich; das Archiv bleibt lesbar und geschwärzt |
 
 Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issue_codes.py`; ein Test
 (`test_itsm_import_issue_codes.py`) stellt sicher, dass Code, Tabelle und Importer übereinstimmen.
@@ -687,7 +806,7 @@ Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issu
 Die CSV-Datei („Vollständiger Bericht (CSV)“) hat die Spalten `Schritt`, `Code`, `Objekt` und `Meldung`, eine
 Zeile je Meldung, UTF-8 mit Byte-Order-Mark (damit Excel Umlaute richtig zeigt), Semikolon als Trenner
 und Zeilenende CRLF wie die übrigen Berichte. Filtern Sie zuerst nach `Code`: Meldungen wie
-`changes_not_imported` oder `deleted_in_znuny` sind Hinweise, `bad_value`, `unresolved_reference` und
+`not_archived` oder `deleted_in_znuny` sind Hinweise, `bad_value`, `unresolved_reference` und
 `definition_unreadable` bedeuten, dass Daten fehlen. Die Spalte `Objekt` führt direkt zum Datensatz in
 Znuny. Texte aus Znuny können in Excel als Formel gedeutet werden; deshalb erhält jede Zelle, die mit
 `=`, `+`, `-`, `@`, Tabulator oder Wagenrücklauf beginnt, einen vorangestellten Apostroph.

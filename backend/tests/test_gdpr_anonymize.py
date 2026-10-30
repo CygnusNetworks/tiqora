@@ -28,12 +28,16 @@ NOW = datetime(2026, 1, 1, 12, 0, 0)
 
 @pytest.fixture(autouse=True)
 def _drop_report_marks(request: pytest.FixtureRequest) -> Iterator[None]:
-    """anonymize_customer queues the customer's tickets for a report rebuild: drop the marks."""
+    """anonymize_customer queues the customer's tickets for a report rebuild and leaves change
+    archive tombstones: drop both."""
     yield
     if "mariadb_znuny_url" not in request.fixturenames:
         return
     engine = create_engine(request.getfixturevalue("mariadb_znuny_url"))
     try:
+        if "tiqora_itsm_legacy_erased" in inspect(engine).get_table_names():
+            with engine.begin() as conn:  # the anonymisation's tombstones (change archive)
+                conn.execute(text("DELETE FROM tiqora_itsm_legacy_erased"))
         if "tiqora_report_dirty_ticket" in inspect(engine).get_table_names():
             with engine.begin() as conn:
                 ids = [
