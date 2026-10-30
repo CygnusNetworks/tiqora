@@ -1151,8 +1151,14 @@ Hintergrundaufträge verfolgen Sie über `GET /api/v1/jobs/{id}`. Zeiten sind UT
 ### Datenschutz (DSGVO)
 
 - Die **DSGVO-Löschung eines Kunden** ([gdpr.md](gdpr.md#itsm-changes)) behält die Change-Daten seiner
-  Tickets, leert aber Begründung, Pläne, Nachbetrachtung, die Begründung der Risiko-Übersteuerung und
-  die Details im Verlauf. Werden die Tickets mitgelöscht, verschwinden die Change-Daten mit ihnen.
+  Tickets, leert aber Begründung, Pläne, Nachbetrachtung, die Begründung der Risiko-Übersteuerung,
+  die Details im Verlauf und die Notizen der CAB-Tagesordnung. Werden die Tickets mitgelöscht,
+  verschwinden die Change-Daten mit ihnen.
+- Der **Termin im Znuny-Kalender** (Spiegel, `calendar_id`) trägt den Ticket-Titel: Beim Anonymisieren
+  legt Tiqora ihn mit dem anonymisierten Titel neu an, beim Mitlöschen der Tickets löscht es ihn. Eine
+  Rücknahme der Löschung gleicht den Spiegel für die wiederhergestellten Changes neu ab.
+- Titel und Protokolle von CAB-Sitzungen durchsucht die Löschung nicht; nennen sie einen Kunden, ändern
+  Sie sie selbst.
 - Löscht die Löschung auch die Freigabe-Anfrage, zeigt der Change „Freigabeverlauf nicht mehr
   vorhanden“. Eine nachträgliche Freigabe mit festgehaltenem Freigabezeitpunkt zählt dann als
   freigegeben, sonst als zurückgezogen (ein Change-Manager kann mit Begründung abschließen). Restfall:

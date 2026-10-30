@@ -34,6 +34,7 @@ from tiqora.gdpr.erasure import (
     ErasureSelector,
     build_customer_record_preview,
     build_erasure_preview,
+    build_erasure_preview_for_ids,
     purge_expired_backups,
     purge_job_backup,
     resolve_selector,
@@ -3107,5 +3108,258 @@ async def test_gdpr_ticket_delete_removes_change_rows(
             conn.execute(
                 text("DELETE FROM customer_company WHERE customer_id LIKE :p"),
                 {"p": "ERASE-CHG94-%"},
+            )
+        sync_engine.dispose()
+
+
+_MIRROR_CAL = 946150
+_MIRROR_CAB = 946152
+_MIRROR_MEETING = 946153
+
+
+async def _mirror_title(factory: async_sessionmaker[AsyncSession], tid: int) -> str | None:
+    """Title of the appointment the change row points at (``None``: no row or none left)."""
+    async with factory() as session:
+        found = (
+            await session.execute(
+                text(
+                    "SELECT a.title FROM tiqora_itsm_change c JOIN calendar_appointment a"
+                    " ON a.id = c.calendar_appointment_id WHERE c.ticket_id = :t"
+                ),
+                {"t": tid},
+            )
+        ).first()
+    return None if found is None else str(found[0])
+
+
+async def _scalar(factory: async_sessionmaker[AsyncSession], sql: str, **params: object) -> object:
+    async with factory() as session:
+        return (await session.execute(text(sql), params)).scalar()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_gdpr_erasure_keeps_the_change_calendar_mirror_in_line(
+    url_fixture: str, mode: str, request: pytest.FixtureRequest
+) -> None:
+    """B-I1: the Znuny appointment of a scheduled change copies the ticket title. Anonymise
+    recreates it with the new title, a ticket hard delete removes it, and a rollback re-syncs the
+    mirror (the restored change owns an appointment with its title again). B-M2: anonymise
+    blanks the CAB agenda note. B-M3: a deleted customer's CAB entry comes back with the
+    rollback. The preview names all of it once."""
+    from sqlalchemy import create_engine
+
+    from tests._row_cleanup import delete_above_marks, snapshot_marks
+    from tiqora.db.tiqora.models import TiqoraSettings
+    from tiqora.itsm.change.calendar_mirror import sync_appointment
+    from tiqora.itsm.change.settings import ITSM_CHANGE_SECTION, load_change_settings
+    from tiqora.settings_sections.store import save_section_values
+
+    url = request.getfixturevalue(url_fixture)
+    mysql = _is_mysql(url)
+    marks = snapshot_marks(
+        url,
+        (
+            "tiqora_gdpr_backup",
+            "tiqora_gdpr_job",
+            "tiqora_gdpr_audit",
+            "tiqora_itsm_legacy_erased",
+            "tiqora_cache_invalidation",
+            "tiqora_event_outbox",
+            "ticket_history",
+            "article",
+            "ticket",
+            "customer_user",
+        ),
+    )
+    engine, factory = await _factory(url)
+    settings = Settings()
+    tag = f"{url_fixture[:2]}{mode}"
+    login = f"erase.mirror.{tag}@example.com"
+    company = f"ERASE-MIRROR-{tag.upper()}"
+    calendar_key = ITSM_CHANGE_SECTION.storage_key("calendar_id")
+    tid = 0
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session, mysql=mysql)
+            await _insert_company(session, customer_id=company, name=f"Acme Mirror {tag}")
+            cuid = await _insert_customer(session, login=login, customer_id=company)
+            tn = f"2026MI{tag}{cuid}"
+            tid = await _insert_ticket(session, customer_user_id=login, customer_id=company, tn=tn)
+            await session.execute(
+                text(
+                    "INSERT INTO calendar (id, group_id, name, salt_string, color, valid_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, 1, :n, 'salt', '#3b82f6', 1, :t, 1, :t, 1)"
+                ),
+                {"id": _MIRROR_CAL, "n": f"chg94-mirror-{tag}", "t": NOW},
+            )
+            await save_section_values(
+                session,
+                ITSM_CHANGE_SECTION,
+                {"calendar_id": _MIRROR_CAL},
+                secret_key=settings.secret_key,
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_change (ticket_id, change_type, phase, planned_start,"
+                    " planned_end, created_at, created_by, updated_at, updated_by)"
+                    " VALUES (:t, 'normal', 'scheduled', :s, :e, :now, 1, :now, 1)"
+                ),
+                {
+                    "t": tid,
+                    "s": datetime(2026, 11, 2, 8, 0),
+                    "e": datetime(2026, 11, 2, 10, 0),
+                    "now": NOW,
+                },
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab (id, name, rule, created_at, created_by,"
+                    " updated_at, updated_by) VALUES (:i, :n, 'any', :now, 1, :now, 1)"
+                ),
+                {"i": _MIRROR_CAB, "n": f"chg94-mirror-cab-{tag}", "now": NOW},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_member (cab_id, member_kind, member_ref)"
+                    " VALUES (:c, 'customer_user', :l)"
+                ),
+                {"c": _MIRROR_CAB, "l": login},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_meeting (id, cab_id, title, starts_at, ends_at,"
+                    " status, created_at, created_by, updated_at, updated_by)"
+                    " VALUES (:i, :c, 'chg94 meeting', :now, :now, 'planned', :now, 1, :now, 1)"
+                ),
+                {"i": _MIRROR_MEETING, "c": _MIRROR_CAB, "now": NOW},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_cab_agenda_item (meeting_id, change_ticket_id,"
+                    " position, note) VALUES (:m, :t, 1, :n)"
+                ),
+                {"m": _MIRROR_MEETING, "t": tid, "n": f"Rückfrage bei {login}"},
+            )
+            await session.commit()
+            cfg = await load_change_settings(session, settings)
+            await sync_appointment(session, cfg, ticket_id=tid, user_id=1, base_url="")
+            await session.commit()
+        original = f"Change {tn}: Erase me"
+        assert await _mirror_title(factory, tid) == original
+        first_id = await _scalar(
+            factory, "SELECT calendar_appointment_id FROM tiqora_itsm_change WHERE ticket_id = :t",
+            t=tid,
+        )  # fmt: skip
+
+        async with factory() as session:
+            preview = await build_erasure_preview_for_ids(
+                session,
+                [cuid],
+                mode,
+                delete_tickets=mode == "delete",  # type: ignore[arg-type]
+            )
+        assert len(preview.tables_deleted) == len(set(preview.tables_deleted))
+        assert preview.columns_changed["tiqora_itsm_change_event"] == ["detail"]
+        assert preview.columns_changed["tiqora_itsm_cab_agenda_item"] == ["note"]
+        assert "reason" in preview.columns_changed["tiqora_itsm_change"]
+        if mode == "delete":
+            assert {"calendar_appointment", "tiqora_itsm_cab_member"} <= set(preview.tables_deleted)
+        else:
+            assert preview.columns_changed["calendar_appointment"] == ["title"]
+
+        result = await run_erasure(
+            factory,
+            settings,
+            customer_user_ids=[cuid],
+            mode="delete" if mode == "delete" else "anonymize",
+            seed=31,
+            force_parallel=True,
+            actor="test",
+            delete_tickets=mode == "delete",
+        )
+        assert result.counts["calendar_appointment"] == 1
+        gone = await _scalar(
+            factory, "SELECT count(*) FROM calendar_appointment WHERE id = :a", a=first_id
+        )
+        assert gone == 0  # the old title is nowhere any more
+        members = await _scalar(
+            factory, "SELECT count(*) FROM tiqora_itsm_cab_member WHERE cab_id = :c",
+            c=_MIRROR_CAB,
+        )  # fmt: skip
+        assert members == 1 if mode == "anonymize" else members == 0
+        if mode == "anonymize":
+            assert await _mirror_title(factory, tid) == f"Change {tn}: [anonymisiert]"
+            note = await _scalar(
+                factory,
+                "SELECT note FROM tiqora_itsm_cab_agenda_item WHERE change_ticket_id = :t",
+                t=tid,
+            )
+            assert note is None
+        else:
+            left = await _scalar(
+                factory,
+                "SELECT count(*) FROM calendar_appointment WHERE calendar_id = :c",
+                c=_MIRROR_CAL,
+            )
+            assert left == 0
+
+        await rollback_job(factory, settings, result.job_id, force_parallel=True, actor="test")
+        # the mirror is re-synced: the restored change owns an appointment with its title again
+        assert await _mirror_title(factory, tid) == original
+        note = await _scalar(
+            factory,
+            "SELECT note FROM tiqora_itsm_cab_agenda_item WHERE change_ticket_id = :t",
+            t=tid,
+        )
+        assert note == f"Rückfrage bei {login}"
+        member = await _scalar(
+            factory,
+            "SELECT member_ref FROM tiqora_itsm_cab_member WHERE cab_id = :c",
+            c=_MIRROR_CAB,
+        )
+        assert member == login
+    finally:
+        async with factory() as session:
+            for sql, params in (
+                (
+                    "DELETE FROM tiqora_itsm_cab_agenda_item WHERE meeting_id = :m",
+                    {"m": _MIRROR_MEETING},
+                ),
+                ("DELETE FROM tiqora_itsm_change WHERE ticket_id = :t", {"t": tid}),
+                ("DELETE FROM tiqora_itsm_cab_meeting WHERE id = :m", {"m": _MIRROR_MEETING}),
+                ("DELETE FROM tiqora_itsm_cab_member WHERE cab_id = :c", {"c": _MIRROR_CAB}),
+                ("DELETE FROM tiqora_itsm_cab WHERE id = :c", {"c": _MIRROR_CAB}),
+                (
+                    "DELETE FROM calendar_appointment_ticket WHERE appointment_id IN"
+                    " (SELECT id FROM calendar_appointment WHERE calendar_id = :c)",
+                    {"c": _MIRROR_CAL},
+                ),
+                ("DELETE FROM calendar_appointment WHERE calendar_id = :c", {"c": _MIRROR_CAL}),
+                ("DELETE FROM calendar WHERE id = :c", {"c": _MIRROR_CAL}),
+            ):
+                await session.execute(text(sql), params)
+            stored = await session.get(TiqoraSettings, calendar_key)
+            if stored is not None:
+                await session.delete(stored)
+            await session.commit()
+        await engine.dispose()
+        delete_above_marks(
+            url,
+            marks,
+            first=[
+                (
+                    "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id > :m",
+                    {"m": marks["ticket"]},
+                )
+            ],
+        )
+        sync_engine = create_engine(url)
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM customer_company WHERE customer_id = :c"), {"c": company}
             )
         sync_engine.dispose()

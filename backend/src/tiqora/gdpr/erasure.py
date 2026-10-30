@@ -58,6 +58,11 @@ from tiqora.gdpr.saved_criteria import (
     scrub_schedule_items,
 )
 from tiqora.gi.debug_store import delete_debug_entries_for_tickets
+from tiqora.itsm.change.calendar_mirror import (
+    delete_appointments,
+    mirrored_appointments,
+    resync_tickets,
+)
 from tiqora.itsm.change.legacy.archive import GDPR_TABLES as LEGACY_CHANGE_GDPR_TABLES
 from tiqora.itsm.change.legacy.archive import (
     ErasedKeyChanged,
@@ -98,6 +103,8 @@ INVALID_VALID_ID = 2
 # Placeholder written into free-text columns (ticket.title, ticket_history.name,
 # dynamic_field_value.value_text) when anonymizing — rollback-able via backup.
 _ANON_PLACEHOLDER = "[anonymisiert]"
+#: Znuny's system user: writes of the erasure outside the erased rows (the calendar mirror)
+_SYSTEM_USER_ID = 1
 
 # ITSM tables keyed by ``ticket_id`` (tiqora-owned): child before parent, so the update rows of a
 # major incident are backed up before the incident row (its FK would cascade without a backup).
@@ -131,6 +138,10 @@ _BACKUP_PK_COLUMNS: dict[str, tuple[str, ...]] = {
     "tiqora_itsm_change_impact": ("ticket_id", "kind", "ref_key"),
     "tiqora_itsm_change_service": ("ticket_id", "service_id"),
 }
+#: Count key of the Znuny calendar appointments of changes (the mirror, ``itsm.change.
+#: calendar_mirror``): recreated with the anonymised title, or deleted with the tickets. Their
+#: ``calendar_appointment`` rows are not backed up: a rollback re-syncs the mirror instead.
+_CALENDAR_MIRROR_KEY = "calendar_appointment"
 #: Free-text columns blanked (set NULL) on anonymise; the change record itself stays.
 _CHANGE_TEXT_COLUMNS: tuple[str, ...] = (
     "reason",
@@ -938,7 +949,15 @@ async def build_erasure_preview_for_ids(
         "article_data_mime_plain": ["body"],
         "article_data_mime_attachment": ["filename", "content"],
         "article_search_index": ["article_value"],
+        # change records stay on anonymise; their free texts are blanked
+        "tiqora_itsm_change": list(_CHANGE_TEXT_COLUMNS),
+        "tiqora_itsm_change_event": ["detail"],
+        "tiqora_itsm_cab_agenda_item": ["note"],
     }
+    if mode == "anonymize":
+        # the Znuny calendar appointment of a change copies the ticket title (the mirror
+        # recreates it with the anonymised one)
+        columns_changed[_CALENDAR_MIRROR_KEY] = ["title"]
     tables_deleted: list[str] = []
     if mode == "delete":
         tables_deleted = [
@@ -948,10 +967,17 @@ async def build_erasure_preview_for_ids(
             "group_customer_user",
             "customer_company",  # only when no remaining users
         ]
+        tables_deleted.append("tiqora_itsm_cab_member")  # CAB entries of the customer
         if delete_tickets:
-            # The tickets + all FK children are hard-deleted too.
+            # The tickets + all FK children are hard-deleted too, and the Znuny calendar
+            # appointments of their changes (the mirror).
             tables_deleted.extend(
-                ["ticket", *(t for t, _, _ in _TICKET_DELETE_ORDER), "dynamic_field_value"]
+                [
+                    "ticket",
+                    *dict.fromkeys(t for t, _, _ in _TICKET_DELETE_ORDER),
+                    "dynamic_field_value",
+                    _CALENDAR_MIRROR_KEY,
+                ]
             )
 
     return ErasurePreview(
@@ -1553,6 +1579,7 @@ async def run_erasure(
         **{table: 0 for table in CHANGE_TICKET_TABLES},
         **{table: 0 for table in APPROVAL_TICKET_TABLES},
         _APPROVAL_REFS_KEY: 0,
+        _CALENDAR_MIRROR_KEY: 0,
         "customer_preferences": 0,
         "customer_user_customer": 0,
         "group_customer_user": 0,
@@ -1643,6 +1670,17 @@ async def run_erasure(
             )
 
         do_ticket_delete = mode == "delete" and delete_tickets
+        # the change appointments in Znuny's calendar copy the ticket title; collected before the
+        # change rows (which hold their ids) are deleted or rewritten
+        mirrored = (
+            await mirrored_appointments(session, ticket_ids)
+            if ticket_ids and await _table_exists(session, "tiqora_itsm_change")
+            else {}
+        )
+        if do_ticket_delete and mirrored:
+            counts[_CALENDAR_MIRROR_KEY] += await delete_appointments(
+                session, mirrored.values(), user_id=_SYSTEM_USER_ID
+            )
         if do_ticket_delete and ticket_ids:
             # FK-safe hard delete: child tables first, then dynamic fields, then
             # the tickets themselves. Every deleted row is backed up (full) so
@@ -1945,7 +1983,7 @@ async def run_erasure(
                     {"u": old_login},
                 )
             # CAB members of kind customer_user hold the login: anonymize follows the new
-            # login, delete drops the member (no backup, like the stars above)
+            # login; delete drops the member, backed up (CAB configuration: rollback restores it)
             if has_cab_member and mode == "anonymize":
                 await session.execute(
                     text(
@@ -1955,6 +1993,28 @@ async def run_erasure(
                     {"new_u": login_to_new[old_login], "old_u": old_login},
                 )
             elif has_cab_member:
+                members = (
+                    (
+                        await session.execute(
+                            text(
+                                "SELECT * FROM tiqora_itsm_cab_member"
+                                " WHERE member_kind = 'customer_user' AND member_ref = :u"
+                            ),
+                            {"u": old_login},
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                for member in members:
+                    await _add_backup(
+                        session,
+                        job_id=job_id,
+                        table_name="tiqora_itsm_cab_member",
+                        row_pk={"id": member["id"]},
+                        original_row=dict(member),
+                        created=now,
+                    )
                 await session.execute(
                     text(
                         "DELETE FROM tiqora_itsm_cab_member"
@@ -2056,6 +2116,11 @@ async def run_erasure(
                 await _update_row(session, "ticket", {"id": tid}, updates_t)
                 counts["tickets"] += 1
                 report_ticket_ids.add(tid)
+
+        if mode == "anonymize" and mirrored:
+            # the appointments carry the old title: recreate them with the anonymised one
+            await resync_tickets(session, settings, mirrored.keys(), user_id=_SYSTEM_USER_ID)
+            counts[_CALENDAR_MIRROR_KEY] += len(mirrored)
 
         # ---- ticket_history + dynamic_field_value: scrub free-text PII ----
         # Only on anonymize (delete removes these rows outright, batch B). The
@@ -2783,6 +2848,19 @@ async def rollback_job(
                 restored += 1
                 continue
 
+            if table == "tiqora_itsm_cab_member":
+                # a CAB entry of a deleted customer: back, unless the CAB is gone since
+                cab_left = await _fetch_full_row(
+                    session, "tiqora_itsm_cab", {"id": original["cab_id"]}
+                )
+                if cab_left is not None and await _fetch_full_row(session, table, pk) is None:
+                    await _insert_row(session, table, original)
+                    restored += 1
+                elif cab_left is None:
+                    skipped += 1
+                    logger.warning("gdpr_rollback_row_skipped", job_id=job_id, table=table, pk=pk)
+                continue
+
             if table in _APPROVAL_TABLES:
                 # Rewritten rows (changed columns, outside the erased tickets) are updated back,
                 # also in a ticket hard-delete job, whose branch below would INSERT them; deleted
@@ -2909,6 +2987,12 @@ async def rollback_job(
                 )
             except ErasedKeyChanged as exc:  # the rollback rolls back as a whole
                 raise ErasureError(exc.message) from exc
+
+        if ticket_ids and await _table_exists(session, "tiqora_itsm_change"):
+            # the restored change rows (title, phase, window) own their appointment again: the
+            # mirror recreates it (the erasure deleted or replaced it without a backup)
+            restored_mirror = await mirrored_appointments(session, ticket_ids)
+            await resync_tickets(session, settings, restored_mirror.keys(), user_id=_SYSTEM_USER_ID)
 
         # Fix anonymize-mode login renames on related tables: after customer_user
         # is restored, rename related user_id from new→old using job.resolved_logins
@@ -3268,9 +3352,10 @@ async def _table_exists(session: AsyncSession, table: str) -> bool:
 async def _blank_change_texts(
     session: AsyncSession, *, job_id: int, ids: list[int], now: datetime
 ) -> int:
-    """Anonymise path: set the free-text columns of the change records of *ids* (and the
-    ``detail`` of their timeline events) to NULL. The records stay; only the columns that held
-    text are backed up (partial row), so ``rollback_job`` restores them with an UPDATE."""
+    """Anonymise path: set the free-text columns of the change records of *ids* (the ``detail``
+    of their timeline events and the ``note`` of their CAB agenda lines too) to NULL. The records
+    stay; only the columns that held text are backed up (partial row), so ``rollback_job``
+    restores them with an UPDATE."""
     if not ids or not await _table_exists(session, "tiqora_itsm_change"):
         return 0
     id_list = ",".join(str(int(i)) for i in ids)
@@ -3331,6 +3416,31 @@ async def _blank_change_texts(
             )
             await _update_row(
                 session, "tiqora_itsm_change_event", {"id": ev["id"]}, {"detail": None}
+            )
+    if await _table_exists(session, "tiqora_itsm_cab_agenda_item"):
+        notes = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT id, note FROM tiqora_itsm_cab_agenda_item"  # noqa: S608
+                        f" WHERE change_ticket_id IN ({id_list}) AND note IS NOT NULL"
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        for item in notes:
+            await _add_backup(
+                session,
+                job_id=job_id,
+                table_name="tiqora_itsm_cab_agenda_item",
+                row_pk={"id": item["id"]},
+                original_row={"note": item["note"]},
+                created=now,
+            )
+            await _update_row(
+                session, "tiqora_itsm_cab_agenda_item", {"id": item["id"]}, {"note": None}
             )
     return changed
 

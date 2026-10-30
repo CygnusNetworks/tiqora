@@ -435,9 +435,22 @@ Change management ([itsm.md](itsm.md#8-change-management), Mode B) keeps a recor
 
 - **Change records of the erased tickets stay** (they drive phases, CAB and the calendar) in both
   modes; their free texts (`reason`, the three plans, `pir_notes`, `risk_override_reason`) are set to
-  NULL and the details of the change timeline (`tiqora_itsm_change_event.detail`) are blanked, with
-  backup. With `delete_tickets` the change rows (tasks, agenda items, events, answers, impact,
-  services, the record) are deleted child first, with backup.
+  NULL and the details of the change timeline (`tiqora_itsm_change_event.detail`) and the notes of
+  their CAB agenda lines (`tiqora_itsm_cab_agenda_item.note`) are blanked, with backup. With
+  `delete_tickets` the change rows (tasks, agenda items, events, answers, impact, services, the
+  record) are deleted child first, with backup.
+- **Znuny calendar mirror.** A scheduled change can own an appointment in a Znuny calendar
+  (`itsm_change.calendar_id`) whose title copies the ticket title. Anonymise recreates it with the
+  anonymised title (an appointment left over while the mirror is switched off is deleted);
+  `delete_tickets` deletes it. The appointment row is not backed up: a rollback re-syncs the mirror
+  for the restored changes, which recreates the appointment with the restored title.
+- **CAB members of kind `customer_user`** hold the customer's login: anonymise renames them with the
+  login (rollback renames them back), delete removes them with a backup, so a rollback restores the
+  CAB entry (unless the CAB was deleted since).
+- **Residuals** (free text the erasure does not scan): the titles and minutes of CAB meetings
+  (`tiqora_itsm_cab_meeting.title`, `.minutes`) may name the customer. In archived Znuny changes the
+  redaction matches the customer's **login and e-mail address** only; a name written in an archived
+  description, justification or work order report stays.
 - The approval sets of these tickets are deleted (see [Approvals](#approvals)); the change then shows
   "Freigabeverlauf nicht mehr vorhanden". An emergency post-approval counts as approved when the change
   had recorded its approval time, otherwise as cancelled (a change manager may close with a reason).

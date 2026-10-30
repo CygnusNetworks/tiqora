@@ -9,12 +9,17 @@ kept in ``tiqora_itsm_change.calendar_appointment_id``.
 The mirror is a courtesy: a missing calendar or appointment is logged (``change_calendar_missing``)
 and never fails the transition or edit that triggered it. It runs in its own savepoint, so a
 failed write leaves the caller's transaction intact. Services never commit.
+
+The appointment title is a copy of the ticket title, so the GDPR erasure keeps it in line
+(:func:`resync_tickets` after the anonymise title rewrite and after a rollback,
+:func:`delete_appointments` before a hard delete of the tickets).
 """
 
 from __future__ import annotations
 
 import contextlib
 import logging
+from collections.abc import Collection, Sequence
 from typing import Final
 
 from sqlalchemy import select
@@ -22,9 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.calendar.schemas import AppointmentIn
 from tiqora.calendar.service import AppointmentNotFound, CalendarNotFound, CalendarService
-from tiqora.config import get_settings
+from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.calendar import Calendar, CalendarAppointment
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.domain.ticket_access import CHUNK
 from tiqora.itsm.change.models import TiqoraItsmChange
 from tiqora.itsm.change.settings import ItsmChangeSettings, load_change_settings
 
@@ -167,4 +173,86 @@ async def resync_after_title_edit(session: AsyncSession, *, ticket_id: int, user
         logger.exception("change_calendar_mirror_failed", extra={"ticket_id": ticket_id})
 
 
-__all__ = ["MIRRORED_PHASES", "resync_after_title_edit", "sync_appointment"]
+# --- GDPR erasure ---------------------------------------------------------------------------
+
+
+async def mirrored_appointments(session: AsyncSession, ticket_ids: Sequence[int]) -> dict[int, int]:
+    """``ticket_id -> calendar_appointment_id`` of the given tickets whose change owns an
+    appointment (IN lists of at most ``CHUNK`` ids)."""
+    out: dict[int, int] = {}
+    ids = sorted({int(t) for t in ticket_ids})
+    for start in range(0, len(ids), CHUNK):
+        rows = await session.execute(
+            select(TiqoraItsmChange.ticket_id, TiqoraItsmChange.calendar_appointment_id).where(
+                TiqoraItsmChange.ticket_id.in_(ids[start : start + CHUNK]),
+                TiqoraItsmChange.calendar_appointment_id.is_not(None),
+            )
+        )
+        out.update({int(t): int(a) for t, a in rows})
+    return out
+
+
+async def delete_appointments(
+    session: AsyncSession, appointment_ids: Collection[int], *, user_id: int
+) -> int:
+    """Delete the appointments of change tickets that are being hard-deleted (the mirror's
+    allow-listed write; the caller deletes the change rows). One already gone is skipped."""
+    service = CalendarService(session)
+    removed = 0
+    for appointment_id in sorted(set(appointment_ids)):
+        try:
+            await service.delete_appointment_unchecked(user_id, int(appointment_id))
+        except AppointmentNotFound:
+            continue
+        removed += 1
+    return removed
+
+
+async def resync_tickets(
+    session: AsyncSession, settings: Settings, ticket_ids: Collection[int], *, user_id: int
+) -> None:
+    """Bring the appointments of these change tickets in line after their rows were written
+    outside the change module (the anonymised title, a rollback's restored rows): recreated with
+    the current title, or created again for a restored change in a mirrored phase. With the
+    mirror switched off since, a left-over appointment goes (it carries the old title). Errors
+    are logged per change, like every mirror write."""
+    if not ticket_ids:
+        return
+    cfg = await load_change_settings(session, settings)
+    for ticket_id in sorted(set(ticket_ids)):
+        row = await session.get(TiqoraItsmChange, ticket_id)
+        if row is None:
+            continue
+        await session.refresh(row)  # restored / rewritten with raw statements
+        ticket = await session.get(Ticket, ticket_id)
+        if ticket is not None:
+            await session.refresh(ticket)
+        if cfg.calendar_id != 0:
+            await sync_appointment(
+                session,
+                cfg,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                base_url=settings.public_base_url,
+            )
+            continue
+        if row.calendar_appointment_id is None:
+            continue
+        try:
+            async with session.begin_nested():
+                await _remove(CalendarService(session), row, user_id)
+                await session.flush()
+        except Exception:  # noqa: BLE001 - a mirror error never fails the caller
+            logger.exception("change_calendar_mirror_failed", extra={"ticket_id": ticket_id})
+            with contextlib.suppress(Exception):
+                await session.refresh(row)
+
+
+__all__ = [
+    "MIRRORED_PHASES",
+    "delete_appointments",
+    "mirrored_appointments",
+    "resync_after_title_edit",
+    "resync_tickets",
+    "sync_appointment",
+]
