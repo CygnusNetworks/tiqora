@@ -689,6 +689,74 @@ describe("NewTicketPage", () => {
     );
   });
 
+  it("an internal note ticket needs no customer, adds an internal note and books the time on it", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 2, name: "closed successful", type_name: "closed" },
+      { id: 6, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    createArticle.mockResolvedValue({ article_id: 78 });
+    createTicketTimeAccounting.mockReset().mockResolvedValue({});
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    expect(screen.getByTestId("new-ticket-note-hint")).toBeInTheDocument();
+    // Unlocked without picking or skipping a customer; no recipients.
+    expect(screen.queryByTestId("new-ticket-to")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Server-Wartung" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Updates eingespielt." },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-time"), { target: { value: "45" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() =>
+      expect(createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Server-Wartung", customer_user_id: null }),
+      ),
+    );
+    await waitFor(() =>
+      expect(createArticle).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({
+          channel: "note",
+          is_visible_for_customer: false,
+          body: "Updates eingespielt.",
+        }),
+      ),
+    );
+    expect(createArticle.mock.calls[0][1]).not.toHaveProperty("to_address");
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(42, {
+        time_unit: 45,
+        article_id: 78,
+      }),
+    );
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/agent/tickets/$ticketId",
+        params: { ticketId: "42" },
+      }),
+    );
+  });
+
+  it("an internal note ticket offers closed but no pending states", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 2, name: "closed successful", type_name: "closed" },
+      { id: 6, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    fireEvent.click(await screen.findByTestId("new-ticket-state-value"));
+    expect(await screen.findByText("Closed successful")).toBeInTheDocument();
+    expect(screen.queryByText("Pending reminder")).not.toBeInTheDocument();
+  });
+
   it("stays on the page with a link when only the time booking fails", async () => {
     createArticle.mockResolvedValue({ article_id: 77 });
     createTicketTimeAccounting.mockReset().mockRejectedValue(new Error("down"));
