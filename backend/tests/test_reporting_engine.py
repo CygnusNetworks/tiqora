@@ -1381,6 +1381,12 @@ async def test_time_series_fill_never_exceeds_the_row_cap(
         assert len(full.rows) == 61 * 2 and full.truncated is False  # T1, T2 x 61 days
         assert sum(1 for row in full.rows if row[2]) == 4
 
+        # a flat table with a column dimension lists only the booked combinations
+        table = await db.run(
+            {**per_ticket, "visualization": {"type": "table", "series_dimension": 1}}
+        )
+        assert len(table.rows) == 4 and all(row[2] for row in table.rows)
+
         capped = await db.run(per_ticket, row_cap=100)
         assert capped.truncated is True and len(capped.rows) == 4  # grid refused, data kept
         assert all(row[2] for row in capped.rows)
