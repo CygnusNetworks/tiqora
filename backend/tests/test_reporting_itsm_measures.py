@@ -30,6 +30,7 @@ from tests._approvals_helpers import to_async_url
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.extensions.core import get_registry
+from tiqora.reporting import engine as engine_module
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import ReportDefinition, TimeRange
 from tiqora.reporting.engine import run_report
@@ -380,6 +381,59 @@ async def test_fls_rate_ignores_rows_not_yet_upgraded(
 @pytest.mark.db
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_fls_with_role_filter_and_a_null_row(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    factory = await _factory(request, url_fixture)
+    try:
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "UPDATE tiqora_report_ticket_fact SET first_level_solved = NULL"
+                    " WHERE ticket_id = :t"
+                ),
+                {"t": T_INC_LONG},
+            )
+            await s.commit()
+        res = await _run(
+            factory,
+            _defn(
+                "tickets",
+                [],
+                ["tickets", "first_level_solved", "first_level_solution_rate"],
+                JUNE,
+                _where("itsm_role", ["incident"]),
+            ),
+        )
+        # incidents 972110 (first level) and 972112 (not yet known): 1 of 1 known
+        assert res.rows == [[2, 1, pytest.approx(1.0)]]
+    finally:
+        async with factory() as s:
+            await rebuild_ticket_facts(s, [T_INC_LONG], now=BUILT)
+            await s.commit()
+        await factory.kw["bind"].dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_p50_sample_cap_does_not_count_null_rows(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """July has two NULL rows and one value: with a cap of 1 the NULLs must not use it up."""
+    factory = await _factory(request, url_fixture)
+    monkeypatch.setattr(engine_module, "PERCENTILE_SAMPLE_CAP", 1)
+    try:
+        res = await _run(factory, _defn("tickets", [], ["itsm_solution_p50"], JULY))
+        assert res.rows == [[pytest.approx(90.0)]]
+        assert res.truncated is False
+    finally:
+        await factory.kw["bind"].dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_itsm_solution_avg_ignores_null(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
@@ -438,7 +492,7 @@ async def test_itsm_role_without_configured_types(
             factory,
             _defn("tickets", [], ["tickets"], BOTH, _where("itsm_role", ["incident"])),
         )
-        assert none.rows in ([], [[0]])
+        assert none.rows == [[0]]
     finally:
         async with factory() as s:
             for key, value in _SETTINGS.items():
