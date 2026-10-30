@@ -279,10 +279,17 @@ def test_changes_per_ci_class_406() -> None:
     ) in _issues(m, "dropped")
     assert len([1 for _, r in _issues(m, "dropped") if "gibt es in diesem System nicht" in r]) == 4
     assert ("UseAsXvalue.CategoryIDs", _CIP) in _issues(m, "dropped")
-    assert (
-        "UseAsRestriction.CIStateIDs",
-        "Znuny wertet den Vorfallsstatus im Zeitraum aus; Tiqora den aktuellen.",
-    ) in _issues(m, "approximated")
+    state_issues = [i for i in m.issues if i.element == "UseAsRestriction.CIStateIDs"]
+    assert [(i.severity, i.reason) for i in state_issues] == [
+        (
+            "approximated",
+            "Die Statusnamen aus Znuny lassen sich nicht zuordnen. "
+            "Solange Sie keine Auswahl treffen, zählt der Bericht alle Vorfallsstatus.",
+        )
+    ]
+    assert by_field["ci_incident_state"].default is None
+    assert by_field["ci_incident_state"].op == "in"
+    assert all(c[0] != "ci_incident_state" for c in _filter(m))
     assert not any("gültige Nummer" in reason for _, reason in _issues(m))
     assert (
         CHANGES_PER_CI_CLASS in itsm_fixture("ITSMStats-406-ITSMChangeManagement.xml").object_module

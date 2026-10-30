@@ -393,17 +393,20 @@ def map_changes_per_ci_class(stat: ZnunyStat, lookups: StatLookups, is_admin: bo
     for el in stat.elements:
         if el.element != "CIStateIDs" or not el.selected:
             continue
-        issues.append(
-            make_issue(element_ref(el), ", ".join(el.selected), _CI_STATE_PERIOD, "approximated")
-        )
-        if not any(raw.strip().isascii() and raw.strip().isdigit() for raw in el.selected):
-            # state names (export files) cannot be looked up; the shipped selection is all of them
-            skip.append("CIStateIDs")
+        if any(raw.strip().isascii() and raw.strip().isdigit() for raw in el.selected):
             issues.append(
-                make_issue(element_ref(el), ", ".join(el.selected), _CI_STATE_NAMES, "approximated")
+                make_issue(
+                    element_ref(el), ", ".join(el.selected), _CI_STATE_PERIOD, "approximated"
+                )
             )
-            if not el.fixed:
-                extra_parameters.append("ci_incident_state")
+            continue
+        # state names (export files) cannot be looked up; the shipped selection is all of them
+        skip.append("CIStateIDs")
+        issues.append(
+            make_issue(element_ref(el), ", ".join(el.selected), _CI_STATE_NAMES, "approximated")
+        )
+        if not el.fixed:
+            extra_parameters.append("ci_incident_state")
     return _matrix(
         stat,
         lookups,
