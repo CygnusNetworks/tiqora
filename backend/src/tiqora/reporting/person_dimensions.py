@@ -35,6 +35,7 @@ NON_PERSON_DIMENSIONS: Final[frozenset[str]] = frozenset(
         "ticket_priority",
         "type",
         "ticket_type",
+        "itsm_role",
         "service",
         "sla",
         "channel",

@@ -8,6 +8,7 @@ from sqlalchemy import ColumnElement, FromClause, and_
 
 from tiqora.db.legacy.ticket import Ticket, TicketState, TicketStateType
 from tiqora.domain.ticket_service import UNASSIGNED_OWNER_ID
+from tiqora.reporting.itsm_roles import itsm_role_dim
 from tiqora.reporting.semantic import BoolFn, CompileContext, Measure, ReportSource
 from tiqora.reporting.sources._common import (
     OPEN_TYPES,
@@ -87,6 +88,7 @@ def open_tickets_source() -> ReportSource:
             ),
             attribute_dim("priority", col(T, "ticket_priority_id"), "priority"),
             attribute_dim("type", col(T, "type_id"), "type"),
+            itsm_role_dim("itsm_role", col(T, "type_id")),
             attribute_dim("service", col(T, "service_id"), "service"),
             attribute_dim("sla", col(T, "sla_id"), "sla"),
             dim("owner", "id", col(T, "user_id"), labels="user"),
