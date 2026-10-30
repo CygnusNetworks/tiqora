@@ -6,7 +6,11 @@ ITSMServiceLevelManagement in ``xml_storage``. Tiqora reads them (``load_stats``
 checklist ``PARITY`` of ``backend/tests/test_znuny_itsm_stats_parity.py``.
 
     GOLDEN_PEER=znuny-6.5-itsm just golden-up && just golden-seed
-    GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm just golden-test -k itsm_stats_import
+    eval "$(python3 tests/golden/peer_env.py znuny-6.5-itsm)"; export GOLDEN=1
+    cd backend && uv run python -m pytest -q -m golden \\
+        ../tests/golden/test_itsm_stats_import.py -s -rs
+
+(``just golden-test`` runs the whole golden directory and takes no ``-k``.)
 """
 
 from __future__ import annotations
@@ -25,7 +29,6 @@ from tiqora.reporting.znuny_stats.reader import load_stat_lookups, load_stats
 
 pytestmark = [pytest.mark.golden, pytest.mark.itsm_peer]
 
-MIN_MATCHED = 40
 _FLS_200 = "ITSMStats-200-ITSMTicketFirstLevelSolutionRate.xml"
 _IDS_AS_STORED = "IDs wie in Znuny hinterlegt – bitte Typ und Status prüfen."
 
@@ -76,12 +79,12 @@ async def test_installed_itsm_stats_map_like_the_fixtures(
     matched = 0  # distinct fixtures found on the peer
     copies = 0  # peer statistics compared (the ITSM bundle installs each stat several times)
     for key, name in sorted(fixtures.items(), key=lambda kv: kv[1]):
+        from_file = map_stat(itsm_fixture(name), lookups, is_admin=True)
         if key in by_key:
             matched += 1
         for db_stat in by_key.get(key, []):
             copies += 1
             from_db = map_stat(db_stat, lookups, is_admin=True)
-            from_file = map_stat(itsm_fixture(name), lookups, is_admin=True)
             assert from_db.definition is not None, f"{name}: peer stat {db_stat.stat_id}"
             assert _shape(from_db) == _shape(from_file), name
             assert _shape(from_db) == PARITY[name], name
@@ -96,7 +99,7 @@ async def test_installed_itsm_stats_map_like_the_fixtures(
     print(f"[golden {golden_peer_id}] peer stats compared: {copies}")
     print(f"[golden {golden_peer_id}] ITSM-module stats on the peer without fixture: {only_peer}")
     print(f"[golden {golden_peer_id}] fixtures without a peer stat: {only_fixture}")
-    assert matched >= MIN_MATCHED
+    assert matched == len(TITLES)
 
 
 @pytest.mark.asyncio
