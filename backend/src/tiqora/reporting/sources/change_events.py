@@ -1,8 +1,8 @@
 """Source ``change_events``: one row per phase change of a change record (Mode B).
 
-``tiqora_itsm_change_event`` (``event = 'phase'`` with a ``from_phase``: one row per phase change on every path; the
-initial NULL -> draft row of creation is no change) joined
-with the change record and the change ticket's report fact. The fact join carries the queue scope
+``tiqora_itsm_change_event`` (``event = 'phase'`` with a ``from_phase``: one row per phase change
+on every path; the initial NULL -> draft row of creation is no change) joined with the change
+record and the change ticket's report fact. The fact join carries the queue scope
 (the ticket's current queue, as for ``changes``) and the archive rule. The event table's
 ``ticket_id`` is a cascading foreign key to the change, so both inner joins keep every event;
 all three tables are Tiqora's own.
