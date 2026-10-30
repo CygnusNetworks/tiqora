@@ -716,11 +716,11 @@ Change-Management“ erreichbar; gespeichert als `itsm_change.<Schlüssel>`).
 | `weight_open_incidents` | 4 | Punkte für offene Incidents auf den betroffenen Services |
 | `weight_overlap` | 4 | Punkte für andere Changes im selben Zeitfenster |
 | `weight_freeze` | 10 | Punkte, wenn das Zeitfenster einen Sperrzeitraum berührt |
-| `weight_failed_history` | 3 | Punkte für gescheiterte Changes an denselben CIs oder Services |
+| `weight_failed_history` | 3 | Punkte für fehlgeschlagene Changes an denselben CIs oder Services |
 | `weight_emergency` | 5 | Punkte für jeden Notfall-Change |
 | `weight_missing_backout` | 3 | Punkte, wenn der Rückfallplan fehlt |
 | `incident_lookback_days` | 7 | Rückblick für offene Incidents in Tagen (1 bis 90) |
-| `failed_change_lookback_days` | 180 | Rückblick für gescheiterte Changes in Tagen (1 bis 1095) |
+| `failed_change_lookback_days` | 180 | Rückblick für fehlgeschlagene Changes in Tagen (1 bis 1095) |
 | `impact_refresh_hours` | 24 | Die Auswirkung aktiver Changes wird nach so vielen Stunden neu berechnet (1 bis 720) |
 | `max_tasks` | 50 | Höchstzahl Aufgaben je Change, auch in Vorlagen (1 bis 200) |
 | `calendar_id` | 0 | Znuny-Kalender, der je geplantem Change einen Termin erhält; 0 = aus |
@@ -1233,11 +1233,11 @@ ITSMServiceLevelManagement, 47 mitgelieferte Statistiken). Alles Weitere steht i
 
 | Was | Modus | Wo |
 |---|---|---|
-| Tickets nach Typ, offene Tickets nach Typ, neue Tickets nach „ITSM-Art“, **First-Level-Lösungsquote**, **Lösungszeit (ITSM)** | A und B (nicht bei „Aus“) | Berichte, Kategorie „ITSM“; im Bericht-Editor Datenbasis „Tickets“ |
+| Tickets nach Typ, offene Tickets nach Typ, neue Tickets nach „ITSM-Art“, **First-Level-Lösungsquote**, **Lösungszeit (ITSM)** | A und B (nicht bei „Aus“); die Datenbasis „Tickets“ im Bericht-Editor in jedem Modus | Berichte, Kategorie „ITSM“; im Bericht-Editor Datenbasis „Tickets“ |
 | CIs nach Klasse und Status, neue CIs je Tag | nur B | Kategorie „ITSM“; Datenbasis „Configuration Items (CMDB)“ |
 | Changes nach Status, Ergebnis der Changes, abgelehnte und abgebrochene Changes, Changes je Antragsteller | nur B | Kategorie „ITSM“; Datenbasen „Changes“ und „Change-Statuswechsel“ |
 | Changes je CI-Klasse, störungsanfällige CIs | nur B | Kategorie „ITSM“; Datenbasis „CIs und verknüpfte Tickets“ |
-| Znunys ITSM-Statistiken | A und B | „Statistiken aus Znuny übernehmen“ ([compatibility.md](compatibility.md#importing-znuny-statistics)) |
+| Znunys ITSM-Statistiken | jeder Modus (CI- und Change-Statistiken zeigen Zahlen erst, wenn Tiqora das ITSM geführt hat) | „Statistiken aus Znuny übernehmen“ ([compatibility.md](compatibility.md#importing-znuny-statistics)) |
 
 Die ITSM-Art eines Tickets („Störung“, „Schwere Störung“, „Service-Anfrage“, „Problem“, „Change“,
 „Change-Aufgabe“) folgt den Ticket-Typen, die Sie unter Admin, „ITSM“ eingestellt haben.

@@ -517,7 +517,7 @@ and their numbers are incomplete until it has finished. Operate it from the CLI:
 
 ```sh
 tiqora report backfill [--since YYYY-MM-DD]   # start or resume; --since starts at the first ticket created on/after that date
-tiqora report status                          # state of the report data as JSON
+tiqora report status                          # state of the report data as JSON (`outdated_rows`: rows left for a fact upgrade)
 ```
 
 The admin page for report data (Admin, **Berichtsdaten** = report data; `/admin/reporting`) shows the state and
@@ -542,10 +542,15 @@ This version raises the report fact version to 3 (two new ticket columns for the
 solution and the ITSM solution time; migration `20261010_0085`). After updating, the report worker
 recomputes all ticket facts in batches (500 per run of the `report_facts` loop; the interval is
 `TIQORA_REPORT_FACTS_INTERVAL`, default 60 seconds, or `daemon.report_facts.interval_seconds`
-in the settings), which is about 30 000 tickets per hour at the default; large installations need
-a few hours. Until it has finished, the first-level and ITSM solution-time figures cover only the
-already recomputed tickets (tickets not yet reached are in neither the count nor the rate). No
-admin rebuild is needed for these two figures. The four ITSM
+in the settings). The duration is the number of tickets divided by 500 per run: about 30 000 tickets
+per hour at the default, so one million tickets take about 33 hours; a lower interval speeds it up.
+The newest tickets go first, so the default report windows are right soon after the start. Until it
+has finished, the first-level and ITSM solution-time figures cover only the already recomputed
+tickets (tickets not yet reached are in neither the count nor the rate); the `tickets` column already
+counts everything. `tiqora report status` (`outdated_rows`) and Admin, **Berichtsdaten** ("Noch neu zu
+berechnen" = still to recalculate) show how many ticket rows are left, and reports show a notice while
+the count is above 0. A count that stops falling means single tickets fail to rebuild: see the worker
+log. No admin rebuild is needed for these two figures. The four ITSM
 report data bases read `tiqora_*` tables and need no configuration.
 
 The first backfill (and every admin rebuild) runs as a background job in the

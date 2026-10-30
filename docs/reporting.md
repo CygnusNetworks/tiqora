@@ -166,7 +166,7 @@ the ticket-based reports only. Details: [ITSM reports and data bases](#itsm-repo
 | "Neue CIs je Tag" / new CIs per day | CIs created per day and class, last month | Configuration Items (CMDB) |
 | "Changes nach Status" / changes by status | Changes created per day and change status, last month (switchable to phase, change type, risk) | Changes |
 | "Ergebnis der Changes" / change outcomes | Per change type, last 3 months: changes, successful, failed or backed out, success rate, currently rejected, finished later than planned | Changes |
-| "Abgelehnte und abgebrochene Changes" / rejected and cancelled changes | Phase changes into "Abgelehnt" or "Abgebrochen" per day, last month | Change-Statuswechsel |
+| "Abgelehnte und abgebrochene Changes" / rejected and cancelled changes | Changes moved into "Abgelehnt" or "Abgebrochen" per day (measure "Changes": each change once per day and phase), last month | Change-Statuswechsel |
 | "Changes je Antragsteller" / changes per requester | Top 20 customer users by new changes, last month (switchable to creating agent, owner) | Changes |
 | "Changes je CI-Klasse" / changes per CI class | Changes of the last month per class of the linked CIs; a change counts once per class | CIs und verknüpfte Tickets |
 | "Störungsanfällige CIs" / incident-prone CIs | The 20 CIs with the most linked incidents in the last 3 months, with the still open ones | CIs und verknüpfte Tickets |
@@ -460,7 +460,7 @@ Znuny's `configitem*` and `change_*` tables; they are available only while Tiqor
 | Data basis (German) | One row is | Groupings (examples) | Values |
 |---|---|---|---|
 | "Configuration Items (CMDB)" | a CI | "CI-Klasse", "Verwendungsstatus", "Vorfallsstatus", "Verwendung (Gruppe)", "Vorfall (Gruppe)", "Erstellt", "Geändert", "Angelegt von" | "CIs", "CIs mit Störung", "CIs mit Warnung", "Produktive CIs", "Versionen Ø" |
-| "Changes" | a change | "Phase", "Ergebnis", "Change-Status", "Change-Art", "Risiko", queue, priority, service, SLA, owner, customer, "Ansprechpartner", dates | "Changes", "Offene Changes", "Erfolgreich", "Gescheitert oder zurückgerollt", "Erfolgsquote", "Notfall-Changes", "Derzeit abgelehnt", "Später fertig als geplant" |
+| "Changes" | a change | "Phase", "Ergebnis", "Change-Status", "Change-Art", "Risiko", queue, priority, service, SLA, owner, customer, "Ansprechpartner", dates | "Changes", "Offene Changes", "Erfolgreich", "Fehlgeschlagen oder zurückgerollt", "Erfolgsquote", "Notfall-Changes", "Derzeit abgelehnt", "Später fertig als geplant" |
 | "Change-Statuswechsel" | one phase change of a change | "Zeitpunkt", "Von Phase", "Nach Phase", "Change-Art", queue, priority, service | "Statuswechsel", "Changes" (each change once) |
 | "CIs und verknüpfte Tickets" | a CI linked to a ticket | "CI", "CI-Klasse", "CI-Verwendungsstatus", "CI-Vorfallsstatus", "Verknüpfungsart", ticket type, "ITSM-Art", status type, "Change-Phase", queue, priority, service | "Tickets", "CIs", "Offen", "Changes", "Störungen", "Offene Störungen" |
 
@@ -472,6 +472,8 @@ Rules worth knowing:
 - "Change-Statuswechsel" counts the phase changes after creation; the creation of a change (no
   previous phase) is not a change of phase. A change that is rejected, reworked and rejected again is
   two "Statuswechsel" and one "Changes".
+- The filters on "CI" and "Verknüpfungsart" are free input: the builder asks for a CI id or a link
+  type name, there is no picker.
 - A change is counted in the queue its ticket has now, and only once its ticket is in the report data
   (see the upgrade note below). Archived tickets are not counted.
 - Changes per CI class count the CIs linked to the **change ticket**, which is where Tiqora's impact
@@ -496,8 +498,16 @@ wallboards use the CI classes of the schedule's owner or the link's creator (see
 **Mode A and off.** In Mode A only the ticket-based ITSM reports are listed; with the ITSM mode
 "Aus" none is. The four data bases are hidden in the builder, and the built-in reports on them are
 not listed. A saved or imported report on one of them is not an error: it opens, read-only with a
-note, and runs: it reads Tiqora's own tables, which hold data only once Tiqora has led the ITSM. Without
-Mode B it shows no rows; after a switch back from Mode B to Mode A it counts the rows that remain.
+note in the builder, and runs: it reads Tiqora's own tables, which hold data only once Tiqora has led the
+ITSM. Without Mode B it shows no rows; after a switch back from Mode B to Mode A it counts the rows that
+remain. The report page and a dashboard tile show the same note ("Diese Datenbasis wird nur gepflegt,
+solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein."); a wallboard link
+does not. A dashboard tile or a schedule on such a report keeps running; the mail carries no note and goes
+out empty unless "only if non-empty" is set.
+
+**Period of a tile or a schedule.** "CIs nach Klasse und Status" has no period of its own. A dashboard
+period or a schedule's "Zeitraum für den Versand" narrows it, like every CI report, to the CIs created
+in that period, the same rule as for "Offene Tickets (jetzt)".
 Statistics over Znuny's own CMDB and change tables in Mode A are
 not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
 
@@ -505,8 +515,11 @@ not implemented (see [compatibility.md](compatibility.md#znuny-features-not-impl
 "ITSM solution time") and raises the report fact version. The report worker recomputes all ticket
 facts in batches of 500 per run; until it has finished, tickets not yet recomputed are in neither the
 count nor the rate of the first-level measures and have no ITSM solution time, so the figures cover
-only the recomputed tickets and grow to the full numbers on their own. No admin rebuild is needed
-for this. Operating notes: [deployment.md](deployment.md#reporting-data).
+only the recomputed tickets and grow to the full numbers on their own; the newest tickets go first.
+The upgrade recomputes old tickets with today's configuration, so existing breach and working-minute
+figures can shift on sites that changed a calendar or an SLA since. Reports show "Die Kennzahlen werden
+nach dem Update neu berechnet. First-Level- und ITSM-Lösungszeit-Werte sind bis dahin unvollständig."
+while rows are left. No admin rebuild is needed for this. Operating notes: [deployment.md](deployment.md#reporting-data).
 
 ## How the numbers are produced
 
@@ -530,7 +543,8 @@ minutes. A target of 0 means "no SLA".
 
 On the first start after an upgrade the worker runs a **backfill** over the whole ticket history.
 Until it has finished, reports show "Die Berichtsdaten werden noch aufgebaut ({{percent}} %). Die
-Zahlen sind bis dahin unvollständig." Afterwards the worker follows new history rows continuously.
+Zahlen sind bis dahin unvollständig." (a fact upgrade after an update has its own notice, see "After
+the update"). Afterwards the worker follows new history rows continuously.
 Changes that write no history row are **not** picked up: calendar, SLA or escalation settings
 (working minutes stay as built), a change of the report time zone (older snapshots keep the old
 zone), and direct SQL changes. After such a change an administrator rebuilds the data (below).

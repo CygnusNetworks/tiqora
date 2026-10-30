@@ -1247,8 +1247,9 @@ figures differ from Znuny's `Kernel::System::Stats`:
   not counted). The CI incident state is the current one, where Znuny evaluates it in the period.
   The shipped statistic 406 selects all incident states, which is what Tiqora counts.
 - **State changes of changes (402, 403).** Znuny lists the numbers of the changes that changed
-  into the state "rejected" or "retracted" in the period; Tiqora counts the phase changes in the
-  period ("Abgelehnt", "Abgebrochen"). Creation is not a state change.
+  into the state "rejected" or "retracted" in the period; Tiqora counts the changes moved into
+  "Abgelehnt" or "Abgebrochen" (measure `changes`, each change once per day and phase). Creation is
+  not a state change.
 - **Changes per requester (405).** Znuny counts the request-for-change tickets per agent or customer;
   Tiqora counts changes per customer user.
 - **No availability statistics.** Znuny ships none in ITSMServiceLevelManagement; Tiqora has none.
@@ -1396,7 +1397,10 @@ Change-state mapping (Znuny's change state, a general-catalog name, to the Tiqor
 | canceled, retracted | cancelled |
 
 Names that are not in this list are reported ("Diesen Change-Status gibt es in Tiqora nicht."). The
-history statistics use the same mapping on the phase (`closed_*` collapsed to `closed`).
+history statistics use the same mapping on the phase (`closed_*` collapsed to `closed`), so a copy
+that filters on "successful" or "failed" counts both outcomes and says so ("„successful“ und „failed“
+fallen in Tiqora in die Phase „Abgeschlossen“; der Bericht zählt beide Ergebnisse."). The shipped 402
+and 403 select "rejected" and "retracted" and are not affected.
 
 **Mode A and off.** An imported CI or change statistic still becomes a report, with the note that
 it shows data only once Tiqora has led the ITSM (Mode B). It opens read-only in the builder and runs; it
@@ -1414,6 +1418,69 @@ first-level and solution-time reports; they keep the "closed" restriction. The s
 imported without that restriction and counts all incident states, which equals Znuny's selection. Read
 from the Znuny database, the numeric selection becomes a filter on the current incident state ("Znuny
 wertet den Vorfallsstatus im Zeitraum aus; Tiqora den aktuellen.").
+State type ids are the exception: the ids of a file are mapped to this system's state types and stay a
+fixed filter (statistics 014 to 016:
+"open"), with the note "Status-Typ-IDs aus einer Exportdatei wurden auf die Status-Typen dieses Systems
+abgebildet. Bitte prüfen Sie die Auswahl." A custom first-level or solution-time statistic with a state
+axis and no selection gets the "closed" restriction too ("Der Bericht zählt nur geschlossene Tickets,
+auch ohne Status-Auswahl.").
+
+**The 47 shipped statistics.** One row per statistic of ITSMServiceLevelManagement, by its Znuny title. The
+import keeps that title and creates a report on the data basis, groupings and values shown; a test keeps
+this table equal to the mapper's result. The last column names the built-in report that answers the same
+question, often through its switch (for example per queue instead of per priority) and with its own
+default period: Znuny's "ever created" is a period you choose. Statistic 401 has no category (see above),
+and 404 is the split by ticket type.
+
+| No. | Znuny title | Data basis | Groupings | Values | Built-in report |
+|---|---|---|---|---|---|
+| 001 | Total number of all tickets ever created per Ticket-Type and Priority | `tickets` | `type`, `priority` | `tickets` | "Tickets nach Typ" |
+| 002 | Total number of all tickets ever created per Ticket-Type and State | `tickets` | `type`, `state` | `tickets` | "Tickets nach Typ" |
+| 003 | Total number of all tickets ever created per Ticket-Type and Queue | `tickets` | `type`, `queue` | `tickets` | "Tickets nach Typ" |
+| 004 | Total number of all tickets ever created per Ticket-Type and Service | `tickets` | `type`, `service` | `tickets` | "Tickets nach Typ" |
+| 005 | Monthly overview of all tickets created in the last month per Ticket-Type | `tickets` | `created`, `type` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 006 | Monthly overview of all tickets created in the last month per Priority | `tickets` | `created`, `priority` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 007 | Monthly overview of all tickets created in the last month per State | `tickets` | `created`, `state` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 008 | Monthly overview of all tickets created in the last month per Queue | `tickets` | `created`, `queue` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 009 | Monthly overview of all tickets created in the last month per Service | `tickets` | `created`, `service` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 010 | Number of tickets created in a specific time period per Ticket-Type and Priority | `tickets` | `type`, `priority` | `tickets` | "Tickets nach Typ" |
+| 011 | Number of tickets created in a specific time period per Ticket-Type and State | `tickets` | `type`, `state` | `tickets` | "Tickets nach Typ" |
+| 012 | Number of tickets created in a specific time period per Ticket-Type and Queue | `tickets` | `type`, `queue` | `tickets` | "Tickets nach Typ" |
+| 013 | Number of tickets created in a specific time period per Ticket-Type and Service | `tickets` | `type`, `service` | `tickets` | "Tickets nach Typ" |
+| 014 | Number of currently open tickets per Ticket-Type and Priority | `tickets` | `type`, `priority` | `tickets` | "Offene Tickets nach Typ" |
+| 015 | Number of currently open tickets per Ticket-Type and Queue | `tickets` | `type`, `queue` | `tickets` | "Offene Tickets nach Typ" |
+| 016 | Number of currently open tickets per Ticket-Type and Service | `tickets` | `type`, `service` | `tickets` | "Offene Tickets nach Typ" |
+| 100 | Total number of all config items ever created per Class and State | `config_items` | `class`, `deployment_state` | `config_items` | "CIs nach Klasse und Status" |
+| 101 | Monthly overview of all config items created in the last month per Class | `config_items` | `created`, `class` | `config_items` | "Neue CIs je Tag" |
+| 102 | Monthly overview of all config items created in the last month per State | `config_items` | `created`, `deployment_state` | `config_items` | "Neue CIs je Tag" |
+| 103 | Number of config items created in a specific time period per Class and State | `config_items` | `class`, `deployment_state` | `config_items` | "CIs nach Klasse und Status" |
+| 200 | First level solution rate for all tickets ever created per Ticket-Type and Priority | `tickets` | `type`, `priority` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 201 | First level solution rate for all tickets ever created per Ticket-Type and Queue | `tickets` | `type`, `queue` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 202 | First level solution rate for all tickets ever created per Ticket-Type and Service | `tickets` | `type`, `service` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 203 | Monthly overview of first level solution rate per Ticket-Type in the last month | `tickets` | `created`, `type` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 204 | Monthly overview of first level solution rate per Priority in the last month | `tickets` | `created`, `priority` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 205 | Monthly overview of first level solution rate per Queue in the last month | `tickets` | `created`, `queue` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 206 | Monthly overview of first level solution rate per Service in the last month | `tickets` | `created`, `service` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 207 | First level solution rate for all tickets created in a specific time period per Ticket-Type and Priority | `tickets` | `type`, `priority` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 208 | First level solution rate for all tickets created in a specific time period per Ticket-Type and Queue | `tickets` | `type`, `queue` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 209 | First level solution rate for all tickets created in a specific time period per Ticket-Type and Service | `tickets` | `type`, `service` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 300 | Average solution time for all tickets ever created per Ticket-Type and Priority | `tickets` | `type`, `priority` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 301 | Average solution time for all tickets ever created per Ticket-Type and Queue | `tickets` | `type`, `queue` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 302 | Average solution time for all tickets ever created per Ticket-Type and Service | `tickets` | `type`, `service` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 303 | Monthly overview of the average solution time per Ticket-Type in the last month | `tickets` | `created`, `type` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 304 | Monthly overview of the average solution time per Priority in the last month | `tickets` | `created`, `priority` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 305 | Monthly overview of the average solution time per Queue in the last month | `tickets` | `created`, `queue` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 306 | Monthly overview of the average solution time per Service in the last month | `tickets` | `created`, `service` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 307 | Average solution time of tickets created in the last month per Ticket-Type and Priority | `tickets` | `type`, `priority` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 308 | Average solution time of tickets created in the last month per Ticket-Type and Queue | `tickets` | `type`, `queue` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 309 | Average solution time of tickets created in the last month per Ticket-Type and Service | `tickets` | `type`, `service` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 400 | ITSMChange Count Changes | `changes` | `created`, `change_status` | `changes` | "Changes nach Status" |
+| 401 | ITSMChange Changes per Category | `changes` | `created` | `changes` | "Changes nach Status" |
+| 402 | ITSMChange rejected changes | `change_events` | `occurred`, `to_phase` | `changes` | "Abgelehnte und abgebrochene Changes" |
+| 403 | ITSMChange retracted changes | `change_events` | `occurred`, `to_phase` | `changes` | "Abgelehnte und abgebrochene Changes" |
+| 404 | Relation Tickets (by types) ↔ Changes | `tickets` | `created`, `type` | `tickets` | "Störungen, Anfragen, Probleme und Changes" |
+| 405 | RfCs per Requester | `changes` | `created`, `customer_user` | `changes` | "Changes je Antragsteller" |
+| 406 | Changes per config item class | `ci_tickets` | `ci_class` | `changes` | "Changes je CI-Klasse" |
 
 Axes and restrictions: `UseAsXvalue` becomes the first dimension, up to two
 `UseAsValueSeries` elements the next ones (a fourth dimension is dropped). Selected

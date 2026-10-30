@@ -516,7 +516,7 @@ not implemented:
 | Customer portal print view | missing |
 | Follow-up as a new ticket (`queue.follow_up_id == 3`) | missing (behaves like reopen) |
 | Process transitions after every ticket change | missing (evaluated after process dialogs and new process tickets) |
-| ITSM change management (changes, work orders), service catalogue, approvals | planned (wave 5) |
+| ITSM service catalogue | planned (wave 5); change management and approvals are available ([itsm.md](./docs/itsm.md)) |
 | SysConfig edit/deploy UI | by design (settings are read from `sysconfig_*`) |
 | Perl OPM packages / Package Manager | by design (replaced by [plugins](./docs/plugins.md)) |
 
