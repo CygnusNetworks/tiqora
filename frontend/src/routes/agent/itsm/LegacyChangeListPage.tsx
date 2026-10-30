@@ -71,9 +71,11 @@ export function LegacyChangeListPage() {
             placeholder={t("itsm.change.legacy.searchPlaceholder")}
             onChange={(e) => setText(e.target.value)}
           />
-          <p className="mt-1 text-xs text-muted" data-testid="legacy-list-search-hint">
-            {t(page?.source === "live" ? "itsm.change.legacy.searchScopeLive" : "itsm.change.legacy.searchScope")}
-          </p>
+          {page && (
+            <p className="mt-1 text-xs text-muted" data-testid="legacy-list-search-hint">
+              {t(page.source === "live" ? "itsm.change.legacy.searchScopeLive" : "itsm.change.legacy.searchScope")}
+            </p>
+          )}
         </div>
         {ticketId !== undefined && (
           <div className="flex items-end" data-testid="legacy-list-ticket-filter">

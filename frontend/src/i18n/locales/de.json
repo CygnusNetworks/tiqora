@@ -6252,7 +6252,7 @@
         "cab": "CAB",
         "duration": "Dauer (Minuten)",
         "durationHint": "Ende = Beginn + Dauer, wenn beim Anlegen nur ein Beginn angegeben wird.",
-        "portalVisible": "Im Kundenportal als Wartung anzeigen",
+        "portalVisible": "Im Kundenportal bei den Wartungsfenstern anzeigen",
         "reason": "Begründung",
         "implementationPlan": "Umsetzungsplan",
         "backoutPlan": "Rückfallplan",
@@ -9717,7 +9717,7 @@
         },
         "windowInvalid": "Das Ende des Zeitfensters darf nicht vor dem Beginn liegen.",
         "calendar": "Kalender",
-        "tasksTruncated": "Es werden nur die ersten 100 Arbeitsaufträge angezeigt."
+        "tasksTruncated": "Es werden nur die ersten 100 Aufgaben angezeigt."
       },
       "create": {
         "title": "Change anlegen",

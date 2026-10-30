@@ -219,7 +219,7 @@ describe("ChangeListPage", () => {
     myTasks.mockResolvedValue({ items: [task(141)], truncated: true });
     renderPage();
     fireEvent.click(await screen.findByRole("tab", { name: "Meine Aufgaben" }));
-    expect(await screen.findByTestId("change-tasks-truncated")).toHaveTextContent("Es werden nur die ersten 100 Arbeitsaufträge angezeigt.");
+    expect(await screen.findByTestId("change-tasks-truncated")).toHaveTextContent("Es werden nur die ersten 100 Aufgaben angezeigt.");
   });
 
   it("links the calendar and the CAB meetings, and the archive only for an agent who may see it", async () => {

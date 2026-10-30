@@ -215,6 +215,19 @@ describe("CreateChangeDialog", () => {
     expect(create.mock.calls[0][0]).toMatchObject({ service_id: 2, service_ids: [] });
   });
 
+  it("clears the dropped-service notes when the agent goes back to no template", async () => {
+    templates.mockResolvedValue([template(1, "Server-Wartung", { defaults: { portal_visible: false, service_ids: [2, 99] } })]);
+    renderDialog();
+    await screen.findByTestId("change-create-form");
+    await waitFor(() => expect(listReferenceServices).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("change-create-template"));
+    fireEvent.click(await screen.findByTestId("change-create-template-menu-option-1"));
+    await screen.findByTestId("change-create-template-notes");
+    fireEvent.click(screen.getByTestId("change-create-template"));
+    fireEvent.click(await screen.findByTestId("change-create-template-menu-option-"));
+    await waitFor(() => expect(screen.queryByTestId("change-create-template-notes")).toBeNull());
+  });
+
   it("takes the portal default from the template and sends nothing extra when it is kept", async () => {
     templates.mockResolvedValue([template(1, "Server-Wartung", { defaults: { portal_visible: true } })]);
     create.mockResolvedValue(created({ change: { ticket_id: 140, tn: "20261012140", portal_visible: true } }));

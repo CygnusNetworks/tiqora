@@ -77,12 +77,12 @@ export function CreateChangeDialog({
   };
   const pickTemplate = (id: number | "") => {
     setTemplateId(id);
+    setDroppedRefs([]);
     const d = templates.find((x) => x.id === id)?.defaults;
     if (!d) return;
     // Only fill what is still empty: the template never overwrites what was typed.
     if (!title.trim() && d.title) setTitle(d.title);
     if (queueId === "" && d.queue_id) setQueueId(d.queue_id);
-    setDroppedRefs([]);
     if (serviceIds.length === 0 && d.service_ids?.length) {
       // A retired service in the template would fail the create with `service_not_found`: drop it and say so.
       const known = servicesQ.data ? new Set(servicesQ.data.map((s) => s.id)) : null;

@@ -79,6 +79,12 @@ describe("LegacyChangeListPage", () => {
     await waitFor(() => expect(legacyList).toHaveBeenLastCalledWith({ q: "switch", ticket_id: undefined, limit: 25, offset: 0 }, expect.anything()));
   });
 
+  it("shows no search hint while the page is loading", () => {
+    legacyList.mockReturnValue(new Promise(() => {}));
+    renderWithClient(<LegacyChangeListPage />);
+    expect(screen.queryByTestId("legacy-list-search-hint")).toBeNull();
+  });
+
   it("says the archive search covers only number and title", async () => {
     legacyList.mockResolvedValue(page("archive", [summary(11)]));
     renderWithClient(<LegacyChangeListPage />);
