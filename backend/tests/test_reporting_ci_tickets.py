@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import column, delete
 from sqlalchemy.dialects import mysql, postgresql
 
 from tests import _cmdb_helpers
@@ -115,13 +115,6 @@ _CLEANUP = (
 )
 
 
-@dataclass
-class Tickets:
-    db: CmdbWorld
-    incident_type: int
-    change_type: int
-
-
 def _sql_in(world: CmdbWorld, sql: str, **params: Any) -> None:
     """``world.sql`` with the ``IN :ids`` marker expanded to a literal list of ints."""
     ids = ", ".join(str(i) for i in (*OWN_TICKETS, *WORLD_TICKETS))
@@ -150,7 +143,7 @@ async def _unseed_async(world: CmdbWorld) -> None:
 
 
 @pytest.fixture(scope="module")
-def tickets(cmdb_db: CmdbWorld) -> Iterator[Tickets]:
+def tickets(cmdb_db: CmdbWorld) -> Iterator[None]:
     _clean(cmdb_db)
     for name in ("ist972 Incident", "ist972 Change"):
         cmdb_db.sql(
@@ -178,7 +171,7 @@ def tickets(cmdb_db: CmdbWorld) -> Iterator[Tickets]:
         )
     cmdb_db.sql(_CHANGE_SQL, id=CHG, f=False, t=STAMP)
     asyncio.run(_seed_async(cmdb_db))
-    yield Tickets(cmdb_db, type_ids["ist972 Incident"], type_ids["ist972 Change"])
+    yield
     asyncio.run(_unseed_async(cmdb_db))
     _clean(cmdb_db)
 
@@ -191,7 +184,7 @@ class World:
 
 
 @pytest.fixture
-async def world(cmdb_db: CmdbWorld, tickets: Tickets) -> Any:
+async def world(cmdb_db: CmdbWorld, tickets: None) -> Any:
     set_mode(cmdb_db, "tiqora")
     reset_mode_cache()
     async with cmdb_db.factory() as session:
@@ -243,12 +236,15 @@ async def _run(
     dims: tuple[str, ...] = (),
     measures: tuple[str, ...] = ("tickets",),
     filter_: dict[str, Any] | None = None,
+    totals: bool = False,
 ) -> ReportResultOut:
     payload: dict[str, Any] = {
         "source": "ci_tickets",
         "dimensions": [{"key": k} for k in dims],
         "measures": [{"key": k} for k in measures],
     }
+    if totals:
+        payload["totals"] = {"grand": True}
     if filter_ is not None:
         payload["filter"] = {"version": 1, "where": filter_}
     async with world.db.factory() as session:
@@ -262,6 +258,10 @@ async def _run(
             now=NOW,
             use_cache=False,
         )
+
+
+def _by_key(res: ReportResultOut) -> dict[str, list[Any]]:
+    return {str(row[0]): row[1:] for row in res.rows}
 
 
 def _by_id(res: ReportResultOut) -> dict[int, list[Any]]:
@@ -319,6 +319,8 @@ async def test_rows_written_by_link_service_are_counted(world: World) -> None:
 
 async def test_pair_linked_twice_counts_once(world: World) -> None:
     _link(world, "ci", world.ci[DB], "ticket", INC_OPEN, "RelevantTo")  # DependsOn exists already
+    # the same pair stored in both directions (pointed type): two link rows, one ticket
+    _link(world, "ticket", INC_OPEN, "ci", world.ci[DB], "DependsOn")
     by_ci = await _run(world, USER_A, dims=("ci",))
     assert _by_id(by_ci)[world.ci[DB]] == [3]
     res = await _run(
@@ -336,10 +338,19 @@ async def test_pair_linked_twice_counts_once(world: World) -> None:
 
 
 async def test_double_scope_queue_and_class(world: World) -> None:
+    # a readable ticket linked only to a CI of the unreadable class: in no row and no total
+    _link(world, "ci", world.ci[SEC], "ticket", TICKET_OPEN, "RelevantTo")
+    with_totals = await _run(world, USER_A, dims=("ci",), measures=("tickets", "cis"), totals=True)
+    assert with_totals.totals is not None
+    assert with_totals.totals.grand == [
+        None,
+        4,
+        3,
+    ]  # INC_OPEN, INC_CLOSED, CHG, REQ / DB, WEB, CORE
     res = await _run(world, USER_A, dims=("ci",), measures=("tickets", "cis"))
     assert world.ci[SEC] not in _by_id(res)  # unreadable class, readable ticket
     assert _by_id(res)[world.ci[DB]] == [3, 1]  # the link to TICKET_HIDDEN is not counted
-    assert SEC not in {v for col in res.labels.values() for v in col.values()}
+    assert not any(SEC in v for col in res.labels.values() for v in col.values())
     by_ticket = await _run(world, USER_A, dims=("ticket_type",), measures=("tickets",))
     assert sum(r[1] for r in by_ticket.rows) == 4  # INC_OPEN, INC_CLOSED, CHG, REQ
     # filtering on the hidden pieces reveals nothing
@@ -402,13 +413,7 @@ async def test_ci_state_dimensions(world: World) -> None:
     assert _labelled(res, 1) == {("Production",): [2], ("Planned",): [1]}
 
 
-def _by_key(res: ReportResultOut) -> dict[str, list[Any]]:
-    return {str(row[0]): row[1:] for row in res.rows}
-
-
 def test_digits_only_compiles_per_dialect() -> None:
-    from sqlalchemy import column
-
     expr = digits_only(column("target_key"))
     my = str(expr.compile(dialect=mysql.dialect()))
     pg = str(expr.compile(dialect=postgresql.dialect()))

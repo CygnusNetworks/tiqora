@@ -1,4 +1,4 @@
-"""Source ``ci_tickets``: one row per (CI, linked ticket, link type) of the Tiqora CMDB (Mode B).
+"""Source ``ci_tickets``: CI-ticket links of the Tiqora CMDB (Mode B), one row per stored link.
 
 ``tiqora_itsm_link`` rows with a CI end and a ticket end, in both directions (a pointed link
 type keeps the orientation it was added with, an unpointed one has the CI first), joined with the

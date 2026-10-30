@@ -100,10 +100,16 @@ def _unsupported(construct: str, compiler: Any) -> CompileError:
 
 
 @compiles(digits_only)
+def _digits_default(element: digits_only, compiler: Any, **kw: Any) -> str:
+    # ``Select.get_final_froms`` renders FROM elements (the ``ci_tickets`` link subquery) with
+    # the default dialect; it never executes
+    if compiler.dialect.name != "default":
+        raise _unsupported("digits_only", compiler)
+    return _digits_pg(element, compiler, **kw)
+
+
 @compiles(digits_only, "postgresql")
 def _digits_pg(element: digits_only, compiler: Any, **kw: Any) -> str:
-    # also the default: it sits in the FROM clause of ``ci_tickets``, and
-    # ``Select.get_final_froms`` renders FROM elements with the default dialect
     return f"({_inner(element, compiler, **kw)} ~ '^[0-9]{{1,18}}$')"
 
 
