@@ -162,11 +162,13 @@ export function DashboardPage() {
     leaveEdit();
   }, [dashboard, qc, leaveEdit]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  // Column beside the grid for the widget gallery in edit mode (the grid's width, and so its
-  // breakpoint, follows whether the gallery is open).
+  // Column beside the grid for the widget gallery in edit mode.
   const [galleryHost, setGalleryHost] = useState<HTMLElement | null>(null);
-  const breakpoint = useGridBreakpoint(containerRef);
+  // The breakpoint comes from the row that holds the grid AND the gallery: it is as wide as the
+  // grid in view mode, so an edit changes the layout the view shows. Measured on the grid alone,
+  // the open gallery pushed a desktop below "lg" and resizes only landed in the md layout.
+  const layoutRowRef = useRef<HTMLDivElement>(null);
+  const breakpoint = useGridBreakpoint(layoutRowRef);
 
   const greeting = t(`dashboard.greeting.${greetingKey()}`, { name: user?.first_name || user?.login || "" });
   const today = new Intl.DateTimeFormat(locale, {
@@ -298,9 +300,8 @@ export function DashboardPage() {
         <p className="text-sm text-muted">{t("dashboards.view.lockedHint")}</p>
       )}
 
-      <div className={isEditing ? "flex items-start gap-5" : undefined}>
+      <div ref={layoutRowRef} className={isEditing ? "flex items-start gap-5" : undefined}>
         <div
-          ref={containerRef}
           id={panelId}
           role={isEditing ? undefined : "tabpanel"}
           aria-labelledby={!isEditing && isTab ? `${panelId}-tab-${selectedId}` : undefined}
@@ -310,7 +311,7 @@ export function DashboardPage() {
         >
           {content}
         </div>
-        {isEditing && <div ref={setGalleryHost} className="sticky top-24 w-[340px] flex-none self-start empty:hidden max-lg:hidden" />}
+        {isEditing && <div ref={setGalleryHost} data-testid="dashboard-gallery-host" className="sticky top-24 w-[340px] flex-none self-start empty:hidden max-lg:hidden" />}
       </div>
       {sharing && dashboard && <ShareDialog dashboard={dashboard} onClose={() => setSharing(false)} />}
     </div>
