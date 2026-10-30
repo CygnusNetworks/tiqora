@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from sqlalchemy import Integer, column, table
+from sqlalchemy import Integer, column, delete, table
 
 from tests import _cmdb_helpers
 from tests._cmdb_helpers import (
@@ -22,12 +22,13 @@ from tests._cmdb_helpers import (
     set_mode,
 )
 from tiqora.cmdb.gate import reset_mode_cache
-from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi
+from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi, TiqoraSettings
 from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import ReportDefinition
 from tiqora.reporting.engine import RunPlan, _recompile, plan_report
+from tiqora.reporting.itsm_roles import itsm_role_dim
 from tiqora.reporting.labels import resolve_labels
 from tiqora.reporting.scope import available_sources, source_available
 from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource, active_sources
@@ -39,7 +40,9 @@ pytestmark = pytest.mark.db
 cmdb_db = _cmdb_helpers.cmdb_db
 _cmdb_rows_reset = _cmdb_helpers._cmdb_rows_reset
 
-CI = table("ist972_ci", column("id", Integer), column("class_id", Integer))
+CI = table(
+    "ist972_ci", column("id", Integer), column("class_id", Integer), column("type_id", Integer)
+)
 #: no group grants at all
 USER_NOBODY = 972060
 
@@ -51,7 +54,7 @@ def _class_source() -> ReportSource:
         from_clause=lambda ctx: CI,
         scope_column=col(CI, "class_id"),
         scope_kind="cmdb_class",
-        dimensions=(),
+        dimensions=(itsm_role_dim("itsm_role", col(CI, "type_id")),),
         measures=(measure("cis", "count"),),
         requires_facts=False,
         availability="itsm_tiqora",
@@ -66,12 +69,23 @@ def _registry(*sources: ReportSource) -> Registry:
     return reg
 
 
-async def _plan(cmdb_db: CmdbWorld, reg: Registry, source: str, measure_key: str, user: int) -> Any:
+async def _plan(
+    cmdb_db: CmdbWorld,
+    reg: Registry,
+    source: str,
+    measure_key: str,
+    user: int,
+    dims: tuple[str, ...] = (),
+) -> Any:
     async with cmdb_db.factory() as session:
         return await plan_report(
             session,
             defn=ReportDefinition.model_validate(
-                {"source": source, "measures": [{"key": measure_key}]}
+                {
+                    "source": source,
+                    "dimensions": [{"key": k} for k in dims],
+                    "measures": [{"key": measure_key}],
+                }
             ),
             params=RunParams(),
             user_id=user,
@@ -113,6 +127,47 @@ async def test_plan_report_loads_class_scope_only_when_needed(cmdb_db: CmdbWorld
     nobody: RunPlan = await _plan(cmdb_db, reg, "ist972_cis", "cis", USER_NOBODY)
     assert nobody.cmdb_class_ids == frozenset()
     assert nobody.compiled.stmt is None
+
+
+async def test_plan_report_carries_type_roles(cmdb_db: CmdbWorld) -> None:
+    """Compile, cache key and totals recompile all see the same roles."""
+    async with cmdb_db.factory() as session:
+        await make_class(session, key="ist972ro", group_id=GROUP_RO)
+    reg = _registry(_class_source())
+    plan_without: RunPlan = await _plan(
+        cmdb_db, reg, "ist972_cis", "cis", USER_B, dims=("itsm_role",)
+    )
+    assert "ist972 Incident" not in plan_without.type_roles.values()
+
+    cmdb_db.sql(
+        "INSERT INTO ticket_type (name, valid_id, create_time, create_by, change_time, change_by)"
+        " VALUES ('ist972 Incident', 1, '2026-10-01 08:00:00', 1, '2026-10-01 08:00:00', 1)"
+    )
+    try:
+        type_id = int(
+            cmdb_db.sql("SELECT id FROM ticket_type WHERE name = 'ist972 Incident'")[0][0]
+        )
+        async with cmdb_db.factory() as session:
+            session.add(TiqoraSettings(key="itsm.incident_type", value="ist972 Incident"))
+            await session.commit()
+
+        plan: RunPlan = await _plan(cmdb_db, reg, "ist972_cis", "cis", USER_B, dims=("itsm_role",))
+        assert plan.type_roles[type_id] == "incident"
+        case = f"CASE ist972_ci.type_id WHEN {type_id} THEN 'incident'"
+        for compiled in (plan.compiled, _recompile(plan, [0], None)):
+            assert compiled.stmt is not None
+            assert case in str(compiled.stmt.compile(compile_kwargs={"literal_binds": True}))
+
+        again: RunPlan = await _plan(cmdb_db, reg, "ist972_cis", "cis", USER_B, dims=("itsm_role",))
+        assert again.cache_key == plan.cache_key
+        assert plan_without.cache_key != plan.cache_key
+    finally:
+        async with cmdb_db.factory() as session:
+            await session.execute(
+                delete(TiqoraSettings).where(TiqoraSettings.key == "itsm.incident_type")
+            )
+            await session.commit()
+        cmdb_db.sql("DELETE FROM ticket_type WHERE name = 'ist972 Incident'")
 
 
 async def test_cmdb_labels(cmdb_db: CmdbWorld) -> None:

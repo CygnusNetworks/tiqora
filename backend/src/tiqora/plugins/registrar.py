@@ -1148,7 +1148,7 @@ class PluginRegistrar:
         Labels must live in the plugin's i18n namespace (``plugin.<plugin id>:...``). The source
         reads Znuny tables or the plugin's own ``tqp_<short_id>_*`` tables, never ``tiqora_*``
         tables and never a mix; the queue scope column is enforced by the report compiler. CMDB
-        class scopes and ITSM-only availability are reserved for core sources.
+        class scopes, CMDB labels and ITSM-only availability are reserved for core sources.
         """
         short_id = self._manifest.short_id
         label_prefix = f"plugin.{self.plugin_id}:"
@@ -1189,6 +1189,12 @@ class PluginRegistrar:
                     f"Die Berichtsquelle „{source.key}“ muss nach Queues berechtigt sein und "
                     "immer verfügbar sein"
                 )
+            for dimension in source.dimensions:
+                if str(dimension.labels).startswith("cmdb_"):
+                    raise RegistrationRejected(
+                        f"Die Dimension „{dimension.key}“ der Berichtsquelle „{source.key}“ darf "
+                        "keine CMDB-Beschriftungen verwenden"
+                    )
             check_plugin_source(source, short_id)
 
         self._stage(REPORT_SOURCES, source, check=check)

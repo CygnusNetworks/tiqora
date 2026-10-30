@@ -27,9 +27,19 @@ MIXED_TABLES_MESSAGE: Final = (
     "nicht gemischt"
 )
 
+#: without roles ``itsm_role_dim`` is a bare ``CAST(NULL)`` and would hide its type column
+_PROBE_TYPE_ROLES: Final = {0: "incident"}
+
 
 def _probe(source: ReportSource) -> Any:
-    ctx = CompileContext(now=utc_now(), time_zone="UTC", tz=(), near_miss_percent=0, window=None)
+    ctx = CompileContext(
+        now=utc_now(),
+        time_zone="UTC",
+        tz=(),
+        near_miss_percent=0,
+        window=None,
+        type_roles=_PROBE_TYPE_ROLES,
+    )
     exprs: list[Any] = [source.scope_column(ctx)]
     exprs.extend(fn(ctx) for _, fn in source.extra_scopes)
     exprs.extend(d.expr(ctx) for d in source.dimensions)
