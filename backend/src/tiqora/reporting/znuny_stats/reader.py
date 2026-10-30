@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import PermissionGroups, Users
+from tiqora.db.tiqora.models import TiqoraCmdbClass, TiqoraItsmImportMap
+from tiqora.itsm.znuny_adapter.detect import detect_znuny_itsm
 from tiqora.reporting.engine import CLIENT_GRACE_SECONDS, QueryBudget
 from tiqora.reporting.sql import ReportQueryTimeout, invalidate_quietly, statement_timeout
 from tiqora.reporting.znuny_stats.mapping_common import StatLookups
@@ -29,6 +31,7 @@ MAX_PREVIEW_STATS: Final = 500
 _CHUNK: Final = 200
 MAX_TOTAL_ROWS: Final = 200_000  # leaves held in memory across one load_stats call
 _PERMISSION_LIKE: Final = "%{'Permission'}%"
+_CHANGE_STATE_CLASS: Final = "ITSM::ChangeManagement::Change::State"
 
 
 async def _query(
@@ -185,6 +188,48 @@ async def load_stats(
     return stats, errors, truncated
 
 
+async def _load_itsm_lookups(session: AsyncSession) -> dict[str, Any]:
+    """ITSM mode, import maps, CI class names and Znuny change states (D10); no JOIN."""
+    from tiqora.cmdb.gate import current_itsm_mode  # noqa: PLC0415 - import cycle
+
+    maps: dict[str, dict[int, int]] = {"class": {}, "catalog": {}}
+    map_rows = await session.execute(
+        select(
+            TiqoraItsmImportMap.source_kind,
+            TiqoraItsmImportMap.source_id,
+            TiqoraItsmImportMap.target_id,
+        ).where(TiqoraItsmImportMap.source_kind.in_(("class", "catalog")))
+    )
+    for kind, source_id, target_id in map_rows.all():
+        znuny_id = _numeric_key(source_id)
+        if znuny_id is not None:
+            maps[str(kind)][znuny_id] = int(target_id)
+    class_ids: dict[str, int] = {}
+    for class_id, name, class_key in (
+        await session.execute(
+            select(TiqoraCmdbClass.id, TiqoraCmdbClass.name, TiqoraCmdbClass.class_key)
+        )
+    ).all():
+        class_ids[str(name).casefold()] = int(class_id)
+        class_ids.setdefault(str(class_key).casefold(), int(class_id))
+    change_states: dict[int, str] = {}
+    # general_catalog is only queried when Znuny's change tables exist: a failed statement
+    # would abort the PostgreSQL transaction
+    if (await detect_znuny_itsm(session)).change_installed:
+        rows = await session.execute(
+            text("SELECT id, name FROM general_catalog WHERE general_catalog_class = :c"),
+            {"c": _CHANGE_STATE_CLASS},
+        )
+        change_states = {int(i): str(n) for i, n in rows.all()}
+    return {
+        "itsm_mode": str(await current_itsm_mode(session)),
+        "cmdb_class_by_znuny_id": maps["class"],
+        "cmdb_catalog_by_znuny_id": maps["catalog"],
+        "cmdb_class_ids_by_name": class_ids,
+        "change_state_names": change_states,
+    }
+
+
 async def load_stat_lookups(session: AsyncSession, user_id: int) -> StatLookups:
     """Name -> id maps for file imports, state types and the agent's zone (one query per table).
 
@@ -202,6 +247,7 @@ async def load_stat_lookups(session: AsyncSession, user_id: int) -> StatLookups:
         for i, n in (await session.execute(select(TicketStateType.id, TicketStateType.name))).all()
     }
     search = await load_lookups(session, user_id)
+    itsm = await _load_itsm_lookups(session)
     return StatLookups(
         state_type_names=state_types,
         queue_ids_by_name=await names(Queue.id, Queue.name, Queue.valid_id == 1),
@@ -213,4 +259,5 @@ async def load_stat_lookups(session: AsyncSession, user_id: int) -> StatLookups:
         ),
         default_time_zone=search.time_zone,
         search=search,
+        **itsm,
     )

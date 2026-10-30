@@ -507,3 +507,65 @@ async def test_import_routes_answer_504_when_budget_is_spent(
     monkeypatch.undo()
     saved = await env.client.get("/api/v1/reports")
     assert all(r.get("copied_from") != "znuny.stat.52080" for r in saved.json().get("items", []))
+
+
+# --- ITSM lookups (itsm-stats Task 10), band 972700-972749 -------------------------------------
+
+_ITSM_CLASS_SRC, _ITSM_CATALOG_SRC = "972707", "972721"
+_ITSM_TARGET_CLASS, _ITSM_TARGET_CATALOG = 972701, 972711
+_ITSM_CLEANUP = (
+    "DELETE FROM tiqora_itsm_import_map WHERE source_id IN ('972707', '972721', 'x972')",
+    "DELETE FROM tiqora_cmdb_class WHERE id = 972741",
+    "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
+)
+
+
+def _seed_itsm_lookups(sync_url: str) -> None:
+    from datetime import datetime
+
+    now = datetime(2026, 10, 1)
+    _run_sql(sync_url, _ITSM_CLEANUP)
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        for kind, src, target in (
+            ("class", _ITSM_CLASS_SRC, _ITSM_TARGET_CLASS),
+            ("catalog", _ITSM_CATALOG_SRC, _ITSM_TARGET_CATALOG),
+            ("class", "x972", 1),  # not a number: ignored
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO tiqora_itsm_import_map (source_kind, source_id, target_id,"
+                    " fingerprint, run_id, updated_at) VALUES (:k, :s, :t, 'x', 972700, :n)"
+                ),
+                {"k": kind, "s": src, "t": target, "n": now},
+            )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_cmdb_class (id, class_key, name, number_prefix, group_id,"
+                " created_by, created_at, changed_by, changed_at)"
+                " VALUES (972741, 'ist972srv', 'Ist972 Server', 'IS', 1, 1, :n, 1, :n)"
+            ),
+            {"n": now},
+        )
+    engine.dispose()
+
+
+async def test_load_stat_lookups_itsm(env: Env) -> None:
+    from tiqora.cmdb.gate import current_itsm_mode
+    from tiqora.reporting.znuny_stats.reader import load_stat_lookups
+
+    _seed_itsm_lookups(env.sync_url)
+    try:
+        async with env.factory() as session:
+            lookups = await load_stat_lookups(session, IMPORTER)
+            expected_mode = await current_itsm_mode(session)
+            # a failed statement would abort the PostgreSQL transaction: query again
+            assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
+        assert lookups.cmdb_class_by_znuny_id == {972707: _ITSM_TARGET_CLASS}
+        assert lookups.cmdb_catalog_by_znuny_id == {972721: _ITSM_TARGET_CATALOG}
+        assert lookups.cmdb_class_ids_by_name["ist972srv"] == 972741
+        assert lookups.cmdb_class_ids_by_name["ist972 server"] == 972741
+        assert lookups.itsm_mode == expected_mode
+        assert lookups.change_state_names == {}  # no change tables: general_catalog not read
+    finally:
+        _run_sql(env.sync_url, _ITSM_CLEANUP)
