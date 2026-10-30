@@ -45,9 +45,25 @@ SEPTEMBER = AbsoluteTimeRange(start=date(2026, 9, 1), end=date(2026, 9, 30))
 TWICE, RETRACTED, FORCED, OLD, FOREIGN = 972810, 972811, 972812, 972813, 972820
 TICKETS = [TWICE, RETRACTED, FORCED, OLD, FOREIGN]
 
-# ticket id, event, from phase, to phase, created_at
+
+def _creation(
+    ticket_id: int, at: datetime
+) -> list[tuple[int, str, str | None, str | None, datetime]]:
+    """What ``create_change`` / ``adopt_ticket`` write: ``created`` plus a ``phase`` row with
+    ``from_phase`` NULL -> ``draft``. The latter is no phase change and must not be counted."""
+    return [(ticket_id, "created", None, "draft", at), (ticket_id, "phase", None, "draft", at)]
+
+
+# ticket id, event, from phase, to phase, created_at. Expected figures follow from these rows:
+# in September the visible changes have 10 real phase changes (TWICE 7, RETRACTED 2, FORCED 1),
+# 3 of them to ``rejected`` on 2 changes (the ruling's 2/1 describes one change rejected twice;
+# the extra RETRACTED change rejected once makes 3/2).
 EVENTS: list[tuple[int, str, str | None, str | None, datetime]] = [
-    (TWICE, "created", None, "draft", datetime(2026, 9, 1, 8)),
+    *_creation(TWICE, datetime(2026, 9, 1, 8)),
+    *_creation(RETRACTED, datetime(2026, 9, 1, 8)),
+    *_creation(FORCED, datetime(2026, 9, 1, 8)),
+    *_creation(OLD, datetime(2026, 8, 1, 8)),
+    *_creation(FOREIGN, datetime(2026, 9, 1, 8)),
     (TWICE, "phase", "draft", "submitted", datetime(2026, 9, 2, 8)),
     (TWICE, "phase", "submitted", "approval", datetime(2026, 9, 2, 9)),
     (TWICE, "phase", "approval", "rejected", datetime(2026, 9, 3, 8)),
@@ -373,3 +389,69 @@ def test_source_shape_and_classification() -> None:
     assert keys <= PERSON_DIMENSIONS | NON_PERSON_DIMENSIONS
     assert not keys & PERSON_DIMENSIONS
     assert {m.key for m in src.measures} == {"phase_changes", "changes"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_real_service_creation_and_transition(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A change made by ``create_change`` and moved by ``transition`` counts exactly the
+    transition: the seeds above cannot drift from what production writes."""
+    from tests._change_fixtures import (
+        APP_SETTINGS,
+        Q_A,
+        U_FULL,
+        change_world,
+    )
+    from tiqora.itsm.change.service import ChangeCreateIn, create_change
+    from tiqora.itsm.change.transitions import TransitionIn, transition
+    from tiqora.jobs.service import utc_now
+    from tiqora.znuny.sysconfig import SysConfig
+
+    async with change_world(request, url_fixture) as w:
+        data = ChangeCreateIn.model_validate(
+            {"title": "Switch-Tausch", "change_type": "normal", "queue_id": Q_A}
+        )
+        view, _job = await create_change(
+            w.session,
+            APP_SETTINGS,
+            SysConfig(w.session),
+            data=data,
+            user_id=U_FULL,
+            session_factory=w.factory,
+        )
+        tid = view.record.ticket_id
+        await transition(
+            w.session,
+            APP_SETTINGS,
+            SysConfig(w.session),
+            ticket_id=tid,
+            data=TransitionIn(to="submitted"),
+            user_id=U_FULL,
+        )
+        await rebuild_ticket_facts(w.session, [tid], now=utc_now())
+        today = utc_now().date()
+        defn = ReportDefinition.model_validate(
+            {
+                "source": "change_events",
+                "dimensions": [{"key": "from_phase"}, {"key": "to_phase"}],
+                "measures": [{"key": "phase_changes"}],
+                "filter": {"version": 1, "where": {"field": "queue", "op": "in", "value": [Q_A]}},
+                "visualization": {"type": "table"},
+            }
+        )
+        res = await run_report(
+            w.session,
+            defn=defn,
+            params=RunParams(
+                time_zone="UTC",
+                time_range=AbsoluteTimeRange(start=today, end=today),
+            ),
+            user_id=U_FULL,
+            report_key=None,
+            reporting=ReportingSettings(),
+            now=utc_now(),
+            use_cache=False,
+        )
+        assert [list(r) for r in res.rows] == [["draft", "submitted", 1]]
