@@ -807,6 +807,62 @@ describe("NewTicketPage", () => {
     expect(screen.getByText("Go to ticket")).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it("after a failed send it retries only the send: no second ticket, the create button stays disabled", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    const retry = await screen.findByTestId("new-ticket-retry-send");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+    // Enter in a field would submit the form too: still no second ticket, and the link stays.
+    fireEvent.submit(screen.getByTestId("new-ticket-submit").closest("form")!);
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(2));
+    expect(createArticle).toHaveBeenLastCalledWith(42, expect.objectContaining({ channel: "email" }));
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }),
+    );
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps offering the send retry when it fails again", async () => {
+    createArticle.mockRejectedValue(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    fireEvent.click(await screen.findByTestId("new-ticket-retry-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("new-ticket-retry-send")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    expect(createTicket).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("after a failed booking it retries only the booking: the mail does not go out twice", async () => {
+    createArticle.mockResolvedValue({ article_id: 77 });
+    createTicketTimeAccounting.mockReset().mockRejectedValueOnce(new Error("down")).mockResolvedValue({});
+    await fillEmail();
+    fireEvent.change(screen.getByTestId("new-ticket-time"), { target: { value: "15" } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    const retry = await screen.findByTestId("new-ticket-retry-time");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.click(retry);
+    await waitFor(() => expect(createTicketTimeAccounting).toHaveBeenCalledTimes(2));
+    expect(createTicketTimeAccounting).toHaveBeenLastCalledWith(42, { time_unit: 15, article_id: 77 });
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }),
+    );
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("NewTicketPage property bar and queue default", () => {
@@ -1586,6 +1642,15 @@ describe("NewTicketPage from a failed change", () => {
     expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }));
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("a retried send still links the change afterwards", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+    await submit();
+    fireEvent.click(await screen.findByTestId("new-ticket-retry-send"));
+    await waitFor(() => expect(addRelated).toHaveBeenCalledWith(132, 42));
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
     expect(createTicket).toHaveBeenCalledTimes(1);
   });
 

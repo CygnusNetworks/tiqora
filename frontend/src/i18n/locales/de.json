@@ -1364,7 +1364,9 @@
     "processLabel": "Prozess starten",
     "fromChange": "Das neue Ticket wird mit dem Change (Ticket #{{id}}) verknüpft.",
     "changeLinkFailed": "Das Ticket wurde angelegt, konnte aber nicht mit dem Change verknüpft werden.",
-    "retryChangeLink": "Verknüpfung erneut versuchen"
+    "retryChangeLink": "Verknüpfung erneut versuchen",
+    "retrySend": "Senden erneut versuchen",
+    "retryTime": "Zeitbuchung erneut versuchen"
   },
   "connection": {
     "live": "Live verbunden",

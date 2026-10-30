@@ -114,6 +114,16 @@ function defaultId(
 type TicketType = "email" | "phone" | "note";
 type RecipientField = "to" | "cc" | "bcc";
 type Direction = "inbound" | "outbound";
+/** A step after the ticket's creation that failed and can run again on its own. */
+type FailedStep =
+  | { step: "send" | "link"; ticketId: number }
+  | { step: "time"; ticketId: number; articleId: number };
+
+const RETRY_LABEL = {
+  send: "newTicket.retrySend",
+  time: "newTicket.retryTime",
+  link: "newTicket.retryChangeLink",
+} as const;
 
 /**
  * Agent-facing New-ticket compose page, reached from the top bar's "＋ New".
@@ -308,8 +318,9 @@ export function NewTicketPage() {
   const [error, setError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
   /** The ticket that exists but whose link to the opening change failed: only the link is retried, never the create. */
-  const [linkRetryId, setLinkRetryId] = useState<number | null>(null);
-  const [retryingLink, setRetryingLink] = useState(false);
+  // The ticket exists but a step after its creation failed: only that step may run again.
+  const [failedStep, setFailedStep] = useState<FailedStep | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Unlocked once a customer is chosen, or the agent explicitly opts to
@@ -494,22 +505,92 @@ export function NewTicketPage() {
       return true;
     } catch {
       setCreatedTicketId(ticketId);
-      setLinkRetryId(ticketId);
+      setFailedStep({ step: "link", ticketId });
       setError(t("newTicket.changeLinkFailed"));
       return false;
     }
   };
 
-  const retryLink = async () => {
-    if (linkRetryId === null) return;
+  const openTicket = (ticketId: number) =>
+    navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(ticketId) } });
+
+  /** The email ticket's steps after its creation, from the first article on (or, with
+   * *articleId*, from the booking on). The ticket exists: a failed step stays here with its
+   * reason, a retry of that step and the link to the ticket. */
+  const finishEmailTicket = async (ticketId: number, text: string, articleId?: number) => {
+    let sentArticleId = articleId;
+    if (sentArticleId === undefined) {
+      // The article can fail independently of ticket creation (e.g. an agent
+      // email reply whose SMTP delivery fails, HTTP 502).
+      try {
+        ({ article_id: sentArticleId } = await api.createArticle(ticketId, {
+          sender_type: "agent",
+          channel: "email",
+          is_visible_for_customer: true,
+          subject: subject.trim(),
+          body: text,
+          content_type: richText
+            ? "text/html; charset=utf-8"
+            : "text/plain; charset=utf-8",
+          to_address: joinRecipients(to),
+          cc: joinRecipients(cc),
+          bcc: joinRecipients(bcc),
+          reply_to: replyTo.trim() || null,
+          email_security: emailSecurity.payload,
+          ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
+        }));
+      } catch (articleErr) {
+        setFailedStep({ step: "send", ticketId });
+        if (!(articleErr instanceof ApiError)) throw articleErr;
+        // Same reason text as the reply dialog: the server's detail, unless
+        // it is just the bare status line.
+        const reason =
+          articleErr.status === 413
+            ? t("ticket.telegram.composer.attachTooLargeServer")
+            : articleErr.message && !articleErr.message.startsWith("HTTP ")
+              ? articleErr.message
+              : null;
+        setError(reason ? `${t("newTicket.sendError")} ${reason}` : t("newTicket.sendError"));
+        return;
+      }
+    }
+    // The mail is out; the booking follows and may fail on its own — the
+    // error then keeps the link to the new ticket to book there.
+    const extras = await postComposerExtras(ticketId, {
+      articleId: sentArticleId,
+      body: text,
+      mentions: [],
+      timeUnits: emailTimeUnits,
+      queryClient,
+    });
+    if (extras.failed.length > 0) {
+      setFailedStep({ step: "time", ticketId, articleId: sentArticleId });
+      setError(t("ticket.extrasFailedTime"));
+      return;
+    }
+    if (!(await linkToChange(ticketId))) return;
+    setFailedStep(null);
+    await openTicket(ticketId);
+  };
+
+  const retryFailedStep = async () => {
+    if (failedStep === null) return;
     setError(null);
-    setRetryingLink(true);
+    setRetrying(true);
     try {
-      if (!(await linkToChange(linkRetryId))) return;
-      setLinkRetryId(null);
-      await navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(linkRetryId) } });
+      if (failedStep.step === "link") {
+        if (!(await linkToChange(failedStep.ticketId))) return;
+        setFailedStep(null);
+        await openTicket(failedStep.ticketId);
+        return;
+      }
+      await finishEmailTicket(
+        failedStep.ticketId,
+        refineReview.flush() ?? body,
+        failedStep.step === "time" ? failedStep.articleId : undefined,
+      );
     } finally {
-      setRetryingLink(false);
+      setRetrying(false);
     }
   };
 
@@ -575,6 +656,10 @@ export function NewTicketPage() {
       Date.parse(occurredIso) <= Date.now() &&
       Date.parse(occurredIso) >= Date.now() - 365 * 86_400_000);
 
+  // The retried mail goes out from the form as it stands now: it must still be sendable.
+  const canResend =
+    subject.trim().length > 0 && body.trim().length > 0 && to.length > 0 && !attachments.encoding;
+
   const canSubmit =
     (ticketType !== "email" || emailSecurity.blocked === null) &&
     (ticketType !== "note" || occurredValid) &&
@@ -588,12 +673,13 @@ export function NewTicketPage() {
     (ticketType !== "phone" || phoneReady) &&
     // A file still being read would silently go missing from the request.
     !attachments.encoding &&
-    // The ticket exists already (only its link to the change failed): no second create.
-    linkRetryId === null &&
+    // The ticket exists already (only a later step failed): no second create.
+    failedStep === null &&
     !submitting;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (failedStep !== null) return;
     setError(null);
     setCreatedTicketId(null);
     // `canSubmit` already asserts queue/priority/state are set (TS narrows
@@ -679,59 +765,7 @@ export function NewTicketPage() {
         customer_user_id: customer?.login ?? null,
       });
       setCreatedTicketId(ticket_id);
-      // The article can fail independently of ticket creation (e.g. an agent
-      // email reply whose SMTP delivery fails, HTTP 502) — the ticket already
-      // exists at that point, so surface an error with a link to it instead
-      // of silently losing the agent's typed message.
-      let articleId: number;
-      try {
-        ({ article_id: articleId } = await api.createArticle(ticket_id, {
-          sender_type: "agent",
-          channel: "email",
-          is_visible_for_customer: true,
-          subject: subject.trim(),
-          body: text,
-          content_type: richText
-            ? "text/html; charset=utf-8"
-            : "text/plain; charset=utf-8",
-          to_address: joinRecipients(to),
-          cc: joinRecipients(cc),
-          bcc: joinRecipients(bcc),
-          reply_to: replyTo.trim() || null,
-          email_security: emailSecurity.payload,
-          ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
-        }));
-      } catch (articleErr) {
-        if (!(articleErr instanceof ApiError)) throw articleErr;
-        // Same reason text as the reply dialog: the server's detail, unless
-        // it is just the bare status line.
-        const reason =
-          articleErr.status === 413
-            ? t("ticket.telegram.composer.attachTooLargeServer")
-            : articleErr.message && !articleErr.message.startsWith("HTTP ")
-              ? articleErr.message
-              : null;
-        setError(reason ? `${t("newTicket.sendError")} ${reason}` : t("newTicket.sendError"));
-        return;
-      }
-      // The mail is out; the booking follows and may fail on its own — the
-      // error then keeps the link to the new ticket to book there.
-      const extras = await postComposerExtras(ticket_id, {
-        articleId,
-        body: text,
-        mentions: [],
-        timeUnits: emailTimeUnits,
-        queryClient,
-      });
-      if (extras.failed.length > 0) {
-        setError(t("ticket.extrasFailedTime"));
-        return;
-      }
-      if (!(await linkToChange(ticket_id))) return;
-      await navigate({
-        to: "/agent/tickets/$ticketId",
-        params: { ticketId: String(ticket_id) },
-      });
+      await finishEmailTicket(ticket_id, text);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(t("newTicket.submitError"));
@@ -1347,17 +1381,17 @@ export function NewTicketPage() {
               role="alert"
             >
               {error}
-              {linkRetryId !== null && (
+              {failedStep !== null && (
                 <>
                   {" "}
                   <button
                     type="button"
                     className="underline disabled:opacity-50"
-                    disabled={retryingLink}
-                    onClick={() => void retryLink()}
-                    data-testid="new-ticket-retry-link"
+                    disabled={retrying || (failedStep.step === "send" && !canResend)}
+                    onClick={() => void retryFailedStep()}
+                    data-testid={`new-ticket-retry-${failedStep.step}`}
                   >
-                    {t("newTicket.retryChangeLink")}
+                    {t(RETRY_LABEL[failedStep.step])}
                   </button>
                 </>
               )}

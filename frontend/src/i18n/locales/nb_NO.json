@@ -1364,7 +1364,9 @@
     "processLabel": "Start process",
     "fromChange": "The new ticket is linked to the change (ticket #{{id}}).",
     "changeLinkFailed": "The ticket was created but could not be linked to the change.",
-    "retryChangeLink": "Retry linking to the change"
+    "retryChangeLink": "Retry linking to the change",
+    "retrySend": "Retry sending",
+    "retryTime": "Retry booking the time"
   },
   "connection": {
     "live": "Tilkoblet live",
