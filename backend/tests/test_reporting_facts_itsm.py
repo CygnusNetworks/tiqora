@@ -135,8 +135,19 @@ def test_span_trailing_open_span_not_counted() -> None:
 
 
 def test_span_uses_the_given_measure_and_event_order() -> None:
-    events = [_ev("reopen", 200, 3), _ev("close", 100, 2), _ev("close", 230, 4)]
+    # history ids run against the time order, so only sorting by time gives 100 + 30
+    events = [_ev("close", 230, 1), _ev("close", 100, 9), _ev("reopen", 200, 5)]
     assert open_span_minutes(T0, events, lambda a, b: 2 * wall(a, b)) == 2 * (100 + 30)
+
+
+def test_span_close_before_creation_is_clamped_to_zero() -> None:
+    events = [_ev("close", -10, 1), _ev("reopen", 10, 2), _ev("close", 40, 3)]
+    assert open_span_minutes(T0, events, wall) == 30
+
+
+def test_span_reopen_while_open_does_not_restart_the_span() -> None:
+    events = [_ev("reopen", 50, 2), _ev("close", 100, 3)]
+    assert open_span_minutes(T0, events, wall) == 100
 
 
 def test_compute_fact_sets_both_columns() -> None:
