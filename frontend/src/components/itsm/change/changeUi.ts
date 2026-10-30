@@ -4,9 +4,9 @@
  * after a write.
  */
 import { useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { changeErrorCode, changeErrorDetail, changeKeys, type Change, type ChangePhase } from "@/lib/changeApi";
+import { changeApi, changeErrorCode, changeErrorDetail, changeKeys, type Change, type ChangePhase } from "@/lib/changeApi";
 import { changeDetailHref, ciDetailHref } from "@/lib/itsmRoutes";
 
 export const FIELD_CLASS =
@@ -38,6 +38,13 @@ export const FINAL_PHASES: ReadonlySet<Change["phase"]> = new Set(["closed", "ca
 
 /** `2026-10-24T20:00:00Z` → `2026-10-24 20:00` (the API's times are UTC; the labels say so). */
 export const utcText = (iso: string | null | undefined): string => (iso ? iso.slice(0, 16).replace("T", " ") : "");
+
+/** `2026-10-24 20:00 – 21:00`; the end carries its date when the meeting spans days. */
+export const utcRangeText = (start: string, end: string): string => {
+  const a = utcText(start);
+  const b = utcText(end);
+  return `${a} – ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b}`;
+};
 
 export const windowText = (start: string | null | undefined, end: string | null | undefined): string =>
   start && end ? `${utcText(start)} – ${utcText(end)}` : "";
@@ -138,4 +145,27 @@ export function useChangeRefresh(ticketId: number) {
     },
     [qc, ticketId],
   );
+}
+
+/**
+ * One note of a change created from a template (`warnings` of the create answer, `template_warnings`
+ * of the `created` event): a dropped reference (`service_not_found:7`, `risk_answer_stale:tested`) or
+ * a plain code. An unknown code shows `fallback`, else the code itself.
+ */
+export function warningText(warning: string, t: TFunction, fallback?: string): string {
+  const missing = /^(queue|priority|service|cab|owner)_not_found:(.+)$/.exec(warning);
+  if (missing) return t("itsm.change.warnings.notFound", { kind: t(`itsm.change.warnings.kinds.${missing[1]}`), ref: missing[2] });
+  const stale = /^risk_answer_stale:(.+)$/.exec(warning);
+  if (stale) return t("itsm.change.warnings.riskAnswerStale", { question: stale[1] });
+  return t(`itsm.change.create.warnings.${warning}`, { defaultValue: fallback ?? warning });
+}
+
+/** The change status (mode, legacy source, what the caller may see); one cached query for every change screen. */
+export function useChangeStatus() {
+  return useQuery({
+    queryKey: changeKeys.status(),
+    queryFn: ({ signal }) => changeApi.status(signal),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
 }

@@ -159,6 +159,19 @@ describe("TicketItsmChips", () => {
     expect(screen.getByTestId("risk-badge")).toHaveAttribute("data-risk-level", "high");
   });
 
+  it("colours the phase chip like the list does (approval is a warning)", async () => {
+    ticketItsm.mockResolvedValue(
+      makeItsm({
+        mode: "tiqora",
+        role: "change",
+        change: { change_type: "normal", phase: "approval", risk_level: "high", planned_start: null, planned_end: null },
+      }),
+    );
+    renderChips();
+    const phase = await screen.findByTestId("itsm-chip-change-phase");
+    expect(phase.className).toContain("text-escalation");
+  });
+
   it("shows no phase chip for a change ticket without a record", async () => {
     ticketItsm.mockResolvedValue(makeItsm({ mode: "tiqora", role: "change", change: null }));
     renderChips();

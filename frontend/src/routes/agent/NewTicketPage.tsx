@@ -298,6 +298,9 @@ export function NewTicketPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
+  /** The ticket that exists but whose link to the opening change failed: only the link is retried, never the create. */
+  const [linkRetryId, setLinkRetryId] = useState<number | null>(null);
+  const [retryingLink, setRetryingLink] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Unlocked once a customer is chosen, or the agent explicitly opts to
@@ -479,8 +482,22 @@ export function NewTicketPage() {
       return true;
     } catch {
       setCreatedTicketId(ticketId);
+      setLinkRetryId(ticketId);
       setError(t("newTicket.changeLinkFailed"));
       return false;
+    }
+  };
+
+  const retryLink = async () => {
+    if (linkRetryId === null) return;
+    setError(null);
+    setRetryingLink(true);
+    try {
+      if (!(await linkToChange(linkRetryId))) return;
+      setLinkRetryId(null);
+      await navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(linkRetryId) } });
+    } finally {
+      setRetryingLink(false);
     }
   };
 
@@ -550,6 +567,8 @@ export function NewTicketPage() {
     (ticketType === "email" || phoneReady) &&
     // A file still being read would silently go missing from the request.
     !attachments.encoding &&
+    // The ticket exists already (only its link to the change failed): no second create.
+    linkRetryId === null &&
     !submitting;
 
   const onSubmit = async (e: FormEvent) => {
@@ -1237,6 +1256,20 @@ export function NewTicketPage() {
               role="alert"
             >
               {error}
+              {linkRetryId !== null && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="underline disabled:opacity-50"
+                    disabled={retryingLink}
+                    onClick={() => void retryLink()}
+                    data-testid="new-ticket-retry-link"
+                  >
+                    {t("newTicket.retryChangeLink")}
+                  </button>
+                </>
+              )}
               {createdTicketId && (
                 <>
                   {" "}

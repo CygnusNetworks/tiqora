@@ -1466,4 +1466,28 @@ describe("NewTicketPage from a failed change", () => {
     expect(error.querySelector("a")?.getAttribute("href")).toContain("42");
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it("retries only the link after a failed link: no second ticket, the create button stays disabled", async () => {
+    addRelated.mockRejectedValueOnce(new Error("link_refused"));
+    await submit();
+    await screen.findByTestId("new-ticket-error");
+    expect(createTicket).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
+    await waitFor(() => expect(addRelated).toHaveBeenCalledTimes(2));
+    expect(addRelated).toHaveBeenLastCalledWith(132, 42);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }));
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps offering the retry when the link fails again", async () => {
+    addRelated.mockRejectedValue(new Error("link_refused"));
+    await submit();
+    await screen.findByTestId("new-ticket-retry-link");
+    fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
+    await waitFor(() => expect(addRelated).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("new-ticket-retry-link")).toBeInTheDocument();
+    expect(createTicket).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+  });
 });

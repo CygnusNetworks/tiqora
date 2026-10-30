@@ -117,6 +117,20 @@ describe("ChangeRiskSection", () => {
     expect(screen.queryByTestId("change-risk-override-open")).toBeNull();
   });
 
+  it("drops an earlier error once another write of the section succeeds", async () => {
+    risk.mockResolvedValue(makeRisk({ can_override: true }));
+    overrideRisk.mockRejectedValue(changeError(422, { code: "risk_override_reason_required" }));
+    evaluateRisk.mockResolvedValue(makeRisk({ can_override: true }));
+    renderWithClient(<ChangeRiskSection change={makeChange()} />);
+    fireEvent.click(await screen.findByTestId("change-risk-override-open"));
+    fireEvent.change(screen.getByTestId("change-risk-override-reason"), { target: { value: "x" } });
+    fireEvent.click(screen.getByTestId("change-risk-override-save"));
+    await screen.findByTestId("change-risk-error");
+    fireEvent.click(screen.getByTestId("change-risk-evaluate"));
+    await waitFor(() => expect(evaluateRisk).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId("change-risk-error")).toBeNull());
+  });
+
   it("names a refused override", async () => {
     risk.mockResolvedValue(makeRisk({ can_override: true }));
     overrideRisk.mockRejectedValue(changeError(422, { code: "risk_override_reason_required" }));

@@ -16,7 +16,7 @@ const DEBOUNCE_MS = 300;
 /**
  * `/agent/itsm/legacy-changes`: the changes of Znuny's ITSMChangeManagement, read only. In Mode A
  * they are read live from Znuny, in Mode B from the archive. `?ticket_id=` (from the ticket zoom)
- * shows only the changes linked to that ticket. The search covers number and title only.
+ * shows only the changes linked to that ticket. The live search also covers description and justification; the archive only number and title.
  */
 export function LegacyChangeListPage() {
   const { t } = useTranslation();
@@ -72,7 +72,7 @@ export function LegacyChangeListPage() {
             onChange={(e) => setText(e.target.value)}
           />
           <p className="mt-1 text-xs text-muted" data-testid="legacy-list-search-hint">
-            {t("itsm.change.legacy.searchScope")}
+            {t(page?.source === "live" ? "itsm.change.legacy.searchScopeLive" : "itsm.change.legacy.searchScope")}
           </p>
         </div>
         {ticketId !== undefined && (

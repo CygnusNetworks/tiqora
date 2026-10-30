@@ -5,14 +5,14 @@ import { makeItsm, makeTicket } from "@/components/itsm/testSupport";
 import { changeError, makeChange, renderWithClient } from "./changeTestSupport";
 import { ChangePanel } from "./ChangePanel";
 
-const { ticketItsm, get, adopt, record } = vi.hoisted(() => ({ ticketItsm: vi.fn(), get: vi.fn(), adopt: vi.fn(), record: vi.fn() }));
+const { ticketItsm, get, adopt, record, status } = vi.hoisted(() => ({ ticketItsm: vi.fn(), get: vi.fn(), adopt: vi.fn(), record: vi.fn(), status: vi.fn() }));
 vi.mock("@/lib/itsmApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/itsmApi")>("@/lib/itsmApi");
   return { ...actual, itsmApi: { ...actual.itsmApi, ticketItsm } };
 });
 vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
-  return { ...actual, changeApi: { ...actual.changeApi, get, adopt } };
+  return { ...actual, changeApi: { ...actual.changeApi, get, adopt, status } };
 });
 // The record has its own tests; here it only shows what it was given.
 vi.mock("./ChangeRecord", () => ({
@@ -31,7 +31,8 @@ function renderPanel(ticket = makeTicket({ id: 130 })) {
 describe("ChangePanel", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("de");
-    for (const f of [ticketItsm, get, adopt, record]) f.mockReset();
+    for (const f of [ticketItsm, get, adopt, record, status]) f.mockReset();
+    status.mockResolvedValue({ can_see_legacy: true, legacy: "live" });
   });
   afterEach(cleanup);
 
@@ -86,8 +87,17 @@ describe("ChangePanel", () => {
     renderPanel();
     const card = await screen.findByTestId("change-mode-a-hint");
     expect(card).toHaveTextContent("Znuny");
-    expect(screen.getByTestId("change-mode-a-link")).toHaveAttribute("href", "/agent/itsm/legacy-changes?ticket_id=130");
+    expect(await screen.findByTestId("change-mode-a-link")).toHaveAttribute("href", "/agent/itsm/legacy-changes?ticket_id=130");
     expect(get).not.toHaveBeenCalled();
+  });
+
+  it("keeps the hint but drops the link for an agent who may not see the Znuny changes", async () => {
+    status.mockResolvedValue({ can_see_legacy: false, legacy: "live" });
+    ticketItsm.mockResolvedValue(makeItsm({ mode: "znuny_readthrough", role: "change" }));
+    renderPanel();
+    expect(await screen.findByTestId("change-mode-a-hint")).toHaveTextContent("Modus A");
+    await waitFor(() => expect(status).toHaveBeenCalled());
+    expect(screen.queryByTestId("change-mode-a-link")).toBeNull();
   });
 
   it("shows the parent change, kind and window of a change task", async () => {

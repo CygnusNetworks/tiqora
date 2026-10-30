@@ -44,6 +44,8 @@ export type FreezeOccurrences = Schemas["FreezeOccurrencesOut"];
 export type FreezeOccurrence = Schemas["FreezeOccurrenceOut"];
 export type Cab = Schemas["CabOut"];
 export type CabMeeting = Schemas["MeetingOut"];
+/** A meeting in the month list: no minutes, no agenda (the meeting page loads those). */
+export type CabMeetingListItem = Schemas["MeetingListItemOut"];
 export type CabMeetingIn = Schemas["MeetingIn"];
 export type CabMeetingUpdateIn = Schemas["MeetingUpdateIn"];
 export type CabAgendaIn = Schemas["AgendaIn"];
@@ -229,8 +231,10 @@ export const changeApi = {
   approval(ticketId: number, signal?: AbortSignal) {
     return api.request<ChangeApproval>("GET", `${changePath(ticketId)}/approval`, { signal });
   },
-  myTasks(openOnly = true, signal?: AbortSignal) {
-    return api.request<ChangeTaskListItem[]>("GET", `${BASE}/change-tasks/mine`, { query: { open_only: openOnly }, signal });
+  /** The agent's change tasks; `truncated` is the `X-Tasks-Truncated` header (more tasks than answered). */
+  async myTasks(openOnly = true, signal?: AbortSignal): Promise<{ items: ChangeTaskListItem[]; truncated: boolean }> {
+    const { data, headers } = await api.requestWithHeaders<ChangeTaskListItem[]>("GET", `${BASE}/change-tasks/mine`, { query: { open_only: openOnly }, signal });
+    return { items: data, truncated: (headers.get("X-Tasks-Truncated") ?? "").toLowerCase() === "true" };
   },
   calendar(query: ChangeCalendarQuery, signal?: AbortSignal) {
     return api.request<ChangeCalendar>("GET", `${BASE}/change-calendar`, {
@@ -248,7 +252,7 @@ export const changeApi = {
     return api.request<Cab[]>("GET", `${BASE}/cabs`, { signal });
   },
   meetings(start: string, end: string, signal?: AbortSignal) {
-    return api.request<CabMeeting[]>("GET", `${BASE}/cab-meetings`, { query: { start, end }, signal });
+    return api.request<CabMeetingListItem[]>("GET", `${BASE}/cab-meetings`, { query: { start, end }, signal });
   },
   createMeeting(body: CabMeetingIn) {
     return api.request<CabMeeting>("POST", `${BASE}/cab-meetings`, { body });

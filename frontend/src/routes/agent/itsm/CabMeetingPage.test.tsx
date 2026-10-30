@@ -265,6 +265,29 @@ describe("CabMeetingPage", () => {
     expect(screen.queryByTestId("cab-agenda-up-133")).toBeNull();
   });
 
+  it("drops an unsaved agenda line when the meeting stops being editable", async () => {
+    renderWithClient(<CabMeetingPage />);
+    await screen.findByTestId("cab-agenda-item-130");
+    fireEvent.click(await screen.findByTestId("cab-suggestion-add-140"));
+    expect(order()).toEqual(["130", "133", "140"]);
+    fireEvent.click(screen.getByTestId("cab-status-select"));
+    fireEvent.click(await screen.findByTestId("cab-status-select-menu-option-held"));
+    const held = makeMeeting({ status: "held", minutes: "Fertig." });
+    updateMeeting.mockResolvedValue(held);
+    meeting.mockResolvedValue(held);
+    fireEvent.change(screen.getByTestId("cab-minutes-input"), { target: { value: "Fertig." } });
+    fireEvent.click(screen.getByTestId("cab-minutes-save"));
+    await waitFor(() => expect(screen.getByTestId("cab-meeting-status")).toHaveTextContent("Durchgeführt"));
+    expect(order()).toEqual(["130", "133"]);
+    expect(screen.queryByTestId("cab-agenda-item-140")).toBeNull();
+  });
+
+  it("shows the end date in the header of a meeting that spans days", async () => {
+    meeting.mockResolvedValue(makeMeeting({ ends_at: "2026-10-16T10:00:00Z" }));
+    renderWithClient(<CabMeetingPage />);
+    expect(await screen.findByTestId("cab-meeting-header")).toHaveTextContent("2026-10-15 09:00 – 2026-10-16 10:00 UTC");
+  });
+
   it("is read only for agents who may not manage: minutes as text, no editing, no suggestions", async () => {
     status.mockResolvedValue({ can_manage: false });
     meeting.mockResolvedValue(makeMeeting({ minutes: "Zeile 1\n<b>Zeile 2</b>" }));

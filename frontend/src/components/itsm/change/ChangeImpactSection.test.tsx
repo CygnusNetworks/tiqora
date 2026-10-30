@@ -63,9 +63,15 @@ describe("ChangeImpactSection", () => {
   });
 
   it("says when nothing is computed yet or the set is out of date", async () => {
-    impact.mockResolvedValue(makeImpact({ computed_at: null, stale: true }));
+    impact.mockResolvedValue(makeImpact({ computed_at: null, requested_at: null, stale: true }));
     renderWithClient(<ChangeImpactSection change={makeChange()} />);
     expect(await screen.findByTestId("change-impact-stale")).toHaveTextContent("noch nicht berechnet");
+  });
+
+  it("says the impact is being computed while the creation's job runs", async () => {
+    impact.mockResolvedValue(makeImpact({ computed_at: null, requested_at: "2026-10-12T08:00:00Z", stale: true }));
+    renderWithClient(<ChangeImpactSection change={makeChange()} />);
+    expect(await screen.findByTestId("change-impact-stale")).toHaveTextContent("Die Auswirkung wird berechnet");
   });
 
   it("recomputes in the background and reloads when the job is done", async () => {

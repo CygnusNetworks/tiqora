@@ -69,6 +69,20 @@ describe("ChangeTasksSection", () => {
     expect(await screen.findByTestId("change-tasks-error")).toHaveTextContent("Der Change hat schon die größte mögliche Zahl an Aufgaben.");
   });
 
+  it("drops an earlier add error once a move succeeds", async () => {
+    tasks.mockResolvedValue(three);
+    createTask.mockRejectedValue(changeError(409, { code: "max_tasks_reached" }));
+    orderTasks.mockResolvedValue(three);
+    renderWithClient(<ChangeTasksSection change={makeChange()} />);
+    fireEvent.click(await screen.findByTestId("change-tasks-add"));
+    fireEvent.change(screen.getByTestId("change-task-new-title"), { target: { value: "Noch eine" } });
+    fireEvent.click(screen.getByTestId("change-task-new-submit"));
+    await screen.findByTestId("change-tasks-error");
+    fireEvent.click(screen.getAllByTestId("change-task-down")[0]);
+    await waitFor(() => expect(orderTasks).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId("change-tasks-error")).toBeNull());
+  });
+
   it("is read-only on a final change", async () => {
     tasks.mockResolvedValue(three);
     renderWithClient(<ChangeTasksSection change={makeChange({ phase: "closed" })} />);

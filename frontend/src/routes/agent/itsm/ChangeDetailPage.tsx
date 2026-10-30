@@ -6,7 +6,7 @@ import { ChangeRecord } from "@/components/itsm/change/ChangeRecord";
 import { PortalVisibleSwitch } from "@/components/itsm/change/PortalVisibleSwitch";
 import { ChangeTypeBadge } from "@/components/itsm/change/ChangeTypeBadge";
 import { RiskBadge } from "@/components/itsm/change/RiskBadge";
-import { changeErrorText, legacyChangesHref } from "@/components/itsm/change/changeUi";
+import { changeErrorText, legacyChangesHref, useChangeStatus } from "@/components/itsm/change/changeUi";
 import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { Spinner } from "@/components/ui/Spinner";
 import { changeApi, changeErrorCode, changeKeys } from "@/lib/changeApi";
@@ -30,6 +30,7 @@ export function ChangeDetailPage() {
   });
   const change = q.data;
   const code = q.isError ? changeErrorCode(q.error) : null;
+  const canLegacy = useChangeStatus().data?.can_see_legacy === true;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4" data-testid="changeDetailPage">
@@ -39,7 +40,7 @@ export function ChangeDetailPage() {
       {!valid || q.isError ? (
         <div className="space-y-2 rounded-md border border-hairline bg-surface p-4 text-sm" role="alert" data-testid="change-detail-error">
           <p className="text-danger">{valid ? changeErrorText(q.error, t) : t("itsm.change.errors.change_not_found")}</p>
-          {code === "change_mode_a" && (
+          {code === "change_mode_a" && canLegacy && (
             <RouterAnchor href={legacyChangesHref(ticketId)} className="text-accent hover:underline" data-testid="change-detail-legacy">
               {t("itsm.change.zoom.modeALink")}
             </RouterAnchor>

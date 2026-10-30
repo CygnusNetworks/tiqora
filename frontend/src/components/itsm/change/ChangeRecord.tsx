@@ -33,7 +33,7 @@ function Banners({ change }: { change: Change }) {
           {t("itsm.change.banners.drift", { fields: drift.map((d) => t(`itsm.change.banners.fields.${d}`)).join(", ") })}
         </p>
       )}
-      {change.phase === "closed" && FAILED_OUTCOMES.has(change.outcome ?? "") && (
+      {change.can_write && change.phase === "closed" && FAILED_OUTCOMES.has(change.outcome ?? "") && (
         <div
           className="flex flex-wrap items-center justify-between gap-2 rounded border border-escalation/30 bg-escalation/10 px-3 py-2 text-xs text-ink"
           data-testid="change-incident-offer"
@@ -77,7 +77,7 @@ export function ChangeRecord({ change, embedApprovals, wide = false }: { change:
     <div className="min-w-0 space-y-3" data-testid="change-record" data-phase={change.phase}>
       <Banners change={change} />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <ChangePhaseBar changeType={change.change_type} phase={change.phase} />
+        <ChangePhaseBar changeType={change.change_type} phase={change.phase} approvalPending={change.approval_via === "post" && !change.approved_at} />
         {targets.length > 0 && (
           <div className="flex flex-wrap gap-2" data-testid="change-actions">
             {targets.map((to) => (

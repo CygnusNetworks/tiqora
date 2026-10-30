@@ -74,9 +74,29 @@ describe("LegacyChangeListPage", () => {
     legacyList.mockResolvedValue(page("live", [summary(11)]));
     renderWithClient(<LegacyChangeListPage />);
     await screen.findByTestId("legacy-row-11");
-    expect(screen.getByTestId("legacy-list-search-hint")).toHaveTextContent("nur die Nummer und den Titel");
+    expect(screen.getByTestId("legacy-list-search-hint")).toHaveTextContent("Beschreibung und Begründung");
     fireEvent.change(screen.getByTestId("legacy-list-search"), { target: { value: " switch " } });
     await waitFor(() => expect(legacyList).toHaveBeenLastCalledWith({ q: "switch", ticket_id: undefined, limit: 25, offset: 0 }, expect.anything()));
+  });
+
+  it("says the archive search covers only number and title", async () => {
+    legacyList.mockResolvedValue(page("archive", [summary(11)]));
+    renderWithClient(<LegacyChangeListPage />);
+    await screen.findByTestId("legacy-row-11");
+    expect(screen.getByTestId("legacy-list-search-hint")).toHaveTextContent("nur die Nummer und den Titel");
+  });
+
+  it.each([
+    ["legacy_forbidden", "Sie gehören nicht zur Gruppe"],
+    ["legacy_unavailable", "Es gibt keine Znuny-Changes zum Anzeigen"],
+    ["search_too_broad", "Bitte grenzen Sie sie ein"],
+  ])("explains %s instead of the generic failure", async (code, text) => {
+    legacyList.mockRejectedValue(changeError(code === "legacy_forbidden" ? 403 : 409, { code }));
+    renderWithClient(<LegacyChangeListPage />);
+    const error = await screen.findByTestId("legacy-list-error");
+    expect(error).toHaveAttribute("data-code", code);
+    expect(error).toHaveTextContent(text);
+    expect(error).not.toHaveTextContent("Die Aktion ist fehlgeschlagen.");
   });
 
   it("pages through the results", async () => {

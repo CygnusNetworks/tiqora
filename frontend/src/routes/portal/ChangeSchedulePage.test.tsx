@@ -88,14 +88,14 @@ describe("PortalChangeSchedulePage", () => {
   it("says the schedule is unavailable on 404, without the generic error", async () => {
     list.mockRejectedValue(new ApiError(404, "nope", "/x"));
     renderPage();
-    expect(await screen.findByTestId("portal-changes-unavailable")).toHaveTextContent("Der Wartungskalender ist nicht verfügbar.");
+    expect(await screen.findByTestId("portal-changes-unavailable")).toHaveTextContent("Die Wartungsfenster sind nicht verfügbar.");
     expect(screen.queryByTestId("portal-changes-error")).toBeNull();
   });
 
   it("shows the load error on other failures, without the unavailable text", async () => {
     list.mockRejectedValue(new ApiError(500, "boom", "/x"));
     renderPage();
-    expect(await screen.findByTestId("portal-changes-error")).toHaveTextContent("Der Wartungskalender konnte nicht geladen werden.");
+    expect(await screen.findByTestId("portal-changes-error")).toHaveTextContent("Die Wartungsfenster konnten nicht geladen werden.");
     expect(screen.queryByTestId("portal-changes-unavailable")).toBeNull();
   });
 });

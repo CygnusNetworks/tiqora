@@ -73,7 +73,11 @@ export function ChangeImpactSection({ change }: { change: Change }) {
           </p>
           {(impact.stale || !impact.computed_at) && (
             <p className="text-escalation" data-testid="change-impact-stale">
-              {impact.computed_at ? t("itsm.change.impact.stale") : t("itsm.change.impact.notComputed")}
+              {impact.computed_at
+                ? t("itsm.change.impact.stale")
+                : impact.requested_at
+                  ? t("itsm.change.impact.computing")
+                  : t("itsm.change.impact.notComputed")}
             </p>
           )}
           {impact.truncated && (

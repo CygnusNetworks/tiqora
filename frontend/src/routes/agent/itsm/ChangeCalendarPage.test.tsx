@@ -8,8 +8,9 @@ import type { CalendarChange, ChangeCalendar, ServiceAvailability } from "@/lib/
 import { MAX_RANGE_DAYS } from "@/lib/changeCalendar";
 import { ChangeCalendarPage } from "./ChangeCalendarPage";
 
-const { calendar, calendarServices, listReferenceServices, navigate } = vi.hoisted(() => ({
+const { calendar, status, calendarServices, listReferenceServices, navigate } = vi.hoisted(() => ({
   calendar: vi.fn(),
+  status: vi.fn(),
   calendarServices: vi.fn(),
   listReferenceServices: vi.fn(),
   navigate: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock("@tanstack/react-router", async () => {
 });
 vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
-  return { ...actual, changeApi: { ...actual.changeApi, calendar, calendarServices } };
+  return { ...actual, changeApi: { ...actual.changeApi, calendar, status, calendarServices } };
 });
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -89,6 +90,7 @@ beforeEach(async () => {
   vi.setSystemTime(NOW);
   await i18n.changeLanguage("de");
   calendar.mockReset().mockResolvedValue(cal());
+  status.mockReset().mockResolvedValue({ can_see_legacy: true, legacy: "live", available: false });
   calendarServices.mockReset().mockResolvedValue(availability);
   listReferenceServices.mockReset().mockResolvedValue([{ id: 1, name: "E-Mail" }, { id: 2, name: "VPN" }]);
   navigate.mockReset();
@@ -168,7 +170,25 @@ describe("month view", () => {
     renderPage();
     const err = await screen.findByTestId("change-calendar-error");
     expect(err).toHaveAttribute("data-code", "change_mode_a");
-    expect(within(err).getByRole("link")).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+    expect(await within(err).findByRole("link")).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+  });
+
+  it("shows no Znuny link to an agent who may not see the Znuny changes", async () => {
+    status.mockResolvedValue({ can_see_legacy: false, legacy: "live", available: false });
+    calendar.mockRejectedValue(new ApiError(409, { detail: { code: "change_mode_a" } }, "/x"));
+    renderPage();
+    const err = await screen.findByTestId("change-calendar-error");
+    await waitFor(() => expect(status).toHaveBeenCalled());
+    expect(within(err).queryByRole("link")).toBeNull();
+  });
+
+  it("links the list and the CAB meetings in the header, and the archive when the agent may read it", async () => {
+    status.mockResolvedValue({ can_see_legacy: true, legacy: "archive", available: true });
+    renderPage();
+    expect(await screen.findByTestId("change-link-archive")).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+    expect(screen.getByTestId("change-link-list")).toHaveAttribute("href", "/agent/itsm/changes");
+    expect(screen.getByTestId("change-link-meetings")).toHaveAttribute("href", "/agent/itsm/cab-meetings");
+    expect(screen.queryByTestId("change-link-calendar")).toBeNull();
   });
 });
 

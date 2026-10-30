@@ -5,10 +5,15 @@ import type { ChangeEvent } from "@/lib/changeApi";
 import { renderWithClient } from "./changeTestSupport";
 import { ChangeEventsSection, EVENTS_PAGE } from "./ChangeEventsSection";
 
-const { events } = vi.hoisted(() => ({ events: vi.fn() }));
+const { events, listReferenceAgents } = vi.hoisted(() => ({ events: vi.fn(), listReferenceAgents: vi.fn() }));
 vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
   return { ...actual, changeApi: { ...actual.changeApi, events } };
+});
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, api: { ...actual.api, listReferenceAgents } };
 });
 
 const ev = (id: number, over: Partial<ChangeEvent> = {}): ChangeEvent => ({
@@ -26,6 +31,7 @@ describe("ChangeEventsSection", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("de");
     events.mockReset();
+    listReferenceAgents.mockReset().mockResolvedValue([{ id: 4, login: "ada", full_name: "Ada Agent" }]);
   });
   afterEach(cleanup);
 
@@ -43,7 +49,7 @@ describe("ChangeEventsSection", () => {
     expect(rows[0]).toHaveTextContent("Keine gültigen CAB-Mitglieder");
     expect(rows[1]).toHaveTextContent("Phase: Bewertung → Freigabe");
     expect(rows[1]).toHaveTextContent("CAB am Dienstag");
-    expect(rows[1]).toHaveTextContent("Benutzer #4");
+    await waitFor(() => expect(rows[1]).toHaveTextContent("Ada Agent"));
     expect(rows[2]).toHaveTextContent("Phase: Entwurf");
     expect(rows[2]).not.toHaveTextContent("–");
     expect(events).toHaveBeenCalledWith(130, { limit: EVENTS_PAGE, before_id: undefined }, expect.anything());
@@ -59,6 +65,25 @@ describe("ChangeEventsSection", () => {
     await waitFor(() => expect(events).toHaveBeenLastCalledWith(130, { limit: EVENTS_PAGE, before_id: 200 - EVENTS_PAGE + 1 }, expect.anything()));
     await waitFor(() => expect(screen.getAllByTestId("change-event")).toHaveLength(EVENTS_PAGE + 1));
     expect(screen.queryByTestId("change-events-more")).toBeNull();
+  });
+
+  it("keeps the user number for an agent the list does not know", async () => {
+    events.mockResolvedValue([ev(1, { created_by: 77 })]);
+    renderWithClient(<ChangeEventsSection ticketId={130} />);
+    const row = await screen.findByTestId("change-event");
+    await waitFor(() => expect(listReferenceAgents).toHaveBeenCalled());
+    expect(row).toHaveTextContent("Benutzer #77");
+  });
+
+  it("reads the template notes of a new change as sentences, not codes", async () => {
+    events.mockResolvedValue([
+      ev(1, { event: "created", detail: { template_warnings: ["queue_not_found:5", "risk_answer_stale:tested", "ci_refs_truncated"] } }),
+    ]);
+    renderWithClient(<ChangeEventsSection ticketId={130} />);
+    const row = await screen.findByTestId("change-event");
+    expect(row).toHaveTextContent("Queue 5 gibt es nicht mehr");
+    expect(row).toHaveTextContent("Frage „tested“");
+    expect(row).not.toHaveTextContent("queue_not_found");
   });
 
   it("shows detail values as plain text, never as markup", async () => {

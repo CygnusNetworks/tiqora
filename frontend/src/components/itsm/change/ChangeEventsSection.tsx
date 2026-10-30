@@ -1,10 +1,12 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { changeApi, changeKeys, type ChangeEvent } from "@/lib/changeApi";
-import { changeErrorText, SECTION_CLASS, utcText } from "./changeUi";
+import { api } from "@/lib/api";
+import { changeErrorText, SECTION_CLASS, utcText, warningText } from "./changeUi";
 
 export const EVENTS_PAGE = 50;
 /** Writes of the approval outcome path are attributed to the system user (backend ruling F2). */
@@ -13,6 +15,7 @@ const SYSTEM_USER_ID = 1;
 /** One detail value as plain text (React escapes it; nothing is rendered as HTML). */
 function valueText(key: string, value: unknown, t: TFunction): string {
   if (value == null) return "–";
+  if (key === "template_warnings" && Array.isArray(value)) return value.map((w) => warningText(String(w), t)).join("\n");
   if (key === "reason" && value === "no_approvers") return t("itsm.change.approval.noApprovers");
   if (key === "status" && typeof value === "string") return t(`approvals.status.${value}`, { defaultValue: value });
   if ((key === "from" || key === "to") && typeof value === "string") return t(`itsm.change.risk.levels.${value}`, { defaultValue: value });
@@ -21,7 +24,7 @@ function valueText(key: string, value: unknown, t: TFunction): string {
   return String(value);
 }
 
-function EventRow({ event }: { event: ChangeEvent }) {
+function EventRow({ event, userName }: { event: ChangeEvent; userName: Map<number, string> }) {
   const { t } = useTranslation();
   const phase = (p: string | null) => (p ? t(`itsm.change.phases.${p}`, { defaultValue: p }) : "–");
   // the first phase event of a change has no previous phase
@@ -38,7 +41,7 @@ function EventRow({ event }: { event: ChangeEvent }) {
         <span className="tabular-nums text-muted">{utcText(event.created_at)}</span>
         <span className="font-medium text-ink">{title}</span>
         <span className="text-muted">
-          {event.created_by === SYSTEM_USER_ID ? t("itsm.change.events.system") : t("itsm.change.events.user", { id: event.created_by })}
+          {event.created_by === SYSTEM_USER_ID ? t("itsm.change.events.system") : userName.get(event.created_by) ?? t("itsm.change.events.user", { id: event.created_by })}
         </span>
       </div>
       {entries.length > 0 && (
@@ -69,6 +72,9 @@ export function ChangeEventsSection({ ticketId }: { ticketId: number }) {
     getNextPageParam: (last) => (last.length < EVENTS_PAGE ? undefined : last[last.length - 1].id),
   });
   const events = q.data?.pages.flat() ?? [];
+  // Names of the acting agents; ids the list does not know (a former agent) keep "Benutzer #n".
+  const agentsQ = useQuery({ queryKey: ["reference", "agents"], queryFn: ({ signal }) => api.listReferenceAgents(signal), staleTime: 60_000 });
+  const userName = useMemo(() => new Map((agentsQ.data ?? []).map((a) => [a.id, a.full_name || a.login])), [agentsQ.data]);
 
   return (
     <section className={SECTION_CLASS} aria-label={t("itsm.change.events.title")} data-testid="change-events">
@@ -83,7 +89,7 @@ export function ChangeEventsSection({ ticketId }: { ticketId: number }) {
       {events.length > 0 && (
         <ol className="divide-y divide-hairline">
           {events.map((e) => (
-            <EventRow key={e.id} event={e} />
+            <EventRow key={e.id} event={e} userName={userName} />
           ))}
         </ol>
       )}

@@ -32,6 +32,17 @@ describe("ChangeRiskQuestionsTab", () => {
     await waitFor(() => expect(bodyOf(requests, "PUT", `${BASE}/order`)).toEqual({ order: [2, 1] }));
   });
 
+  it("says why a question that changes have answered cannot be deleted", async () => {
+    serveChangeAdmin([], (method, path) => {
+      if (method === "DELETE" && path === `${BASE}/1`) throw new ApiError(409, { detail: { code: "risk_question_in_use" } }, path);
+      return undefined;
+    });
+    renderWithClient(<ChangeRiskQuestionsTab />);
+    fireEvent.click((await screen.findAllByTestId("risk-question-delete"))[0]);
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    expect(await screen.findByTestId("risk-delete-error")).toHaveTextContent("Changes haben diese Frage beantwortet");
+  });
+
   it("takes over the example questions and says how many were added", async () => {
     const requests: Recorded[] = [];
     serveChangeAdmin(requests);

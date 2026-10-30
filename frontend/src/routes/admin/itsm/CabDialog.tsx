@@ -15,6 +15,12 @@ import { changeErrorCode, changeErrorDetail, changeKeys } from "@/lib/changeApi"
 const CAB_RULES: AdminCab["rule"][] = ["any", "all", "majority", "quorum"];
 /** The approval engine's subject type of changes: offers the change's own resolvers (`itsm.service_owner`). */
 const SUBJECT_TYPE = "itsm.change";
+/** What the dialog says when only one half of a CAB got saved. */
+const PARTIAL_TEXT = {
+  created: "admin.itsmChange.cab.membersNotSaved",
+  board: "admin.itsmChange.cab.boardSavedOnly",
+  members: "admin.itsmChange.cab.membersSavedOnly",
+} as const;
 type Problem = "name" | "quorum" | "quorumTooLarge" | "members";
 /** Kinds the engine counts one by one; groups, roles, lists and rules expand later. */
 const COUNTED_KINDS: ReadonlySet<ApproverEntry["kind"]> = new Set(["user", "customer_user"]);
@@ -28,13 +34,17 @@ function quorumExceedsMembers(quorum: number | null, entries: ApproverEntry[]): 
   return quorum > new Set(entries.map((e) => `${e.kind}:${e.ref}`)).size;
 }
 
-/** `cab_invalid` names its reason only in an English engine message; the quorum case gets its own text. */
+/** `cab_invalid` carries a `reason` code (`detail.reason`); a missing or unknown one falls back to the generic mismatch text. */
 function cabErrorText(err: unknown, t: TFunction): string {
   if (changeErrorCode(err) !== "cab_invalid") return changeAdminErrorText(err, t);
-  const message = changeErrorDetail(err)?.message;
-  return typeof message === "string" && /quorum \d+ exceeds/.test(message)
-    ? t("admin.itsmChange.cab.quorumTooLarge")
-    : t("admin.itsmChange.cab.ruleMismatch");
+  switch (changeErrorDetail(err)?.reason) {
+    case "quorum_exceeds_members":
+      return t("admin.itsmChange.cab.quorumTooLarge");
+    case "invalid_member":
+      return t("admin.itsmChange.cab.memberInvalid");
+    default:
+      return t("admin.itsmChange.cab.ruleMismatch");
+  }
 }
 
 /**
@@ -50,7 +60,7 @@ export function CabDialog({ cab, customersAllowed, onClose }: { cab: AdminCab | 
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [cabId, setCabId] = useState<number | null>(cab?.id ?? null);
-  const [partial, setPartial] = useState<"created" | "board" | null>(null);
+  const [partial, setPartial] = useState<"created" | "board" | "members" | null>(null);
   const [storedMembers, setStoredMembers] = useState(() => JSON.stringify((cab?.members ?? []).map(memberToEntry)));
   const [name, setName] = useState(cab?.name ?? "");
   const [description, setDescription] = useState(cab?.description ?? "");
@@ -103,6 +113,7 @@ export function CabDialog({ cab, customersAllowed, onClose }: { cab: AdminCab | 
       } catch (err) {
         if (!membersChanged || changeErrorCode(err) !== "cab_invalid") throw err;
         await saveMembers(cabId);
+        setPartial("members");
         await changeAdminApi.saveCab(cabId, body);
         return;
       }
@@ -211,7 +222,7 @@ export function CabDialog({ cab, customersAllowed, onClose }: { cab: AdminCab | 
         )}
         {save.isError && (
           <p className="text-sm text-danger" role="alert" data-testid="cab-error">
-            {partial && <>{t(partial === "created" ? "admin.itsmChange.cab.membersNotSaved" : "admin.itsmChange.cab.boardSavedOnly")} </>}
+            {partial && <>{t(PARTIAL_TEXT[partial])} </>}
             {cabErrorText(save.error, t)}
           </p>
         )}

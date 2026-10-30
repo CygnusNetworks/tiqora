@@ -38,8 +38,10 @@ export type PhaseStep = { phase: ChangePhase; state: PhaseStepState };
  * approval it came from (everything up to the approval counts as done), `cancelled` after the
  * steps of the path (nothing is known about how far it got, so none counts as done). A standard
  * change that is in `review` (setting `standard_requires_review`) gets that step before `closed`.
+ * With `approvalPending` (emergency post-approval: implemented first, the CAB decides afterwards) the
+ * steps "Freigabe" and "Geplant" were skipped, so they do not count as done.
  */
-export function phaseSteps(changeType: ChangeType, phase: ChangePhase): PhaseStep[] {
+export function phaseSteps(changeType: ChangeType, phase: ChangePhase, approvalPending = false): PhaseStep[] {
   const path = [...PHASE_PATH[changeType]];
   if (phase === "review" && !path.includes("review")) path.splice(path.indexOf("closed"), 0, "review");
   if (phase === "rejected" || phase === "cancelled") {
@@ -50,7 +52,10 @@ export function phaseSteps(changeType: ChangeType, phase: ChangePhase): PhaseSte
     ];
   }
   const at = path.indexOf(phase);
-  return path.map((p, i): PhaseStep => ({ phase: p, state: i < at ? "done" : i === at ? "current" : "upcoming" }));
+  return path.map((p, i): PhaseStep => ({
+    phase: p,
+    state: i < at && !(approvalPending && (p === "approval" || p === "scheduled")) ? "done" : i === at ? "current" : "upcoming",
+  }));
 }
 
 export function isRiskLevel(value: string | null | undefined): value is RiskLevel {

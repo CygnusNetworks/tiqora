@@ -8,10 +8,11 @@ import { Dialog } from "@/components/ui/Dialog";
 import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
+import { ChangeLinkRow } from "@/components/itsm/change/ChangeLinkRow";
 import { MEETING_STATUS_TONE, shiftMonth, utcMonthRange } from "@/components/itsm/change/cabUi";
-import { changeErrorText, FIELD_CLASS, fromLocalInput, LABEL_CLASS, utcText } from "@/components/itsm/change/changeUi";
+import { changeErrorText, FIELD_CLASS, fromLocalInput, LABEL_CLASS, utcRangeText } from "@/components/itsm/change/changeUi";
 import { toBcp47 } from "@/i18n";
-import { changeApi, changeErrorCode, changeKeys, type CabMeeting } from "@/lib/changeApi";
+import { changeApi, changeErrorCode, changeKeys, type CabMeetingListItem } from "@/lib/changeApi";
 
 /**
  * `/agent/itsm/cab-meetings`: the CAB meetings of one month (UTC); change managers plan a new
@@ -46,6 +47,7 @@ export function CabMeetingsPage() {
           </Button>
         )}
       </div>
+      <ChangeLinkRow current="meetings" />
       <p className="text-xs text-muted">{t("itsm.change.cab.utcHint")}</p>
 
       <div className="flex items-center gap-1">
@@ -66,7 +68,7 @@ export function CabMeetingsPage() {
       {listQ.isError ? (
         <div className="rounded-lg border border-hairline bg-surface px-4 py-6 text-center text-sm text-danger" role="alert" data-testid="cab-meetings-error" data-code={code ?? undefined}>
           <p>{changeErrorText(listQ.error, t)}</p>
-          {code === "change_mode_a" && (
+          {code === "change_mode_a" && statusQ.data?.can_see_legacy && (
             <RouterAnchor href="/agent/itsm/legacy-changes" className="mt-2 inline-block text-accent hover:underline">
               {t("itsm.change.pages.legacyList")}
             </RouterAnchor>
@@ -93,7 +95,7 @@ export function CabMeetingsPage() {
   );
 }
 
-function MeetingRow({ meeting: m }: { meeting: CabMeeting }) {
+function MeetingRow({ meeting: m }: { meeting: CabMeetingListItem }) {
   const { t } = useTranslation();
   return (
     <li className="rounded-lg border border-hairline bg-surface px-4 py-3" data-testid={`cab-meeting-${m.id}`} data-status={m.status}>
@@ -106,7 +108,7 @@ function MeetingRow({ meeting: m }: { meeting: CabMeeting }) {
       <p className="mt-1 break-words text-xs text-muted">
         {m.cab_name}
         {" · "}
-        {utcText(m.starts_at)} – {utcText(m.ends_at).slice(11)} UTC
+        {utcRangeText(m.starts_at, m.ends_at)} UTC
         {m.location ? ` · ${m.location}` : ""}
         {" · "}
         {t("itsm.change.cab.agendaCount", { count: m.agenda_count })}
@@ -169,6 +171,18 @@ function CreateMeetingDialog({ onClose }: { onClose: () => void }) {
             onChange={setCabId}
             placeholder={t("itsm.change.cab.cabPlaceholder")}
           />
+          {cabsQ.isError ? (
+            <p className="mt-1 text-xs text-danger" role="alert" data-testid="cab-create-cabs-error">
+              {changeErrorText(cabsQ.error, t)}
+            </p>
+          ) : (
+            cabsQ.isSuccess &&
+            cabsQ.data.length === 0 && (
+              <p className="mt-1 text-xs text-muted" data-testid="cab-create-no-cabs">
+                {t("itsm.change.cab.noCabs")}
+              </p>
+            )
+          )}
         </div>
         <div>
           <label className={LABEL_CLASS} htmlFor="cab-create-title">

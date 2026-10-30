@@ -80,7 +80,7 @@ describe("ChangeCabTab", () => {
       if (method === "GET" && path === BASE) return cabs;
       if (method === "PUT" && path === `${BASE}/1`) {
         const quorum = (body as { quorum: number }).quorum;
-        if (quorum > stored.members) throw new ApiError(422, { detail: { code: "cab_invalid", message: `step 'CAB': quorum ${quorum} exceeds distinct approvers` } }, path);
+        if (quorum > stored.members) throw new ApiError(422, { detail: { code: "cab_invalid", reason: "quorum_exceeds_members", message: `step 'CAB': quorum ${quorum} exceeds distinct approvers` } }, path);
         stored = { ...stored, quorum };
         return cabs[0];
       }
@@ -101,6 +101,35 @@ describe("ChangeCabTab", () => {
     await waitFor(() => expect(screen.queryByTestId("cab-dialog")).toBeNull());
     expect(requests.filter((r) => r.method === "PUT").map((r) => r.path)).toEqual([`${BASE}/1`, `${BASE}/1/members`, `${BASE}/1`]);
     expect(stored).toEqual({ quorum: 3, members: 3 });
+  });
+
+  it("says that only the members were saved when the board fails after the members-first retry", async () => {
+    const requests: Recorded[] = [];
+    const cabs = demoCabs();
+    cabs[0] = { ...cabs[0], rule: "quorum", quorum: 2, members: [
+      { member_kind: "user", member_ref: "1", label: "Ada Agent", count: null, missing: false },
+      { member_kind: "user", member_ref: "2", label: "Alex Turner", count: null, missing: false },
+    ] };
+    let boardWrites = 0;
+    serveChangeAdmin(requests, (method, path) => {
+      if (method === "GET" && path === BASE) return cabs;
+      if (method === "PUT" && path === `${BASE}/1`) {
+        boardWrites += 1;
+        throw new ApiError(422, { detail: { code: "cab_invalid", reason: boardWrites === 1 ? "quorum_exceeds_members" : "invalid_definition" } }, path);
+      }
+      if (method === "PUT" && path === `${BASE}/1/members`) return cabs[0];
+      return undefined;
+    });
+    renderWithClient(<ChangeCabTab />);
+    fireEvent.click(within(await rowOf(1)).getByTestId("cab-edit"));
+    await screen.findByTestId("cab-dialog");
+    fireEvent.change(screen.getByTestId("cab-quorum"), { target: { value: "3" } });
+    fireEvent.click(screen.getByTestId("cab-member-add"));
+    fireEvent.click(screen.getByTestId("cab-member-ref-2"));
+    fireEvent.click(await screen.findByTestId("cab-member-ref-2-menu-option-3"));
+    fireEvent.click(screen.getByTestId("cab-save"));
+    await waitFor(() => expect(screen.getByTestId("cab-error")).toHaveTextContent("Die Mitglieder sind gespeichert, Name und Regel jedoch nicht."));
+    expect(requests.filter((r) => r.method === "PUT").map((r) => r.path)).toEqual([`${BASE}/1`, `${BASE}/1/members`, `${BASE}/1`]);
   });
 
   it("refuses a quorum above the number of individual members before saving", async () => {
@@ -236,10 +265,11 @@ describe("ChangeCabTab", () => {
   });
 
   it("explains refused saves in both error shapes", async () => {
-    let shape: "code" | "other" | "list" = "list";
+    let shape: "code" | "member" | "other" | "list" = "list";
     serveChangeAdmin([], (method, path) => {
       if (method !== "PUT" || path !== `${BASE}/2`) return undefined;
-      if (shape === "code") throw new ApiError(422, { detail: { code: "cab_invalid", message: "step 'CAB': quorum 5 exceeds distinct approvers" } }, path);
+      if (shape === "code") throw new ApiError(422, { detail: { code: "cab_invalid", reason: "quorum_exceeds_members", message: "step 'CAB': quorum 5 exceeds distinct approvers" } }, path);
+      if (shape === "member") throw new ApiError(422, { detail: { code: "cab_invalid", reason: "invalid_member" } }, path);
       if (shape === "other") throw new ApiError(422, { detail: { code: "cab_invalid", message: "duplicate step names: CAB" } }, path);
       throw new ApiError(422, { detail: [{ loc: ["body", "quorum"], msg: "Input should be less than or equal to 100", type: "less_than_equal" }] }, path);
     });
@@ -250,6 +280,9 @@ describe("ChangeCabTab", () => {
     shape = "code";
     fireEvent.click(screen.getByTestId("cab-save"));
     await waitFor(() => expect(screen.getByTestId("cab-error")).toHaveTextContent("Das Quorum ist größer als die Zahl der Mitglieder."));
+    shape = "member";
+    fireEvent.click(screen.getByTestId("cab-save"));
+    await waitFor(() => expect(screen.getByTestId("cab-error")).toHaveTextContent("Ein Mitglied ist ungültig oder existiert nicht mehr."));
     shape = "other";
     fireEvent.click(screen.getByTestId("cab-save"));
     await waitFor(() => expect(screen.getByTestId("cab-error")).toHaveTextContent("Entscheidungsregel, Mindestzahl und Mitglieder passen nicht zusammen."));

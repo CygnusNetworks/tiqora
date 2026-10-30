@@ -28,6 +28,7 @@ import type {
   CabChangeItem,
   CalendarChange,
   CabMeeting,
+  CabMeetingListItem,
   Change,
   ChangeCreateIn,
   ChangeApproval,
@@ -220,7 +221,7 @@ const PHASE_TARGETS: Record<Change["phase"], Change["phase"][]> = {
   implementing: ["review"],
   review: ["closed"],
   closed: [],
-  rejected: ["draft"],
+  rejected: ["draft", "cancelled"],
   cancelled: [],
 };
 
@@ -1425,7 +1426,10 @@ function changeRoutes(path: string, method: string, params: URLSearchParams): un
     if (method !== "GET") return MEETINGS[0];
     const from = params.get("start");
     const to = params.get("end");
-    return MEETINGS.filter((m) => !from || !to || overlaps(m.starts_at, m.ends_at, from, to));
+    // The list answers without the agenda and the minutes (`MeetingListItemOut`).
+    return MEETINGS.filter((m) => !from || !to || overlaps(m.starts_at, m.ends_at, from, to)).map(
+      ({ agenda: _agenda, minutes: _minutes, ...item }): CabMeetingListItem => item,
+    );
   }
   const meeting = path.match(/\/api\/v1\/itsm\/cab-meetings\/(\d+)(\/agenda|\/suggestions)?$/);
   if (meeting) {

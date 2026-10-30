@@ -38,6 +38,13 @@ describe("TransitionDialog", () => {
     expect(transition).toHaveBeenCalledWith(130, { to: "approval", reason: "CAB am Dienstag" });
   });
 
+  it("explains a standard change whose template is no longer a standard template", async () => {
+    transition.mockRejectedValue(changeError(422, { code: "standard_template_invalid" }));
+    renderDialog(makeChange({ change_type: "standard", phase: "draft" }), "scheduled");
+    fireEvent.click(screen.getByTestId("change-transition-submit"));
+    expect(await screen.findByTestId("change-transition-error")).toHaveTextContent("keine Standard-Vorlage mehr");
+  });
+
   it("lists the guard failures of a 409 and offers no override to a non-manager", async () => {
     transition.mockRejectedValue(
       refused([

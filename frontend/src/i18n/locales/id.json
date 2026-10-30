@@ -1356,7 +1356,8 @@
     },
     "processLabel": "Start process",
     "fromChange": "The new ticket is linked to the change (ticket #{{id}}).",
-    "changeLinkFailed": "The ticket was created but could not be linked to the change."
+    "changeLinkFailed": "The ticket was created but could not be linked to the change.",
+    "retryChangeLink": "Retry linking to the change"
   },
   "connection": {
     "live": "Terhubung langsung",
@@ -6178,7 +6179,7 @@
         "attachments": "Attachments",
         "priority_matrix": "Priority matrix",
         "service_meta": "Service details",
-        "changes": "Changes (counted only)",
+        "changes": "Changes (archive)",
         "deleted_in_znuny": "Deleted in Znuny",
         "incident_states": "Incident states"
       },
@@ -6316,7 +6317,9 @@
         "deleteMessage": "Delete CAB “{{name}}”?",
         "quorumTooLarge": "The quorum is larger than the number of members. Add members or lower the minimum number.",
         "ruleMismatch": "Decision rule, minimum number and members do not fit together.",
-        "boardSavedOnly": "Name and rule are saved, but the members are not."
+        "boardSavedOnly": "Name and rule are saved, but the members are not.",
+        "memberInvalid": "A member is invalid or no longer exists.",
+        "membersSavedOnly": "The members are saved, but name and rule are not."
       },
       "risk": {
         "new": "New question",
@@ -9659,7 +9662,9 @@
         "cabMeetings": "CAB meetings",
         "cabMeeting": "CAB meeting",
         "legacyList": "Changes (Znuny)",
-        "legacyDetail": "Znuny change"
+        "legacyDetail": "Znuny change",
+        "legacyArchive": "Changes (Znuny archive)",
+        "linksLabel": "More change pages"
       },
       "list": {
         "create": "Create change",
@@ -9703,7 +9708,8 @@
           "pir": "Post-implementation review"
         },
         "windowInvalid": "The end of the window must not be before its start.",
-        "calendar": "Calendar"
+        "calendar": "Calendar",
+        "tasksTruncated": "Only the first 100 tasks are shown."
       },
       "create": {
         "title": "Create change",
@@ -9968,7 +9974,8 @@
           "operational": "Operational",
           "warning": "Warning",
           "incident": "Incident"
-        }
+        },
+        "computing": "The impact is being computed …"
       },
       "conflicts": {
         "title": "Conflicts",
@@ -10015,7 +10022,8 @@
         "historyMissing": "Approval history no longer available",
         "none": "No approval requested yet.",
         "voteHint": "Vote in the approvals section",
-        "defaultEmergencyCab": "Emergency CAB from the settings"
+        "defaultEmergencyCab": "Emergency CAB from the settings",
+        "meetingsLink": "View CAB meetings"
       },
       "banners": {
         "ticketClosed": "The ticket was closed ({{state}}), but the change is still in the phase \"{{phase}}\". Please close or cancel the change, or reopen the ticket.",
@@ -10168,7 +10176,8 @@
         "unsaved": "Approval status visible after saving",
         "position": "Position {{pos}} of {{count}}: {{title}}",
         "dragHandle": "Drag to reorder: {{title}}",
-        "blockedLine": "The change {{tn}} is affected."
+        "blockedLine": "The change {{tn}} is affected.",
+        "noCabs": "There is no CAB yet. An administrator creates one under Admin, Change management."
       },
       "legacy": {
         "sourceLive": "Live from Znuny",
@@ -10221,7 +10230,19 @@
         "ofWorkorder": "on work order {{number}}",
         "dynamicFields": "Dynamic fields",
         "history": "History",
-        "historyEmpty": "No history."
+        "historyEmpty": "No history.",
+        "searchScopeLive": "The search covers number, title, description and justification (from 3 characters)."
+      },
+      "warnings": {
+        "notFound": "{{kind}} {{ref}} no longer exists and was not taken over from the template.",
+        "riskAnswerStale": "The template's answer to the question “{{question}}” no longer fits and was not taken over.",
+        "kinds": {
+          "queue": "Queue",
+          "priority": "Priority",
+          "service": "Service",
+          "cab": "CAB",
+          "owner": "Owner"
+        }
       }
     }
   },

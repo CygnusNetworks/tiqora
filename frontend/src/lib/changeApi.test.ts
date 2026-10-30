@@ -60,8 +60,6 @@ describe("changeApi paths and queries", () => {
 
   it("builds the calendar, task, template and CAB routes", async () => {
     const spy = vi.spyOn(api, "request").mockResolvedValue({} as never);
-    await changeApi.myTasks();
-    await changeApi.myTasks(false);
     await changeApi.calendar({ start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z", service_id: [1, 2], include_tasks: true });
     await changeApi.calendarServices("2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z");
     await changeApi.templates();
@@ -70,8 +68,6 @@ describe("changeApi paths and queries", () => {
     await changeApi.meeting(1);
     await changeApi.meetingSuggestions(1);
     expect(calls(spy)).toEqual([
-      ["GET", "/api/v1/itsm/change-tasks/mine", { open_only: true }],
-      ["GET", "/api/v1/itsm/change-tasks/mine", { open_only: false }],
       ["GET", "/api/v1/itsm/change-calendar", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z", service_id: [1, 2], include_tasks: true }],
       ["GET", "/api/v1/itsm/change-calendar/services", { start: "2026-10-01T00:00:00Z", end: "2026-11-01T00:00:00Z" }],
       ["GET", "/api/v1/itsm/change-templates", undefined],
@@ -168,6 +164,25 @@ describe("changeAdminApi paths", () => {
       ["GET", "/api/v1/admin/itsm/change/legacy-archive", undefined],
       ["POST", "/api/v1/admin/itsm/change/legacy-archive", { dry_run: true }],
     ]);
+  });
+});
+
+describe("changeApi.myTasks", () => {
+  it("asks for the open or all tasks and reads the truncation header", async () => {
+    const spy = vi
+      .spyOn(api, "requestWithHeaders")
+      .mockResolvedValue({ data: [], headers: new Headers({ "X-Tasks-Truncated": "true" }) } as never);
+    expect(await changeApi.myTasks()).toEqual({ items: [], truncated: true });
+    await changeApi.myTasks(false);
+    expect(calls(spy)).toEqual([
+      ["GET", "/api/v1/itsm/change-tasks/mine", { open_only: true }],
+      ["GET", "/api/v1/itsm/change-tasks/mine", { open_only: false }],
+    ]);
+  });
+
+  it("is not truncated without the header", async () => {
+    vi.spyOn(api, "requestWithHeaders").mockResolvedValue({ data: [], headers: new Headers() } as never);
+    expect((await changeApi.myTasks()).truncated).toBe(false);
   });
 });
 

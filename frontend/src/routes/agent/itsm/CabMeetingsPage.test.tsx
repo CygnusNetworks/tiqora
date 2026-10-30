@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import i18n from "@/i18n";
 import { changeError, renderWithClient } from "@/components/itsm/change/changeTestSupport";
-import type { CabMeeting } from "@/lib/changeApi";
+import type { CabMeetingListItem } from "@/lib/changeApi";
 import { CabMeetingsPage } from "./CabMeetingsPage";
 
 const { meetings, status, cabs, createMeeting, navigate } = vi.hoisted(() => ({
@@ -21,7 +21,7 @@ vi.mock("@/lib/changeApi", async () => {
   return { ...actual, changeApi: { ...actual.changeApi, meetings, status, cabs, createMeeting } };
 });
 
-const meeting = (id: number, over: Partial<CabMeeting> = {}): CabMeeting => ({
+const meeting = (id: number, over: Partial<CabMeetingListItem> = {}): CabMeetingListItem => ({
   id,
   cab_id: 1,
   cab_name: "CAB Netzwerk",
@@ -30,9 +30,7 @@ const meeting = (id: number, over: Partial<CabMeeting> = {}): CabMeeting => ({
   ends_at: "2026-10-15T10:00:00Z",
   location: "Raum 2",
   status: "planned",
-  minutes: null,
   agenda_count: 2,
-  agenda: [],
   created_at: "2026-10-01T08:00:00Z",
   created_by: 1,
   updated_at: "2026-10-01T08:00:00Z",
@@ -45,7 +43,7 @@ describe("CabMeetingsPage", () => {
     await i18n.changeLanguage("de");
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-20T12:00:00Z") });
     for (const m of [meetings, status, cabs, createMeeting, navigate]) m.mockReset();
-    status.mockResolvedValue({ can_manage: false });
+    status.mockResolvedValue({ can_manage: false, can_see_legacy: true, legacy: "live" });
     cabs.mockResolvedValue([{ id: 1, name: "CAB Netzwerk" }]);
   });
   afterEach(() => {
@@ -129,6 +127,37 @@ describe("CabMeetingsPage", () => {
     meetings.mockRejectedValue(changeError(409, { code: "change_mode_a" }));
     renderWithClient(<CabMeetingsPage />);
     expect(await screen.findByTestId("cab-meetings-error")).toHaveTextContent("Modus A");
-    expect(screen.getByRole("link", { name: "Changes (Znuny)" })).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+    expect(await screen.findByRole("link", { name: "Changes (Znuny)" })).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+  });
+
+  it("offers no Znuny link to an agent who may not see the Znuny changes", async () => {
+    status.mockResolvedValue({ can_manage: false, can_see_legacy: false, legacy: "live" });
+    meetings.mockRejectedValue(changeError(409, { code: "change_mode_a" }));
+    renderWithClient(<CabMeetingsPage />);
+    const error = await screen.findByTestId("cab-meetings-error");
+    await waitFor(() => expect(status).toHaveBeenCalled());
+    expect(error.querySelector("a")).toBeNull();
+  });
+
+  it("shows the end date of a meeting that spans days", async () => {
+    meetings.mockResolvedValue([meeting(1, { starts_at: "2026-10-15T09:00:00Z", ends_at: "2026-10-16T10:00:00Z" }), meeting(2, { starts_at: "2026-10-17T09:00:00Z", ends_at: "2026-10-17T10:00:00Z" })]);
+    renderWithClient(<CabMeetingsPage />);
+    expect(await screen.findByTestId("cab-meeting-1")).toHaveTextContent("2026-10-15 09:00 – 2026-10-16 10:00 UTC");
+    expect(screen.getByTestId("cab-meeting-2")).toHaveTextContent("2026-10-17 09:00 – 10:00 UTC");
+  });
+
+  it("says so when there is no CAB to hold a meeting, and when the CABs do not load", async () => {
+    status.mockResolvedValue({ can_manage: true, can_see_legacy: false, legacy: "none" });
+    meetings.mockResolvedValue([]);
+    cabs.mockResolvedValueOnce([]);
+    renderWithClient(<CabMeetingsPage />);
+    fireEvent.click(await screen.findByTestId("cab-meetings-create"));
+    expect(await screen.findByTestId("cab-create-no-cabs")).toHaveTextContent("Es gibt noch kein CAB.");
+    cleanup();
+    cabs.mockRejectedValue(changeError(500, { code: "boom" }));
+    renderWithClient(<CabMeetingsPage />);
+    fireEvent.click(await screen.findByTestId("cab-meetings-create"));
+    expect(await screen.findByTestId("cab-create-cabs-error")).toBeInTheDocument();
+    expect(screen.queryByTestId("cab-create-no-cabs")).toBeNull();
   });
 });

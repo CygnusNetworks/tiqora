@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import { changeApi, changeErrorCode, changeKeys, type ChangeCreated, type ChangeType } from "@/lib/changeApi";
 import { CHANGE_TYPES } from "@/lib/changePhases";
 import type { CiSummary } from "@/lib/itsmApi";
+import { warningText } from "./changeUi";
 
 const FIELD_CLASS =
   "w-full rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-none";
@@ -52,6 +53,10 @@ export function CreateChangeDialog({
   const [reason, setReason] = useState("");
   const [body, setBody] = useState("");
   const [portalVisible, setPortalVisible] = useState(false);
+  // A template fills the portal switch only while the agent has not touched it.
+  const [portalTouched, setPortalTouched] = useState(false);
+  /** Service ids of the picked template that the service list does not know any more (dropped, like the backend does). */
+  const [droppedRefs, setDroppedRefs] = useState<string[]>([]);
   const [created, setCreated] = useState<ChangeCreated | null>(null);
 
   const templatesQ = useQuery({ queryKey: changeKeys.templates(), queryFn: ({ signal }) => changeApi.templates(signal), retry: false });
@@ -77,9 +82,16 @@ export function CreateChangeDialog({
     // Only fill what is still empty: the template never overwrites what was typed.
     if (!title.trim() && d.title) setTitle(d.title);
     if (queueId === "" && d.queue_id) setQueueId(d.queue_id);
-    if (serviceIds.length === 0 && d.service_ids?.length) setServiceIds(d.service_ids);
+    setDroppedRefs([]);
+    if (serviceIds.length === 0 && d.service_ids?.length) {
+      // A retired service in the template would fail the create with `service_not_found`: drop it and say so.
+      const known = servicesQ.data ? new Set(servicesQ.data.map((s) => s.id)) : null;
+      const ids = known ? d.service_ids.filter((sid) => known.has(sid)) : d.service_ids;
+      setServiceIds(ids);
+      if (known) setDroppedRefs(d.service_ids.filter((sid) => !known.has(sid)).map((sid) => `service_not_found:${sid}`));
+    }
     if (!reason.trim() && d.reason) setReason(d.reason);
-    setPortalVisible(d.portal_visible);
+    if (!portalTouched) setPortalVisible(d.portal_visible);
   };
 
   const windowInvalid = Boolean(start && end && end <= start);
@@ -161,7 +173,7 @@ export function CreateChangeDialog({
           {warnings.length > 0 && (
             <ul className="space-y-1 text-xs text-muted" data-testid="change-create-warnings">
               {warnings.map((w) => (
-                <li key={w}>{t([`itsm.change.create.warnings.${w}`, "itsm.change.create.warnings.generic"])}</li>
+                <li key={w}>{warningText(w, t, t("itsm.change.create.warnings.generic"))}</li>
               ))}
             </ul>
           )}
@@ -289,6 +301,13 @@ export function CreateChangeDialog({
                   ))}
                 </ul>
               )}
+              {droppedRefs.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-xs text-muted" data-testid="change-create-template-notes">
+                  {droppedRefs.map((w) => (
+                    <li key={w}>{warningText(w, t)}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
@@ -336,7 +355,10 @@ export function CreateChangeDialog({
                 id="change-create-portal"
                 testId="change-create-portal"
                 checked={portalVisible}
-                onChange={setPortalVisible}
+                onChange={(v) => {
+                  setPortalTouched(true);
+                  setPortalVisible(v);
+                }}
                 aria-describedby="change-create-portal-help"
               />
               <label htmlFor="change-create-portal" className="text-sm text-ink">

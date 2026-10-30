@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ApprovalStatusBadge } from "@/components/approvals/ApprovalStatusBadge";
 import { TicketApprovalsPanel } from "@/components/approvals/TicketApprovalsPanel";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { changeApi, changeKeys, type Change, type ChangeApprovalSnapshot } from "@/lib/changeApi";
@@ -99,6 +100,13 @@ export function ChangeApprovalSection({ change, embedApprovals }: { change: Chan
             onChange={(v) => setCab.mutate(v === DEFAULT_CAB ? null : v)}
           />
         </div>
+      )}
+      {change.phase === "approval" && (
+        <p className="text-xs">
+          <RouterAnchor href="/agent/itsm/cab-meetings" className="text-accent hover:underline" data-testid="change-approval-meetings-link">
+            {t("itsm.change.approval.meetingsLink")}
+          </RouterAnchor>
+        </p>
       )}
       {(q.error ?? setCab.error ?? cabsQ.error) && (
         <p className="text-xs text-danger" role="alert" data-testid="change-approval-error">

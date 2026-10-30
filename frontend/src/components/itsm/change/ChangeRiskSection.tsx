@@ -76,6 +76,10 @@ export function ChangeRiskSection({ change }: { change: Change }) {
   const stored = (risk: ChangeRisk) => {
     qc.setQueryData(changeKeys.risk(id), risk);
     setSaved((n) => n + 1);
+    // An earlier failure of another write of this section is obsolete once this one went through.
+    answers.reset();
+    evaluate.reset();
+    override.reset();
     refresh();
   };
   const answers = useMutation({ mutationFn: (a: Record<string, string>) => changeApi.saveRiskAnswers(id, a), onSuccess: stored });

@@ -4,14 +4,14 @@ import i18n from "@/i18n";
 import { changeError, makeChange, renderWithClient } from "@/components/itsm/change/changeTestSupport";
 import { ChangeDetailPage } from "./ChangeDetailPage";
 
-const { get, record, params } = vi.hoisted(() => ({ get: vi.fn(), record: vi.fn(), params: { ticketId: "130" } }));
+const { get, status, record, params } = vi.hoisted(() => ({ get: vi.fn(), status: vi.fn(), record: vi.fn(), params: { ticketId: "130" } }));
 vi.mock("@tanstack/react-router", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/react-router")>("@tanstack/react-router");
   return { ...actual, useParams: () => params };
 });
 vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
-  return { ...actual, changeApi: { ...actual.changeApi, get } };
+  return { ...actual, changeApi: { ...actual.changeApi, get, status } };
 });
 vi.mock("@/components/itsm/change/ChangeEventsSection", () => ({
   ChangeEventsSection: ({ ticketId }: { ticketId: number }) => <div data-testid="change-events-stub" data-ticket={ticketId} />,
@@ -30,6 +30,7 @@ describe("ChangeDetailPage", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("de");
     get.mockReset();
+    status.mockReset().mockResolvedValue({ can_see_legacy: true, legacy: "live" });
     record.mockReset();
     params.ticketId = "130";
   });
@@ -55,7 +56,16 @@ describe("ChangeDetailPage", () => {
     get.mockRejectedValue(changeError(409, { code: "change_mode_a" }));
     renderWithClient(<ChangeDetailPage />);
     expect(await screen.findByTestId("change-detail-error")).toHaveTextContent("Modus A");
-    expect(screen.getByTestId("change-detail-legacy")).toHaveAttribute("href", "/agent/itsm/legacy-changes?ticket_id=130");
+    expect(await screen.findByTestId("change-detail-legacy")).toHaveAttribute("href", "/agent/itsm/legacy-changes?ticket_id=130");
+  });
+
+  it("keeps the Znuny link away from an agent who may not see the Znuny changes", async () => {
+    status.mockResolvedValue({ can_see_legacy: false, legacy: "live" });
+    get.mockRejectedValue(changeError(409, { code: "change_mode_a" }));
+    renderWithClient(<ChangeDetailPage />);
+    expect(await screen.findByTestId("change-detail-error")).toHaveTextContent("Modus A");
+    await waitFor(() => expect(status).toHaveBeenCalled());
+    expect(screen.queryByTestId("change-detail-legacy")).toBeNull();
   });
 
   it("says when the change does not exist or cannot be read", async () => {

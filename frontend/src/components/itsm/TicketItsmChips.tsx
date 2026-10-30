@@ -3,10 +3,12 @@ import { useTranslation } from "react-i18next";
 import { ItsmDialogs } from "@/components/itsm/ItsmDialogs";
 import { CiStateBadge } from "@/components/itsm/CiStateBadge";
 import { RiskBadge } from "@/components/itsm/change/RiskBadge";
+import { PHASE_TONE } from "@/components/itsm/change/changeUi";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { api, type TicketDetail } from "@/lib/api";
 import type { AllowedActions } from "@/lib/aclActions";
+import type { ChangePhase } from "@/lib/changeApi";
 import { itsmApi, itsmKeys, type RecentIncident } from "@/lib/itsmApi";
 import { ticketPerms } from "@/lib/ticket";
 
@@ -84,7 +86,7 @@ export function TicketItsmChips({ ticket, allowedActions = null }: { ticket: Tic
       )}
       {itsm.role === "change" && itsm.change && (
         <>
-          <Badge tone="accent" data-testid="itsm-chip-change-phase" data-phase={itsm.change.phase}>
+          <Badge tone={PHASE_TONE[itsm.change.phase as ChangePhase] ?? "accent"} data-testid="itsm-chip-change-phase" data-phase={itsm.change.phase}>
             {t(`itsm.change.phases.${itsm.change.phase}`, { defaultValue: itsm.change.phase })}
           </Badge>
           <RiskBadge level={itsm.change.risk_level} />

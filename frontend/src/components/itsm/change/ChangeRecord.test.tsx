@@ -50,6 +50,13 @@ describe("ChangeRecord", () => {
     expect(screen.getByTestId("change-action-draft")).toHaveTextContent("Überarbeiten");
   });
 
+  it("lets a rejected change be cancelled", () => {
+    renderWithClient(<ChangeRecord change={makeChange({ phase: "rejected", allowed_targets: ["draft", "cancelled"] })} embedApprovals />);
+    const actions = screen.getByTestId("change-actions");
+    expect(within(actions).getAllByRole("button").map((b) => b.getAttribute("data-target"))).toEqual(["draft", "cancelled"]);
+    expect(within(actions).getByTestId("change-action-cancelled")).toHaveTextContent("Change abbrechen");
+  });
+
   it("shows no buttons without write access", () => {
     renderWithClient(<ChangeRecord change={makeChange({ can_write: false })} embedApprovals />);
     expect(screen.queryByTestId("change-actions")).toBeNull();
@@ -95,6 +102,11 @@ describe("ChangeRecord", () => {
     expect(url.searchParams.get("subject")).toBe("Incident nach Change 20261012130: Switch-Firmware aktualisieren");
     cleanup();
     renderWithClient(<ChangeRecord change={makeChange({ phase: "closed", outcome: "successful", allowed_targets: [] })} embedApprovals />);
+    expect(screen.queryByTestId("change-incident-offer")).toBeNull();
+  });
+
+  it("offers no incident to an agent without write access", () => {
+    renderWithClient(<ChangeRecord change={makeChange({ phase: "closed", outcome: "failed", can_write: false, allowed_targets: [] })} embedApprovals />);
     expect(screen.queryByTestId("change-incident-offer")).toBeNull();
   });
 

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Snapshot } from "@/components/itsm/change/ChangeApprovalSection";
 import { ChangeTypeBadge } from "@/components/itsm/change/ChangeTypeBadge";
 import { type AgendaDraftItem, MEETING_STATUS_TONE, moveItem, visibleAgenda } from "@/components/itsm/change/cabUi";
-import { changeErrorText, FIELD_CLASS, LABEL_CLASS, PHASE_TONE, SECTION_CLASS, utcText, windowText } from "@/components/itsm/change/changeUi";
+import { changeErrorText, FIELD_CLASS, LABEL_CLASS, PHASE_TONE, SECTION_CLASS, utcRangeText, windowText } from "@/components/itsm/change/changeUi";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { RouterAnchor } from "@/components/ui/RouterAnchor";
@@ -65,7 +65,7 @@ function MeetingBody({ meeting, canManage }: { meeting: CabMeeting; canManage: b
           </Badge>
           <span>{meeting.cab_name}</span>
           <span>
-            {utcText(meeting.starts_at)} – {utcText(meeting.ends_at).slice(11)} UTC
+            {utcRangeText(meeting.starts_at, meeting.ends_at)} UTC
           </span>
           {meeting.location && <span>{meeting.location}</span>}
         </p>
@@ -84,7 +84,13 @@ function AgendaSection({ meeting, canEdit }: { meeting: CabMeeting; canEdit: boo
   const [dragOver, setDragOver] = useState<number | null>(null);
   // After a move: which row and arrow keeps the focus, and what the live region announces.
   const [moved, setMoved] = useState<{ id: number; btn: "up" | "down"; pos: number; title: string } | null>(null);
-  const items = draft ?? visibleAgenda(meeting);
+  // An unsaved line outlives neither a status change nor a lost right to edit: without `canEdit` it has no save button.
+  const items = canEdit && draft ? draft : visibleAgenda(meeting);
+  useEffect(() => {
+    if (canEdit) return;
+    setDraft(null);
+    setMoved(null);
+  }, [canEdit]);
   const save = useMutation({
     mutationFn: () => changeApi.saveAgenda(meeting.id, { items: items.map((i) => ({ change_ticket_id: i.ticket_id, note: i.note.trim() || null })) }),
     onSuccess: (saved) => {

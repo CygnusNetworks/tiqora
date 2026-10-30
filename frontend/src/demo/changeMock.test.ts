@@ -197,6 +197,16 @@ describe("change demo mock (Mode B)", () => {
     expect(meeting.agenda[0].approval).toMatchObject({ approval_id: 501 });
   });
 
+  it("lists the meetings without agenda and minutes", () => {
+    const list = get("/api/v1/itsm/cab-meetings", "?start=2026-10-01T00:00:00Z&end=2026-11-01T00:00:00Z") as Record<string, unknown>[];
+    expect(list.length).toBeGreaterThan(0);
+    for (const m of list) {
+      expect(m).not.toHaveProperty("minutes");
+      expect(m).not.toHaveProperty("agenda");
+      expect(m).toHaveProperty("agenda_count");
+    }
+  });
+
   it("answers the writes with a plausible record and the job as done", () => {
     expect(resolveChangeData("/api/v1/itsm/changes", "POST", "", "tiqora")).toMatchObject({ tasks_job_id: DEMO_CHANGE_JOB_ID });
     expect(resolveChangeData("/api/v1/itsm/changes/130/transition", "POST", "", "tiqora")).toMatchObject({ ticket_id: 130 });

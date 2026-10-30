@@ -712,7 +712,7 @@ abgeleitete Zustände. Die Schlüssel und Namen auf der Seite sind:
 | `attachments` | „Anhänge“ | |
 | `priority_matrix` | „Prioritätsmatrix“ | |
 | `service_meta` | „Service-Angaben“ | |
-| `changes` | „Changes (nur gezählt)“ | archiviert die Changes (Abschnitt unten); die Bezeichnung auf der Seite ist noch die alte |
+| `changes` | „Changes (Archiv)“ | archiviert die Changes (Abschnitt unten) |
 | `deleted_in_znuny` | „In Znuny gelöscht“ | läuft nur mit installiertem CMDB-Paket |
 | `incident_states` | „Vorfallstatus“ | |
 

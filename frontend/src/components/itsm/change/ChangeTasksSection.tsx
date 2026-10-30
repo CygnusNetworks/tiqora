@@ -70,12 +70,16 @@ export function ChangeTasksSection({ change }: { change: Change }) {
     mutationFn: ({ title, kind }: { title: string; kind: ChangeTaskKind }) => changeApi.createTask(id, { title, task_kind: kind }),
     onSuccess: () => {
       setAdding(false);
+      order.reset();
       refresh();
     },
   });
   const order = useMutation({
     mutationFn: (ids: number[]) => changeApi.orderTasks(id, ids),
-    onSuccess: () => refresh(),
+    onSuccess: () => {
+      add.reset();
+      refresh();
+    },
   });
   const move = (index: number, by: -1 | 1) => {
     const ids = tasks.map((task) => task.ticket_id);

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ChangeTypeBadge } from "@/components/itsm/change/ChangeTypeBadge";
+import { ChangeLinkRow } from "@/components/itsm/change/ChangeLinkRow";
 import { CreateChangeDialog } from "@/components/itsm/change/CreateChangeDialog";
 import { RiskBadge } from "@/components/itsm/change/RiskBadge";
 import { Badge } from "@/components/ui/Badge";
@@ -24,7 +25,7 @@ import {
 } from "@/lib/changeApi";
 import { CHANGE_PHASES, CHANGE_TYPES } from "@/lib/changePhases";
 import { changeDetailHref } from "@/lib/itsmRoutes";
-import { PHASE_TONE } from "@/components/itsm/change/changeUi";
+import { PHASE_TONE, useChangeStatus } from "@/components/itsm/change/changeUi";
 
 const PAGE = 25;
 const DEBOUNCE_MS = 300;
@@ -104,6 +105,7 @@ export function ChangeListPage() {
   });
   const active = onTasks ? tasksQ : listQ;
   const errorCode = active.isError ? changeErrorCode(active.error) : null;
+  const canLegacy = useChangeStatus().data?.can_see_legacy === true;
 
   const reset = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v);
@@ -114,21 +116,17 @@ export function ChangeListPage() {
   const items = listQ.data?.items ?? [];
   const total = listQ.data?.total ?? 0;
   const truncated = listQ.data?.truncated ?? false;
-  const tasks = tasksQ.data ?? [];
+  const tasks = tasksQ.data?.items ?? [];
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-6" data-testid="changeListPage">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-xl font-semibold text-ink">{t("itsm.change.pages.list")}</h1>
-        <div className="flex items-center gap-2">
-          <RouterAnchor href="/agent/itsm/changes/calendar" className="text-sm text-accent hover:underline" data-testid="change-list-calendar-link">
-            {t("itsm.change.list.calendar")}
-          </RouterAnchor>
-          <Button variant="primary" size="sm" onClick={() => setCreating(true)} data-testid="change-list-create">
-            {t("itsm.change.list.create")}
-          </Button>
-        </div>
+        <Button variant="primary" size="sm" onClick={() => setCreating(true)} data-testid="change-list-create">
+          {t("itsm.change.list.create")}
+        </Button>
       </div>
+      <ChangeLinkRow current="list" />
 
       <Tabs
         ariaLabel={t("itsm.change.pages.list")}
@@ -215,14 +213,21 @@ export function ChangeListPage() {
       ) : active.isError ? (
         <div className="rounded-lg border border-hairline bg-surface px-4 py-6 text-center text-sm text-danger" role="alert" data-testid="change-list-error" data-code={errorCode ?? undefined}>
           <p>{t([`itsm.change.errors.${errorCode}`, "itsm.change.errors.generic"])}</p>
-          {errorCode === "change_mode_a" && (
+          {errorCode === "change_mode_a" && canLegacy && (
             <RouterAnchor href="/agent/itsm/legacy-changes" className="mt-2 inline-block text-accent hover:underline">
               {t("itsm.change.pages.legacyList")}
             </RouterAnchor>
           )}
         </div>
       ) : onTasks ? (
-        <TaskTable tasks={tasks} />
+        <>
+          <TaskTable tasks={tasks} />
+          {tasksQ.data?.truncated && (
+            <p className="text-xs text-muted" role="status" data-testid="change-tasks-truncated">
+              {t("itsm.change.list.tasksTruncated")}
+            </p>
+          )}
+        </>
       ) : items.length === 0 ? (
         <p className="rounded-lg border border-hairline bg-surface px-4 py-8 text-center text-sm text-muted" data-testid="change-list-empty">
           {t("itsm.change.list.empty")}

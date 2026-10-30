@@ -15,19 +15,23 @@ import { ticketPerms } from "@/lib/ticket";
 import { ChangeRecord } from "./ChangeRecord";
 import { ChangeTypeBadge } from "./ChangeTypeBadge";
 import { RiskBadge } from "./RiskBadge";
-import { changeErrorText, legacyChangesHref, SECTION_CLASS, useChangeRefresh, windowText } from "./changeUi";
+import { changeErrorText, legacyChangesHref, SECTION_CLASS, useChangeRefresh, useChangeStatus, windowText } from "./changeUi";
 
 const PANEL_CLASS = "min-w-0 space-y-3 rounded-lg border border-hairline bg-surface p-3 text-sm";
 
 function ModeAHint({ ticketId }: { ticketId: number }) {
   const { t } = useTranslation();
+  // Without the right to read Znuny changes the link would end in a 403: the hint stays, the link goes.
+  const canLegacy = useChangeStatus().data?.can_see_legacy === true;
   return (
     <section className={PANEL_CLASS} aria-label={t("itsm.change.zoom.title")} data-testid="change-mode-a-hint">
       <h2 className="text-sm font-medium text-ink">{t("itsm.change.zoom.title")}</h2>
       <p className="text-xs text-muted">{t("itsm.change.zoom.modeA")}</p>
-      <RouterAnchor href={legacyChangesHref(ticketId)} className="text-xs text-accent hover:underline" data-testid="change-mode-a-link">
-        {t("itsm.change.zoom.modeALink")}
-      </RouterAnchor>
+      {canLegacy && (
+        <RouterAnchor href={legacyChangesHref(ticketId)} className="text-xs text-accent hover:underline" data-testid="change-mode-a-link">
+          {t("itsm.change.zoom.modeALink")}
+        </RouterAnchor>
+      )}
     </section>
   );
 }

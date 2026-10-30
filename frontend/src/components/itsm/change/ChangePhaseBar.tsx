@@ -11,14 +11,17 @@ import { phaseSteps } from "@/lib/changePhases";
 export function ChangePhaseBar({
   changeType,
   phase,
+  approvalPending = false,
   className,
 }: {
   changeType: ChangeType;
   phase: ChangePhase;
+  /** Emergency post-approval that has not been decided yet: "Freigabe" and "Geplant" were skipped. */
+  approvalPending?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
-  const steps = phaseSteps(changeType, phase);
+  const steps = phaseSteps(changeType, phase, approvalPending);
   return (
     <ol
       className={cn("flex flex-wrap items-center gap-1 text-xs", className)}

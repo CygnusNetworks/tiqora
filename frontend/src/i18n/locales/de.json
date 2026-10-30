@@ -1356,7 +1356,8 @@
     },
     "processLabel": "Prozess starten",
     "fromChange": "Das neue Ticket wird mit dem Change (Ticket #{{id}}) verknüpft.",
-    "changeLinkFailed": "Das Ticket wurde angelegt, konnte aber nicht mit dem Change verknüpft werden."
+    "changeLinkFailed": "Das Ticket wurde angelegt, konnte aber nicht mit dem Change verknüpft werden.",
+    "retryChangeLink": "Verknüpfung erneut versuchen"
   },
   "connection": {
     "live": "Live verbunden",
@@ -1506,8 +1507,8 @@
       "prev": "Voriger Monat",
       "next": "Nächster Monat",
       "truncated": "Es werden nicht alle Wartungsfenster dieses Monats angezeigt.",
-      "unavailable": "Der Wartungskalender ist nicht verfügbar.",
-      "loadError": "Der Wartungskalender konnte nicht geladen werden.",
+      "unavailable": "Die Wartungsfenster sind nicht verfügbar.",
+      "loadError": "Die Wartungsfenster konnten nicht geladen werden.",
       "empty": "In diesem Monat sind keine Wartungsfenster geplant.",
       "noWindow": "Kein Zeitfenster",
       "phases": {
@@ -6186,7 +6187,7 @@
         "attachments": "Anhänge",
         "priority_matrix": "Prioritätsmatrix",
         "service_meta": "Service-Angaben",
-        "changes": "Changes (nur gezählt)",
+        "changes": "Changes (Archiv)",
         "deleted_in_znuny": "In Znuny gelöscht",
         "incident_states": "Vorfallstatus"
       },
@@ -6324,7 +6325,9 @@
         "deleteMessage": "CAB „{{name}}“ löschen?",
         "quorumTooLarge": "Das Quorum ist größer als die Zahl der Mitglieder. Fügen Sie Mitglieder hinzu oder senken Sie die Mindestzahl.",
         "ruleMismatch": "Entscheidungsregel, Mindestzahl und Mitglieder passen nicht zusammen.",
-        "boardSavedOnly": "Name und Regel sind gespeichert, die Mitglieder aber nicht."
+        "boardSavedOnly": "Name und Regel sind gespeichert, die Mitglieder aber nicht.",
+        "memberInvalid": "Ein Mitglied ist ungültig oder existiert nicht mehr.",
+        "membersSavedOnly": "Die Mitglieder sind gespeichert, Name und Regel jedoch nicht."
       },
       "risk": {
         "new": "Neue Frage",
@@ -9667,7 +9670,9 @@
         "cabMeetings": "CAB-Sitzungen",
         "cabMeeting": "CAB-Sitzung",
         "legacyList": "Changes (Znuny)",
-        "legacyDetail": "Znuny-Change"
+        "legacyDetail": "Znuny-Change",
+        "legacyArchive": "Changes (Znuny-Archiv)",
+        "linksLabel": "Weitere Seiten des Change-Managements"
       },
       "list": {
         "create": "Change anlegen",
@@ -9711,7 +9716,8 @@
           "pir": "Nachbetrachtung"
         },
         "windowInvalid": "Das Ende des Zeitfensters darf nicht vor dem Beginn liegen.",
-        "calendar": "Kalender"
+        "calendar": "Kalender",
+        "tasksTruncated": "Es werden nur die ersten 100 Arbeitsaufträge angezeigt."
       },
       "create": {
         "title": "Change anlegen",
@@ -9763,7 +9769,7 @@
         "queue_required": "Bitte wählen Sie eine Queue: Es ist keine Standard-Queue für Changes eingestellt.",
         "queue_not_found": "Die Queue gibt es nicht.",
         "forbidden": "Dafür fehlen Ihnen die Rechte.",
-        "service_not_found": "Einer der Services gibt es nicht mehr.",
+        "service_not_found": "Einen der Services gibt es nicht mehr.",
         "cab_not_found": "Das CAB gibt es nicht.",
         "cab_invalid": "Das CAB ist ungültig.",
         "ci_ref_invalid": "Eine CI-Angabe ist ungültig.",
@@ -9807,7 +9813,7 @@
         "template_duplicate_task_key": "Der Schlüssel „{{key}}“ kommt bei den Aufgaben mehrfach vor.",
         "template_queue_not_found": "Eine gewählte Queue gibt es nicht mehr.",
         "template_priority_not_found": "Die gewählte Priorität gibt es nicht mehr.",
-        "template_service_not_found": "Ein gewählter Service gibt es nicht mehr.",
+        "template_service_not_found": "Einen gewählten Service gibt es nicht mehr.",
         "template_cab_not_found": "Das gewählte CAB gibt es nicht mehr.",
         "template_owner_not_found": "Ein gewählter Besitzer ist ungültig oder gelöscht.",
         "template_risk_answer_invalid": "Eine vorgegebene Antwort der Risikobewertung passt nicht mehr zu den Risikofragen.",
@@ -9976,7 +9982,8 @@
           "operational": "Betriebsbereit",
           "warning": "Warnung",
           "incident": "Störung"
-        }
+        },
+        "computing": "Die Auswirkung wird berechnet …"
       },
       "conflicts": {
         "title": "Konflikte",
@@ -10023,7 +10030,8 @@
         "historyMissing": "Freigabeverlauf nicht mehr vorhanden",
         "none": "Noch keine Freigabe angefordert.",
         "voteHint": "Abstimmen im Abschnitt Freigaben",
-        "defaultEmergencyCab": "Notfall-CAB laut Einstellungen"
+        "defaultEmergencyCab": "Notfall-CAB laut Einstellungen",
+        "meetingsLink": "CAB-Sitzungen ansehen"
       },
       "banners": {
         "ticketClosed": "Das Ticket wurde geschlossen ({{state}}), der Change steht aber noch in der Phase „{{phase}}“. Bitte schließen Sie den Change ab oder brechen Sie ihn ab, oder öffnen Sie das Ticket wieder.",
@@ -10051,7 +10059,7 @@
         "openTicket": "Ticket öffnen"
       },
       "portal": {
-        "label": "Im Kundenportal im Wartungskalender anzeigen",
+        "label": "Im Kundenportal bei den Wartungsfenstern anzeigen",
         "help": "Sobald der Change eingeplant ist, sehen Kunden dort Titel, Zeitfenster und ihre betroffenen Services, aber keine Pläne."
       },
       "incident": {
@@ -10176,7 +10184,8 @@
         "unsaved": "Freigabestand nach dem Speichern sichtbar",
         "position": "Position {{pos}} von {{count}}: {{title}}",
         "dragHandle": "Zum Verschieben ziehen: {{title}}",
-        "blockedLine": "Betroffen ist der Change {{tn}}."
+        "blockedLine": "Betroffen ist der Change {{tn}}.",
+        "noCabs": "Es gibt noch kein CAB. Ein Administrator legt es unter Admin, Change-Management an."
       },
       "legacy": {
         "sourceLive": "Live aus Znuny",
@@ -10229,7 +10238,19 @@
         "ofWorkorder": "am Arbeitsauftrag {{number}}",
         "dynamicFields": "Dynamische Felder",
         "history": "Verlauf",
-        "historyEmpty": "Kein Verlauf vorhanden."
+        "historyEmpty": "Kein Verlauf vorhanden.",
+        "searchScopeLive": "Die Suche erfasst Nummer, Titel, Beschreibung und Begründung (ab drei Zeichen)."
+      },
+      "warnings": {
+        "notFound": "{{kind}} {{ref}} gibt es nicht mehr; die Angabe wurde nicht aus der Vorlage übernommen.",
+        "riskAnswerStale": "Die Antwort der Vorlage auf die Frage „{{question}}“ passt nicht mehr und wurde nicht übernommen.",
+        "kinds": {
+          "queue": "Queue",
+          "priority": "Priorität",
+          "service": "Service",
+          "cab": "CAB",
+          "owner": "Bearbeiter"
+        }
       }
     }
   },

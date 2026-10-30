@@ -7,8 +7,9 @@ import { ApiError } from "@/lib/api";
 import type { ChangeListItem, ChangeTaskListItem } from "@/lib/changeApi";
 import { ChangeListPage } from "./ChangeListPage";
 
-const { list, myTasks, listReferenceServices, navigate } = vi.hoisted(() => ({
+const { list, status, myTasks, listReferenceServices, navigate } = vi.hoisted(() => ({
   list: vi.fn(),
+  status: vi.fn(),
   myTasks: vi.fn(),
   listReferenceServices: vi.fn(),
   navigate: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock("@tanstack/react-router", async () => {
 });
 vi.mock("@/lib/changeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/changeApi")>("@/lib/changeApi");
-  return { ...actual, changeApi: { ...actual.changeApi, list, myTasks } };
+  return { ...actual, changeApi: { ...actual.changeApi, list, status, myTasks } };
 });
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -88,7 +89,10 @@ beforeEach(async () => {
   await i18n.changeLanguage("de");
   navigate.mockReset();
   list.mockReset().mockResolvedValue(page([item(130), item(131, { change_type: "standard", phase: "scheduled", risk_level: null })]));
-  myTasks.mockReset().mockResolvedValue([task(141), task(142, { finished: true, state: "closed successful", task_kind: "backout" })]);
+  status.mockReset().mockResolvedValue({ legacy: "none", can_see_legacy: false, available: true });
+  myTasks
+    .mockReset()
+    .mockResolvedValue({ items: [task(141), task(142, { finished: true, state: "closed successful", task_kind: "backout" })], truncated: false });
   listReferenceServices.mockReset().mockResolvedValue([
     { id: 1, name: "E-Mail" },
     { id: 3, name: "VPN" },
@@ -202,13 +206,39 @@ describe("ChangeListPage", () => {
   });
 
   it("shows the empty and the error state of my tasks", async () => {
-    myTasks.mockResolvedValueOnce([]);
+    myTasks.mockResolvedValueOnce({ items: [], truncated: false });
     renderPage();
     fireEvent.click(await screen.findByRole("tab", { name: "Meine Aufgaben" }));
     expect(await screen.findByTestId("change-tasks-empty")).toHaveTextContent("Keine Aufgaben gefunden.");
     myTasks.mockRejectedValue(new ApiError(409, { detail: { code: "change_mode_a" } }, "x"));
     fireEvent.click(screen.getByTestId("change-list-open-only"));
     expect(await screen.findByTestId("change-list-error")).toHaveAttribute("data-code", "change_mode_a");
+  });
+
+  it("says when only the first tasks are shown", async () => {
+    myTasks.mockResolvedValue({ items: [task(141)], truncated: true });
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: "Meine Aufgaben" }));
+    expect(await screen.findByTestId("change-tasks-truncated")).toHaveTextContent("Es werden nur die ersten 100 Arbeitsaufträge angezeigt.");
+  });
+
+  it("links the calendar and the CAB meetings, and the archive only for an agent who may see it", async () => {
+    renderPage();
+    await screen.findByTestId("change-row-130");
+    expect(screen.getByTestId("change-link-calendar")).toHaveAttribute("href", "/agent/itsm/changes/calendar");
+    expect(screen.getByTestId("change-link-meetings")).toHaveAttribute("href", "/agent/itsm/cab-meetings");
+    expect(screen.queryByTestId("change-link-archive")).toBeNull();
+    cleanup();
+    status.mockResolvedValue({ legacy: "archive", can_see_legacy: true, available: true });
+    renderPage();
+    expect(await screen.findByTestId("change-link-archive")).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+    expect(screen.getByTestId("change-link-archive")).toHaveTextContent("Changes (Znuny-Archiv)");
+    cleanup();
+    status.mockResolvedValue({ legacy: "archive", can_see_legacy: false, available: true });
+    renderPage();
+    await screen.findByTestId("change-link-calendar");
+    await waitFor(() => expect(status).toHaveBeenCalledTimes(3));
+    expect(screen.queryByTestId("change-link-archive")).toBeNull();
   });
 
   it("pages through the list", async () => {
@@ -231,7 +261,15 @@ describe("ChangeListPage", () => {
     renderPage();
     const error = await screen.findByTestId("change-list-error");
     expect(error).toHaveTextContent("im Modus A nicht verfügbar");
-    expect(error.querySelector("a")).toHaveAttribute("href", "/agent/itsm/legacy-changes");
+    expect(error.querySelector("a")).toBeNull();
+  });
+
+  it("links the Znuny changes in Mode A only for an agent who may see them", async () => {
+    status.mockResolvedValue({ legacy: "live", can_see_legacy: true, available: false });
+    list.mockRejectedValue(new ApiError(409, { detail: { code: "change_mode_a" } }, "x"));
+    renderPage();
+    const error = await screen.findByTestId("change-list-error");
+    await waitFor(() => expect(error.querySelector("a")).toHaveAttribute("href", "/agent/itsm/legacy-changes"));
   });
 
   it("opens the new change after the dialog reports it", async () => {

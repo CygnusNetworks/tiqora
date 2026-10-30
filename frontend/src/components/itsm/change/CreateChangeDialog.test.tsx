@@ -181,11 +181,38 @@ describe("CreateChangeDialog", () => {
     update.mockResolvedValue({ ticket_id: 140, tn: "20261012140", portal_visible: true });
     renderDialog();
     fillTitle("Router tauschen");
-    expect(screen.getByText("Im Kundenportal im Wartungskalender anzeigen")).toBeInTheDocument();
+    expect(screen.getByText("Im Kundenportal bei den Wartungsfenstern anzeigen")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("change-create-portal"));
     fireEvent.click(screen.getByTestId("change-create-submit"));
     await waitFor(() => expect(update).toHaveBeenCalledWith(140, { portal_visible: true }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(140));
+  });
+
+  it("does not overwrite a portal choice the agent already made when a template is picked", async () => {
+    templates.mockResolvedValue([template(1, "Server-Wartung", { defaults: { portal_visible: false } })]);
+    renderDialog();
+    await screen.findByTestId("change-create-form");
+    fireEvent.click(screen.getByTestId("change-create-portal"));
+    expect(screen.getByTestId("change-create-portal")).toBeChecked();
+    fireEvent.click(screen.getByTestId("change-create-template"));
+    fireEvent.click(await screen.findByTestId("change-create-template-menu-option-1"));
+    expect(screen.getByTestId("change-create-portal")).toBeChecked();
+  });
+
+  it("drops a service of the template that no longer exists and says so", async () => {
+    templates.mockResolvedValue([template(1, "Server-Wartung", { defaults: { portal_visible: false, service_ids: [2, 99] } })]);
+    renderDialog();
+    await screen.findByTestId("change-create-form");
+    await waitFor(() => expect(listReferenceServices).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("change-create-template"));
+    fireEvent.click(await screen.findByTestId("change-create-template-menu-option-1"));
+    await waitFor(() => expect(screen.getByTestId("change-create-services")).toHaveTextContent("VPN"));
+    expect(screen.getByTestId("change-create-services")).not.toHaveTextContent("99");
+    expect(screen.getByTestId("change-create-template-notes")).toHaveTextContent("Service 99 gibt es nicht mehr");
+    fillTitle("Wartung");
+    fireEvent.click(screen.getByTestId("change-create-submit"));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0]).toMatchObject({ service_id: 2, service_ids: [] });
   });
 
   it("takes the portal default from the template and sends nothing extra when it is kept", async () => {

@@ -487,3 +487,50 @@ test.describe("CAB meeting", () => {
     await expect(page.getByTestId("cab-agenda-hidden")).toBeVisible();
   });
 });
+
+test.describe("agent change screens at phone width", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  // The screen itself must not grow past the viewport or scroll sideways; wide tables scroll inside their
+  // own box. (The shell's header controls are not the change screens' business: measure their root.)
+  async function fits(page: Page, rootTestId: string) {
+    const root = page.getByTestId(rootTestId);
+    await expect(root).toBeVisible();
+    const m = await root.evaluate((el) => ({ scroll: el.scrollWidth - el.clientWidth, right: el.getBoundingClientRect().right, vw: document.documentElement.clientWidth }));
+    expect(m.scroll).toBeLessThanOrEqual(0);
+    expect(m.right).toBeLessThanOrEqual(m.vw);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await mockApi(page);
+    await useGermanUi(page);
+    await page.clock.setFixedTime(new Date("2026-10-12T08:00:00Z"));
+    await loginAsAgent(page);
+  });
+
+  test("list, detail, calendar and CAB meetings stay inside the viewport", async ({ page }) => {
+    await page.goto("/agent/itsm/changes");
+    await expect(page.getByTestId("change-list-table")).toBeVisible();
+    await expect(page.getByTestId("change-link-row")).toBeVisible();
+    await fits(page, "changeListPage");
+
+    await page.goto("/agent/itsm/changes/130");
+    await expect(page.getByTestId("change-record")).toBeVisible();
+    await expect(page.getByTestId("change-events")).toBeVisible();
+    await fits(page, "changeDetailPage");
+
+    await page.goto("/agent/itsm/changes/calendar");
+    await expect(page.getByTestId("change-calendar-legend")).toBeVisible();
+    await fits(page, "changeCalendarPage");
+    await page.getByRole("tab", { name: "Woche" }).click();
+    await expect(page.getByTestId("change-calendar-week")).toBeVisible();
+    await fits(page, "changeCalendarPage");
+    await page.getByRole("tab", { name: "Nach Service" }).click();
+    await expect(page.getByTestId("change-calendar-services")).toBeVisible();
+    await fits(page, "changeCalendarPage");
+
+    await page.goto("/agent/itsm/cab-meetings");
+    await expect(page.getByTestId("cab-meeting-1")).toBeVisible();
+    await fits(page, "cabMeetingsPage");
+  });
+});

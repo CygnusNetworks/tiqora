@@ -636,7 +636,7 @@ Wo Sie was finden:
   Liste der Znuny-Changes.
 - **Change-Seite** (`/agent/itsm/changes/<Ticket-ID>`): Phasenleiste, Schaltflächen für den nächsten
   Schritt, „Pläne und Zeitfenster“, „Freigabe (CAB)“ mit der Abstimmung, „Risikobewertung“,
-  „Auswirkung“, „Konflikte“, „Change-Aufgaben“, „Im Kundenportal im Wartungskalender anzeigen“ und
+  „Auswirkung“, „Konflikte“, „Change-Aufgaben“, „Im Kundenportal bei den Wartungsfenstern anzeigen“ und
   „Verlauf des Changes“.
 - **Ticket-Zoom**: Block „Change“ mit denselben Abschnitten in schmaler Form (ohne Verlauf; die
   Abstimmung steht dort im Block „Freigaben“ des Tickets) und „Change-Seite öffnen“. Ein Ticket vom
@@ -1045,7 +1045,7 @@ Change erstellen“ an (siehe oben). Die Auswirkung zeigt offene Incidents auf d
 
 Die Seite **„Wartungsfenster“** (`/portal/change-schedule`) zeigt Kunden geplante Changes ihrer
 Services. Sie ist **aus** (`portal_schedule_enabled`), und nur Changes mit dem Schalter „Im
-Kundenportal im Wartungskalender anzeigen“ (auf der Change-Seite und beim Anlegen; in Vorlagen als
+Kundenportal bei den Wartungsfenstern anzeigen“ (auf der Change-Seite und beim Anlegen; in Vorlagen als
 Vorgabe) erscheinen, in den Phasen Geplant, Umsetzung und Abgeschlossen, wenn ihr Zeitfenster den
 Monat berührt und sie mindestens einen Service betreffen, der dem Kunden zugeordnet ist (direkt oder
 über die CMDB; Zuordnung wie in Znunys `TicketServiceList`, also auch die Vorgabe-Services
@@ -1086,8 +1086,9 @@ Arbeitsaufträgen ab ([itsm-import.md](itsm-import.md), „Change-Verwaltung: Sc
   ITSMChangeManagement installiert ist. Jeder Lauf aktualisiert nur, was sich geändert hat; Changes, die
   in Znuny gelöscht wurden, bleiben im Archiv. Change-Vorlagen, Bedingungen und Benachrichtigungsregeln
   werden nicht übernommen, nur gezählt. Die Seitenleiste führt in Modus B zu den Tiqora-Changes; das
-  Archiv öffnen Sie unter `/agent/itsm/legacy-changes` (einen eigenen Menüpunkt gibt es dafür noch
-  nicht).
+  Archiv öffnen Sie über den Link „Changes (Znuny-Archiv)“ unter der Überschrift der Change-Liste, des
+  Change-Kalenders und der CAB-Sitzungen (nur für Agenten, die Znuny-Changes sehen dürfen), oder unter
+  `/agent/itsm/legacy-changes`.
 - **Wer sie sieht.** Agenten mit `ro` in der Gruppe `legacy_change_group` (Vorgabe `itsm-change`, wie
   Znunys Change-Masken) und Administratoren; gibt es die Gruppe nicht (mehr), auch die Change-Manager.
   Verknüpfte Tickets ohne Leserecht und CIs einer Klasse ohne Leserecht fehlen; ein archiviertes CI, das

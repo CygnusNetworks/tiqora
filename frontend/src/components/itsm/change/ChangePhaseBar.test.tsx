@@ -31,6 +31,11 @@ describe("ChangePhaseBar", () => {
     expect(within(bar).getByText("Bewertung")).toHaveAttribute("aria-current", "step");
   });
 
+  it("does not draw the skipped approval steps as done for an emergency post-approval", () => {
+    expect(phaseSteps("emergency", "implementing", true).map((s) => s.state)).toEqual(["done", "upcoming", "upcoming", "current", "upcoming", "upcoming"]);
+    expect(phaseSteps("emergency", "implementing").map((s) => s.state)).toEqual(["done", "done", "done", "current", "upcoming", "upcoming"]);
+  });
+
   it("skips submission and assessment for a standard change", () => {
     const bar = renderBar("standard", "draft");
     expect(labels(bar)).toEqual(["Entwurf", "Geplant", "Umsetzung", "Abgeschlossen"]);

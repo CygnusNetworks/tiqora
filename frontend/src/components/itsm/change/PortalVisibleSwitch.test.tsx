@@ -20,7 +20,7 @@ describe("PortalVisibleSwitch", () => {
   it("shows the change in the portal's maintenance schedule when switched on", async () => {
     update.mockResolvedValue(makeChange({ portal_visible: true }));
     renderWithClient(<PortalVisibleSwitch change={makeChange({ portal_visible: false })} />);
-    expect(screen.getByTestId("change-portal-visible")).toHaveTextContent("Im Kundenportal im Wartungskalender anzeigen");
+    expect(screen.getByTestId("change-portal-visible")).toHaveTextContent("Im Kundenportal bei den Wartungsfenstern anzeigen");
     const toggle = screen.getByTestId("change-portal-visible-switch");
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);

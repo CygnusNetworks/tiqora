@@ -4,8 +4,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { MonthGrid } from "@/components/agent/calendar/MonthGrid";
 import { CalendarConflictMark } from "@/components/itsm/change/CalendarConflictMark";
+import { ChangeLinkRow } from "@/components/itsm/change/ChangeLinkRow";
 import { ChangeServiceTable } from "@/components/itsm/change/ChangeServiceTable";
 import { ChangeWeekList } from "@/components/itsm/change/ChangeWeekList";
+import { useChangeStatus } from "@/components/itsm/change/changeUi";
 import { Button } from "@/components/ui/Button";
 import { RouterAnchor } from "@/components/ui/RouterAnchor";
 import { SelectField } from "@/components/ui/SelectField";
@@ -92,6 +94,7 @@ export function ChangeCalendarPage() {
 
   const active = view === "service" ? svcQ : calQ;
   const errorCode = active.isError ? changeErrorCode(active.error) : null;
+  const canLegacy = useChangeStatus().data?.can_see_legacy === true;
   const changes = useMemo(() => calQ.data?.changes ?? [], [calQ.data]);
   const freezes = useMemo(() => calQ.data?.freezes ?? [], [calQ.data]);
   const occurrences = useMemo(() => changeOccurrences(changes), [changes]);
@@ -118,10 +121,8 @@ export function ChangeCalendarPage() {
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-3 px-4 py-6" data-testid="changeCalendarPage">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-xl font-semibold text-ink">{t("itsm.change.pages.calendar")}</h1>
-        <RouterAnchor href="/agent/itsm/changes" className="text-sm text-accent hover:underline" data-testid="change-calendar-list-link">
-          {t("itsm.change.pages.list")}
-        </RouterAnchor>
       </div>
+      <ChangeLinkRow current="calendar" />
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs
@@ -171,7 +172,7 @@ export function ChangeCalendarPage() {
       {active.isError && !hasData ? (
         <div className="rounded-lg border border-hairline bg-surface px-4 py-6 text-center text-sm text-danger" role="alert" data-testid="change-calendar-error" data-code={errorCode ?? undefined}>
           <p>{t([`itsm.change.errors.${errorCode}`, "itsm.change.errors.generic"])}</p>
-          {errorCode === "change_mode_a" && (
+          {errorCode === "change_mode_a" && canLegacy && (
             <RouterAnchor href="/agent/itsm/legacy-changes" className="mt-2 inline-block text-accent hover:underline">
               {t("itsm.change.pages.legacyList")}
             </RouterAnchor>
