@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from sqlalchemy import Integer, column, table
 
 from tests import _cmdb_helpers
@@ -32,6 +33,8 @@ from tiqora.reporting.scope import available_sources, source_available
 from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource, active_sources
 from tiqora.reporting.settings import ReportingSettings
 from tiqora.reporting.sources._common import col, measure
+
+pytestmark = pytest.mark.db
 
 cmdb_db = _cmdb_helpers.cmdb_db
 _cmdb_rows_reset = _cmdb_helpers._cmdb_rows_reset
