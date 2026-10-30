@@ -3858,7 +3858,8 @@
       "rollbackTitle": "ロールバックの確認",
       "rollbackBody": "ジョブ #{{id}} のバックアップを復元しますか？現在の状態は上書きされます。",
       "purgeTitle": "バックアップを永久に消去する",
-      "purgeBody": "ジョブ #{{id}} のバックアップを完全に削除しますか？ロールバックはできなくなります。"
+      "purgeBody": "ジョブ #{{id}} のバックアップを完全に削除しますか？ロールバックはできなくなります。",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "設定とページを検索",

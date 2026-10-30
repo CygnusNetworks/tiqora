@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Kinnitage tagasivõtmine",
       "rollbackBody": "Kas taastada töö #{{id}} varukoopia? Praegune olek kirjutatakse üle.",
       "purgeTitle": "Tühjendage varukoopia jäädavalt",
-      "purgeBody": "Kas kustutada töö #{{id}} varukoopia jäädavalt? Tagasivõtmine ei ole enam võimalik."
+      "purgeBody": "Kas kustutada töö #{{id}} varukoopia jäädavalt? Tagasivõtmine ei ole enam võimalik.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Otsinguseaded ja lehed",

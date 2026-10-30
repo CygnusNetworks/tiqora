@@ -192,6 +192,21 @@ describe("GdprPage", () => {
     searchReferenceCustomers.mockResolvedValue([]);
   });
 
+  it("shows a changed change-archive key as a warning, not as a count", async () => {
+    getJob.mockResolvedValue({
+      ...(await listJobs()).items[0],
+      counts_parsed: { customer_user: 2, legacy_archive_key_changed: 1 },
+      resolved_logins_parsed: ["x"],
+      selector_parsed: { logins: ["x"] },
+    });
+    renderPage();
+    fireEvent.click(screen.getByTestId("gdpr-tab-jobs"));
+    fireEvent.click(await screen.findByTestId("gdpr-job-id-7"));
+    expect(await screen.findByTestId("gdpr-job-archive-key-changed")).toHaveTextContent("The key of the change archive was changed.");
+    expect(screen.queryByText("legacy_archive_key_changed")).toBeNull();
+    expect(screen.getByText("customer_user")).toBeInTheDocument();
+  });
+
   it("previews resolved customers and affected counts", async () => {
     renderPage();
 

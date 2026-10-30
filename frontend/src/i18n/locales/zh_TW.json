@@ -3850,7 +3850,8 @@
       "rollbackTitle": "確認回滾",
       "rollbackBody": "恢復作業 #{{id}} 的備份？當前狀態將被覆蓋。",
       "purgeTitle": "永久清除備份",
-      "purgeBody": "永久刪除作業 #{{id}} 的備份？回滾將不再可能。"
+      "purgeBody": "永久刪除作業 #{{id}} 的備份？回滾將不再可能。",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "搜尋設定和頁面",

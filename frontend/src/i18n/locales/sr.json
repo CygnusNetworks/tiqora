@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Потврдите враћање",
       "rollbackBody": "Вратити резервну копију за посао #{{id}}? Тренутно стање ће бити замењено.",
       "purgeTitle": "Трајно очисти резервну копију",
-      "purgeBody": "Трајно избрисати резервну копију за посао #{{id}}? Враћање више неће бити могуће."
+      "purgeBody": "Трајно избрисати резервну копију за посао #{{id}}? Враћање више неће бити могуће.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Претражи подешавања и странице",

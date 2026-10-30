@@ -3850,7 +3850,8 @@
       "rollbackTitle": "रोलबैक की पुष्टि करें",
       "rollbackBody": "कार्य #{{id}} के लिए बैकअप पुनर्स्थापित करें? वर्तमान स्थिति को अधिलेखित कर दिया जाएगा.",
       "purgeTitle": "बैकअप को स्थायी रूप से शुद्ध करें",
-      "purgeBody": "नौकरी #{{id}} के लिए बैकअप को स्थायी रूप से हटाएं? रोलबैक अब संभव नहीं होगा."
+      "purgeBody": "नौकरी #{{id}} के लिए बैकअप को स्थायी रूप से हटाएं? रोलबैक अब संभव नहीं होगा.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "खोज सेटिंग और पेज",

@@ -29,6 +29,8 @@ import { cn } from "@/lib/cn";
 const JOBS_KEY = ["admin", "gdpr", "jobs"] as const;
 const DELETE_CONFIRM_WORD = "LÖSCHEN";
 const LIVE_COUNT_HIGH_THRESHOLD = 1000;
+/** Count key of an erasure job that ran while the change archive key was changed (a warning, not a number). */
+const ARCHIVE_KEY_CHANGED = "legacy_archive_key_changed";
 
 export type GdprSearch = {
   /** Comma-separated customer_user logins prefilled from bulk selection. */
@@ -1653,9 +1655,16 @@ export function GdprPage() {
                   ? JSON.stringify(jobDetailQ.data.selector_parsed, null, 2)
                   : selectedJob?.selector}
               </pre>
+              {jobDetailQ.data?.counts_parsed?.[ARCHIVE_KEY_CHANGED] ? (
+                <p className="mt-2 rounded border border-escalation/30 bg-escalation/10 px-3 py-2 text-xs text-ink" role="status" data-testid="gdpr-job-archive-key-changed">
+                  {t("admin.gdpr.legacyArchiveKeyChanged")}
+                </p>
+              ) : null}
               {jobDetailQ.data?.counts_parsed && (
                 <dl className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-4">
-                  {Object.entries(jobDetailQ.data.counts_parsed).map(([k, v]) => (
+                  {Object.entries(jobDetailQ.data.counts_parsed)
+                    .filter(([k]) => k !== ARCHIVE_KEY_CHANGED)
+                    .map(([k, v]) => (
                     <div key={k}>
                       <dt className="font-mono text-[10px] text-muted">{k}</dt>
                       <dd className="font-mono text-sm">{v}</dd>

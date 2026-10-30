@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Geri almayı onayla",
       "rollbackBody": "{{id}} numaralı işin yedeği geri yüklensin mi? Mevcut durumun üzerine yazılacaktır.",
       "purgeTitle": "Yedeklemeyi kalıcı olarak temizle",
-      "purgeBody": "{{id}} numaralı işin yedeği kalıcı olarak silinsin mi? Geri alma artık mümkün olmayacak."
+      "purgeBody": "{{id}} numaralı işin yedeği kalıcı olarak silinsin mi? Geri alma artık mümkün olmayacak.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Arama ayarları ve sayfaları",

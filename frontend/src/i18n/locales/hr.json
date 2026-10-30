@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Potvrdite vraćanje",
       "rollbackBody": "Vratiti sigurnosnu kopiju za posao #{{id}}? Trenutno stanje će biti prebrisano.",
       "purgeTitle": "Trajno očisti sigurnosnu kopiju",
-      "purgeBody": "Trajno izbrisati sigurnosnu kopiju za posao #{{id}}? Vraćanje više neće biti moguće."
+      "purgeBody": "Trajno izbrisati sigurnosnu kopiju za posao #{{id}}? Vraćanje više neće biti moguće.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Postavke pretraživanja i stranice",

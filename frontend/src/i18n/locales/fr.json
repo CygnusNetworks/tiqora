@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmer la restauration",
       "rollbackBody": "Restaurer la sauvegarde pour la tâche n°{{id}} ? L'état actuel sera écrasé.",
       "purgeTitle": "Purger définitivement la sauvegarde",
-      "purgeBody": "Supprimer définitivement la sauvegarde du travail n°{{id}} ? Le retour en arrière ne sera plus possible."
+      "purgeBody": "Supprimer définitivement la sauvegarde du travail n°{{id}} ? Le retour en arrière ne sera plus possible.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Paramètres et pages de recherche",

@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmeu la recuperació",
       "rollbackBody": "Restaurar la còpia de seguretat de la tasca núm. {{id}}? L'estat actual es sobreescriurà.",
       "purgeTitle": "Purga permanentment la còpia de seguretat",
-      "purgeBody": "Vols suprimir permanentment la còpia de seguretat de la tasca núm. {{id}}? La recuperació ja no serà possible."
+      "purgeBody": "Vols suprimir permanentment la còpia de seguretat de la tasca núm. {{id}}? La recuperació ja no serà possible.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Configuració de cerca i pàgines",

@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Potrdite povrnitev nazaj",
       "rollbackBody": "Obnoviti varnostno kopijo za opravilo #{{id}}? Trenutno stanje bo prepisano.",
       "purgeTitle": "Trajno počisti varnostno kopijo",
-      "purgeBody": "Trajno izbrisati varnostno kopijo za opravilo #{{id}}? Povratek ne bo več mogoč."
+      "purgeBody": "Trajno izbrisati varnostno kopijo za opravilo #{{id}}? Povratek ne bo več mogoč.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Nastavitve iskanja in strani",

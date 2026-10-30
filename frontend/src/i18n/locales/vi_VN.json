@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Xác nhận khôi phục",
       "rollbackBody": "Khôi phục bản sao lưu cho công việc #{{id}}? Trạng thái hiện tại sẽ bị ghi đè.",
       "purgeTitle": "Xóa vĩnh viễn bản sao lưu",
-      "purgeBody": "Xóa vĩnh viễn bản sao lưu cho công việc #{{id}}? Rollback sẽ không thể thực hiện được nữa."
+      "purgeBody": "Xóa vĩnh viễn bản sao lưu cho công việc #{{id}}? Rollback sẽ không thể thực hiện được nữa.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Cài đặt và trang tìm kiếm",

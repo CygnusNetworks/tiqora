@@ -3850,7 +3850,8 @@
       "rollbackTitle": "ยืนยันการย้อนกลับ",
       "rollbackBody": "คืนค่าการสำรองข้อมูลสำหรับงาน #{{id}} หรือไม่ สถานะปัจจุบันจะถูกเขียนทับ",
       "purgeTitle": "ล้างข้อมูลสำรองอย่างถาวร",
-      "purgeBody": "ลบข้อมูลสำรองสำหรับงาน #{{id}} อย่างถาวรหรือไม่ การย้อนกลับจะไม่สามารถทำได้อีกต่อไป"
+      "purgeBody": "ลบข้อมูลสำรองสำหรับงาน #{{id}} อย่างถาวรหรือไม่ การย้อนกลับจะไม่สามารถทำได้อีกต่อไป",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "การตั้งค่าการค้นหาและหน้า",

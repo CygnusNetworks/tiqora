@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Επιβεβαίωση επαναφοράς",
       "rollbackBody": "Επαναφορά αντιγράφου ασφαλείας για την εργασία #{{id}}; Η τρέχουσα κατάσταση θα αντικατασταθεί.",
       "purgeTitle": "Μόνιμη εκκαθάριση του αντιγράφου ασφαλείας",
-      "purgeBody": "Να διαγραφεί οριστικά το αντίγραφο ασφαλείας για την εργασία #{{id}}; Η επαναφορά δεν θα είναι πλέον δυνατή."
+      "purgeBody": "Να διαγραφεί οριστικά το αντίγραφο ασφαλείας για την εργασία #{{id}}; Η επαναφορά δεν θα είναι πλέον δυνατή.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Ρυθμίσεις και σελίδες αναζήτησης",

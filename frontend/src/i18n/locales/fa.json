@@ -3850,7 +3850,8 @@
       "rollbackTitle": "بازگشت به عقب را تأیید کنید",
       "rollbackBody": "پشتیبان‌گیری برای شغل #{{id}} بازیابی شود؟ وضعیت فعلی بازنویسی خواهد شد.",
       "purgeTitle": "بک آپ را برای همیشه پاک کنید",
-      "purgeBody": "پشتیبان‌گیری برای شغل #{{id}} برای همیشه حذف شود؟ بازگشت دوباره امکان پذیر نخواهد بود."
+      "purgeBody": "پشتیبان‌گیری برای شغل #{{id}} برای همیشه حذف شود؟ بازگشت دوباره امکان پذیر نخواهد بود.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "تنظیمات و صفحات جستجو",

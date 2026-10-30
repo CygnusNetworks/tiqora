@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Bekräfta återställning",
       "rollbackBody": "Återställa backup för jobb #{{id}}? Nuvarande tillstånd skrivs över.",
       "purgeTitle": "Rensa backup permanent",
-      "purgeBody": "Permanent radera backup för jobb #{{id}}? Återställning blir inte längre möjlig."
+      "purgeBody": "Permanent radera backup för jobb #{{id}}? Återställning blir inte längre möjlig.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Sök inställningar och sidor",

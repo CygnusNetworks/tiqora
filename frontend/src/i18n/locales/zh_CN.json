@@ -3850,7 +3850,8 @@
       "rollbackTitle": "确认回滚",
       "rollbackBody": "恢复作业 #{{id}} 的备份？当前状态将被覆盖。",
       "purgeTitle": "永久清除备份",
-      "purgeBody": "永久删除作业 #{{id}} 的备份？回滚将不再可能。"
+      "purgeBody": "永久删除作业 #{{id}} 的备份？回滚将不再可能。",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "搜索设置和页面",

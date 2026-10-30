@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Подтвердить откат",
       "rollbackBody": "Восстановить резервную копию задания № {{id}}? Текущее состояние будет перезаписано.",
       "purgeTitle": "Полностью очистить резервную копию",
-      "purgeBody": "Удалить резервную копию задания #{{id}} навсегда? Откат уже будет невозможен."
+      "purgeBody": "Удалить резервную копию задания #{{id}} навсегда? Откат уже будет невозможен.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Настройки поиска и страницы",

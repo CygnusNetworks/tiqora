@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmați rollback",
       "rollbackBody": "Restabiliți backup pentru jobul #{{id}}? Starea actuală va fi suprascrisă.",
       "purgeTitle": "Ștergeți permanent backupul",
-      "purgeBody": "Ștergeți definitiv backupul pentru jobul #{{id}}? Rollback nu va mai fi posibil."
+      "purgeBody": "Ștergeți definitiv backupul pentru jobul #{{id}}? Rollback nu va mai fi posibil.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Căutați setări și pagini",

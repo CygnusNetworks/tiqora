@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Потвърдете връщане назад",
       "rollbackBody": "Възстановяване на резервно копие за задача #{{id}}? Текущото състояние ще бъде презаписано.",
       "purgeTitle": "Перманентно изчистване на архива",
-      "purgeBody": "Изтриване за постоянно на резервно копие за задача #{{id}}? Връщане назад вече няма да е възможно."
+      "purgeBody": "Изтриване за постоянно на резервно копие за задача #{{id}}? Връщане назад вече няма да е възможно.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Настройки за търсене и страници",

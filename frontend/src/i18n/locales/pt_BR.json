@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmar reversão",
       "rollbackBody": "Restaurar o backup do job #{{id}}? O estado atual será sobrescrito.",
       "purgeTitle": "Eliminar backup permanentemente",
-      "purgeBody": "Excluir permanentemente o backup do job #{{id}}? A reversão não será mais possível."
+      "purgeBody": "Excluir permanentemente o backup do job #{{id}}? A reversão não será mais possível.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Pesquisar configurações e páginas",

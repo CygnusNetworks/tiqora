@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Vahvista palautus",
       "rollbackBody": "Palautetaanko työn #{{id}} varmuuskopio? Nykyinen tila korvataan.",
       "purgeTitle": "Tyhjennä varmuuskopio pysyvästi",
-      "purgeBody": "Poistetaanko työn #{{id}} varmuuskopio pysyvästi? Palautus ei ole enää mahdollista."
+      "purgeBody": "Poistetaanko työn #{{id}} varmuuskopio pysyvästi? Palautus ei ole enää mahdollista.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Hakuasetukset ja sivut",

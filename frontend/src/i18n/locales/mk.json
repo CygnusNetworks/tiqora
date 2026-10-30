@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Потврдете враќање назад",
       "rollbackBody": "Да се врати резервната копија за работа #{{id}}? Сегашната состојба ќе биде препишана.",
       "purgeTitle": "Трајно исчистете ја резервната копија",
-      "purgeBody": "Трајно да се избрише резервната копија за работата #{{id}}? Враќањето повеќе нема да биде можно."
+      "purgeBody": "Трајно да се избрише резервната копија за работата #{{id}}? Враќањето повеќе нема да биде можно.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Поставки за пребарување и страници",

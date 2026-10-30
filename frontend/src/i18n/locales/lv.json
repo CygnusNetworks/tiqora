@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Apstipriniet atcelšanu",
       "rollbackBody": "Vai atjaunot dublējumu darbam #{{id}}? Pašreizējais stāvoklis tiks pārrakstīts.",
       "purgeTitle": "Neatgriezeniski iztīrīt dublējumu",
-      "purgeBody": "Vai neatgriezeniski dzēst dublējumu darbam #{{id}}? Atcelšana vairs nebūs iespējama."
+      "purgeBody": "Vai neatgriezeniski dzēst dublējumu darbam #{{id}}? Atcelšana vairs nebūs iespējama.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Meklēšanas iestatījumi un lapas",

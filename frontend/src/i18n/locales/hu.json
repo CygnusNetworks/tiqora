@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Visszaállítás megerősítése",
       "rollbackBody": "Visszaállítja a biztonsági másolatot a #{{id}} feladathoz? A jelenlegi állapot felülíródik.",
       "purgeTitle": "A biztonsági mentés végleges törlése",
-      "purgeBody": "Véglegesen törli a #{{id}} feladat biztonsági másolatát? A visszaállítás többé nem lesz lehetséges."
+      "purgeBody": "Véglegesen törli a #{{id}} feladat biztonsági másolatát? A visszaállítás többé nem lesz lehetséges.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Keresési beállítások és oldalak",

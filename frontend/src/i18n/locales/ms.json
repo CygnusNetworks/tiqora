@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Sahkan gulung semula",
       "rollbackBody": "Pulihkan sandaran untuk kerja #{{id}}? Keadaan semasa akan ditimpa.",
       "purgeTitle": "Bersihkan sandaran secara kekal",
-      "purgeBody": "Padamkan sandaran untuk kerja #{{id}} secara kekal? Rollback tidak akan dapat dilakukan lagi."
+      "purgeBody": "Padamkan sandaran untuk kerja #{{id}} secara kekal? Rollback tidak akan dapat dilakukan lagi.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Tetapan & halaman carian",

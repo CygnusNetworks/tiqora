@@ -3858,7 +3858,8 @@
       "rollbackTitle": "Rollback bestätigen",
       "rollbackBody": "Backup von Auftrag #{{id}} wiederherstellen? Der aktuelle Zustand wird überschrieben.",
       "purgeTitle": "Backup unwiderruflich löschen",
-      "purgeBody": "Backup von Auftrag #{{id}} endgültig löschen? Rollback ist danach nicht mehr möglich."
+      "purgeBody": "Backup von Auftrag #{{id}} endgültig löschen? Rollback ist danach nicht mehr möglich.",
+      "legacyArchiveKeyChanged": "Der Schlüssel für das Change-Archiv wurde geändert. Die Löschung ist erfolgt, weitere Archivläufe bleiben aber gesperrt. Details finden Sie in der Betriebsdokumentation."
     },
     "commandPalette": {
       "title": "Einstellungen & Seiten suchen",

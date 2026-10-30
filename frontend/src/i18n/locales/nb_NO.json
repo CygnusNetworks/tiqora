@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Bekreft tilbakeføring",
       "rollbackBody": "Gjenopprette sikkerhetskopi for jobb #{{id}}? Den nåværende tilstanden vil bli overskrevet.",
       "purgeTitle": "Tøm sikkerhetskopien permanent",
-      "purgeBody": "Vil du slette sikkerhetskopien for jobb #{{id}} permanent? Tilbakeføring vil ikke lenger være mulig."
+      "purgeBody": "Vil du slette sikkerhetskopien for jobb #{{id}} permanent? Tilbakeføring vil ikke lenger være mulig.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Søkeinnstillinger og sider",

@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Konfirmasikan pengembalian",
       "rollbackBody": "Pulihkan cadangan untuk pekerjaan #{{id}}? Keadaan saat ini akan ditimpa.",
       "purgeTitle": "Hapus cadangan secara permanen",
-      "purgeBody": "Hapus cadangan untuk pekerjaan #{{id}} secara permanen? Rollback tidak dapat dilakukan lagi."
+      "purgeBody": "Hapus cadangan untuk pekerjaan #{{id}} secara permanen? Rollback tidak dapat dilakukan lagi.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Pengaturan & halaman pencarian",

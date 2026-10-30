@@ -3850,7 +3850,8 @@
       "rollbackTitle": "롤백 확인",
       "rollbackBody": "작업 #{{id}}의 백업을 복원하시겠습니까? 현재 상태를 덮어씁니다.",
       "purgeTitle": "백업을 영구적으로 제거",
-      "purgeBody": "작업 #{{id}}의 백업을 영구적으로 삭제하시겠습니까? 더 이상 롤백이 불가능합니다."
+      "purgeBody": "작업 #{{id}}의 백업을 영구적으로 삭제하시겠습니까? 더 이상 롤백이 불가능합니다.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "검색 설정 및 페이지",

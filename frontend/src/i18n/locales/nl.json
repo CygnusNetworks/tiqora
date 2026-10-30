@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Bevestigen het terugdraaien",
       "rollbackBody": "Back-up voor taak #{{id}} herstellen? De huidige status wordt overschreven.",
       "purgeTitle": "Back-up permanent opschonen",
-      "purgeBody": "Back-up voor taak #{{id}} permanent verwijderen? Terugdraaien zal niet meer mogelijk zijn."
+      "purgeBody": "Back-up voor taak #{{id}} permanent verwijderen? Terugdraaien zal niet meer mogelijk zijn.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Zoekinstellingen en pagina's",

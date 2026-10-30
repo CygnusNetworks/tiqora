@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmar a recuperación",
       "rollbackBody": "Queres restaurar a copia de seguranza do traballo #{{id}}? O estado actual sobrescribirase.",
       "purgeTitle": "Borra permanentemente a copia de seguranza",
-      "purgeBody": "Queres eliminar permanentemente a copia de seguranza do traballo #{{id}}? Xa non será posible a recuperación."
+      "purgeBody": "Queres eliminar permanentemente a copia de seguranza do traballo #{{id}}? Xa non será posible a recuperación.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Configuración de busca e páxinas",

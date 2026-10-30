@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Potvrdit rollback",
       "rollbackBody": "Obnovit zálohu úlohy #{{id}}? Aktuální stav bude přepsán.",
       "purgeTitle": "Trvale smazat zálohu",
-      "purgeBody": "Trvale smazat zálohu úlohy #{{id}}? Rollback už nebude možný."
+      "purgeBody": "Trvale smazat zálohu úlohy #{{id}}? Rollback už nebude možný.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Hledat nastavení a stránky",

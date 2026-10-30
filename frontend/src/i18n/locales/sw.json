@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Thibitisha urejeshaji",
       "rollbackBody": "Ungependa kurejesha nakala ya kazi #{{id}}? Hali ya sasa itafutwa.",
       "purgeTitle": "Futa nakala rudufu kabisa",
-      "purgeBody": "Je, ungependa kufuta kabisa nakala rudufu ya kazi #{{id}}? Urejeshaji hautawezekana tena."
+      "purgeBody": "Je, ungependa kufuta kabisa nakala rudufu ya kazi #{{id}}? Urejeshaji hautawezekana tena.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Tafuta mipangilio na kurasa",

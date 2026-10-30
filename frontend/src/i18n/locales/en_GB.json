@@ -3858,7 +3858,8 @@
       "rollbackTitle": "Confirm rollback",
       "rollbackBody": "Restore backup for job #{{id}}? The current state will be overwritten.",
       "purgeTitle": "Permanently purge backup",
-      "purgeBody": "Permanently delete backup for job #{{id}}? Rollback will no longer be possible."
+      "purgeBody": "Permanently delete backup for job #{{id}}? Rollback will no longer be possible.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Search settings & pages",

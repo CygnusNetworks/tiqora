@@ -3850,7 +3850,8 @@
       "rollbackTitle": "אשר החזרה לאחור",
       "rollbackBody": "לשחזר גיבוי לעבודה מס' {{id}}? המצב הנוכחי יוחלף.",
       "purgeTitle": "ניקוי גיבוי לצמיתות",
-      "purgeBody": "למחוק לצמיתות את הגיבוי עבור עבודה #{{id}}? חזרה לאחור לא תתאפשר עוד."
+      "purgeBody": "למחוק לצמיתות את הגיבוי עבור עבודה #{{id}}? חזרה לאחור לא תתאפשר עוד.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "הגדרות ודפי חיפוש",

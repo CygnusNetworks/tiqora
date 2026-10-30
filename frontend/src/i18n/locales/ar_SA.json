@@ -3850,7 +3850,8 @@
       "rollbackTitle": "تأكيد التراجع",
       "rollbackBody": "استعادة النسخة الاحتياطية للمهمة رقم {{id}}؟ سيتم الكتابة فوق الحالة الحالية.",
       "purgeTitle": "تطهير النسخة الاحتياطية بشكل دائم",
-      "purgeBody": "هل تريد حذف النسخة الاحتياطية للمهمة رقم {{id}} نهائيًا؟ التراجع لن يكون ممكنا بعد الآن."
+      "purgeBody": "هل تريد حذف النسخة الاحتياطية للمهمة رقم {{id}} نهائيًا؟ التراجع لن يكون ممكنا بعد الآن.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "إعدادات البحث والصفحات",

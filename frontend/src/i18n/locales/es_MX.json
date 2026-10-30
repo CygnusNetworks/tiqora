@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmar reversión",
       "rollbackBody": "¿Restaurar copia de seguridad para el trabajo #{{id}}? Se sobrescribirá el estado actual.",
       "purgeTitle": "Purgar permanentemente la copia de seguridad",
-      "purgeBody": "¿Eliminar permanentemente la copia de seguridad del trabajo #{{id}}? La reversión ya no será posible."
+      "purgeBody": "¿Eliminar permanentemente la copia de seguridad del trabajo #{{id}}? La reversión ya no será posible.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Configuración de búsqueda y páginas",

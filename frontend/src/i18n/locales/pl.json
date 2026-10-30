@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Potwierdź wycofanie",
       "rollbackBody": "Przywrócić kopię zapasową zadania nr {{id}}? Aktualny stan zostanie nadpisany.",
       "purgeTitle": "Trwale usuń kopię zapasową",
-      "purgeBody": "Trwale usunąć kopię zapasową zadania nr {{id}}? Wycofanie nie będzie już możliwe."
+      "purgeBody": "Trwale usunąć kopię zapasową zadania nr {{id}}? Wycofanie nie będzie już możliwe.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Szukaj ustawień i stron",

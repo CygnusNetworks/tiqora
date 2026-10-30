@@ -3850,7 +3850,8 @@
       "rollbackTitle": "Confirmar reversão",
       "rollbackBody": "Restaurar backup da tarefa #{{id}}? O estado atual será substituído.",
       "purgeTitle": "Limpar backup permanentemente",
-      "purgeBody": "Excluir permanentemente o backup da tarefa #{{id}}? A reversão não será mais possível."
+      "purgeBody": "Excluir permanentemente o backup da tarefa #{{id}}? A reversão não será mais possível.",
+      "legacyArchiveKeyChanged": "The key of the change archive was changed. The erasure was carried out, but further archive runs stay blocked. See the operations documentation for details."
     },
     "commandPalette": {
       "title": "Configurações e páginas de pesquisa",
