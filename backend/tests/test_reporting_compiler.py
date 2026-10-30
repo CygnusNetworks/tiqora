@@ -559,7 +559,10 @@ def test_group_by_keeps_original_dimension_indices() -> None:
 _URLS: set[str] = set()
 _BAND = {"lo": LO, "hi": HI}
 _CLEANUP = (
+    "DELETE FROM tiqora_itsm_change_event WHERE ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_itsm_change WHERE ticket_id BETWEEN :lo AND :hi",
+    "DELETE FROM tiqora_itsm_link WHERE link_type = 'rep47-link'",
+    "DELETE FROM tiqora_itsm_link_type WHERE name = 'rep47-link'",
     "DELETE FROM tiqora_cmdb_ci WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_cmdb_catalog WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_cmdb_class WHERE id BETWEEN :lo AND :hi",
@@ -656,6 +659,39 @@ def _seed_change(conn: Any, ticket_id: int, created: datetime) -> None:
             " false, false, :t, :u, :t, :u)"
         ),
         {"id": ticket_id, "u": AGENT, "t": created},
+    )
+
+
+def _seed_change_event(conn: Any, ticket_id: int, at: datetime) -> None:
+    """One phase change (approval -> implementing) of the change on ``T_A``."""
+    conn.execute(
+        text(
+            "INSERT INTO tiqora_itsm_change_event (ticket_id, created_at, created_by, event,"
+            " from_phase, to_phase) VALUES (:id, :t, :u, 'phase', 'approval', 'implementing')"
+        ),
+        {"id": ticket_id, "u": AGENT, "t": at},
+    )
+
+
+def _seed_ci_link(conn: Any, ticket_id: int, created: datetime) -> None:
+    """The CI of ``_seed_cmdb`` linked to ``T_A`` (CI first, as an unpointed type is stored)."""
+    conn.execute(
+        text(
+            "INSERT INTO tiqora_itsm_link_type (name, origin, pointed, propagation,"
+            " offer_ticket_ticket, offer_ticket_ci, offer_ci_ci, offer_ci_service, position,"
+            " valid, create_time, create_by, change_time, change_by)"
+            " VALUES ('rep47-link', 'tiqora', false, 'none', false, true, false, false, 0,"
+            " true, :t, :u, :t, :u)"
+        ),
+        {"u": AGENT, "t": created},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO tiqora_itsm_link (source_kind, source_key, target_kind, target_key,"
+            " link_type, created_by, created_at)"
+            " VALUES ('ci', :ci, 'ticket', :tid, 'rep47-link', :u, :t)"
+        ),
+        {"ci": str(CMDB_CI), "tid": str(ticket_id), "u": AGENT, "t": created},
     )
 
 
@@ -758,6 +794,8 @@ def _seed(sync_url: str) -> None:
             )
         _seed_cmdb(conn, T_A_CREATED)
         _seed_change(conn, T_A, T_A_CREATED)
+        _seed_change_event(conn, T_A, datetime(2024, 4, 2, 10, 0))
+        _seed_ci_link(conn, T_A, T_A_CREATED)
         for taid, tid, units, at in (
             (47730, T_A, "1.50", datetime(2024, 4, 2, 10, 0)),
             (47731, T_A, "2.00", datetime(2024, 4, 3, 10, 0)),

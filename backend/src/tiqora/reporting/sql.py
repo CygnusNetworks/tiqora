@@ -20,7 +20,7 @@ from typing import Any, Literal, get_args
 from zoneinfo import ZoneInfo
 
 import structlog
-from sqlalchemy import Date, DateTime, Integer, bindparam, case
+from sqlalchemy import Boolean, Date, DateTime, Integer, bindparam, case
 from sqlalchemy import text as sa_text
 from sqlalchemy.exc import CompileError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,12 +76,41 @@ class date_part(FunctionElement[int]):  # noqa: N801
         super().__init__(expr)
 
 
+class digits_only(FunctionElement[bool]):  # noqa: N801
+    """True when the string ``expr`` is 1-18 ASCII digits, i.e. safe to ``CAST`` to BIGINT.
+
+    Guards casts of free-text keys (``tiqora_itsm_link.*_key``): PostgreSQL raises on the first
+    non-numeric row, MariaDB silently casts it to 0. Wrap it in ``CASE WHEN ... THEN CAST(...)``.
+    """
+
+    type = Boolean()
+    inherit_cache = False
+    name = "digits_only"
+
+    def __init__(self, expr: ColumnElement[Any]) -> None:
+        super().__init__(expr)
+
+
 def _inner(element: FunctionElement[Any], compiler: Any, **kw: Any) -> str:
     return str(compiler.process(element.clauses.clauses[0], **kw))
 
 
 def _unsupported(construct: str, compiler: Any) -> CompileError:
     return CompileError(f"{construct}: unsupported dialect {compiler.dialect.name}")
+
+
+@compiles(digits_only)
+@compiles(digits_only, "postgresql")
+def _digits_pg(element: digits_only, compiler: Any, **kw: Any) -> str:
+    # also the default: it sits in the FROM clause of ``ci_tickets``, and
+    # ``Select.get_final_froms`` renders FROM elements with the default dialect
+    return f"({_inner(element, compiler, **kw)} ~ '^[0-9]{{1,18}}$')"
+
+
+@compiles(digits_only, "mysql")
+@compiles(digits_only, "mariadb")
+def _digits_mysql(element: digits_only, compiler: Any, **kw: Any) -> str:
+    return f"({_inner(element, compiler, **kw)} REGEXP '^[0-9]{{1,18}}$')"
 
 
 @compiles(shift_seconds)
