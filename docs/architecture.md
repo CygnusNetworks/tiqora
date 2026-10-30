@@ -1265,7 +1265,10 @@ mirror); Znuny's `change_*` and `condition_*` tables are never written.
 - **Read contract (X2).** `read.py` (`list_changes`, `upcoming_changes`, `phase_counts`, `my_tasks`,
   `calendar`, `service_availability`, `active_freezes`, `change_refs_for_tickets`,
   `task_refs_for_tickets`) is the permission-filtered read for other features (dashboard widgets, AI
-  features); it returns nothing outside Mode B and scans at most `LIST_SCAN_CAP = 5000` rows. The
+  features); it returns nothing outside Mode B and scans at most `LIST_SCAN_CAP = 5000` rows.
+  Exceptions: `change_refs_for_tickets`, `task_refs_for_tickets` without `user_id` and
+  `active_freezes` do not filter by permission: callers must already hold the tickets, and
+  `active_freezes` answers every valid freeze window (agent data, not for the portal). The
   statistics aggregate `tiqora_itsm_change*`, `tiqora_itsm_change_event` and the legacy archive
   directly under the reporting compiler's queue scope. Therefore the column names, the event names in
   `tiqora_itsm_change_event.event` (one `phase` row per phase change on every path) and the dataclass

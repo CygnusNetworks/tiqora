@@ -743,7 +743,7 @@ was vor dem Schritt erfüllt sein muss; fehlt etwas, nennt der Dialog alles auf 
 | Von | Nach | Arten | Schaltfläche | Bedingungen |
 |---|---|---|---|---|
 | Entwurf | Eingereicht | Normal | „Einreichen“ | keine |
-| Entwurf | Geplant | Standard | „Einplanen“ | Zeitfenster; kein blockierender Sperrzeitraum (*). Vorab genehmigt: die Freigabe wird ohne Abstimmung festgehalten |
+| Entwurf | Geplant | Standard | „Einplanen“ | Zeitfenster; kein blockierender Sperrzeitraum (*); die Standard-Vorlage gibt es noch, sie ist gültig und eine Standard-Vorlage (sonst `422 standard_template_invalid`). Vorab genehmigt: die Freigabe wird ohne Abstimmung festgehalten |
 | Entwurf | Freigabe | Notfall | „Freigabe anfordern“ | Zeitfenster; kein blockierender Sperrzeitraum (*); Umsetzungs- und Rückfallplan; ein CAB mit Mitgliedern |
 | Entwurf | Umsetzung | Notfall | „Sofort umsetzen (Freigabe nachträglich)“ | nur mit `emergency_post_approval`; Zeitfenster; kein blockierender Sperrzeitraum (*); ein CAB mit Mitgliedern. Die Freigabe wird angefordert und nachträglich entschieden |
 | Eingereicht | Bewertung | Normal | „Bewertung beginnen“ | keine |
@@ -754,6 +754,7 @@ was vor dem Schritt erfüllt sein muss; fehlt etwas, nennt der Dialog alles auf 
 | Freigabe | Abgelehnt | Normal, Notfall | keine (das CAB lehnt ab) | Ergebnis der Freigabe, auch „Keine gültigen CAB-Mitglieder“ und eine Fristüberschreitung mit `approval_timeout = reject` |
 | Freigabe | Bewertung (Normal) / Entwurf (Notfall) | Normal, Notfall | keine | Die Anfrage wurde in der Freigabe-Verwaltung zurückgezogen |
 | Abgelehnt | Entwurf | Normal, Notfall | „Überarbeiten“ | keine; die nächste Freigabe ist eine neue Runde |
+| Abgelehnt | Abgebrochen | alle | „Change abbrechen“ | keine; die Ablehnung ist entschieden, es gibt nichts zurückzuziehen |
 | Geplant | Umsetzung | alle | „Umsetzung starten“ | Zeitfenster; kein blockierender Sperrzeitraum (*). Setzt den tatsächlichen Beginn |
 | Geplant | Entwurf | alle | „Neu planen“ | keine; die Freigabe entfällt, ein normaler oder Notfall-Change braucht vor „Geplant“ eine neue |
 | Umsetzung | Nachbetrachtung | Normal, Notfall; Standard nur mit `standard_requires_review` | „Zur Nachbetrachtung“ | alle Aufgaben erledigt (**). Setzt das tatsächliche Ende |
@@ -780,8 +781,9 @@ sie anfordert). Weitere Regeln:
   verlangt `rw`, ein Plugin kann ihn ablehnen (`409 vetoed`, dann bleibt die Phase stehen), und beim
   Schließen gelten Znunys Regeln für Sperre und Besitzer wie beim Schließen in Znuny. Die
   Entscheidung des CAB ändert den Ticket-Status nie.
-- **Abgelehnt.** Der einzige Schritt aus „Abgelehnt“ ist „Überarbeiten“. Wer einen abgelehnten Change
-  aufgeben will, überarbeitet ihn und bricht ihn im Entwurf ab.
+- **Abgelehnt.** Aus „Abgelehnt“ führen „Überarbeiten“ (zurück in den Entwurf, neue Runde) und „Change
+  abbrechen“ (das Ticket wird mit `state_closed_cancelled` geschlossen, die Auswirkung wird nicht mehr
+  aufgefrischt).
 - **Ticket außerhalb geschlossen.** Wird das Ticket in Znuny oder im Ticket-Dialog geschlossen, bleibt
   die Phase stehen; die Change-Seite zeigt „Das Ticket wurde geschlossen …, der Change steht aber noch
   in der Phase …“.
@@ -795,8 +797,10 @@ sie anfordert). Weitere Regeln:
   jeder Phase außer den endgültigen (Hinweis „Das Ticket ist inzwischen ein Prozess-Ticket“).
 - **Bearbeiten.** Die Art des Changes ändert sich nur im Entwurf. Während der Freigabe sind Art,
   Zeitfenster, Pläne und CAB gesperrt (`409 change_locked_in_approval`): das CAB entscheidet über
-  einen festen Stand. In späteren Phasen bleiben sie bearbeitbar, wie in Znuny; jede Änderung steht im
-  Verlauf („Geändert“ mit den Feldnamen). Abgeschlossene und abgebrochene Changes sind schreibgeschützt.
+  einen festen Stand. Services, CIs und Risikofragen bleiben während der Freigabe änderbar. In späteren
+  Phasen bleiben sie bearbeitbar, wie in Znuny; jede Änderung steht im Verlauf („Geändert“ mit den
+  Feldnamen). Abgeschlossene und abgebrochene Changes sind schreibgeschützt, ihre Aufgaben ebenso
+  (`409 change_final`).
 - **Zeiten.** Alle Zeitfenster sind UTC; die Oberfläche schreibt das dazu.
 
 ### Vorlagen und Standard-Changes
@@ -862,7 +866,9 @@ gültig und Reihenfolge. Es werden keine Fragen automatisch angelegt; „Beispie
 legt vier Fragen an, deren Schlüssel noch fehlen: Ausfall während der Umsetzung (`downtime`),
 Rückfallplan getestet (`backout_tested`), betroffene Anwender (`users_affected`), Erfahrung mit
 solchen Changes (`experience`). Bei normalen Changes muss vor „Freigabe anfordern“ jede gültige Frage
-beantwortet sein; ohne gültige Fragen gilt der Fragebogen als vollständig.
+beantwortet sein; ohne gültige Fragen gilt der Fragebogen als vollständig. Eine Frage, die ein Change
+schon beantwortet hat, lässt sich nicht löschen (`409 risk_question_in_use`); setzen Sie sie auf
+ungültig, die Antworten und die Punkte abgeschlossener Changes bleiben dann erhalten.
 
 **Automatische Prüfungen.** Sie lesen nur gespeicherte Daten (die berechnete Auswirkung, die
 Konflikte, Zählungen) und liefern je höchstens einen Befund:
@@ -919,8 +925,9 @@ monatlich, jährlich, mit Intervall und Ende nach Anzahl oder Datum). **Zeiten i
 wöchentlicher Sperrzeitraum folgt der Sommerzeit nicht.
 
 Ein Sperrzeitraum trifft einen Change, wenn sich die Zeitfenster überschneiden und er für alle
-Services gilt oder für einen Service, den der Change direkt oder über die CMDB betrifft. Der Abschnitt
-„Konflikte“ zeigt:
+Services gilt oder für einen Service, den der Change direkt oder über die CMDB betrifft. Die direkten
+Services (der des Tickets und die weiteren) zählen sofort, auch bevor die Auswirkung berechnet ist. Der
+Abschnitt „Konflikte“ zeigt:
 
 | Konflikt | Stufe |
 |---|---|
@@ -929,6 +936,7 @@ Services gilt oder für einen Service, den der Change direkt oder über die CMDB
 | Aufgabe außerhalb des Zeitfensters | Warnung |
 | Kein Zeitfenster gesetzt | Hinweis |
 | Zu viele Sperrzeiträume, um alle zu prüfen | Warnung; zählt bei den Bedingungen wie „Blockiert“ (im Zweifel sicher) |
+| Auswirkung noch nicht berechnet, der Change hat CIs, und ein sperrender Sperrzeitraum für Services überschneidet das Zeitfenster (`freeze_unverified`) | Warnung; zählt bei den Bedingungen wie „Blockiert“, bis die Auswirkung berechnet ist: ein Service, den ein CI erreicht, könnte betroffen sein |
 | Zu viele andere Changes im Zeitraum (mehr als 500 werden nicht geprüft) | Warnung; die Liste ist unvollständig |
 
 Ein blockierender Konflikt hält „Freigabe anfordern“, „Einplanen“ (Standard) und „Umsetzung starten“
@@ -1000,6 +1008,9 @@ beschreibt [approvals.md](approvals.md); dieses Kapitel wiederholt es nicht.
   Umsetzung ab, wechselt der Change in die Nachbetrachtung („Schritt erzwungen“) und kann nicht mehr
   „Erfolgreich“ abgeschlossen werden. Wurde die Anfrage zurückgezogen, kann ein Change-Manager mit
   „Trotzdem fortfahren“ und Begründung abschließen.
+- **Freigabe gelöscht.** Löscht eine DSGVO-Löschung die Freigabe-Anfrage, während der Change in der
+  Freigabe steht, kommt keine Entscheidung mehr: der einzige Ausweg ist „Change abbrechen“ (und bei
+  Bedarf ein neuer Change).
 
 **CAB-Sitzungen** (`/agent/itsm/cab-meetings`) sind organisatorisch: Ein Change-Manager plant eine
 Sitzung („Sitzung planen“: CAB, Titel, Beginn, Ende, Ort; Zeiten in UTC), stellt die Tagesordnung aus
@@ -1007,7 +1018,8 @@ Changes in Eingereicht, Bewertung, Freigabe oder Geplant zusammen (höchstens 10
 sind die Changes, die dieses CAB gerade freigeben soll), schreibt das Protokoll und setzt den Status
 („Geplant“, „Durchgeführt“, „Abgesagt“). Jeder Punkt zeigt den Stand seiner Freigabe. Abgestimmt wird
 nicht in der Sitzung, sondern einzeln über die Freigabe-Engine; die Sitzungsleitung kann nicht für
-andere abstimmen. Sitzungen und **Protokoll sind für alle Agenten sichtbar**; Changes der
+andere abstimmen. Sitzungen und **Protokoll sind für alle Agenten sichtbar** (das Protokoll steht in
+der Sitzung selbst, die Liste der Sitzungen zeigt es nicht); Changes der
 Tagesordnung, die Sie nicht lesen dürfen, erscheinen als „Change ohne Leserecht“ und bleiben auf der
 Tagesordnung, wenn Sie sie speichern.
 
@@ -1126,7 +1138,7 @@ Kundensitzung.
 | Route | Zweck |
 |---|---|
 | `GET /itsm/changes/status` | Verfügbarkeit (`available`, `reason`: `ok`, `itsm_off`, `mode_a`, `setup_missing`), Znuny-Changes (`legacy`: `none`, `live`, `archive`), `can_manage`, `can_see_legacy` |
-| `GET`/`POST /itsm/changes` | Liste (`q`, `phase`, `type`, `service_id`, `ci_id`, Zeitfenster, `mine`, `order`, `limit` ≤ 100) und Anlegen (201, mit `tasks_job_id`) |
+| `GET`/`POST /itsm/changes` | Liste (`q`, `phase`, `change_type`, `service_id`, `ci_id`, Zeitfenster, `mine`, `order`, `limit` ≤ 100) und Anlegen (201, mit `tasks_job_id`) |
 | `GET`/`PATCH /itsm/changes/{id}` | Change lesen und bearbeiten (die Phase ist kein Feld) |
 | `POST /itsm/changes/{id}/transition` | Schritt: `to`, `reason`, `override_reason`, `force`, `outcome`, `pir_notes`; `409 transition_refused` mit `failures` (`code`, `overridable`) |
 | `GET /itsm/changes/{id}/events` | Verlauf des Changes |
@@ -1136,16 +1148,18 @@ Kundensitzung.
 | `GET`/`POST /itsm/changes/{id}/tasks`, `PATCH …/tasks/{task_id}`, `PUT …/tasks/order` | Aufgaben |
 | `GET`/`POST /itsm/changes/{id}/related`, `DELETE …/related/{other_id}` | Verknüpfte Incidents und Probleme |
 | `GET /itsm/changes/{id}/approval` | Stand der Freigabe (Runde, Weg, Momentaufnahme oder `history_missing`) |
-| `GET /itsm/change-tasks/mine` | Meine Aufgaben |
+| `GET /itsm/change-tasks/mine` | Meine Aufgaben (höchstens 100; gibt es mehr, steht `X-Tasks-Truncated: true` in der Antwort) |
 | `GET /itsm/change-calendar`, `GET /itsm/change-calendar/services` | Kalender und geplante Serviceverfügbarkeit (`start`, `end`, höchstens 92 Tage) |
-| `GET /itsm/change-templates`, `GET /itsm/cabs`, `GET /itsm/freeze-windows` | gültige Vorlagen, CABs, Sperrzeiträume eines Zeitraums |
-| `GET`/`POST /itsm/cab-meetings`, `GET`/`PATCH …/{id}`, `PUT …/{id}/agenda`, `GET …/{id}/suggestions` | CAB-Sitzungen |
+| `GET /itsm/change-templates`, `GET /itsm/cabs`, `GET /itsm/freeze-windows` | gültige Vorlagen, CABs (mit ihren Mitgliedern; ein Kunde als Mitglied erscheint mit seinem Login, für jeden Agenten), Sperrzeiträume eines Zeitraums |
+| `GET`/`POST /itsm/cab-meetings`, `GET`/`PATCH …/{id}`, `PUT …/{id}/agenda`, `GET …/{id}/suggestions` | CAB-Sitzungen (die Liste ohne Tagesordnung und Protokoll) |
 | `GET /itsm/legacy-changes`, `GET …/{znuny_change_id}` | Znuny-Changes (`source`: `live` oder `archive`) |
 | `POST /tickets/{id}/change`, `POST /tickets/{id}/change/create-from` | „Als Change führen“, Change aus einem Ticket |
 
 Verwaltung: `/admin/itsm/change/templates`, `/cabs` (mit `…/{id}/members`), `/risk-questions` (mit
 `…/order` und `…/examples`), `/freeze-windows` und `/legacy-archive` (`GET` letzter Lauf, `POST` mit
-`{"dry_run": …}` startet den Archiv-Lauf). Fehler antworten als `{"detail": {"code": …}}`;
+`{"dry_run": …}` startet den Archiv-Lauf). Fehler antworten als `{"detail": {"code": …}}`; `cab_invalid`
+nennt dazu in `reason`, warum die Freigabe-Engine das CAB ablehnt (`quorum_exceeds_members`,
+`invalid_definition`, `invalid_member`);
 Hintergrundaufträge verfolgen Sie über `GET /api/v1/jobs/{id}`. Zeiten sind UTC.
 
 ### Datenschutz (DSGVO)
