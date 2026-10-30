@@ -954,9 +954,9 @@
       "prev": "सूची का पिछला टिकट",
       "next": "सूची का अगला टिकट"
     },
-    "stateGroup": {
-      "pending": "लंबित",
-      "closed": "बंद"
+    "statusAction": {
+      "pending": "स्थगित करें…",
+      "close": "बंद करें…"
     },
     "signatureAppended": "हस्ताक्षर · भेजते समय जुड़ता है",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "रद्द करें",
     "typeEmail": "ईमेल टिकट",
     "typePhone": "फ़ोन टिकट",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "ग्राहक खोजें...",
     "customerSearchHint": "नाम, लॉगिन, या ईमेल - मिनट। 2 अक्षर",
     "customerSelected": "चयनित ग्राहक",

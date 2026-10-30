@@ -1,10 +1,11 @@
-"""DB tests: POST /tickets with ``phone_call`` (Znuny AgentTicketPhone parity).
+"""DB tests: POST /tickets with ``phone_call`` (Znuny AgentTicketPhone parity) or ``note``.
 
 The phone form creates the ticket and its first Phone article in one request:
 pending time on the initial state, responsible, time units booked on the
 article, and -- for an inbound call with ``send_auto_response`` -- the queue's
 "auto reply" to the customer (AutoResponseForWebTickets), with the email
-pipeline's loop protection.
+pipeline's loop protection. A note ticket (``note``) gets an internal first
+article and its booking the same way, optionally dated to ``occurred_at``.
 
 Uses the 863xx id range; the module deletes every row it creates.
 """
@@ -12,7 +13,7 @@ Uses the 863xx id range; the module deletes every row it creates.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -359,6 +360,103 @@ async def test_pending_state_without_time_is_422(env: Any) -> None:
     url, client, _sender = env
     before = _rows(url, "SELECT COUNT(*) FROM ticket WHERE queue_id = :q", q=QUEUE_ID)[0][0]
     resp = await client.post("/api/v1/tickets", json=_payload(state_id=STATE_PENDING_REMINDER))
+    assert resp.status_code == 422, resp.text
+    after = _rows(url, "SELECT COUNT(*) FROM ticket WHERE queue_id = :q", q=QUEUE_ID)[0][0]
+    assert after == before
+
+
+# ---------------------------------------------------------------- note tickets
+
+
+def _note_payload(**extra: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "title": "Vor-Ort-Termin Hausanschluss",
+        "queue_id": QUEUE_ID,
+        "state_id": STATE_CLOSED_SUCCESSFUL,
+        "priority_id": 3,
+        "owner_id": AGENT,
+        "note": {"body": "Termin mit dem Elektriker.", "time_unit": 45},
+    }
+    body.update(extra)
+    return body
+
+
+@pytest.mark.asyncio
+async def test_note_ticket_dated_to_occurred_at(env: Any) -> None:
+    url, client, sender = env
+    occurred = (datetime.now(UTC) - timedelta(days=3)).replace(microsecond=0)
+    resp = await client.post(
+        "/api/v1/tickets",
+        # an aware local time: stored as naive UTC like every Tiqora timestamp
+        json=_note_payload(
+            occurred_at=occurred.astimezone(timezone(timedelta(hours=2))).isoformat()
+        ),
+    )
+    assert resp.status_code == 201, resp.text
+    tid = resp.json()["ticket_id"]
+    want = occurred.replace(tzinfo=None)
+    epoch = int(occurred.timestamp())
+
+    ticket = _rows(url, "SELECT create_time, change_time, timeout FROM ticket WHERE id = :t", t=tid)
+    assert ticket == [(want, want, epoch)]
+    articles = _rows(
+        url,
+        "SELECT a.id, st.name, cc.name, a.is_visible_for_customer, a.create_time,"
+        " m.incoming_time, m.a_subject FROM article a"
+        " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+        " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+        " JOIN article_data_mime m ON m.article_id = a.id WHERE a.ticket_id = :t",
+        t=tid,
+    )
+    assert len(articles) == 1
+    aid, sender_type, channel, visible, created, incoming, subject = articles[0]
+    assert (sender_type, channel, visible) == ("agent", "Internal", 0)
+    assert (created, incoming, subject) == (want, epoch, "Vor-Ort-Termin Hausanschluss")
+    ta = _rows(
+        url,
+        "SELECT article_id, time_unit, create_time FROM time_accounting WHERE ticket_id = :t",
+        t=tid,
+    )
+    assert [(r[0], float(r[1]), r[2]) for r in ta] == [(aid, 45.0, want)]
+    history = _rows(
+        url, "SELECT DISTINCT create_time FROM ticket_history WHERE ticket_id = :t", t=tid
+    )
+    assert history == [(want,)]
+    assert sender.sent == []
+
+
+@pytest.mark.asyncio
+async def test_note_ticket_without_occurred_at_is_dated_now(env: Any) -> None:
+    url, client, _sender = env
+    resp = await client.post("/api/v1/tickets", json=_note_payload())
+    assert resp.status_code == 201, resp.text
+    tid = resp.json()["ticket_id"]
+    created = _rows(url, "SELECT create_time FROM ticket WHERE id = :t", t=tid)[0][0]
+    assert abs(created - datetime.now(UTC).replace(tzinfo=None)) < timedelta(minutes=5)
+    ta = _rows(url, "SELECT time_unit FROM time_accounting WHERE ticket_id = :t", t=tid)
+    assert [float(r[0]) for r in ta] == [45.0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param({"occurred_at_days": -2}, id="future"),
+        pytest.param({"occurred_at_days": 400}, id="older-than-a-year"),
+        pytest.param({"occurred_at_days": 3, "note": None}, id="without-note"),
+        pytest.param(
+            {"phone_call": {"direction": "outbound", "body": "Rückruf."}}, id="with-phone-call"
+        ),
+    ],
+)
+async def test_note_ticket_refusals_create_nothing(env: Any, extra: dict[str, Any]) -> None:
+    url, client, _sender = env
+    extra = dict(extra)
+    days = extra.pop("occurred_at_days", None)
+    if days is not None:
+        extra["occurred_at"] = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    before = _rows(url, "SELECT COUNT(*) FROM ticket WHERE queue_id = :q", q=QUEUE_ID)[0][0]
+    resp = await client.post("/api/v1/tickets", json=_note_payload(**extra))
     assert resp.status_code == 422, resp.text
     after = _rows(url, "SELECT COUNT(*) FROM ticket WHERE queue_id = :q", q=QUEUE_ID)[0][0]
     assert after == before

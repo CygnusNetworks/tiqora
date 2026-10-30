@@ -562,6 +562,10 @@ def _fill_time_series(
     series = defn.visualization.series_dimension
     if len(dims) > 1 and (series is None or series == idx):
         return False
+    # A flat table lists each combination as its own row: the days x series grid
+    # would only add zero rows for every (series, day) pair without bookings.
+    if len(dims) > 1 and defn.visualization.type == "table":
+        return False
     grain = defn.dimensions[idx].grain or "day"
     if _bucket_count(grain, window.start_date, window.end_date) > max_rows:
         return True

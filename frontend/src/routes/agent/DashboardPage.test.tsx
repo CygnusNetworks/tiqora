@@ -49,12 +49,15 @@ vi.mock("@/plugins/PluginProvider", async () => {
 /** ResizeObserver stand-in: reports the width set by `setContainerWidth` (default: a wide desktop). */
 let containerWidth = 1200;
 const observers = new Set<{ cb: ResizeObserverCallback; self: ResizeObserver }>();
+/** The element the dashboard last measured for its breakpoint. */
+let observed: Element | null = null;
 class FakeResizeObserver {
   private entry: { cb: ResizeObserverCallback; self: ResizeObserver };
   constructor(cb: ResizeObserverCallback) {
     this.entry = { cb, self: this as unknown as ResizeObserver };
   }
-  observe() {
+  observe(el: Element) {
+    observed = el;
     observers.add(this.entry);
     this.entry.cb([{ contentRect: { width: containerWidth } } as ResizeObserverEntry], this.entry.self);
   }
@@ -722,6 +725,14 @@ describe("DashboardPage", () => {
         return saved;
       }) as never;
       previewData = vi.spyOn(dashboardsApi, "previewData").mockResolvedValue(ok()) as never;
+    });
+
+    it("the breakpoint is measured on the row of grid and gallery, so the open gallery does not switch a desktop to md", async () => {
+      await enterEdit();
+      const row = observed as HTMLElement;
+      expect(row).toContainElement(screen.getByTestId("dashboard-grid"));
+      expect(row).toContainElement(screen.getByTestId("dashboard-gallery-host"));
+      expect(screen.getByTestId("dashboard-grid")).toHaveAttribute("data-breakpoint", "lg");
     });
 
     it("Anpassen shows the dark toolbar, the column guide, handles and the keyboard hint; view-only chrome disappears", async () => {

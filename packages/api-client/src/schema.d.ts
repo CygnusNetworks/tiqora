@@ -10143,6 +10143,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/outbound-ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Outbound Ticket
+         * @description Create a ticket in ``queue`` with one customer-visible outgoing e-mail
+         *     to ``to_address`` and (``close`` true, the default) close it.
+         *
+         *     Needs ``tickets:rw`` and ``create`` + ``note`` + ``rw`` on the queue's
+         *     group. AI automation is paused on the ticket before the article is
+         *     created and no agent notification is raised; the text stays stored in the
+         *     ticket. 404 unknown queue, 403 missing permission, 503
+         *     ``outbound_mail_disabled`` (nothing is created), 502 mail delivery failed
+         *     (nothing is stored).
+         */
+        post: operations["outbound_ticket_api_v1_integrations_outbound_ticket_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/cab-meetings": {
         parameters: {
             query?: never;
@@ -26468,6 +26496,26 @@ export interface components {
             unsupported_actions: string[];
         };
         /**
+         * NewTicketNoteIn
+         * @description First article of a note ticket: internal, never visible to the customer.
+         */
+        NewTicketNoteIn: {
+            /** Attachments */
+            attachments?: components["schemas"]["ArticleAttachmentIn"][];
+            /** Body */
+            body: string;
+            /**
+             * Content Type
+             * @default text/plain
+             * @enum {string}
+             */
+            content_type: "text/plain" | "text/html";
+            /** Subject */
+            subject?: string | null;
+            /** Time Unit */
+            time_unit?: number | null;
+        };
+        /**
          * NewTicketPhoneCallIn
          * @description First article of a phone ticket (Znuny AgentTicketPhone).
          */
@@ -26758,6 +26806,36 @@ export interface components {
             dimension: string;
             /** Items */
             items: components["schemas"]["DimensionCountOut"][];
+        };
+        /**
+         * OutboundTicketIn
+         * @description Create a ticket with one outgoing e-mail (``POST /integrations/outbound-ticket``).
+         */
+        OutboundTicketIn: {
+            /** Body */
+            body: string;
+            /**
+             * Close
+             * @default true
+             */
+            close: boolean;
+            /** Customer User Id */
+            customer_user_id?: string | null;
+            /** Queue */
+            queue: string;
+            /** Subject */
+            subject: string;
+            /** To Address */
+            to_address: string;
+        };
+        /** OutboundTicketOut */
+        OutboundTicketOut: {
+            /** Article Id */
+            article_id: number;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Number */
+            ticket_number: string;
         };
         /** Page[ApiKeyOut] */
         Page_ApiKeyOut_: {
@@ -32218,6 +32296,9 @@ export interface components {
              * @default 1
              */
             lock_id: number;
+            note?: components["schemas"]["NewTicketNoteIn"] | null;
+            /** Occurred At */
+            occurred_at?: string | null;
             /** Owner Id */
             owner_id: number;
             /** Pending Time */
@@ -60163,6 +60244,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerTicketsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outbound_ticket_api_v1_integrations_outbound_ticket_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutboundTicketIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundTicketOut"];
                 };
             };
             /** @description Validation Error */

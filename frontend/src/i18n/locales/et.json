@@ -954,9 +954,9 @@
       "prev": "Eelmine pilet loendis",
       "next": "Järgmine pilet loendis"
     },
-    "stateGroup": {
-      "pending": "Ootel",
-      "closed": "Suletud"
+    "statusAction": {
+      "pending": "Lükka edasi…",
+      "close": "Sulge…"
     },
     "signatureAppended": "Allkiri · lisatakse saatmisel",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "Tühista",
     "typeEmail": "Pilet meili teel",
     "typePhone": "Telefonipilet",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "Otsi klienti…",
     "customerSearchHint": "Nimi, sisselogimine või e-posti aadress – min. 2 tähemärki",
     "customerSelected": "Valitud klient",

@@ -954,9 +954,9 @@
       "prev": "Vorheriges Ticket der Liste",
       "next": "Nächstes Ticket der Liste"
     },
-    "stateGroup": {
-      "pending": "Wartend",
-      "closed": "Geschlossen"
+    "statusAction": {
+      "pending": "Zurückstellen…",
+      "close": "Schließen…"
     },
     "signatureAppended": "Signatur · wird beim Senden angehängt",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "Abbrechen",
     "typeEmail": "E-Mail-Ticket",
     "typePhone": "Telefonticket",
+    "typeNote": "Interne Notiz",
+    "typeNoteHint": "Für Arbeit ohne Telefonat oder E-Mail, z. B. interne Aufgaben: kein Kunde nötig, die Notiz bleibt intern, die Zeit wird darauf gebucht.",
+    "occurredAt": "Zeitpunkt der Arbeit",
+    "occurredAtHint": "Leer lassen für jetzt. Ticket, Notiz und gebuchte Zeit werden auf diesen Zeitpunkt datiert.",
+    "occurredAtInvalid": "Bitte einen Zeitpunkt in der Vergangenheit wählen, höchstens ein Jahr zurück.",
+    "internalNote": "Interne Notiz",
+    "submitNoteClose": "Erstellen und schließen",
     "customerSearch": "Kunde suchen…",
     "customerSearchHint": "Name, Login oder E-Mail — mind. 2 Zeichen",
     "customerSelected": "Ausgewählter Kunde",

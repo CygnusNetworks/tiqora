@@ -34417,6 +34417,61 @@
         "title": "NewProcessTicketOut",
         "type": "object"
       },
+      "NewTicketNoteIn": {
+        "description": "First article of a note ticket: internal, never visible to the customer.",
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ArticleAttachmentIn"
+            },
+            "maxItems": 20,
+            "title": "Attachments",
+            "type": "array"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "content_type": {
+            "default": "text/plain",
+            "enum": [
+              "text/plain",
+              "text/html"
+            ],
+            "title": "Content Type",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "maxLength": 3800,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "time_unit": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Unit"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "NewTicketNoteIn",
+        "type": "object"
+      },
       "NewTicketPhoneCallIn": {
         "description": "First article of a phone ticket (Znuny AgentTicketPhone).",
         "properties": {
@@ -35265,6 +35320,83 @@
           "items"
         ],
         "title": "OpenSnapshotOut",
+        "type": "object"
+      },
+      "OutboundTicketIn": {
+        "description": "Create a ticket with one outgoing e-mail (``POST /integrations/outbound-ticket``).",
+        "properties": {
+          "body": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "close": {
+            "default": true,
+            "title": "Close",
+            "type": "boolean"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "maxLength": 250,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
+          "queue": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Queue",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          },
+          "to_address": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "To Address",
+            "type": "string"
+          }
+        },
+        "required": [
+          "queue",
+          "to_address",
+          "subject",
+          "body"
+        ],
+        "title": "OutboundTicketIn",
+        "type": "object"
+      },
+      "OutboundTicketOut": {
+        "properties": {
+          "article_id": {
+            "title": "Article Id",
+            "type": "integer"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "ticket_number": {
+            "title": "Ticket Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "ticket_number",
+          "article_id"
+        ],
+        "title": "OutboundTicketOut",
         "type": "object"
       },
       "Page_ApiKeyOut_": {
@@ -52049,6 +52181,28 @@
             "default": 1,
             "title": "Lock Id",
             "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewTicketNoteIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
           },
           "owner_id": {
             "title": "Owner Id",
@@ -112348,6 +112502,82 @@
           }
         },
         "summary": "Customer Tickets",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/outbound-ticket": {
+      "post": {
+        "description": "Create a ticket in ``queue`` with one customer-visible outgoing e-mail\nto ``to_address`` and (``close`` true, the default) close it.\n\nNeeds ``tickets:rw`` and ``create`` + ``note`` + ``rw`` on the queue's\ngroup. AI automation is paused on the ticket before the article is\ncreated and no agent notification is raised; the text stays stored in the\nticket. 404 unknown queue, 403 missing permission, 503\n``outbound_mail_disabled`` (nothing is created), 502 mail delivery failed\n(nothing is stored).",
+        "operationId": "outbound_ticket_api_v1_integrations_outbound_ticket_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutboundTicketIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundTicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Outbound Ticket",
         "tags": [
           "integrations"
         ]

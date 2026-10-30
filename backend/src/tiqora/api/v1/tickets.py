@@ -10,7 +10,7 @@ import hashlib
 import json
 import re
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from html import escape as html_escape
 from typing import Annotated, Any, Final, Literal
 
@@ -82,6 +82,8 @@ from tiqora.domain.ticket_write_service import (
     TelegramSendOptions,
     TicketIn,
     TicketWriteService,
+    add_time_accounting,
+    date_new_ticket,
 )
 from tiqora.domain.ticket_write_service import (
     TicketAccessDenied as WriteAccessDenied,
@@ -146,6 +148,13 @@ class TicketCreateRequest(BaseModel):
     #: Send the queue's "auto reply" to the customer after an inbound
     #: ``phone_call`` (Znuny AutoResponseForWebTickets). Ignored otherwise.
     send_auto_response: bool = False
+    #: Note ticket (work without a call or mail): an internal note as the
+    #: first article, in the same transaction. Not together with ``phone_call``.
+    note: NewTicketNoteIn | None = None
+    #: Note tickets only: when the work was done (in the past, at most a year
+    #: ago). Ticket, note, booked time and their history are dated to it
+    #: instead of now. Omitted = now.
+    occurred_at: datetime | None = None
 
 
 class NewTicketPhoneCallIn(BaseModel):
@@ -161,6 +170,24 @@ class NewTicketPhoneCallIn(BaseModel):
     time_unit: float | None = Field(default=None, ge=0)
     attachments: list[ArticleAttachmentIn] = Field(default_factory=list, max_length=20)
     caller_number: str | None = Field(default=None, max_length=100)
+
+
+class NewTicketNoteIn(BaseModel):
+    """First article of a note ticket: internal, never visible to the customer."""
+
+    #: Defaults to the ticket title.
+    subject: str | None = Field(default=None, max_length=3800)
+    body: str
+    content_type: Literal["text/plain", "text/html"] = "text/plain"
+    #: Time units booked on the note.
+    time_unit: float | None = Field(default=None, ge=0)
+    attachments: list[ArticleAttachmentIn] = Field(default_factory=list, max_length=20)
+
+
+#: How far back ``occurred_at`` may date a note ticket.
+MAX_BACKDATE = timedelta(days=366)
+#: Clock skew tolerated for an ``occurred_at`` "just now".
+BACKDATE_SKEW = timedelta(minutes=5)
 
 
 class TicketCreateResponse(BaseModel):
@@ -1658,6 +1685,27 @@ async def create_ticket(
     )
 
     call = body.phone_call
+    note = body.note
+    if call is not None and note is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="phone_call and note are mutually exclusive",
+        )
+    occurred_at: datetime | None = None
+    if body.occurred_at is not None:
+        if note is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="occurred_at is only allowed for a note ticket",
+            )
+        occurred_at = as_naive_utc(body.occurred_at)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        if occurred_at > now + BACKDATE_SKEW or occurred_at < now - MAX_BACKDATE:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="occurred_at must lie in the past, at most a year ago",
+            )
+    note_files = decode_attachments(note.attachments) if note is not None else []
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -1703,6 +1751,32 @@ async def create_ticket(
                     # form's lock_id, not the phone screens' RequiredLock.
                     enforce_permissions=False,
                 )
+            if note is not None:
+                aid = await svc.add_article(
+                    user.id,
+                    tid,
+                    ArticleIn(
+                        sender_type="agent",
+                        is_visible_for_customer=False,
+                        subject=note.subject or body.title,
+                        body=note.body,
+                        content_type=f"{note.content_type}; charset=utf-8",
+                        channel="note",
+                        attachments=note_files,
+                    ),
+                )
+                if note.time_unit:
+                    # Same rights as POST /{id}/time-accounting.
+                    await svc._assert_rw(user.id, body.queue_id)
+                    await add_time_accounting(
+                        session,
+                        ticket_id=tid,
+                        article_id=aid,
+                        time_unit=note.time_unit,
+                        user_id=user.id,
+                    )
+                if occurred_at is not None:
+                    await date_new_ticket(session, ticket_id=tid, when=occurred_at)
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
 
@@ -2735,7 +2809,7 @@ async def create_time_accounting(
     """Book time units on a ticket (requires ``rw``)."""
     from sqlalchemy import text
 
-    from tiqora.domain.ticket_write_service import _ticket_must_exist, add_time_accounting
+    from tiqora.domain.ticket_write_service import _ticket_must_exist
 
     if body.time_unit <= 0:
         raise HTTPException(

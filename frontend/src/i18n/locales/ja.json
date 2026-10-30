@@ -954,9 +954,9 @@
       "prev": "一覧の前のチケット",
       "next": "一覧の次のチケット"
     },
-    "stateGroup": {
-      "pending": "保留",
-      "closed": "クローズ"
+    "statusAction": {
+      "pending": "保留…",
+      "close": "クローズ…"
     },
     "signatureAppended": "署名 · 送信時に付加",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "キャンセル",
     "typeEmail": "メールチケット",
     "typePhone": "電話チケット",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "顧客を検索…",
     "customerSearchHint": "名前、ログイン名、または電子メール — 分2文字",
     "customerSelected": "選択された顧客",

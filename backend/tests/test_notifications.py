@@ -929,6 +929,83 @@ async def test_agent_body_placeholder_quotes_the_event_article(mariadb_znuny_url
 
 
 @pytest.mark.db
+async def test_current_user_placeholder_names_the_note_author_not_the_owner(
+    mariadb_znuny_url: str,
+) -> None:
+    """<OTRS_CURRENT_*> is the agent behind the event (Znuny: the event's UserID).
+    It fell back to the ticket owner, so the owner read "<owner> schrieb" about a
+    colleague's note."""
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id, author_id = 910_961, 910_962
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            qid = await _insert_queue(session, "Notification current user")
+            for uid, login, first, last in (
+                (owner_id, "notify.current.owner", "Olga", "Owner"),
+                (author_id, "notify.current.author", "Arne", "Author"),
+            ):
+                await _insert_agent(session, user_id=uid, login=login)
+                await session.execute(
+                    text("UPDATE users SET first_name = :f, last_name = :l WHERE id = :uid"),
+                    {"uid": uid, "f": first, "l": last},
+                )
+            await _set_user_prefs(session, owner_id, "olga.owner@example.com", "de")
+            tid = await _insert_ticket(session, "2026010410000047", owner_id=owner_id, queue_id=qid)
+            aid = await _insert_article(session, tid, sender_type="agent", is_visible=0)
+            await session.execute(
+                text("UPDATE article SET create_by = :uid WHERE id = :aid"),
+                {"uid": author_id, "aid": aid},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, 'Arne Author', 'Vor Ort', 'Dose war falsch', 'text/plain', 0,"
+                    " current_timestamp, :uid, current_timestamp, :uid)"
+                ),
+                {"aid": aid, "uid": author_id},
+            )
+            await _insert_notification_event(
+                session,
+                "current-user-regression",
+                items={
+                    "Events": ["NotificationAddNote"],
+                    "QueueID": [str(qid)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                language="de",
+                subject="Autor: <OTRS_AGENT_SUBJECT[8]>",
+                body="Hallo <OTRS_NOTIFICATION_RECIPIENT_UserFirstname>,\n"
+                "<OTRS_CURRENT_UserFullname> schrieb:",
+            )
+            await _insert_outbox_event(
+                session, "NotificationAddNote", tid, payload=f'{{"article_id": {aid}}}'
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+        result = await run_notifications_tick(
+            session_factory=factory,
+            mail_sender=sender,
+            settings=Settings(public_base_url="https://support.example.org/"),
+        )
+        assert result["errors"] == 0
+        (message,) = [m for m in sender.sent if str(m["Subject"]).endswith("] Autor: Vor Ort")]
+        body = message.get_content()
+        assert "Hallo Olga,\nArne Author schrieb:" in body
+        assert "Olga Owner schrieb" not in body
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
 async def test_notification_recipient_placeholders_are_rendered_per_actual_agent(
     mariadb_znuny_url: str,
 ) -> None:

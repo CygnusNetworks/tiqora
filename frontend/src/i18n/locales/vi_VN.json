@@ -954,9 +954,9 @@
       "prev": "Ticket trước trong danh sách",
       "next": "Ticket tiếp theo trong danh sách"
     },
-    "stateGroup": {
-      "pending": "Đang chờ xử lý",
-      "closed": "Đã đóng"
+    "statusAction": {
+      "pending": "Hoãn lại…",
+      "close": "Đóng…"
     },
     "signatureAppended": "Chữ ký · được thêm khi gửi",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "Hủy bỏ",
     "typeEmail": "Phiếu email",
     "typePhone": "Vé điện thoại",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "Tìm kiếm khách hàng…",
     "customerSearchHint": "Tên, thông tin đăng nhập hoặc email — tối thiểu. 2 ký tự",
     "customerSelected": "Khách hàng được chọn",

@@ -56,6 +56,7 @@ import {
   requestPhoneCall,
   savePhoneDraft,
   timerFromCall,
+  toLocalInputValue,
 } from "@/lib/phoneCall";
 import { EmailSecurityControl } from "@/components/agent/EmailSecurityControl";
 import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
@@ -110,23 +111,25 @@ function defaultId(
   return options[0]?.id;
 }
 
-type TicketType = "email" | "phone";
+type TicketType = "email" | "phone" | "note";
 type RecipientField = "to" | "cc" | "bcc";
 type Direction = "inbound" | "outbound";
 
 /**
  * Agent-facing New-ticket compose page, reached from the top bar's "＋ New".
  * Customer-first flow ("Variante 2"): pick or skip a customer before the rest
- * of the form unlocks. Two ticket types: an email ticket sends a real SMTP
+ * of the form unlocks. Three ticket types: an email ticket sends a real SMTP
  * message via the same agent-reply pipeline as `ReplyDialog` (compose-context
- * resolves From/signature/rich-text per queue), or a phone ticket that just
- * records a customer/agent note with no email dispatch. The queue may be
+ * resolves From/signature/rich-text per queue), a phone ticket just records a
+ * customer/agent note with no email dispatch, and an internal note ticket
+ * carries work that belongs to no call or mail (needs no customer; its first
+ * article is an internal note, time booked on it). The queue may be
  * pre-selected via the `queue_id` search param set by the top-bar queue picker.
  */
 export type NewTicketSearch = {
   queue_id?: number;
   /** Phone mode prefill (click-to-call from the customer page). */
-  type?: "email" | "phone";
+  type?: "email" | "phone" | "note";
   direction?: "inbound" | "outbound";
   /** Customer login to preselect. */
   customer?: string;
@@ -176,15 +179,19 @@ export function NewTicketPage() {
   const [ticketType, setTicketType] = useState<TicketType>(search.type ?? "email");
   // Only offer states an agent would set on a fresh ticket (new/open), not
   // closed/removed types. A phone ticket (Znuny AgentTicketPhone) may also
-  // start pending (with a time) or be closed right away.
+  // start pending (with a time) or be closed right away; an internal note
+  // ticket may be closed right away (work already done), but has no pending
+  // time input.
   const states = useMemo(
     () =>
       (statesQ.data ?? []).filter((s) =>
         ticketType === "phone"
           ? s.type_name !== "removed" && s.type_name !== "merged"
-          : s.type_name === "new" ||
-            s.type_name === "open" ||
-            s.type_name === "pending auto",
+          : ticketType === "note"
+            ? s.type_name === "new" || s.type_name === "open" || s.type_name.startsWith("closed")
+            : s.type_name === "new" ||
+              s.type_name === "open" ||
+              s.type_name === "pending auto",
       ),
     [statesQ.data, ticketType],
   );
@@ -293,8 +300,10 @@ export function NewTicketPage() {
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [showReplyTo, setShowReplyTo] = useState(false);
-  /** Time booked on the email's article (phone keeps its own in phoneFields). */
+  /** Time booked on the email's / note's article (phone keeps its own in phoneFields). */
   const [emailTimeUnits, setEmailTimeUnits] = useState("");
+  /** Note: when the work was done (`datetime-local`, display zone); blank = now. */
+  const [occurredAt, setOccurredAt] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
@@ -305,7 +314,8 @@ export function NewTicketPage() {
 
   // Unlocked once a customer is chosen, or the agent explicitly opts to
   // continue without one — the escape hatch button stays outside this gate.
-  const formUnlocked = customer !== null || skipCustomer;
+  // Internal work rarely has a customer: a note ticket is never gated.
+  const formUnlocked = customer !== null || skipCustomer || ticketType === "note";
 
   const customersQ = useQuery({
     queryKey: ["reference", "customer-search", debouncedCustomerQuery],
@@ -355,12 +365,14 @@ export function NewTicketPage() {
   // the configured default, else the first non-intake queue — the backend
   // picks; before a customer is known (or "Ohne Kunde") the default applies.
   const suggestLogin = customer?.login ?? null;
+  // A note ticket has no Znuny screen of its own; it follows the phone one.
+  const suggestScreen = ticketType === "note" ? "phone" : ticketType;
   const suggestionQ = useQuery({
-    queryKey: ["new-ticket", "queue-suggestion", ticketType, suggestLogin],
+    queryKey: ["new-ticket", "queue-suggestion", suggestScreen, suggestLogin],
     queryFn: ({ signal }) =>
       suggestLogin
-        ? newTicketApi.suggestedQueue(suggestLogin, ticketType, signal)
-        : newTicketApi.defaultQueue(ticketType, signal),
+        ? newTicketApi.suggestedQueue(suggestLogin, suggestScreen, signal)
+        : newTicketApi.defaultQueue(suggestScreen, signal),
     enabled: !queuePinned,
   });
   const suggestion = suggestionQ.data;
@@ -555,16 +567,25 @@ export function NewTicketPage() {
     enabled: ticketType === "email",
   });
 
+  // The server takes the past year only; a typed date outside it would 422.
+  const occurredIso = occurredAt ? pendingIso(occurredAt) : null;
+  const occurredValid =
+    !occurredAt ||
+    (occurredIso !== null &&
+      Date.parse(occurredIso) <= Date.now() &&
+      Date.parse(occurredIso) >= Date.now() - 365 * 86_400_000);
+
   const canSubmit =
-    (ticketType === "phone" || emailSecurity.blocked === null) &&
+    (ticketType !== "email" || emailSecurity.blocked === null) &&
+    (ticketType !== "note" || occurredValid) &&
     formUnlocked &&
     queue !== "" &&
     priority !== "" &&
     state !== "" &&
     subject.trim().length > 0 &&
     body.trim().length > 0 &&
-    (ticketType === "phone" || to.length > 0) &&
-    (ticketType === "email" || phoneReady) &&
+    (ticketType !== "email" || to.length > 0) &&
+    (ticketType !== "phone" || phoneReady) &&
     // A file still being read would silently go missing from the request.
     !attachments.encoding &&
     // The ticket exists already (only its link to the change failed): no second create.
@@ -619,6 +640,33 @@ export function NewTicketPage() {
         await navigate({
           to: "/agent/tickets/$ticketId",
           params: { ticketId: String(phoneTicketId) },
+        });
+        return;
+      }
+      if (ticketType === "note") {
+        // One request: ticket + internal note + booking, all dated to when
+        // the work was done (or now).
+        const units = Number(emailTimeUnits);
+        const { ticket_id: noteTicketId } = await api.createTicket({
+          title: subject.trim(),
+          queue_id: queue,
+          state_id: state,
+          priority_id: priority,
+          owner_id: user.id,
+          customer_id: customer?.customer_id || null,
+          customer_user_id: customer?.login ?? null,
+          note: {
+            body: text,
+            content_type: richText ? "text/html" : "text/plain",
+            time_unit: emailTimeUnits.trim() !== "" && units > 0 ? units : null,
+            attachments: attachments.payload,
+          },
+          occurred_at: occurredIso,
+        });
+        if (!(await linkToChange(noteTicketId))) return;
+        await navigate({
+          to: "/agent/tickets/$ticketId",
+          params: { ticketId: String(noteTicketId) },
         });
         return;
       }
@@ -776,7 +824,26 @@ export function NewTicketPage() {
         >
           {t("newTicket.typePhone")}
         </button>
+        <button
+          type="button"
+          data-testid="new-ticket-type-note"
+          aria-pressed={ticketType === "note"}
+          onClick={() => setTicketType("note")}
+          className={cn(
+            "border-l border-hairline px-3 py-1.5",
+            ticketType === "note"
+              ? "bg-accent text-accent-ink"
+              : "bg-surface text-muted hover:text-ink",
+          )}
+        >
+          {t("newTicket.typeNote")}
+        </button>
       </div>
+      {ticketType === "note" && (
+        <p className="mt-2 text-[12px] text-muted" data-testid="new-ticket-note-hint">
+          {t("newTicket.typeNoteHint")}
+        </p>
+      )}
 
       {loading ? (
         <div className="mt-6 flex justify-center py-10">
@@ -1071,6 +1138,30 @@ export function NewTicketPage() {
               />
             </label>
 
+            {ticketType === "note" && (
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
+                  {t("newTicket.occurredAt")}
+                </span>
+                <input
+                  type="datetime-local"
+                  data-testid="new-ticket-occurred-at"
+                  value={occurredAt}
+                  max={toLocalInputValue(new Date())}
+                  onChange={(e) => setOccurredAt(e.target.value)}
+                  aria-invalid={!occurredValid}
+                  aria-describedby="new-ticket-occurred-at-hint"
+                  className={cn(FIELD_CLASS, "w-auto")}
+                />
+                <span
+                  id="new-ticket-occurred-at-hint"
+                  className={cn("mt-1 block text-[12px]", occurredValid ? "text-muted" : "text-danger")}
+                >
+                  {occurredValid ? t("newTicket.occurredAtHint") : t("newTicket.occurredAtInvalid")}
+                </span>
+              </label>
+            )}
+
             <TicketPropsBar
               queues={queues}
               queueId={queue === "" ? null : queue}
@@ -1185,7 +1276,7 @@ export function NewTicketPage() {
             ) : (
               <div className="block">
                 <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {t("newTicket.message")}
+                  {ticketType === "note" ? t("newTicket.internalNote") : t("newTicket.message")}
                 </span>
                 {/* Same framed editor as the reply dialog: text, signature,
                     files and the refine/file/time toolbar. */}
@@ -1195,7 +1286,7 @@ export function NewTicketPage() {
                   timeUnits={emailTimeUnits}
                   onTimeUnitsChange={setEmailTimeUnits}
                   signature={
-                    composeContextQ.data
+                    ticketType === "email" && composeContextQ.data
                       ? {
                           text: composeContextQ.data.signature,
                           isHtml: composeContextQ.data.signature_is_html,
@@ -1304,6 +1395,8 @@ export function NewTicketPage() {
                 <Spinner />
               ) : ticketType === "email" ? (
                 t("newTicket.submitSend")
+              ) : ticketType === "note" && closedSelected ? (
+                t("newTicket.submitNoteClose")
               ) : closedSelected ? (
                 t("newTicket.submitClose")
               ) : (

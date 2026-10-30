@@ -954,9 +954,9 @@
       "prev": "Ticket precedente nell'elenco",
       "next": "Ticket successivo nell'elenco"
     },
-    "stateGroup": {
-      "pending": "In sospeso",
-      "closed": "Chiuso"
+    "statusAction": {
+      "pending": "Metti in attesa…",
+      "close": "Chiudi…"
     },
     "signatureAppended": "Firma · aggiunta all'invio",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "Annulla",
     "typeEmail": "Ticket email",
     "typePhone": "Ticket telefonico",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "Cerca cliente…",
     "customerSearchHint": "Nome, login o email — min. 2 caratteri",
     "customerSelected": "Cliente selezionato",

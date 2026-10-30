@@ -954,9 +954,9 @@
       "prev": "Tiket sebelumnya dalam daftar",
       "next": "Tiket berikutnya dalam daftar"
     },
-    "stateGroup": {
-      "pending": "Tertunda",
-      "closed": "Ditutup"
+    "statusAction": {
+      "pending": "Tunda…",
+      "close": "Tutup…"
     },
     "signatureAppended": "Tanda tangan · ditambahkan saat kirim",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "Batalkan",
     "typeEmail": "Tiket email",
     "typePhone": "Tiket telepon",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "Telusuri pelanggan…",
     "customerSearchHint": "Nama, login, atau email — min. 2 karakter",
     "customerSelected": "Pelanggan terpilih",

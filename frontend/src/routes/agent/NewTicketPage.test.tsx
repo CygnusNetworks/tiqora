@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
+import { pendingIso, toLocalInputValue } from "@/lib/phoneCall";
 import { NewTicketPage } from "./NewTicketPage";
 
 const {
@@ -693,6 +694,99 @@ describe("NewTicketPage", () => {
         params: { ticketId: "42" },
       }),
     );
+  });
+
+  it("an internal note ticket needs no customer and sends ticket, note and booking in one request", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 2, name: "closed successful", type_name: "closed" },
+      { id: 6, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    createTicketTimeAccounting.mockReset().mockResolvedValue({});
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    expect(screen.getByTestId("new-ticket-note-hint")).toBeInTheDocument();
+    // Unlocked without picking or skipping a customer; no recipients.
+    expect(screen.queryByTestId("new-ticket-to")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Server-Wartung" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Updates eingespielt." },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-time"), { target: { value: "45" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() =>
+      expect(createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Server-Wartung",
+          customer_user_id: null,
+          note: {
+            body: "Updates eingespielt.",
+            content_type: "text/plain",
+            time_unit: 45,
+            attachments: [],
+          },
+          // blank field: the server dates it now
+          occurred_at: null,
+        }),
+      ),
+    );
+    expect(createArticle).not.toHaveBeenCalled();
+    expect(createTicketTimeAccounting).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/agent/tickets/$ticketId",
+        params: { ticketId: "42" },
+      }),
+    );
+  });
+
+  it("an internal note ticket can be dated to when the work was done, never into the future", async () => {
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Vor-Ort-Termin" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Termin mit dem Elektriker." },
+    });
+    const field = screen.getByTestId("new-ticket-occurred-at");
+    fireEvent.change(field, {
+      target: { value: toLocalInputValue(new Date(Date.now() + 2 * 86_400_000)) },
+    });
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+
+    const past = toLocalInputValue(new Date(Date.now() - 3 * 86_400_000));
+    fireEvent.change(field, { target: { value: past } });
+    expect(field).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() =>
+      expect(createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({ occurred_at: pendingIso(past) }),
+      ),
+    );
+  });
+
+  it("an internal note ticket offers closed but no pending states", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 2, name: "closed successful", type_name: "closed" },
+      { id: 6, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    fireEvent.click(await screen.findByTestId("new-ticket-state-value"));
+    expect(await screen.findByText("Closed successful")).toBeInTheDocument();
+    expect(screen.queryByText("Pending reminder")).not.toBeInTheDocument();
   });
 
   it("stays on the page with a link when only the time booking fails", async () => {
@@ -1476,6 +1570,21 @@ describe("NewTicketPage from a failed change", () => {
     fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
     await waitFor(() => expect(addRelated).toHaveBeenCalledTimes(2));
     expect(addRelated).toHaveBeenLastCalledWith(132, 42);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }));
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("links an internal note ticket to the change too, with the same retry", async () => {
+    addRelated.mockRejectedValueOnce(new Error("link_refused"));
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Rückfall dokumentiert." } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await screen.findByTestId("new-ticket-retry-link");
+    expect(addRelated).toHaveBeenCalledWith(132, 42);
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("new-ticket-retry-link"));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }));
     expect(createTicket).toHaveBeenCalledTimes(1);
   });

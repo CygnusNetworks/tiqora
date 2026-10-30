@@ -954,9 +954,9 @@
       "prev": "Попередній квиток у списку",
       "next": "Наступний квиток у списку"
     },
-    "stateGroup": {
-      "pending": "В очікуванні",
-      "closed": "Закриті"
+    "statusAction": {
+      "pending": "Відкласти…",
+      "close": "Закрити…"
     },
     "signatureAppended": "Підпис · додається під час надсилання",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "Скасувати",
     "typeEmail": "Квиток електронною поштою",
     "typePhone": "Телефонний квиток",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "Пошук клієнтів…",
     "customerSearchHint": "Ім'я, логін або email — мін. 2 символи",
     "customerSelected": "Вибраний клієнт",

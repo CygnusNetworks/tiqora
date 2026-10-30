@@ -954,9 +954,9 @@
       "prev": "列表中的上一張工單",
       "next": "列表中的下一張工單"
     },
-    "stateGroup": {
-      "pending": "待定",
-      "closed": "已關閉"
+    "statusAction": {
+      "pending": "擱置…",
+      "close": "關閉…"
     },
     "signatureAppended": "簽名 · 發送時附加",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "取消",
     "typeEmail": "電子郵件票",
     "typePhone": "電話票",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "搜尋客戶...",
     "customerSearchHint": "姓名、登入名稱或電子郵件 - 分鐘2 個字符",
     "customerSelected": "選定客戶",

@@ -954,9 +954,9 @@
       "prev": "목록의 이전 티켓",
       "next": "목록의 다음 티켓"
     },
-    "stateGroup": {
-      "pending": "보류 중",
-      "closed": "닫힘"
+    "statusAction": {
+      "pending": "보류…",
+      "close": "닫기…"
     },
     "signatureAppended": "서명 · 보낼 때 추가됩니다",
     "replyNext": {
@@ -1321,6 +1321,13 @@
     "cancel": "취소",
     "typeEmail": "이메일 티켓",
     "typePhone": "전화티켓",
+    "typeNote": "Internal note",
+    "typeNoteHint": "For work without a call or mail, e.g. internal tasks: no customer needed, the note stays internal and the time is booked on it.",
+    "occurredAt": "When the work was done",
+    "occurredAtHint": "Leave empty for now. The ticket, the note and the booked time are dated to this moment.",
+    "occurredAtInvalid": "Please pick a moment in the past, at most one year ago.",
+    "internalNote": "Internal note",
+    "submitNoteClose": "Create and close",
     "customerSearch": "고객 검색…",
     "customerSearchHint": "이름, 로그인 또는 이메일 — 최소 2자",
     "customerSelected": "선정된 고객",
