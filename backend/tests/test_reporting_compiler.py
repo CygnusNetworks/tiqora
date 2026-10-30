@@ -559,6 +559,7 @@ def test_group_by_keeps_original_dimension_indices() -> None:
 _URLS: set[str] = set()
 _BAND = {"lo": LO, "hi": HI}
 _CLEANUP = (
+    "DELETE FROM tiqora_itsm_change WHERE ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_cmdb_ci WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_cmdb_catalog WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_cmdb_class WHERE id BETWEEN :lo AND :hi",
@@ -642,6 +643,20 @@ def _event(tid: int, kind: str, at: datetime, queue: int, **kw: Any) -> dict[str
     }
     row.update(kw)
     return row
+
+
+def _seed_change(conn: Any, ticket_id: int, created: datetime) -> None:
+    """One change record on ``T_A`` (queue ``Q_IN``) for the ``changes`` source."""
+    conn.execute(
+        text(
+            "INSERT INTO tiqora_itsm_change (ticket_id, change_type, phase, outcome,"
+            " planned_start, planned_end, actual_end, risk_level, approval_round,"
+            " impact_truncated, portal_visible, created_at, created_by, updated_at, updated_by)"
+            " VALUES (:id, 'normal', 'closed', 'successful', :t, :t, :t, 'low', 0,"
+            " false, false, :t, :u, :t, :u)"
+        ),
+        {"id": ticket_id, "u": AGENT, "t": created},
+    )
 
 
 def _seed_cmdb(conn: Any, created: datetime) -> None:
@@ -742,6 +757,7 @@ def _seed(sync_url: str) -> None:
                 },
             )
         _seed_cmdb(conn, T_A_CREATED)
+        _seed_change(conn, T_A, T_A_CREATED)
         for taid, tid, units, at in (
             (47730, T_A, "1.50", datetime(2024, 4, 2, 10, 0)),
             (47731, T_A, "2.00", datetime(2024, 4, 3, 10, 0)),
