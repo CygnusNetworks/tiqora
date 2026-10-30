@@ -146,8 +146,9 @@ first here.
 | "Muster" (patterns) | "Wann Tickets eingehen" / when tickets arrive | Heatmap weekday by hour, last 12 weeks |
 
 **Category "ITSM".** Sixteen further reports, shown in the catalogue after the core categories. The
-first eight run on ticket data and work in every ITSM mode except "Aus" (off); the other eight read
-Tiqora's own CMDB and change records and show data only in Mode B ("Tiqora führt das ITSM"). While
+first eight run on ticket data and are listed in every ITSM mode except "Aus" (off); the other eight
+read Tiqora's own CMDB and change records, are listed only in Mode B and hold data only once Tiqora has
+led the ITSM ("Tiqora führt das ITSM"). While
 the ITSM mode is off, the category is not listed at all; in Mode A (Znuny führt das ITSM) it lists
 the ticket-based reports only. Details: [ITSM reports and data bases](#itsm-reports-and-data-bases).
 
@@ -267,8 +268,12 @@ groupings, or a key-figure display, which must have no grouping.
 
 The four ITSM data bases appear in the "Datenbasis" picker only while Tiqora leads the ITSM
 (Mode B). A saved or imported report on one of them still opens in other modes, read-only, with the
-note "Diese Datenbasis gibt es erst, wenn Tiqora das ITSM führt (Modus B)."; it runs and shows no
-rows. The ticket reports above (including the ITSM measures on "Tickets") work in every mode.
+note "Diese Datenbasis gibt es erst, wenn Tiqora das ITSM führt (Modus B)."; running it is not
+blocked. The data bases read Tiqora's own tables, which hold data only once Tiqora has led the ITSM:
+without Mode B the result has no rows, and after a switch back from Mode B to Mode A the report
+counts whatever rows remain in those tables. The ticket reports above (including the ITSM measures
+on "Tickets") can be used in any mode; their built-in reports are listed in every mode except "Aus"
+(off).
 
 Save with **"Speichern"** (a name is required; the dialog "Bericht speichern" asks for sharing) or
 "Als Kopie speichern". Unsaved changes ask for confirmation before you leave ("Änderungen
@@ -491,7 +496,9 @@ wallboards use the CI classes of the schedule's owner or the link's creator (see
 **Mode A and off.** In Mode A only the ticket-based ITSM reports are listed; with the ITSM mode
 "Aus" none is. The four data bases are hidden in the builder, and the built-in reports on them are
 not listed. A saved or imported report on one of them is not an error: it opens, read-only with a
-note, and shows an empty result. Statistics over Znuny's own CMDB and change tables in Mode A are
+note, and runs: it reads Tiqora's own tables, which hold data only once Tiqora has led the ITSM. Without
+Mode B it shows no rows; after a switch back from Mode B to Mode A it counts the rows that remain.
+Statistics over Znuny's own CMDB and change tables in Mode A are
 not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
 
 **After the update.** This version adds two columns to the ticket facts ("first level solved" and

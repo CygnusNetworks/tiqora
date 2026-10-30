@@ -1064,7 +1064,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | ITSM CIs: customer portal view | yes | Yes (Tiqora CMDB, Mode B): "Meine Geräte und Systeme", portal-flagged attributes only, ticket form with system picker |
 | ITSM ImportExport (CI CSV/XLSX) | yes | Yes (Tiqora CMDB, Mode B): wizard with column mapping (`attr:NIC[2].IPAddress[1]`), dry run, mapping templates, CSV/XLSX export as background jobs. Znuny's own ImportExport mapping objects are not read; transferring a Znuny CMDB is the job of the ITSM import (see [itsm.md](itsm.md)) |
 | Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 core and 16 ITSM built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV/PDF export, import of Znuny statistics (from `xml_storage` or an exported XML file; the four dynamic ticket objects, the eight ITSM objects and `StateAction`, with a list of what was approximated or dropped) and scheduled delivery by e-mail (daily to yearly, several reports per mail, PDF/XLSX/CSV, run history). Not taken over: dynamic-field axes, cron expressions. See [Reporting differences](#reporting-differences-to-znuny-stats), [Importing Znuny statistics](#importing-znuny-statistics) and [Scheduled reports](#scheduled-reports-vs-the-statistic-reports-add-on) |
-| ITSM statistics (ITSMServiceLevelManagement: 47 shipped statistics) | partial | The ticket-based ones are covered in every ITSM mode but off: first-level solution rate (count and rate) and average solution time on `tickets`, tickets by type. The CI and change statistics (CIs, changes, state changes of changes, changes per requester, changes per CI class) are reports on Tiqora's own CMDB and change tables and show data **only in Mode B**; in Mode A they are not available (backlog: ITSM CI/change statistics over Znuny's `configitem*` / `change_*` tables in Mode A). Changes archived from Znuny are not counted either (backlog: statistics over the change archive, including the CIP matrix). 16 ITSM built-in reports (category "ITSM") and the import of all eight ITSM statistic objects; no availability statistics, because Znuny ships none. See [Importing Znuny statistics](#importing-znuny-statistics) and [reporting.md](reporting.md#itsm-reports-and-data-bases) |
+| ITSM statistics (ITSMServiceLevelManagement: 47 shipped statistics) | partial | The ticket-based ones are covered in every ITSM mode but off: first-level solution rate (count and rate) and average solution time on `tickets`, tickets by type. The CI and change statistics (CIs, changes, state changes of changes, changes per requester, changes per CI class) are reports on Tiqora's own CMDB and change tables and hold data **only once Tiqora has led the ITSM (Mode B)**; in Mode A they are not listed (backlog: ITSM CI/change statistics over Znuny's `configitem*` / `change_*` tables in Mode A). Changes archived from Znuny are not counted either (backlog: statistics over the change archive, including the CIP matrix). 16 ITSM built-in reports (category "ITSM") and the import of all eight ITSM statistic objects; no availability statistics, because Znuny ships none. See [Importing Znuny statistics](#importing-znuny-statistics) and [reporting.md](reporting.md#itsm-reports-and-data-bases) |
 | Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
 | Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
@@ -1233,7 +1233,9 @@ figures differ from Znuny's `Kernel::System::Stats`:
   tickets; a site that changed `ViewableStateType` gets different figures. A ticket created closed
   counts three minutes in both.
 - **CI and change statistics: Mode B only.** The reports read Tiqora's own tables. In Mode A and
-  with ITSM off they are empty; Znuny's own statistics remain the source there.
+  with ITSM off they are not listed and, because those tables hold data only once Tiqora has led the
+  ITSM, show no rows (after a switch back from Mode B they count the rows that remain); Znuny's own
+  statistics remain the source there.
 - **Changes from before the switch** (the read-only change archive) are not counted by the change
   reports; a CIP evaluation of these changes is on the backlog.
 - **The CIP matrix is dropped.** Znuny's change category, impact and priority (`CategoryIDs`,
@@ -1397,14 +1399,16 @@ Names that are not in this list are reported ("Diesen Change-Status gibt es in T
 history statistics use the same mapping on the phase (`closed_*` collapsed to `closed`).
 
 **Mode A and off.** An imported CI or change statistic still becomes a report, with the note that
-it shows data only when Tiqora leads the ITSM (Mode B). It opens read-only in the builder and shows an
-empty result until then.
+it shows data only once Tiqora has led the ITSM (Mode B). It opens read-only in the builder and runs; it
+shows no rows until Tiqora's tables hold data, and after a switch back from Mode B it counts the rows
+that remain.
 
 **Foreign ids.** The ITSM ticket, CI and change-class objects keep the ids of the exporting system
 in an export file, so Tiqora cannot map them reliably to its own ones. Such a selection does not
 become a fixed filter: it becomes a runtime parameter, and the report counts all values until someone
 chooses ("IDs aus einer Exportdatei lassen sich nicht zuordnen. Solange Sie keine Auswahl treffen,
-zählt der Bericht alle Werte."). An unreliable state selection never lets open tickets into the
+zählt der Bericht alle Werte."; for statistic 406 the same note reads "... zählt der Bericht alle
+Vorfallsstatus."). An unreliable state selection never lets open tickets into the
 first-level and solution-time reports; they keep the "closed" restriction. The shipped statistic
 406 selects all three incident states; as the state names of a file cannot be looked up, it is
 imported without that restriction and counts all incident states, which equals Znuny's selection. Read

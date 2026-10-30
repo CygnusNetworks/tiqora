@@ -1247,7 +1247,9 @@ Was Sie wissen sollten:
 - **Nur Modus B für CIs und Changes.** Tiqora liest für diese Berichte die eigene CMDB und die eigenen
   Change-Daten, nie Znunys Tabellen `configitem*` und `change_*`. In Modus A und bei „Aus“ sind die
   Datenbasen im Bericht-Editor nicht wählbar; ein gespeicherter oder importierter Bericht darauf lässt
-  sich öffnen und zeigt ein leeres Ergebnis. Auswertungen über Znunys CIs und Changes in Modus A gibt es
+  sich öffnen und läuft; die Berichte lesen nur Tiqoras eigene Tabellen, die erst Daten enthalten, wenn
+  Tiqora das ITSM geführt hat. Ohne Modus B ist das Ergebnis leer, nach einem Zurückstellen von Modus B
+  auf Modus A zählt der Bericht die Zeilen, die noch vorhanden sind. Auswertungen über Znunys CIs und Changes in Modus A gibt es
   nicht; dafür bleiben Znunys eigene Statistiken.
 - **Changes aus dem Archiv fehlen.** Changes, die der Import oder der Archiv-Lauf aus Znuny in das
   Change-Archiv kopiert hat (Kapitel 8), zählen die Berichte nicht; Auswertungen über diese Changes
