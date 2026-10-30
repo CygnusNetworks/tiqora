@@ -29,6 +29,12 @@ from tiqora.reporting.definition import (
 )
 from tiqora.reporting.sources._common import STATE_TYPES
 from tiqora.reporting.sql import Grain
+from tiqora.reporting.znuny_stats.change_states import (
+    CHANGE_STATE_MAPPED,
+    CHANGE_STATE_UNKNOWN,
+    ZNUNY_CHANGE_STATES,
+    to_phase,
+)
 from tiqora.reporting.znuny_stats.model import StatElement, ZnunyStat
 from tiqora.saved_searches.znuny_import import ZnunyLookups
 
@@ -76,7 +82,16 @@ class StatLookups:
 @dataclass(frozen=True, slots=True)
 class FieldMap:
     field: str  # Tiqora source field key
-    kind: Literal["id", "string", "state_type", "time", "cmdb_class", "cmdb_catalog"]
+    kind: Literal[
+        "id",
+        "string",
+        "state_type",
+        "time",
+        "cmdb_class",
+        "cmdb_catalog",
+        "change_state",
+        "change_phase",
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +216,7 @@ def dropped_reason(
 
 
 _CMDB_KINDS: Final = ("cmdb_class", "cmdb_catalog")
+_CHANGE_KINDS: Final = ("change_state", "change_phase")
 
 
 def file_ids_unreliable(
@@ -215,7 +231,7 @@ def file_ids_unreliable(
         return False
     if fmap.kind == "id":
         return not names_in_file or el.element not in FILE_NAME_ELEMENTS
-    if fmap.kind in _CMDB_KINDS:
+    if fmap.kind in (*_CMDB_KINDS, *_CHANGE_KINDS):
         return any(_int(raw) is not None for raw in el.selected)
     return False
 
@@ -255,6 +271,28 @@ def _resolve_cmdb(
         out.append(found)
 
 
+def _resolve_change_state(
+    raw: str,
+    ref: str,
+    fmap: FieldMap,
+    lookups: StatLookups,
+    out: list[int | str],
+    issues: list[ImportIssue],
+) -> bool:
+    """One Znuny change state in Tiqora's spelling; ``True`` when something mapped."""
+    number = _int(raw)
+    name = lookups.change_state_names.get(number) if number is not None else raw.strip()
+    mapped = ZNUNY_CHANGE_STATES.get(name.casefold()) if name is not None else None
+    if mapped is None:
+        issues.append(make_issue(ref, raw, CHANGE_STATE_UNKNOWN, "dropped"))
+        return False
+    for status in mapped:
+        value = to_phase(status) if fmap.kind == "change_phase" else status
+        if value not in out:
+            out.append(value)
+    return True
+
+
 def resolve_values(
     el: StatElement,
     fmap: FieldMap,
@@ -277,9 +315,12 @@ def resolve_values(
                 "priority": lookups.priority_ids_by_name,
                 "user": lookups.user_ids_by_login,
             }[kind]
+    any_state = False
     for raw in el.selected:
         if fmap.kind in _CMDB_KINDS:
             _resolve_cmdb(raw, ref, fmap, lookups, out, issues)
+        elif fmap.kind in _CHANGE_KINDS:
+            any_state |= _resolve_change_state(raw, ref, fmap, lookups, out, issues)
         elif fmap.kind == "id":
             if by_name is not None:
                 found = by_name.get(raw.strip().casefold())
@@ -320,6 +361,8 @@ def resolve_values(
                 )
             elif raw.strip():
                 out.append(raw)
+    if any_state:
+        issues.append(make_issue(ref, ", ".join(el.selected), CHANGE_STATE_MAPPED, "approximated"))
     if stat.origin == "file" and fmap.kind == "state_type" and out:
         issues.append(make_issue(ref, ", ".join(el.selected), _FILE_IDS_REASON, "approximated"))
     return out
