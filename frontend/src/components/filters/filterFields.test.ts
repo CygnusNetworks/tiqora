@@ -22,6 +22,7 @@ const SOURCE_FIXTURE = {
   key: "tickets",
   label_key: "reports.sources.tickets",
   default_time_field: "created",
+  available: true,
   measures: [],
   dimensions: [
     dim({ key: "queue", kind: "id", filter_type: "id", options_source: "queue", labels: "queue", ops: ["eq", "in", "neq", "not_in"] }),

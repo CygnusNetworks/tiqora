@@ -445,13 +445,24 @@ async def test_itsm_sources_flagged_outside_mode_b(env: Env) -> None:
     assert "builtin.ticket_kpis" in listed
 
 
-async def test_report_on_unavailable_source_still_runs(env: Env) -> None:
-    _write_mode(env.sync_url, "off")
-    resp = await _run(env, {"report_key": "builtin.cmdb_cis_by_class"})
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["result"]["rows"] == []
-    got = await env.client.get("/api/v1/reports/builtin.cmdb_cis_by_class")
-    assert got.status_code == 200
+ONE_BUILTIN_PER_ITSM_SOURCE = (
+    "builtin.cmdb_cis_by_class",  # config_items
+    "builtin.itsm_changes_by_status",  # changes
+    "builtin.itsm_change_transitions",  # change_events
+    "builtin.itsm_changes_per_ci_class",  # ci_tickets
+)
+
+
+@pytest.mark.parametrize("mode", ["off", "znuny_readthrough"])
+async def test_report_on_unavailable_source_still_runs(env: Env, mode: str) -> None:
+    """A saved link, import or schedule on a hidden source gets an empty result, never a 500."""
+    _write_mode(env.sync_url, mode)
+    for key in ONE_BUILTIN_PER_ITSM_SOURCE:
+        resp = await _run(env, {"report_key": key, "time_range": JUNE})
+        assert resp.status_code == 200, (key, resp.text)
+        assert resp.json()["result"]["rows"] == [], key
+        got = await env.client.get(f"/api/v1/reports/{key}")
+        assert got.status_code == 200, key
 
 
 async def test_status_endpoint(env: Env) -> None:
