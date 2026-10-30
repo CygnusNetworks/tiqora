@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -31,6 +31,7 @@ from tiqora.api.v1.itsm_change_schemas import (
     FreezeOccurrencesOut,
     LegacyChangeOut,
     LegacyChangePageOut,
+    MeetingListItemOut,
     MeetingOut,
     RelatedLinkIn,
     RelatedTicketOut,
@@ -48,6 +49,7 @@ from tiqora.api.v1.itsm_change_schemas import (
     freeze_occurrences_out,
     legacy_change_out,
     legacy_page_out,
+    meeting_list_item_out,
     meeting_out,
     related_out,
     service_availability_out,
@@ -88,10 +90,11 @@ from tiqora.itsm.change.legacy.sources import (
 from tiqora.itsm.change.phases import FINAL_PHASES, ChangeType, Phase
 from tiqora.itsm.change.read import (
     MAX_RANGE,
+    MY_TASKS_LIMIT,
     ChangeQuery,
     calendar,
     list_changes,
-    my_tasks,
+    my_tasks_page,
     service_availability,
 )
 from tiqora.itsm.change.related import (
@@ -208,22 +211,24 @@ async def get_cabs(user: CurrentUser, session: DbSession, settings: AppSettings)
     return [cab_out(v) for v in await list_cabs(session, include_invalid=False)]
 
 
-@router.get("/cab-meetings", response_model=list[MeetingOut])
+@router.get("/cab-meetings", response_model=list[MeetingListItemOut])
 async def get_cab_meetings(
     user: CurrentUser,
     session: DbSession,
     settings: AppSettings,
     start: Annotated[datetime, Query()],
     end: Annotated[datetime, Query()],
-) -> list[MeetingOut]:
-    """Meetings that overlap ``[start, end)`` (without their agenda lines); times are UTC."""
+) -> list[MeetingListItemOut]:
+    """Meetings that overlap ``[start, end)``, without their agenda lines and minutes (both on
+    ``GET /cab-meetings/{id}``); times are UTC."""
     await require_change_mode(session, settings)
     lo, hi = to_utc_naive(start), to_utc_naive(end)
     if hi <= lo:
         raise ChangeError("range_invalid", 422)
     if hi - lo > MAX_RANGE:
         raise ChangeError("range_too_large", 422)
-    return [meeting_out(v) for v in await list_meetings(session, start=lo, end=hi, user_id=user.id)]
+    meetings = await list_meetings(session, start=lo, end=hi, user_id=user.id)
+    return [meeting_list_item_out(v) for v in meetings]
 
 
 @router.post("/cab-meetings", response_model=MeetingOut, status_code=status.HTTP_201_CREATED)
@@ -331,11 +336,18 @@ async def get_my_change_tasks(
     user: CurrentUser,
     session: DbSession,
     settings: AppSettings,
+    response: Response,
     open_only: Annotated[bool, Query()] = True,
 ) -> list[TaskListItemOut]:
-    """Change tasks the caller owns (by default only unfinished ones of live changes)."""
+    """Change tasks the caller owns (by default only unfinished ones of live changes), at most
+    ``MY_TASKS_LIMIT`` (100); the body stays a list, ``X-Tasks-Truncated: true`` says more
+    exist."""
     await require_change_mode(session, settings)
-    items = await my_tasks(session, user_id=user.id, open_only=open_only)
+    items, truncated = await my_tasks_page(
+        session, user_id=user.id, open_only=open_only, limit=MY_TASKS_LIMIT
+    )
+    if truncated:
+        response.headers["X-Tasks-Truncated"] = "true"
     return [task_list_item_out(i) for i in items]
 
 
@@ -583,8 +595,11 @@ async def post_change_impact_recompute(
 
 
 @router.get("/changes/{ticket_id:int}/tasks", response_model=list[TaskOut])
-async def get_change_tasks(ticket_id: int, user: CurrentUser, session: DbSession) -> list[TaskOut]:
+async def get_change_tasks(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> list[TaskOut]:
     """The change's tasks in order; task tickets the caller cannot read are left out."""
+    await require_change_mode(session, settings)
     tasks = await list_tasks(session, change_ticket_id=ticket_id, user_id=user.id)
     return [task_out(t) for t in tasks]
 

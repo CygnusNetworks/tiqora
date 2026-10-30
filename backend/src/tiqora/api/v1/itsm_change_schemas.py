@@ -423,6 +423,29 @@ def meeting_out(view: MeetingView) -> MeetingOut:
     return MeetingOut.model_validate(view.model_dump())
 
 
+class MeetingListItemOut(BaseModel):
+    """A meeting of the list: no agenda lines and no minutes (the minutes are on the meeting
+    itself, ``GET /itsm/cab-meetings/{id}``)."""
+
+    id: int
+    cab_id: int
+    cab_name: str
+    title: str
+    starts_at: UtcDateTime
+    ends_at: UtcDateTime
+    location: str | None
+    status: MeetingStatus
+    agenda_count: int
+    created_at: UtcDateTime
+    created_by: int
+    updated_at: UtcDateTime
+    updated_by: int
+
+
+def meeting_list_item_out(view: MeetingView) -> MeetingListItemOut:
+    return MeetingListItemOut.model_validate(view.model_dump(exclude={"minutes", "agenda"}))
+
+
 class AgendaIn(BaseModel):
     items: list[AgendaItemIn] = Field(default_factory=list, max_length=MAX_AGENDA)
 

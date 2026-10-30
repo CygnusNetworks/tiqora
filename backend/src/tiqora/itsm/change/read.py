@@ -659,10 +659,23 @@ async def _task_items(
     return out
 
 
+#: tasks answered by "Meine Aufgaben" (the route says ``X-Tasks-Truncated: true`` when more exist)
+MY_TASKS_LIMIT: Final = 100
+
+
 async def my_tasks(
-    session: AsyncSession, *, user_id: int, open_only: bool = True, limit: int = 100
+    session: AsyncSession, *, user_id: int, open_only: bool = True, limit: int = MY_TASKS_LIMIT
 ) -> list[TaskListItem]:
-    """Task tickets the user owns and may read, soonest planned start first.
+    """Task tickets the user owns and may read, soonest planned start first (see
+    :func:`my_tasks_page`)."""
+    return (await my_tasks_page(session, user_id=user_id, open_only=open_only, limit=limit))[0]
+
+
+async def my_tasks_page(
+    session: AsyncSession, *, user_id: int, open_only: bool = True, limit: int = MY_TASKS_LIMIT
+) -> tuple[list[TaskListItem], bool]:
+    """Task tickets the user owns and may read, soonest planned start first, and whether more
+    exist than answered (``limit``, or the scan cap of the user's task tickets).
 
     ``open_only``: tasks in an open state type (not closed/removed/merged) of changes that are
     still alive: not closed, cancelled or rejected (a rejected change is parked until reworked).
@@ -670,7 +683,7 @@ async def my_tasks(
     newest tickets) only ever sees the user's own tasks.
     """
     if not await _is_mode_b(session):
-        return []
+        return [], False
     cfg = await load_itsm_settings(session, get_settings())
     sql = (
         "SELECT t.id FROM ticket t JOIN ticket_type tt ON tt.id = t.type_id"
@@ -704,7 +717,8 @@ async def my_tasks(
         items = [i for i in items if not i.finished]
     far = datetime.max
     items.sort(key=lambda i: (i.planned_start or far, i.change_ticket_id, i.position, i.ticket_id))
-    return items[: max(limit, 0)]
+    cut = max(limit, 0)
+    return items[:cut], len(items) > cut or len(owned) >= LIST_SCAN_CAP
 
 
 # --- refs ------------------------------------------------------------------------------------
@@ -1114,6 +1128,7 @@ __all__ = [
     "items_for_changes",
     "list_changes",
     "my_tasks",
+    "my_tasks_page",
     "phase_counts",
     "service_availability",
     "task_refs_for_tickets",

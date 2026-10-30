@@ -263,6 +263,8 @@ async def test_routes_refused_outside_mode_b(request: pytest.FixtureRequest, mod
             expected = (404, "change_unavailable") if mode == "off" else (409, "change_mode_a")
             assert (created.status_code, created.json()["detail"]["code"]) == expected
             assert (await client.get("/api/v1/itsm/changes/1")).status_code == expected[0]
+            tasks = await client.get("/api/v1/itsm/changes/1/tasks")  # B-M5: like its siblings
+            assert (tasks.status_code, tasks.json()["detail"]["code"]) == expected
 
 
 def test_every_change_path_is_in_the_tickets_area() -> None:

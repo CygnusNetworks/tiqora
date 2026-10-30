@@ -56,6 +56,7 @@ from tiqora.itsm.change.read import (
     change_refs_for_tickets,
     list_changes,
     my_tasks,
+    my_tasks_page,
     phase_counts,
     service_availability,
     task_refs_for_tickets,
@@ -655,6 +656,31 @@ async def test_api_list_calendar_and_tasks(
                 params={"start": window["end"], "end": window["start"]},
             )
         ).status_code == 422
+
+
+async def test_my_tasks_cap_is_announced(
+    w: ChangeWorld,
+    make_client: Callable[[int, str], AsyncClient],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """B-M8: more open tasks than answered -> ``X-Tasks-Truncated: true`` (the body stays a
+    list); the default cap is 100."""
+    from tiqora.api.v1 import itsm_change as routes
+
+    change = await _change(w)
+    first = await _task(w, change, "Erste")
+    await _task(w, change, "Zweite")
+    items, truncated = await my_tasks_page(w.session, user_id=U_FULL, limit=1)
+    assert ([i.ticket_id for i in items], truncated) == ([first], True)
+    assert (await my_tasks_page(w.session, user_id=U_FULL))[1] is False
+    assert routes.MY_TASKS_LIMIT == 100
+    async with make_client(U_FULL, "chg94-full") as api:
+        whole = await api.get("/api/v1/itsm/change-tasks/mine")
+        assert len(whole.json()) == 2 and "x-tasks-truncated" not in whole.headers
+        monkeypatch.setattr(routes, "MY_TASKS_LIMIT", 1)
+        cut = await api.get("/api/v1/itsm/change-tasks/mine")
+        assert cut.status_code == 200 and [t["ticket_id"] for t in cut.json()] == [first]
+        assert cut.headers["x-tasks-truncated"] == "true"
 
 
 async def test_api_mode_a_is_refused(

@@ -71,25 +71,39 @@ async def schedule_enabled(session: AsyncSession, settings: Settings) -> bool:
 async def _candidate_ids(
     session: AsyncSession, where: list[ColumnElement[bool]], mine: dict[int, str]
 ) -> tuple[list[int], bool]:
-    """Ids of the flagged changes of the range that touch one of the customer's services.
+    """Ids of the flagged changes of the range that touch one of the customer's services, the
+    earliest planned start first, at most :data:`LIST_SCAN_CAP` (``True``: more exist).
 
     Extra and impact service rows are filtered in SQL; the ticket's own service lives in Znuny,
-    so the flagged ids are loaded first and checked there with an IN list (no cross join).
+    so the flagged ids are loaded first and checked there with an IN list (no cross join). Every
+    scan is ordered before its cap, so a cut keeps the earliest changes on both dialects, and the
+    customer's service ids go in chunks (the ``<DEFAULT>`` services can be many).
     """
-    base = select(TiqoraItsmChange.ticket_id).where(*where)
+    base = (
+        select(TiqoraItsmChange.ticket_id, TiqoraItsmChange.planned_start)
+        .where(*where)
+        .order_by(TiqoraItsmChange.planned_start, TiqoraItsmChange.ticket_id)
+    )
     sids = sorted(mine)
-    via_rows = (
-        await session.execute(base.where(service_cond(sids)).limit(LIST_SCAN_CAP + 1))
-    ).scalars()
-    found = {int(i) for i in via_rows}
-    flagged = [int(i) for i in (await session.execute(base.limit(LIST_SCAN_CAP + 1))).scalars()]
-    truncated = len(found) > LIST_SCAN_CAP or len(flagged) > LIST_SCAN_CAP
+    starts: dict[int, datetime | None] = {}
+    truncated = False
+    for sid_part in chunked(sids):
+        rows = (
+            await session.execute(base.where(service_cond(sid_part)).limit(LIST_SCAN_CAP + 1))
+        ).all()
+        truncated = truncated or len(rows) > LIST_SCAN_CAP
+        starts.update((int(tid), when) for tid, when in rows[:LIST_SCAN_CAP])
+    flagged_rows = (await session.execute(base.limit(LIST_SCAN_CAP + 1))).all()
+    truncated = truncated or len(flagged_rows) > LIST_SCAN_CAP
+    flagged = {int(tid): when for tid, when in flagged_rows[:LIST_SCAN_CAP]}
     stmt = text("SELECT id FROM ticket WHERE id IN :ids AND service_id IN :sids").bindparams(
         bindparam("ids", expanding=True), bindparam("sids", expanding=True)
     )
-    for part in chunked(flagged[:LIST_SCAN_CAP]):
-        found.update(int(r[0]) for r in await session.execute(stmt, {"ids": part, "sids": sids}))
-    ordered = sorted(found)
+    for part in chunked(list(flagged)):
+        for sid_part in chunked(sids):
+            for (tid,) in await session.execute(stmt, {"ids": part, "sids": list(sid_part)}):
+                starts[int(tid)] = flagged[int(tid)]
+    ordered = sorted(starts, key=lambda t: (starts[t] or datetime.max, t))
     return ordered[:LIST_SCAN_CAP], truncated or len(ordered) > LIST_SCAN_CAP
 
 

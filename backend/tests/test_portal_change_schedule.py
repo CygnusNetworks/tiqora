@@ -322,3 +322,35 @@ async def test_scan_cap_sets_truncated_header(
     monkeypatch.setattr(portal_module, "LIST_SCAN_CAP", 5000)
     ok = await _get(w)
     assert "X-Schedule-Truncated" not in ok.headers and len(ok.json()) == 3
+
+
+async def test_scan_cap_keeps_the_earliest_and_chunks_services(
+    w: ChangeWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B-M6: the capped scans are ordered by planned start (the cut keeps the earliest changes
+    on both dialects) and the customer's services go in chunks (here: one per query)."""
+    from tiqora.itsm.change import portal as portal_module
+    from tiqora.itsm.change import read as read_module
+
+    late = await _change(
+        w,
+        title="chg94 spaet",
+        extra=(SVC_MINE,),
+        window=(WIN[0] + timedelta(hours=3), WIN[1] + timedelta(hours=3)),
+    )
+    early = await _change(w, title="chg94 frueh", ticket_service=SVC_SHARED)
+    middle = await _change(
+        w,
+        title="chg94 mitte",
+        impact=((SVC_MINE, False),),
+        window=(WIN[0] + timedelta(hours=1), WIN[1] + timedelta(hours=1)),
+    )
+    assert late < early < middle  # ids and starts disagree on purpose
+    monkeypatch.setattr(read_module, "CHUNK", 1)
+    monkeypatch.setattr(portal_module, "LIST_SCAN_CAP", 2)
+    r = await _get(w)
+    assert r.headers["X-Schedule-Truncated"] == "true"
+    assert [i["title"] for i in r.json()] == ["chg94 frueh", "chg94 mitte"]
+    monkeypatch.setattr(portal_module, "LIST_SCAN_CAP", 5000)
+    whole = await _get(w)
+    assert [i["title"] for i in whole.json()] == ["chg94 frueh", "chg94 mitte", "chg94 spaet"]
