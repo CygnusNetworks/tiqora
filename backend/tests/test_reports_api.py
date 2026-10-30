@@ -30,12 +30,14 @@ import tiqora.reporting.run_service as run_service
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.reports import get_report_cache
+from tiqora.cmdb.gate import reset_mode_cache
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import get_registry
 from tiqora.jobs.runner import JobRunner
 from tiqora.reporting.cache import GENERATION_KEY
+from tiqora.reporting.catalogue_itsm import itsm_builtin_reports
 from tiqora.reporting.engine import QueryBudget
 from tiqora.reporting.facts_store import rebuild_ticket_facts
 from tiqora.reporting.settings import REPORTING_SECTION
@@ -72,6 +74,7 @@ _RESET = (
     f"DELETE FROM tiqora_job WHERE {_JOBS}",
     "DELETE FROM tiqora_report_state",
     "DELETE FROM tiqora_settings WHERE {key} LIKE 'reporting.%'",
+    "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
 )
 _CLEANUP = (
     *_RESET,
@@ -338,10 +341,11 @@ async def _run(env: Env, body: dict[str, Any]) -> Any:
 
 
 async def test_catalogue_lists_builtins_and_facts_status(env: Env) -> None:
+    _write_mode(env.sync_url, "tiqora")  # the ITSM built-ins are listed in Mode B
     resp = await env.client.get("/api/v1/reports")
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert len(body["reports"]) == 25
+    assert len(body["reports"]) == 25 + len(itsm_builtin_reports())
     first = body["reports"][0]
     assert first["key"] == "builtin.ticket_kpis"
     assert first["category"] == "overview" and first["overview"] is True
@@ -382,6 +386,10 @@ async def test_sources_endpoint(env: Env) -> None:
         "daily_snapshot",
         "accounted_time",
         "open_tickets",
+        "config_items",
+        "changes",
+        "change_events",
+        "ci_tickets",
     }
     tickets = sources["tickets"]
     queue = next(d for d in tickets["dimensions"] if d["key"] == "queue")
@@ -393,6 +401,68 @@ async def test_sources_endpoint(env: Env) -> None:
     for src in sources.values():
         for f in src["filter_fields"]:
             assert f["kind"] == f["filter_type"] and f["time_field"] is False
+        assert isinstance(src["available"], bool)
+
+
+ITSM_ONLY_SOURCES = {"config_items", "changes", "change_events", "ci_tickets"}
+
+
+def _write_mode(sync_url: str, mode: str) -> None:
+    """``itsm.mode`` is the bare string (the SQL of ``_cmdb_helpers.set_mode``)."""
+    _run_sql(
+        sync_url,
+        (
+            "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
+            f"INSERT INTO tiqora_settings ({{key}}, value) VALUES ('itsm.mode', '{mode}')",
+        ),
+    )
+    reset_mode_cache()
+
+
+async def _listed_builtins(env: Env) -> list[dict[str, Any]]:
+    resp = await env.client.get("/api/v1/reports")
+    assert resp.status_code == 200
+    return [r for r in resp.json()["reports"] if r["kind"] == "builtin"]
+
+
+async def test_itsm_sources_flagged_outside_mode_b(env: Env) -> None:
+    """Every active source is listed; ``available`` says whether the builder offers it."""
+    for mode, offered in (("znuny_readthrough", False), ("tiqora", True)):
+        _write_mode(env.sync_url, mode)
+        sources = {s["key"]: s for s in (await env.client.get("/api/v1/reporting/sources")).json()}
+        assert set(sources) >= ITSM_ONLY_SOURCES, mode
+        for key, src in sources.items():
+            assert src["available"] is (offered or key not in ITSM_ONLY_SOURCES), (mode, key)
+        listed = {r["key"]: r for r in await _listed_builtins(env)}
+        for r in itsm_builtin_reports():
+            on_itsm_source = r.definition.source in ITSM_ONLY_SOURCES
+            assert (r.key in listed) is (offered or not on_itsm_source), (mode, r.key)
+    _write_mode(env.sync_url, "off")
+    sources = {s["key"]: s for s in (await env.client.get("/api/v1/reporting/sources")).json()}
+    assert {k for k, s in sources.items() if not s["available"]} == ITSM_ONLY_SOURCES
+    listed = {r["key"] for r in await _listed_builtins(env)}
+    assert not listed & {r.key for r in itsm_builtin_reports()}
+    assert "builtin.ticket_kpis" in listed
+
+
+ONE_BUILTIN_PER_ITSM_SOURCE = (
+    "builtin.cmdb_cis_by_class",  # config_items
+    "builtin.itsm_changes_by_status",  # changes
+    "builtin.itsm_change_transitions",  # change_events
+    "builtin.itsm_changes_per_ci_class",  # ci_tickets
+)
+
+
+@pytest.mark.parametrize("mode", ["off", "znuny_readthrough"])
+async def test_report_on_unavailable_source_still_runs(env: Env, mode: str) -> None:
+    """A saved link, import or schedule on a hidden source gets an empty result, never a 500."""
+    _write_mode(env.sync_url, mode)
+    for key in ONE_BUILTIN_PER_ITSM_SOURCE:
+        resp = await _run(env, {"report_key": key, "time_range": JUNE})
+        assert resp.status_code == 200, (key, resp.text)
+        assert resp.json()["result"]["rows"] == [], key
+        got = await env.client.get(f"/api/v1/reports/{key}")
+        assert got.status_code == 200, key
 
 
 async def test_status_endpoint(env: Env) -> None:

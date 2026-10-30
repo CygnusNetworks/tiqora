@@ -23,12 +23,14 @@ import tiqora.reporting.saved as saved_module
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.reports import get_report_cache
+from tiqora.cmdb.gate import reset_mode_cache
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import get_registry
 from tiqora.jobs.runner import JobRunner
 from tiqora.reporting.catalogue import BUILTIN_REPORTS
+from tiqora.reporting.catalogue_itsm import ITSM_EXPECTED
 from tiqora.reporting.settings import REPORTING_SECTION
 from tiqora.reporting.state import load_state
 from tiqora.settings_sections.store import save_section_values
@@ -55,6 +57,7 @@ _RESET = (
     "DELETE FROM tiqora_job WHERE kind IN ('core.report_run', 'core.report_export')",
     "DELETE FROM tiqora_report_state",
     "DELETE FROM tiqora_settings WHERE {key} LIKE 'reporting.%'",
+    "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
 )
 _CLEANUP = (
     *_RESET,
@@ -274,12 +277,21 @@ async def test_create_list_get_saved(env: Env) -> None:
     assert made["read_only"] is False
     assert made["owner"] == {"user_id": OWNER, "name": "Rhea Owner"}
     assert made["visibility"] == "private" and made["group_ids"] == []
+    _run_sql(  # Mode B lists the ITSM built-ins as well
+        env.sync_url,
+        (
+            "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
+            "INSERT INTO tiqora_settings ({key}, value) VALUES ('itsm.mode', 'tiqora')",
+        ),
+    )
+    reset_mode_cache()
     cat = (await env.client.get("/api/v1/reports")).json()["reports"]
     builtin_keys = _builtin_keys()
-    assert len(builtin_keys) == 25
-    assert [r["key"] for r in cat[:25]] == builtin_keys  # built-ins first, order unchanged
-    assert [r["kind"] for r in cat[:25]] == ["builtin"] * 25
-    assert cat[25]["key"] == made["key"] and len(cat) == 26
+    n = len(builtin_keys)
+    assert n == 25 + len(ITSM_EXPECTED)
+    assert [r["key"] for r in cat[:n]] == builtin_keys  # built-ins first, order unchanged
+    assert [r["kind"] for r in cat[:n]] == ["builtin"] * n
+    assert cat[n]["key"] == made["key"] and len(cat) == n + 1
     got = (await env.client.get(f"/api/v1/reports/{made['key']}")).json()
     assert got["definition"]["source"] == "tickets" and got["version"] == 1
     assert got["name"] == "rep48 Queues" and got["definition_error"] is None

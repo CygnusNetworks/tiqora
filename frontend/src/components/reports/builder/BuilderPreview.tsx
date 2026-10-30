@@ -12,7 +12,16 @@ import { useDebouncedPreview } from "./useDebounced";
  * Centre column: the report as it is built so far. `definition` is `null` while the report is
  * incomplete (then `issues` say what is missing); otherwise the preview follows it after a short pause.
  */
-export function BuilderPreview({ definition, issues }: { definition: ReportDefinition | null; issues: BuilderIssue[] }) {
+export function BuilderPreview({
+  definition,
+  issues,
+  unavailable = false,
+}: {
+  definition: ReportDefinition | null;
+  issues: BuilderIssue[];
+  /** The report's data basis is hidden: nothing can make the preview appear. */
+  unavailable?: boolean;
+}) {
   const { t } = useTranslation();
   const shown = useDebouncedPreview(definition);
   const body = useMemo(() => (shown ? previewBody(shown) : null), [shown]);
@@ -22,13 +31,17 @@ export function BuilderPreview({ definition, issues }: { definition: ReportDefin
   return (
     <section className="space-y-3 lg:sticky lg:top-4 lg:self-start" aria-labelledby="builder-preview-title" data-testid="builder-preview">
       <p className="sr-only" role="status">
-        {!shown ? t("reports.builder.previewInvalid") : result ? "" : t("reports.loading")}
+        {unavailable ? "" : !shown ? t("reports.builder.previewInvalid") : result ? "" : t("reports.loading")}
       </p>
       <h2 id="builder-preview-title" className="text-xs font-semibold uppercase tracking-wide text-muted">
         {t("reports.builder.preview")}
       </h2>
       <div className="min-h-[16rem] rounded-lg border border-hairline bg-surface p-4">
-        {!shown ? (
+        {unavailable ? (
+          <p className="text-sm text-muted" data-testid="builder-preview-unavailable">
+            {t("reports.builder.sourceUnavailable")}
+          </p>
+        ) : !shown ? (
           <div data-testid="builder-preview-issues">
             <p className="text-sm text-muted">{t("reports.builder.previewInvalid")}</p>
             {issues.length > 0 && (

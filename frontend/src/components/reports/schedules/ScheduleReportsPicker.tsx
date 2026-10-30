@@ -27,7 +27,9 @@ export function ScheduleReportsPicker({
   const { t } = useTranslation();
   const titleOf = (key: string) => {
     const r = catalogue.find((c) => c.key === key);
-    return r ? reportTitle(r, t) : (views.find((v) => v.report_key === key)?.title ?? key);
+    if (r) return reportTitle(r, t);
+    const v = views.find((x) => x.report_key === key);
+    return v?.title ?? (v?.title_key ? t(v.title_key) : key);
   };
   const move = (i: number, d: -1 | 1) => {
     const j = i + d;

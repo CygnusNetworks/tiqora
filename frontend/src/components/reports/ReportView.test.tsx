@@ -4,8 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
 import i18n from "@/i18n";
-import { demoReport } from "@/demo/reportsMock";
-import type { ReportDefinition, ReportResult } from "@/lib/reportsApi";
+import { demoReport, demoSources } from "@/demo/reportsMock";
+import { KioskProvider } from "@/dashboard/wallboard/kioskContext";
+import { reportsApi, type ReportDefinition, type ReportResult } from "@/lib/reportsApi";
 import { ReportView } from "./ReportView";
 
 // Measure aggregations (which totals may be summed) come from GET /reporting/sources.
@@ -225,6 +226,69 @@ describe("ReportView", () => {
       </Providers>,
     );
     expect(screen.getByTestId("report-view-truncated")).toHaveTextContent("Die Tabelle ist gekürzt");
+  });
+
+  it("says why a report on a hidden data basis can be empty or old", async () => {
+    vi.mocked(reportsApi.sources).mockResolvedValueOnce(
+      demoSources().map((s) => ({ ...s, available: s.key !== "tickets" && s.key !== "ticket_events" })),
+    );
+    render(
+      <Providers>
+        <ReportView report={{ key: "builtin.volume", definition: volumeDef }} result={volumeResult} />
+      </Providers>,
+    );
+    expect(await screen.findByTestId("report-view-source-unavailable")).toHaveTextContent("Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein.");
+    expect(screen.getByTestId("report-view-chart")).toBeInTheDocument();
+  });
+
+  it("keeps the result view when the hint arrives: a table opened before stays open", async () => {
+    let release: (v: ReturnType<typeof demoSources>) => void = () => {};
+    vi.mocked(reportsApi.sources).mockReturnValueOnce(new Promise((res) => (release = res)));
+    render(
+      <Providers>
+        <ReportView report={{ key: "builtin.volume", definition: volumeDef }} result={volumeResult} />
+      </Providers>,
+    );
+    fireEvent.click(screen.getByTestId("report-view-toggle-table"));
+    expect(screen.getByTestId("report-view-table")).toBeInTheDocument();
+    release(demoSources().map((s) => ({ ...s, available: false })));
+    await screen.findByTestId("report-view-source-unavailable");
+    expect(screen.getByTestId("report-view-table")).toBeInTheDocument();
+  });
+
+  it("shows no such hint on an available data basis", async () => {
+    render(
+      <Providers>
+        <ReportView report={{ key: "builtin.volume", definition: volumeDef }} result={volumeResult} />
+      </Providers>,
+    );
+    await waitFor(() => expect(reportsApi.sources).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("report-view-source-unavailable")).not.toBeInTheDocument();
+  });
+
+  it("on a wallboard link asks no API and shows no hint", async () => {
+    vi.mocked(reportsApi.sources).mockClear();
+    render(
+      <Providers>
+        <KioskProvider>
+          <ReportView report={{ key: "builtin.volume", definition: volumeDef }} result={volumeResult} />
+        </KioskProvider>
+      </Providers>,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reportsApi.sources).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("report-view-source-unavailable")).not.toBeInTheDocument();
+  });
+
+  it("does not name a period in the empty text of a report without one", () => {
+    const definition = { ...volumeDef, time_range: null } as ReportDefinition;
+    render(
+      <Providers>
+        <ReportView report={{ key: "x", definition }} result={resultOf({ columns: volumeResult.columns })} />
+      </Providers>,
+    );
+    expect(screen.getByTestId("report-view-empty")).toHaveTextContent("Für diesen Bericht gibt es keine Daten.");
   });
 
   it("shows the empty text when there are no rows", () => {

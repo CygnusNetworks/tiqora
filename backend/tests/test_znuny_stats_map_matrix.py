@@ -278,7 +278,7 @@ def test_state_action_static() -> None:
 
 def test_unknown_object_is_none() -> None:
     m = map_stat(
-        _stat(object_module="Kernel::System::Stats::Dynamic::ITSMChangeManagement"),
+        _stat(object_module="Kernel::System::Stats::Dynamic::ITSMServiceCatalog"),
         LOOKUPS,
         is_admin=False,
     )

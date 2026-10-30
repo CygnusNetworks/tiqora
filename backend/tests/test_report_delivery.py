@@ -31,6 +31,7 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.reports import get_report_cache
 from tiqora.channels.email.smtp import CapturingMailSender
+from tiqora.cmdb.gate import reset_mode_cache
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import (
@@ -128,7 +129,7 @@ _RESET = (
     "DELETE FROM tiqora_report WHERE owner_user_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_state",
     "DELETE FROM tiqora_settings WHERE {key} LIKE 'reporting.%'"
-    " OR {key} = 'notification.sender_email'",
+    " OR {key} = 'notification.sender_email' OR {key} = 'itsm.mode'",
     f"DELETE FROM group_user WHERE user_id = {OWNER} AND group_id = {G_OTHER}",
     "UPDATE users SET valid_id = 1 WHERE id BETWEEN :lo AND :hi",
     f"DELETE FROM group_user WHERE user_id = {OWNER} AND group_id = {_STATS}",
@@ -571,6 +572,33 @@ async def test_csv_bundle_is_zipped(env: Env, mail: CapturingMailSender) -> None
     assert isinstance(payload, bytes)
     names = zipfile.ZipFile(io.BytesIO(payload)).namelist()
     assert len(names) == 2 and len(set(names)) == 2 and all(n.endswith(".csv") for n in names)
+
+
+async def test_schedule_on_hidden_itsm_sources_still_delivers_in_mode_a(
+    env: Env, mail: CapturingMailSender
+) -> None:
+    """Built-ins on the CI / change sources (hidden in Mode A) run empty, the run succeeds."""
+    keys = [
+        "builtin.cmdb_cis_by_class",  # config_items
+        "builtin.itsm_changes_by_status",  # changes
+        "builtin.itsm_change_transitions",  # change_events
+        "builtin.itsm_changes_per_ci_class",  # ci_tickets
+    ]
+    key = "`key`" if "mysql" in env.sync_url else '"key"'
+    env.sql(f"INSERT INTO tiqora_settings ({key}, value) VALUES ('itsm.mode', 'znuny_readthrough')")
+    reset_mode_cache()
+    try:
+        sid = await env.schedule(items=[{"report_key": k} for k in keys])
+        await env.run_job((await env.run_now(sid))["job"]["job_id"])
+    finally:
+        reset_mode_cache()
+    run = (await env.load_runs(sid))[0]
+    assert run.status == "succeeded", (run.status, run.error)
+    atts = _attachments(mail.sent[-1])
+    assert len(atts) == 1 and atts[0].get_content_type() == "application/zip"
+    payload = atts[0].get_payload(decode=True)
+    assert isinstance(payload, bytes)
+    assert len(zipfile.ZipFile(io.BytesIO(payload)).namelist()) == len(keys)
 
 
 async def test_run_uses_owner_scope_at_run_time(env: Env, mail: CapturingMailSender) -> None:

@@ -4581,7 +4581,7 @@
           },
           "state_closed_failed": {
             "label": "Ticket-Status: erfolglos abgeschlossen",
-            "help": "Ticket-Status eines gescheiterten oder zurückgerollten Changes."
+            "help": "Ticket-Status eines fehlgeschlagenen oder zurückgerollten Changes."
           },
           "state_closed_cancelled": {
             "label": "Ticket-Status: abgebrochen",
@@ -4628,8 +4628,8 @@
             "help": "Punkte, wenn das Zeitfenster einen Sperrzeitraum berührt."
           },
           "weight_failed_history": {
-            "label": "Gewicht: frühere gescheiterte Changes",
-            "help": "Punkte für gescheiterte Changes an denselben Services."
+            "label": "Gewicht: frühere fehlgeschlagene Changes",
+            "help": "Punkte für fehlgeschlagene Changes an denselben Services."
           },
           "weight_emergency": {
             "label": "Gewicht: Notfall-Change",
@@ -4644,8 +4644,8 @@
             "help": "Störungen der letzten Tage gelten als aktuell."
           },
           "failed_change_lookback_days": {
-            "label": "Rückblick gescheiterte Changes (Tage)",
-            "help": "Gescheiterte Changes der letzten Tage fließen in das Risiko ein."
+            "label": "Rückblick fehlgeschlagene Changes (Tage)",
+            "help": "Fehlgeschlagene Changes der letzten Tage fließen in das Risiko ein."
           },
           "impact_refresh_hours": {
             "label": "Auswirkung aktualisieren nach (Stunden)",
@@ -5293,6 +5293,7 @@
       "dirtyHint": "Tickets, deren Werte neu berechnet werden",
       "lastSnapshot": "Letzter Tagesstand",
       "factRows": "Ticketzeilen",
+      "outdatedRows": "Noch neu zu berechnen",
       "eventRows": "Ereigniszeilen",
       "rebuild": "Berichtsdaten neu aufbauen",
       "rebuildSince": "Ab Datum (optional)",
@@ -7087,6 +7088,7 @@
     "allReports": "Alle Berichte",
     "back": "Zurück zu den Berichten",
     "empty": "Für diesen Zeitraum gibt es keine Daten.",
+    "emptyNoPeriod": "Für diesen Bericht gibt es keine Daten.",
     "loading": "Bericht wird erstellt …",
     "error": "Der Bericht konnte nicht erstellt werden.",
     "other": "Weitere",
@@ -7106,6 +7108,7 @@
     "timeZone": "Zeitzone",
     "factsBuilding": "Die Berichtsdaten werden noch aufgebaut. Die Zahlen sind bis dahin unvollständig.",
     "factsBuildingProgress": "Die Berichtsdaten werden aufgebaut ({{percent}} %). Die Zahlen sind bis dahin unvollständig.",
+    "factsUpgrading": "Die Kennzahlen werden nach dem Update neu berechnet. First-Level- und ITSM-Lösungszeit-Werte sind bis dahin unvollständig.",
     "factsAsOf": "Stand: {{time}}",
     "weekLabel": "KW {{week}}",
     "hourLabel": "{{hour}} Uhr",
@@ -7118,7 +7121,8 @@
       "agents": "Agenten",
       "time": "Zeitbuchungen",
       "customers": "Kunden",
-      "patterns": "Muster"
+      "patterns": "Muster",
+      "itsm": "ITSM"
     },
     "builtin": {
       "ticket_kpis": {
@@ -7220,6 +7224,70 @@
       "created_heatmap": {
         "title": "Wann Tickets eingehen",
         "description": "Eingegangene Tickets nach Wochentag und Uhrzeit (letzte 12 vollständige Wochen) – zeigt, wann am meisten los ist."
+      },
+      "itsm_tickets_by_type": {
+        "title": "Tickets nach Typ",
+        "description": "Tickets je Ticket-Typ und Priorität (umschaltbar auf Status, Queue oder Service), erstellt im letzten Monat."
+      },
+      "itsm_created_by_type": {
+        "title": "Neue Tickets je Tag nach Typ",
+        "description": "Neu erstellte Tickets je Tag und Ticket-Typ im letzten Monat; umschaltbar auf Priorität, Status, Queue oder Service."
+      },
+      "itsm_open_by_type": {
+        "title": "Offene Tickets nach Typ",
+        "description": "Alle gerade offenen Tickets je Ticket-Typ und Priorität (umschaltbar auf Queue oder Service)."
+      },
+      "itsm_first_level_solution": {
+        "title": "First-Level-Lösungsquote",
+        "description": "Störungen und Service-Anfragen, die im ersten Kontakt gelöst wurden: höchstens zwei für den Kunden sichtbare Artikel, eine Kundennachricht und eine Antwort des Agenten (Regel wie Znuny). Geschlossene Tickets, erstellt im letzten Monat."
+      },
+      "itsm_first_level_trend": {
+        "title": "First-Level-Lösungsquote im Verlauf",
+        "description": "Die First-Level-Lösungsquote je Erstelltag im letzten Monat, je Ticket-Typ (umschaltbar auf Priorität, Queue oder Service)."
+      },
+      "itsm_solution_time": {
+        "title": "Lösungszeit (ITSM)",
+        "description": "Durchschnitt und Median der Arbeitszeit, in der geschlossene Tickets offen waren (Zeit zwischen Schließen und Wiedereröffnen zählt nicht), je Ticket-Typ; erstellt im letzten Monat."
+      },
+      "itsm_solution_time_trend": {
+        "title": "Lösungszeit (ITSM) im Verlauf",
+        "description": "Durchschnittliche Lösungszeit (ITSM) je Erstelltag im letzten Monat, je Ticket-Typ."
+      },
+      "itsm_tickets_by_role": {
+        "title": "Störungen, Anfragen, Probleme und Changes",
+        "description": "Neue Störungen, schwere Störungen, Service-Anfragen, Probleme, Changes und Change-Aufgaben je Tag im letzten Monat. Die Ticket-Typen stellen Sie unter Admin „ITSM“ ein."
+      },
+      "cmdb_cis_by_class": {
+        "title": "CIs nach Klasse und Status",
+        "description": "Alle Configuration Items je CI-Klasse und Verwendungsstatus (umschaltbar auf Vorfallsstatus). Nur Klassen, die Sie sehen dürfen."
+      },
+      "cmdb_cis_created": {
+        "title": "Neue CIs je Tag",
+        "description": "Neu angelegte Configuration Items je Tag und CI-Klasse im letzten Monat."
+      },
+      "itsm_changes_by_status": {
+        "title": "Changes nach Status",
+        "description": "Neu erstellte Changes je Tag und Status im letzten Monat; umschaltbar auf Phase, Change-Art oder Risiko."
+      },
+      "itsm_change_outcomes": {
+        "title": "Ergebnis der Changes",
+        "description": "Changes der letzten drei Monate je Change-Art: erfolgreich, fehlgeschlagen oder zurückgerollt, Erfolgsquote, abgelehnt und später fertig als geplant."
+      },
+      "itsm_change_transitions": {
+        "title": "Abgelehnte und abgebrochene Changes",
+        "description": "Changes, die im letzten Monat abgelehnt oder abgebrochen wurden, je Tag (wie Znunys Statistiken „rejected“ und „retracted changes“)."
+      },
+      "itsm_change_requesters": {
+        "title": "Changes je Antragsteller",
+        "description": "Die 20 Kundenbenutzer mit den meisten neuen Changes im letzten Monat; umschaltbar auf die anlegenden Agenten oder die Besitzer."
+      },
+      "itsm_changes_per_ci_class": {
+        "title": "Changes je CI-Klasse",
+        "description": "Changes des letzten Monats je Klasse der verknüpften CIs; ein Change zählt je Klasse einmal."
+      },
+      "itsm_incident_prone_cis": {
+        "title": "Störungsanfällige CIs",
+        "description": "Die 20 CIs mit den meisten verknüpften Störungen der letzten drei Monate, mit den noch offenen Störungen."
       }
     },
     "dimensions": {
@@ -7268,7 +7336,32 @@
       "has_first_response": "Mit Erstreaktion",
       "ai_triaged": "Von der KI einsortiert",
       "ai_auto_replied": "Von der KI beantwortet",
-      "ai_handed_off": "An Agent übergeben"
+      "ai_handed_off": "An Agent übergeben",
+      "itsm_role": "ITSM-Art",
+      "class": "CI-Klasse",
+      "deployment_state": "Verwendungsstatus",
+      "incident_state": "Vorfallsstatus",
+      "deployment_category": "Verwendung (Gruppe)",
+      "incident_category": "Vorfall (Gruppe)",
+      "changed": "Geändert",
+      "created_by": "Angelegt von",
+      "phase": "Phase",
+      "outcome": "Ergebnis",
+      "change_status": "Change-Status",
+      "change_type": "Change-Art",
+      "risk_level": "Risiko",
+      "planned_start": "Geplanter Beginn",
+      "actual_end": "Tatsächliches Ende",
+      "from_phase": "Von Phase",
+      "to_phase": "Nach Phase",
+      "ci": "CI",
+      "ci_class": "CI-Klasse",
+      "ci_deployment_state": "CI-Verwendungsstatus",
+      "ci_incident_state": "CI-Vorfallsstatus",
+      "ci_incident_category": "CI-Vorfall (Gruppe)",
+      "link_type": "Verknüpfungsart",
+      "change_phase": "Change-Phase",
+      "is_change": "Ist ein Change"
     },
     "measures": {
       "tickets": "Tickets",
@@ -7312,7 +7405,28 @@
       "escalated": "Eskaliert",
       "unassigned": "Ohne Besitzer",
       "time_units": "Gebuchte Zeit",
-      "bookings": "Buchungen"
+      "bookings": "Buchungen",
+      "first_level_solved": "Im ersten Kontakt gelöst",
+      "first_level_solution_rate": "First-Level-Lösungsquote",
+      "itsm_solution_avg": "Lösungszeit (ITSM) Ø",
+      "itsm_solution_p50": "Lösungszeit (ITSM) Median",
+      "config_items": "CIs",
+      "cis_in_incident": "CIs mit Störung",
+      "cis_in_warning": "CIs mit Warnung",
+      "productive_cis": "Produktive CIs",
+      "versions_avg": "Versionen Ø",
+      "changes": "Changes",
+      "open_changes": "Offene Changes",
+      "successful_changes": "Erfolgreich",
+      "failed_changes": "Fehlgeschlagen oder zurückgerollt",
+      "change_success_rate": "Erfolgsquote",
+      "emergency_changes": "Notfall-Changes",
+      "rejected_changes": "Derzeit abgelehnt",
+      "late_changes": "Später fertig als geplant",
+      "phase_changes": "Statuswechsel",
+      "cis": "CIs",
+      "incidents": "Störungen",
+      "open_incidents": "Offene Störungen"
     },
     "parameters": {
       "queues": "Queues"
@@ -7362,6 +7476,67 @@
         "5": "Freitag",
         "6": "Samstag",
         "7": "Sonntag"
+      },
+      "itsm_role": {
+        "incident": "Störung",
+        "major_incident": "Schwere Störung",
+        "service_request": "Service-Anfrage",
+        "problem": "Problem",
+        "change": "Change",
+        "change_task": "Change-Aufgabe"
+      },
+      "deployment_category": {
+        "preproductive": "Vor dem Betrieb",
+        "productive": "Im Betrieb",
+        "postproductive": "Außer Betrieb"
+      },
+      "incident_category": {
+        "operational": "Betriebsbereit",
+        "warning": "Warnung",
+        "incident": "Störung"
+      },
+      "change_phase": {
+        "draft": "Entwurf",
+        "submitted": "Eingereicht",
+        "assessment": "Bewertung",
+        "approval": "Freigabe",
+        "scheduled": "Geplant",
+        "implementing": "Umsetzung",
+        "review": "Nachbetrachtung",
+        "closed": "Abgeschlossen",
+        "rejected": "Abgelehnt",
+        "cancelled": "Abgebrochen"
+      },
+      "change_outcome": {
+        "successful": "Erfolgreich",
+        "failed": "Fehlgeschlagen",
+        "backed_out": "Zurückgerollt"
+      },
+      "change_status": {
+        "draft": "Entwurf",
+        "submitted": "Eingereicht",
+        "assessment": "Bewertung",
+        "approval": "Freigabe",
+        "scheduled": "Geplant",
+        "implementing": "Umsetzung",
+        "review": "Nachbetrachtung",
+        "closed": "Abgeschlossen",
+        "rejected": "Abgelehnt",
+        "cancelled": "Abgebrochen",
+        "closed_successful": "Abgeschlossen – erfolgreich",
+        "closed_failed": "Abgeschlossen – fehlgeschlagen",
+        "closed_backed_out": "Abgeschlossen – zurückgerollt"
+      },
+      "change_type": {
+        "standard": "Standard-Change",
+        "normal": "Normaler Change",
+        "emergency": "Notfall-Change"
+      },
+      "risk_level": {
+        "low": "Niedrig",
+        "medium": "Mittel",
+        "high": "Hoch",
+        "very_high": "Sehr hoch"
       }
     },
     "presets": {
@@ -7526,14 +7701,19 @@
         "donut": "Ringdiagramm",
         "heatmap": "Heatmap",
         "kpi": "Kennzahlen"
-      }
+      },
+      "sourceUnavailable": "Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein."
     },
     "sources": {
       "tickets": "Tickets",
       "ticket_events": "Ticketereignisse",
       "daily_snapshot": "Tagesstände",
       "accounted_time": "Zeitbuchungen",
-      "open_tickets": "Offene Tickets (jetzt)"
+      "open_tickets": "Offene Tickets (jetzt)",
+      "config_items": "Configuration Items (CMDB)",
+      "changes": "Changes",
+      "change_events": "Change-Statuswechsel",
+      "ci_tickets": "CIs und verknüpfte Tickets"
     },
     "share": {
       "title": "Teilen",

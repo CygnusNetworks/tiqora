@@ -91,6 +91,7 @@ from tiqora.reporting.schemas import (
     SourceDimensionOut,
     SourceMeasureOut,
 )
+from tiqora.reporting.scope import available_sources
 from tiqora.reporting.semantic import ReportSource, active_sources
 from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout
@@ -235,7 +236,7 @@ def _ops(src: ReportSource, key: str) -> list[str]:
     return sorted(spec.allowed_ops()) if spec is not None else []
 
 
-def _source_out(src: ReportSource) -> ReportSourceOut:
+def _source_out(src: ReportSource, *, available: bool) -> ReportSourceOut:
     return ReportSourceOut(
         key=src.key,
         label_key=src.label_key,
@@ -273,6 +274,7 @@ def _source_out(src: ReportSource) -> ReportSourceOut:
             for f in src.filter_fields
         ],
         default_time_field=src.default_time_field,
+        available=available,
         common_fields=dict(src.common_fields),
     )
 
@@ -282,6 +284,24 @@ def _too_many() -> NoReturn:
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail={"message": TooManyReportJobs().message},
     )
+
+
+async def _listed_builtins(session: DbSession) -> list[BuiltinReport]:
+    """Catalogue reports to list: ITSM ones only while ITSM is on and their source is available.
+
+    ``off`` hides the whole category, Mode A keeps the ticket-based ones. Running, exporting and
+    ``GET /reports/{key}`` are not filtered.
+    """
+    from tiqora.cmdb.gate import current_itsm_mode  # noqa: PLC0415 - import cycle
+
+    registry = get_registry()
+    mode = await current_itsm_mode(session)
+    offered = {s.key for s in await available_sources(session, registry)}
+    return [
+        r
+        for r in active_builtins(registry)
+        if r.category != "itsm" or (mode != "off" and r.definition.source in offered)
+    ]
 
 
 @router.get("", response_model=ReportCatalogueOut)
@@ -301,7 +321,7 @@ async def list_reports(
         session, user.id, admin=rights.admin, include_others_private=all_ and rights.admin
     )
     names = await _owner_names(session, saved)
-    reports = [_builtin_out(r) for r in active_builtins(get_registry())]
+    reports = [_builtin_out(r) for r in await _listed_builtins(session)]
     reports.extend(_saved_out(r, rights, user.id, names) for r in saved)
     return ReportCatalogueOut(reports=reports, facts=await facts_status(session))
 
@@ -618,7 +638,8 @@ async def list_sources(
 ) -> list[ReportSourceOut]:
     """Report sources with their dimensions, measures and filter fields (builder, filters)."""
     await _access(session, user, settings)
-    return [_source_out(s) for s in active_sources(get_registry())]
+    offered = {s.key for s in await available_sources(session, get_registry())}
+    return [_source_out(s, available=s.key in offered) for s in active_sources(get_registry())]
 
 
 @sources_router.get("/status", response_model=FactsStatusOut)

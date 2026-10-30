@@ -1063,7 +1063,8 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | ITSM CIs: links, search, bulk edit | yes | Yes (Tiqora CMDB, Mode B): links to CIs, tickets, services, customers, KB articles; attribute search and saved searches; bulk edit of states and a link as a background job; impact graph and affected objects |
 | ITSM CIs: customer portal view | yes | Yes (Tiqora CMDB, Mode B): "Meine Geräte und Systeme", portal-flagged attributes only, ticket form with system picker |
 | ITSM ImportExport (CI CSV/XLSX) | yes | Yes (Tiqora CMDB, Mode B): wizard with column mapping (`attr:NIC[2].IPAddress[1]`), dry run, mapping templates, CSV/XLSX export as background jobs. Znuny's own ImportExport mapping objects are not read; transferring a Znuny CMDB is the job of the ITSM import (see [itsm.md](itsm.md)) |
-| Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV/PDF export, import of Znuny statistics (from `xml_storage` or an exported XML file; the four dynamic objects and `StateAction`, with a list of what was approximated or dropped) and scheduled delivery by e-mail (daily to yearly, several reports per mail, PDF/XLSX/CSV, run history). Not taken over: ITSM stats, dynamic-field axes, cron expressions. See [Reporting differences](#reporting-differences-to-znuny-stats), [Importing Znuny statistics](#importing-znuny-statistics) and [Scheduled reports](#scheduled-reports-vs-the-statistic-reports-add-on) |
+| Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 core and 16 ITSM built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV/PDF export, import of Znuny statistics (from `xml_storage` or an exported XML file; the four dynamic ticket objects, the eight ITSM objects and `StateAction`, with a list of what was approximated or dropped) and scheduled delivery by e-mail (daily to yearly, several reports per mail, PDF/XLSX/CSV, run history). Not taken over: dynamic-field axes, cron expressions. See [Reporting differences](#reporting-differences-to-znuny-stats), [Importing Znuny statistics](#importing-znuny-statistics) and [Scheduled reports](#scheduled-reports-vs-the-statistic-reports-add-on) |
+| ITSM statistics (ITSMServiceLevelManagement: 47 shipped statistics) | partial | The ticket-based ones are covered in every ITSM mode but off: first-level solution rate (count and rate) and average solution time on `tickets`, tickets by type. The CI and change statistics (CIs, changes, state changes of changes, changes per requester, changes per CI class) are reports on Tiqora's own CMDB and change tables and hold data **only once Tiqora has led the ITSM (Mode B)**; in Mode A they are not listed (backlog: ITSM CI/change statistics over Znuny's `configitem*` / `change_*` tables in Mode A). Changes archived from Znuny are not counted either (backlog: statistics over the change archive, including the CIP matrix). 16 ITSM built-in reports (category "ITSM") and the import of all eight ITSM statistic objects; no availability statistics, because Znuny ships none. See [Importing Znuny statistics](#importing-znuny-statistics) and [reporting.md](reporting.md#itsm-reports-and-data-bases) |
 | Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
 | Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
@@ -1217,6 +1218,41 @@ figures differ from Znuny's `Kernel::System::Stats`:
   tickets that are currently closed; the rates are taken over the tickets with a
   close inside the window. Figures differ from a pure close-in-window view only for
   tickets reopened after their close.
+- **First-level solution: count and rate.** Znuny's statistic returns the number of tickets
+  solved at first contact; Tiqora shows that count (`first_level_solved`) and, next to it, the rate
+  (`first_level_solution_rate`). The rate divides by the tickets whose flag is already computed;
+  right after the update to this version the report worker is still recomputing the ticket facts
+  (500 per run), and tickets it has not reached yet are in neither the count nor the rate. The
+  rule on customer-visible articles is Znuny's. Znuny restricts its shipped statistics to the states
+  "closed successful" and "closed with workaround"; the Tiqora built-ins take every closed ticket
+  (an imported statistic keeps Znuny's state ids).
+- **Solution time (ITSM) vs. `Ticket::ViewableStateType`.** Znuny adds up the time in the states of
+  `Ticket::ViewableStateType`. Tiqora adds up the time between creation or reopening and the next
+  close (`itsm_solution_avg`, `itsm_solution_p50`, working minutes of the SLA calendar, else the queue
+  calendar). With the default `ViewableStateType` both are the same except for merged and removed
+  tickets; a site that changed `ViewableStateType` gets different figures. A ticket created closed
+  counts three minutes in both.
+- **CI and change statistics: Mode B only.** The reports read Tiqora's own tables. In Mode A and
+  with ITSM off they are not listed and, because those tables hold data only once Tiqora has led the
+  ITSM, show no rows (after a switch back from Mode B they count the rows that remain); Znuny's own
+  statistics remain the source there.
+- **Changes from before the switch** (the read-only change archive) are not counted by the change
+  reports; a CIP evaluation of these changes is on the backlog.
+- **The CIP matrix is dropped.** Znuny's change category, impact and priority (`CategoryIDs`,
+  `ImpactIDs`, `PriorityIDs`; statistic 401 and the filters of 406) have no equivalent: a Tiqora change
+  carries a risk level and the priority of its ticket. Statistic 401 therefore becomes a report on
+  changes without the category split.
+- **Changes per CI class go through the linked CIs.** Znuny finds the CIs through the work orders of a
+  change; Tiqora counts the CIs linked to the change ticket (a CI linked only to a change task is
+  not counted). The CI incident state is the current one, where Znuny evaluates it in the period.
+  The shipped statistic 406 selects all incident states, which is what Tiqora counts.
+- **State changes of changes (402, 403).** Znuny lists the numbers of the changes that changed
+  into the state "rejected" or "retracted" in the period; Tiqora counts the changes moved into
+  "Abgelehnt" or "Abgebrochen" (measure `changes`, each change once per day and phase). Creation is
+  not a state change.
+- **Changes per requester (405).** Znuny counts the request-for-change tickets per agent or customer;
+  Tiqora counts changes per customer user.
+- **No availability statistics.** Znuny ships none in ITSMServiceLevelManagement; Tiqora has none.
 - **Job results are private.** The result of a report job (run or export) can be
   fetched by its creator only, administrators included. A user may have at most 3
   report jobs queued or running; further requests get 429. A job whose cancel
@@ -1302,6 +1338,14 @@ or **approximated** ("Angepasst"); nothing is silently ignored.
 | `Dynamic::TicketSolutionResponseTime` | report on `tickets` | `SolutionAverageAllOver` solution clock avg, `NumberOfTicketsAllOver` closed tickets, `SolutionWorkingTimeAverage` solution avg, `ResponseWorkingTimeAverage` first response avg; min/max kinds dropped (Tiqora offers P50/P90); escalation-dependent kinds dropped |
 | `Dynamic::TicketAccountedTime` | report on `accounted_time` | `TotalTime` time units, `NumberOfTickets` tickets; other kinds dropped |
 | `Dynamic::TicketList` | **saved search** | the list shows its fixed columns; column selection and `Limit` are approximated; `OrderBy`/`SortSequence` map to the search sort |
+| `Dynamic::ITSMTicketFirstLevelSolutionRate` | report on `tickets` | `first_level_solved` and `first_level_solution_rate`; closed tickets only |
+| `Dynamic::ITSMTicketSolutionTimeAverage` | report on `tickets` | `itsm_solution_avg`; closed tickets only |
+| `Dynamic::ITSMConfigItem` | report on `config_items` | `config_items`; no period means all CIs |
+| `Dynamic::ITSMChangeManagement` | report on `changes` | `changes` by creation date and change status |
+| `Dynamic::ITSMChangeManagementHistory` | report on `change_events` | `changes` by day and target status (approximated, see below) |
+| `Dynamic::ITSMChangeManagementChangesIncidents` | report on `tickets` | `tickets` by creation date and ticket type |
+| `Dynamic::ITSMChangeManagementRfcRequester` | report on `changes` | `changes` per customer user |
+| `Dynamic::ITSMChangeManagementChangesPerCIClasses` | report on `ci_tickets` | `changes` per CI class, fixed filter "is a change" |
 | static `StateAction` | report on `ticket_events` | approximated: Tiqora counts the event kinds of the report data, not every Znuny history type |
 | any other static file or object | none | "Diese Art von Statistik kann Tiqora nicht übernehmen." |
 
@@ -1320,6 +1364,123 @@ Elements (ticket and solution/response objects; `accounted_time` supports a subs
 | `ChangeTime`, `LastChangeTime`, `PendingUntilTime`, `Escalation*Time` | dropped (no such time field in the report data) |
 | `LockIDs`, `Title`, `Created{State,Priority,User}IDs`, `MIMEBase_*` | dropped |
 | `DynamicField_*` | dropped (dynamic-field dimensions are not available in reports yet) |
+
+ITSM objects (the eight rows above the `StateAction` row):
+
+| Znuny object | Znuny element | Tiqora field |
+|---|---|---|
+| first-level solution, solution time | the ticket elements of the table above, and `TypeIDs`, `StateIDs` | the same fields; ids stay as written in Znuny ("IDs wie in Znuny hinterlegt – bitte Typ und Status prüfen."). Without a state selection (or when it became a runtime parameter) the report counts closed tickets only |
+| `ITSMConfigItem` | `ClassIDs`, `DeplStateIDs`, `InciStateIDs`, `CreateTime`, `ChangeTime` | `class`, `deployment_state`, `incident_state`, `created`, `changed` |
+| | `StateIDs` (Znuny's shipped statistics use it although the module no longer defines it) | `deployment_state` (reported) |
+| | `Number`, `Name`, `XML::<class>::<attribute>` | dropped (CI attributes are not report fields) |
+| `ITSMChangeManagement` | `ChangeStateIDs`, `StateIDs` (the shipped statistic 400 uses state names) | `change_status`, through the change-state mapping below |
+| | `TimePeriod` | `created` |
+| | `CategoryIDs`, `ImpactIDs`, `PriorityIDs` | dropped (no CIP matrix) |
+| `ITSMChangeManagementHistory` | `NewValues`, `TimePeriod` | `to_phase` (through the mapping below, `closed_*` collapsed to `closed`), `occurred` |
+| `ITSMChangeManagementChangesIncidents` | `TimePeriod`; `Object` | `created`; the type becomes the second grouping, the `Object` selection is dropped (changes are tickets of type "Change") |
+| `ITSMChangeManagementRfcRequester` | `TimePeriod`; `Requester` | `created`; the customer user becomes the second grouping, `Requester` is dropped |
+| `ITSMChangeManagementChangesPerCIClasses` | `CIClassIDs`, `CIStateIDs`, `TimePeriod` | `ci_class`, `ci_incident_state` (the current state; reported), `created` |
+| | `CategoryIDs`, `ImpactIDs`, `PriorityIDs` | dropped |
+
+Change-state mapping (Znuny's change state, a general-catalog name, to the Tiqora `change_status`):
+
+| Znuny state | Tiqora `change_status` |
+|---|---|
+| requested | submitted, assessment |
+| pending approval | approval |
+| rejected | rejected |
+| approved | scheduled |
+| in progress | implementing |
+| pending pir | review |
+| successful | closed_successful |
+| failed | closed_failed, closed_backed_out |
+| canceled, retracted | cancelled |
+
+Names that are not in this list are reported ("Diesen Change-Status gibt es in Tiqora nicht."). The
+history statistics use the same mapping on the phase (`closed_*` collapsed to `closed`), so a copy
+that filters on "successful" or "failed" counts both outcomes and says so ("„successful“ und „failed“
+fallen in Tiqora in die Phase „Abgeschlossen“; der Bericht zählt beide Ergebnisse."). The shipped 402
+and 403 select "rejected" and "retracted" and are not affected.
+
+**Mode A and off.** An imported CI or change statistic still becomes a report, with the note that
+it shows data only once Tiqora has led the ITSM (Mode B). It opens read-only in the builder and runs; it
+shows no rows until Tiqora's tables hold data, and after a switch back from Mode B it counts the rows
+that remain.
+
+**Foreign ids.** The ITSM ticket, CI and change-class objects keep the ids of the exporting system
+in an export file, so Tiqora cannot map them reliably to its own ones. Such a selection does not
+become a fixed filter: it becomes a runtime parameter, and the report counts all values until someone
+chooses ("IDs aus einer Exportdatei lassen sich nicht zuordnen. Solange Sie keine Auswahl treffen,
+zählt der Bericht alle Werte."; for statistic 406 the same note reads "... zählt der Bericht alle
+Vorfallsstatus."). An unreliable state selection never lets open tickets into the
+first-level and solution-time reports; they keep the "closed" restriction. The shipped statistic
+406 selects all three incident states; as the state names of a file cannot be looked up, it is
+imported without that restriction and counts all incident states, which equals Znuny's selection. Read
+from the Znuny database, the numeric selection becomes a filter on the current incident state ("Znuny
+wertet den Vorfallsstatus im Zeitraum aus; Tiqora den aktuellen.").
+State type ids are the exception: the ids of a file are mapped to this system's state types and stay a
+fixed filter (statistics 014 to 016:
+"open"), with the note "Status-Typ-IDs aus einer Exportdatei wurden auf die Status-Typen dieses Systems
+abgebildet. Bitte prüfen Sie die Auswahl." A custom first-level or solution-time statistic with a state
+axis and no selection gets the "closed" restriction too ("Der Bericht zählt nur geschlossene Tickets,
+auch ohne Status-Auswahl.").
+
+**The 47 shipped statistics.** One row per statistic of ITSMServiceLevelManagement, by its Znuny title. The
+import keeps that title and creates a report on the data basis, groupings and values shown; a test keeps
+this table equal to the mapper's result. The last column names the built-in report that answers the same
+question, often through its switch (for example per queue instead of per priority) and with its own
+default period: Znuny's "ever created" is a period you choose. Statistic 401 has no category (see above),
+and 404 is the split by ticket type.
+
+| No. | Znuny title | Data basis | Groupings | Values | Built-in report |
+|---|---|---|---|---|---|
+| 001 | Total number of all tickets ever created per Ticket-Type and Priority | `tickets` | `type`, `priority` | `tickets` | "Tickets nach Typ" |
+| 002 | Total number of all tickets ever created per Ticket-Type and State | `tickets` | `type`, `state` | `tickets` | "Tickets nach Typ" |
+| 003 | Total number of all tickets ever created per Ticket-Type and Queue | `tickets` | `type`, `queue` | `tickets` | "Tickets nach Typ" |
+| 004 | Total number of all tickets ever created per Ticket-Type and Service | `tickets` | `type`, `service` | `tickets` | "Tickets nach Typ" |
+| 005 | Monthly overview of all tickets created in the last month per Ticket-Type | `tickets` | `created`, `type` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 006 | Monthly overview of all tickets created in the last month per Priority | `tickets` | `created`, `priority` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 007 | Monthly overview of all tickets created in the last month per State | `tickets` | `created`, `state` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 008 | Monthly overview of all tickets created in the last month per Queue | `tickets` | `created`, `queue` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 009 | Monthly overview of all tickets created in the last month per Service | `tickets` | `created`, `service` | `tickets` | "Neue Tickets je Tag nach Typ" |
+| 010 | Number of tickets created in a specific time period per Ticket-Type and Priority | `tickets` | `type`, `priority` | `tickets` | "Tickets nach Typ" |
+| 011 | Number of tickets created in a specific time period per Ticket-Type and State | `tickets` | `type`, `state` | `tickets` | "Tickets nach Typ" |
+| 012 | Number of tickets created in a specific time period per Ticket-Type and Queue | `tickets` | `type`, `queue` | `tickets` | "Tickets nach Typ" |
+| 013 | Number of tickets created in a specific time period per Ticket-Type and Service | `tickets` | `type`, `service` | `tickets` | "Tickets nach Typ" |
+| 014 | Number of currently open tickets per Ticket-Type and Priority | `tickets` | `type`, `priority` | `tickets` | "Offene Tickets nach Typ" |
+| 015 | Number of currently open tickets per Ticket-Type and Queue | `tickets` | `type`, `queue` | `tickets` | "Offene Tickets nach Typ" |
+| 016 | Number of currently open tickets per Ticket-Type and Service | `tickets` | `type`, `service` | `tickets` | "Offene Tickets nach Typ" |
+| 100 | Total number of all config items ever created per Class and State | `config_items` | `class`, `deployment_state` | `config_items` | "CIs nach Klasse und Status" |
+| 101 | Monthly overview of all config items created in the last month per Class | `config_items` | `created`, `class` | `config_items` | "Neue CIs je Tag" |
+| 102 | Monthly overview of all config items created in the last month per State | `config_items` | `created`, `deployment_state` | `config_items` | "Neue CIs je Tag" |
+| 103 | Number of config items created in a specific time period per Class and State | `config_items` | `class`, `deployment_state` | `config_items` | "CIs nach Klasse und Status" |
+| 200 | First level solution rate for all tickets ever created per Ticket-Type and Priority | `tickets` | `type`, `priority` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 201 | First level solution rate for all tickets ever created per Ticket-Type and Queue | `tickets` | `type`, `queue` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 202 | First level solution rate for all tickets ever created per Ticket-Type and Service | `tickets` | `type`, `service` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 203 | Monthly overview of first level solution rate per Ticket-Type in the last month | `tickets` | `created`, `type` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 204 | Monthly overview of first level solution rate per Priority in the last month | `tickets` | `created`, `priority` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 205 | Monthly overview of first level solution rate per Queue in the last month | `tickets` | `created`, `queue` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 206 | Monthly overview of first level solution rate per Service in the last month | `tickets` | `created`, `service` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote im Verlauf" |
+| 207 | First level solution rate for all tickets created in a specific time period per Ticket-Type and Priority | `tickets` | `type`, `priority` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 208 | First level solution rate for all tickets created in a specific time period per Ticket-Type and Queue | `tickets` | `type`, `queue` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 209 | First level solution rate for all tickets created in a specific time period per Ticket-Type and Service | `tickets` | `type`, `service` | `first_level_solved`, `first_level_solution_rate` | "First-Level-Lösungsquote" |
+| 300 | Average solution time for all tickets ever created per Ticket-Type and Priority | `tickets` | `type`, `priority` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 301 | Average solution time for all tickets ever created per Ticket-Type and Queue | `tickets` | `type`, `queue` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 302 | Average solution time for all tickets ever created per Ticket-Type and Service | `tickets` | `type`, `service` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 303 | Monthly overview of the average solution time per Ticket-Type in the last month | `tickets` | `created`, `type` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 304 | Monthly overview of the average solution time per Priority in the last month | `tickets` | `created`, `priority` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 305 | Monthly overview of the average solution time per Queue in the last month | `tickets` | `created`, `queue` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 306 | Monthly overview of the average solution time per Service in the last month | `tickets` | `created`, `service` | `itsm_solution_avg` | "Lösungszeit (ITSM) im Verlauf" |
+| 307 | Average solution time of tickets created in the last month per Ticket-Type and Priority | `tickets` | `type`, `priority` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 308 | Average solution time of tickets created in the last month per Ticket-Type and Queue | `tickets` | `type`, `queue` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 309 | Average solution time of tickets created in the last month per Ticket-Type and Service | `tickets` | `type`, `service` | `itsm_solution_avg` | "Lösungszeit (ITSM)" |
+| 400 | ITSMChange Count Changes | `changes` | `created`, `change_status` | `changes` | "Changes nach Status" |
+| 401 | ITSMChange Changes per Category | `changes` | `created` | `changes` | "Changes nach Status" |
+| 402 | ITSMChange rejected changes | `change_events` | `occurred`, `to_phase` | `changes` | "Abgelehnte und abgebrochene Changes" |
+| 403 | ITSMChange retracted changes | `change_events` | `occurred`, `to_phase` | `changes` | "Abgelehnte und abgebrochene Changes" |
+| 404 | Relation Tickets (by types) ↔ Changes | `tickets` | `created`, `type` | `tickets` | "Störungen, Anfragen, Probleme und Changes" |
+| 405 | RfCs per Requester | `changes` | `created`, `customer_user` | `changes` | "Changes je Antragsteller" |
+| 406 | Changes per config item class | `ci_tickets` | `ci_class` | `changes` | "Changes je CI-Klasse" |
 
 Axes and restrictions: `UseAsXvalue` becomes the first dimension, up to two
 `UseAsValueSeries` elements the next ones (a fourth dimension is dropped). Selected
@@ -1342,7 +1503,7 @@ lookups; an unknown name is dropped. Ids that only make sense in the exporting s
 runtime parameter instead of a fixed filter, so nothing silently counts the wrong
 queue.
 
-**Never taken over:** ITSM statistics (CI, change), dynamic-field axes, Znuny output
+**Never taken over:** dynamic-field axes, Znuny output
 formats and cache flags, per-statistic permission groups as such (Tiqora's report
 sharing applies instead), cron-based generation from the Znuny stats module.
 

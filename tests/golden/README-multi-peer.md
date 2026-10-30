@@ -19,6 +19,8 @@ container from a release tree listed in `peers.yaml`.
 
 `test_tiqoraitsm_addon.py` (znuny-6.5, znuny-7.3), `test_itsm_import.py` and `test_gi_config_items.py` (the ITSM peers `znuny-6.5-itsm`, `znuny-7.3-itsm`) cover the ITSM importer, the `ConfigItem*` GI operations and the TiqoraITSM add-on; last recorded run 2026-10-13 at the merge into roadmap-wave1 (fresh compose projects, CMDB-PM-I1 included): all 30 add-on cases on `znuny-6.5`, `znuny-7.3`, `znuny-6.5-itsm` and `znuny-7.3-itsm`, and the 6 importer + 29 GI cases on both ITSM peers, passed (incl. `test_readonly_blocks_deleting_ci_links`).
 
+`test_itsm_stats_import.py` (ITSM peers) maps the statistics the ITSM packages installed in `xml_storage` (`load_stats` -> `map_stat`) and compares them with the shipped fixtures and the `PARITY` checklist of `backend/tests/test_znuny_itsm_stats_parity.py`; rerun 2026-10-30 on fresh compose projects: `znuny-6.5-itsm` (Znuny 6.5.22, ITSM bundle 6.5.3) and `znuny-7.3-itsm` (Znuny 7.3.5, ITSMCore 7.3.3, ITSMServiceLevelManagement 7.3.1), 2 passed each, 47 of 47 fixtures matched, each stat once on the peer (47 compared), no ITSM-module stat without a fixture.
+
 `test_process_designer.py` covers the wave-3 process designer against the peer: a Znuny export
 (`ProcessImport` of every sample in `scripts/test/sample/ProcessManagement/`, then `_GetProcessData`
 and `YAML->Dump`) imported and exported again by Tiqora is equal modulo ids/times/list order; a

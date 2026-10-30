@@ -22,6 +22,7 @@ const SOURCE_FIXTURE = {
   key: "tickets",
   label_key: "reports.sources.tickets",
   default_time_field: "created",
+  available: true,
   measures: [],
   dimensions: [
     dim({ key: "queue", kind: "id", filter_type: "id", options_source: "queue", labels: "queue", ops: ["eq", "in", "neq", "not_in"] }),
@@ -82,5 +83,25 @@ describe("fieldsFromSource", () => {
     expect(by.customer.optionsSource).toBeNull();
     expect(by.created.ops).toEqual(["after", "before"]);
     expect(by.created.label).toBe("reports.dimensions.x");
+  });
+
+  it("passes the CMDB option sources of the ITSM data bases through", () => {
+    const source = {
+      ...SOURCE_FIXTURE,
+      dimensions: [
+        dim({ key: "ci_class", kind: "id", filter_type: "id", options_source: "cmdb_class", ops: ["eq", "in"] }),
+        dim({ key: "deployment_state", kind: "id", filter_type: "id", options_source: "cmdb_deployment_state", ops: ["eq"] }),
+        dim({ key: "incident_state", kind: "id", filter_type: "id", options_source: "cmdb_incident_state", ops: ["eq"] }),
+        dim({ key: "ci", kind: "id", filter_type: "id", options_source: null, ops: ["eq"] }),
+      ],
+      filter_fields: [],
+    };
+    const defs = fieldsFromSource(source as never, t);
+    expect(defs.map((d) => [d.key, d.optionsSource])).toEqual([
+      ["ci_class", "cmdb_class"],
+      ["deployment_state", "cmdb_deployment_state"],
+      ["incident_state", "cmdb_incident_state"],
+      ["ci", null],
+    ]);
   });
 });

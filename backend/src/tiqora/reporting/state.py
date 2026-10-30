@@ -17,6 +17,7 @@ from tiqora.db.tiqora.models import (
     TiqoraReportTicketFact,
 )
 from tiqora.jobs.service import utc_now
+from tiqora.reporting.facts import FACT_VERSION
 from tiqora.reporting.schemas import FactsStatusOut, ReportingStatusOut
 
 STATE_NAME: Final = "facts"
@@ -135,9 +136,16 @@ def facts_status_of(state: TiqoraReportState) -> FactsStatusOut:
     return FactsStatusOut.model_validate(_status_fields(state))
 
 
+async def _outdated_rows(session: AsyncSession) -> int:
+    """Fact rows the version upgrade still has to rebuild (``ix_tiqora_report_fact_version``)."""
+    stmt = select(func.count()).where(TiqoraReportTicketFact.fact_version < FACT_VERSION)
+    return int((await session.execute(stmt)).scalar_one())
+
+
 async def facts_status(session: AsyncSession) -> FactsStatusOut:
     """Readiness of the report data (creates the state row when missing)."""
-    return facts_status_of(await load_state(session))
+    status = facts_status_of(await load_state(session))
+    return status.model_copy(update={"outdated_rows": await _outdated_rows(session)})
 
 
 async def reporting_status(session: AsyncSession) -> ReportingStatusOut:
@@ -155,6 +163,7 @@ async def reporting_status(session: AsyncSession) -> ReportingStatusOut:
     return ReportingStatusOut.model_validate(
         {
             **_status_fields(state),
+            "outdated_rows": await _outdated_rows(session),
             "last_history_id": state.last_history_id,
             "history_lag": max(0, int(max_history or 0) - state.last_history_id),
             "gap_count": len(gaps) if isinstance(gaps, list) else 0,

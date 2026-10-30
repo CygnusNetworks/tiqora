@@ -517,7 +517,7 @@ and their numbers are incomplete until it has finished. Operate it from the CLI:
 
 ```sh
 tiqora report backfill [--since YYYY-MM-DD]   # start or resume; --since starts at the first ticket created on/after that date
-tiqora report status                          # state of the report data as JSON
+tiqora report status                          # state of the report data as JSON (`outdated_rows`: rows left for a fact upgrade)
 ```
 
 The admin page for report data (Admin, **Berichtsdaten** = report data; `/admin/reporting`) shows the state and
@@ -537,6 +537,23 @@ After an upgrade that changes the report fact version, the worker rebuilds the
 facts and events on its own, but stored daily snapshots (backlog history) are
 only rewritten for the last two days: run an admin rebuild (Admin,
 Berichtsdaten, "Berichtsdaten neu aufbauen" = rebuild report data) to recompute the older history as well.
+
+This version raises the report fact version to 3 (two new ticket columns for the first-level
+solution and the ITSM solution time; migration `20261010_0085`). After updating, the report worker
+recomputes all ticket facts in batches (500 per run of the `report_facts` loop; the interval is
+`TIQORA_REPORT_FACTS_INTERVAL`, default 60 seconds, or `daemon.report_facts.interval_seconds`
+in the settings). The duration is the number of tickets divided by 500 per run: about 30 000 tickets
+per hour at the default, so one million tickets take about 33 hours; a lower interval speeds it up.
+The newest tickets go first, so the default report windows are right soon after the start. Until it
+has finished, the first-level and ITSM solution-time figures cover only the already recomputed
+tickets (tickets not yet reached are in neither the count nor the rate); the `tickets` column already
+counts everything. `tiqora report status` (`outdated_rows`) and Admin, **Berichtsdaten** ("Noch neu zu
+berechnen" = still to recalculate) show how many ticket rows are left, and reports show a notice while
+more than 500 rows (one batch) are left. A small remainder that stays above 0 is tickets that fail to
+rebuild: they keep their old figures, the others are not held up, and the worker retries them and logs
+`report_facts_ticket_failed` with the ticket id. Fix the cause in that ticket; an admin rebuild does not
+pass it. No admin rebuild is needed for these two figures. The four ITSM
+report data bases read `tiqora_*` tables and need no configuration.
 
 The first backfill (and every admin rebuild) runs as a background job in the
 default lane and occupies one of its `jobs.max_concurrency` slots (default 2) for

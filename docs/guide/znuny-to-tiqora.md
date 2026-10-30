@@ -308,8 +308,8 @@ Nothing here touches Znuny; each step copies, and Znuny stays as it is.
    statistics from Znuny) copy Znuny statistics either from the Znuny database (`xml_storage`, read-only) or
    from an exported `Stats.*.xml` file. A preview lists every statistic with the issues found; "Übernehmen"
    (apply) creates saved reports and saved searches. Every mapping decision is reported as dropped
-   ("Nicht übernommen") or approximated ("Angepasst"); ITSM statistics, dynamic-field axes and Znuny's cron
-   generation are never taken over. Details: [`../compatibility.md`](../compatibility.md#importing-znuny-statistics).
+   ("Nicht übernommen") or approximated ("Angepasst"); the ITSM statistics (first-level solution, solution time,
+   CIs, changes) are taken over, dynamic-field axes and Znuny's cron generation never. Details: [`../compatibility.md`](../compatibility.md#importing-znuny-statistics).
 2. **Search profiles.** Each agent imports their own Znuny search profiles in the saved-searches sidebar
    ("Suchvorlagen aus Znuny übernehmen"). One-way and read-only; full-text and future-relative times are not
    taken over. See [`../compatibility.md`](../compatibility.md#search-profiles).

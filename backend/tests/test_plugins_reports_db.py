@@ -217,6 +217,39 @@ def test_source_tables_checked(booted: None) -> None:
     rejected(dataclasses.replace(good, measures=(bad_measure,)), "plugin.org.example.points:")
 
 
+def test_plugin_source_must_be_queue_scoped(booted: None) -> None:
+    """Class scopes and ITSM-only availability are for core sources (wave 5 ITSM statistics)."""
+    good = _fixture().articles_per_channel_source()
+    for variant in (
+        dataclasses.replace(good, scope_kind="cmdb_class"),
+        dataclasses.replace(good, extra_scopes=(("cmdb_class", good.scope_column),)),
+        dataclasses.replace(good, availability="itsm_tiqora"),
+    ):
+        with pytest.raises(RegistrationRejected) as info:
+            _registrar(
+                short_id="points", plugin_id=PLUGIN_ID, points=["core.reporting.sources"]
+            ).report_source(variant)
+        assert str(info.value) == (
+            f"Die Berichtsquelle „{good.key}“ muss nach Queues berechtigt sein und immer "
+            "verfügbar sein"
+        )
+
+
+def test_plugin_dimension_must_not_use_cmdb_labels(booted: None) -> None:
+    """CMDB labels have no class check of their own: they are for class-scoped core sources."""
+    good = _fixture().articles_per_channel_source()
+    for labels in ("cmdb_class", "cmdb_catalog", "cmdb_ci"):
+        bad_dim = dataclasses.replace(good.dimensions[0], labels=labels)
+        with pytest.raises(RegistrationRejected) as info:
+            _registrar(
+                short_id="points", plugin_id=PLUGIN_ID, points=["core.reporting.sources"]
+            ).report_source(dataclasses.replace(good, dimensions=(bad_dim,)))
+        assert str(info.value) == (
+            f"Die Dimension „{bad_dim.key}“ der Berichtsquelle „{good.key}“ darf keine "
+            "CMDB-Beschriftungen verwenden"
+        )
+
+
 def test_source_table_check_walks_expressions_not_only_from_clause(booted: None) -> None:
     """F12: a ``tiqora_*`` table hidden in a measure condition or the base filter is found."""
     fixture = _fixture()

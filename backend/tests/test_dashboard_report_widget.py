@@ -19,6 +19,7 @@ import tiqora.reporting.jobs as report_jobs
 import tiqora.reporting.run_service as run_service
 from tests._dashboard3_helpers import ADMIN, GROUP_1, GROUP_2, Q1, Q2, A, B, Env3, open_env3
 from tests._dashboard_helpers import run_widget_fn
+from tiqora.cmdb.gate import reset_mode_cache
 from tiqora.config import Settings
 from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.providers import (
@@ -83,6 +84,7 @@ _WIPE = (
     "DELETE FROM ticket WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_state",
     "DELETE FROM tiqora_settings WHERE {key} LIKE 'reporting.%'",
+    "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
 )
 
 
@@ -303,6 +305,30 @@ async def test_builtin_report_widget_returns_result_and_definition(env: Env3) ->
     assert data["result"]["rows"] == [["email", 2]]  # Q2's ticket is not A's
     assert data["ignored_filters"] == []
     assert data["drillable_dimensions"] == ["channel"]
+
+
+@pytest.mark.parametrize(
+    "report_key",
+    [
+        "builtin.cmdb_cis_by_class",  # config_items
+        "builtin.itsm_changes_by_status",  # changes
+        "builtin.itsm_change_transitions",  # change_events
+        "builtin.itsm_changes_per_ci_class",  # ci_tickets
+    ],
+)
+async def test_builtin_on_a_hidden_itsm_source_still_runs_in_mode_a(
+    env: Env3, report_key: str
+) -> None:
+    """A tile pinned to an ITSM built-in survives the mode switch: empty rows, status ``ok``."""
+    key = "`key`" if "mysql" in env.sync_url else '"key"'
+    env.sql(f"INSERT INTO tiqora_settings ({key}, value) VALUES ('itsm.mode', 'znuny_readthrough')")
+    reset_mode_cache()
+    try:
+        data = await run_ok(env, A, {"report_key": report_key})
+    finally:
+        reset_mode_cache()
+    assert data["report"]["key"] == report_key
+    assert data["result"]["rows"] == []
 
 
 async def test_report_widget_runs_as_viewer(env: Env3) -> None:

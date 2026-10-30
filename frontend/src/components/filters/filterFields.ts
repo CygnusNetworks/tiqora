@@ -12,6 +12,8 @@ import { OPS_BY_TYPE, type FilterFieldDef, type FilterFieldType } from "./filter
 type SourceField = ReportSource["dimensions"][number];
 
 const ATTRIBUTE_SOURCES = new Set(["queue", "state", "priority", "type", "service", "sla"]);
+/** Report dimensions on CMDB ids; `useFilterOptions` loads their values. */
+const CMDB_SOURCES = new Set(["cmdb_class", "cmdb_deployment_state", "cmdb_incident_state"]);
 const USER_FIELDS = new Set(["owner_id", "responsible_id", "watched_by"]);
 const DF_SOURCE_PREFIX = "DynamicField_";
 
@@ -38,7 +40,9 @@ export function fieldsFromTicketCatalog(fields: FilterFieldOut[], t: TFunction):
 }
 
 function sourceOptions(f: SourceField): string | null {
-  if (f.options_source && ATTRIBUTE_SOURCES.has(f.options_source)) return f.options_source;
+  if (f.options_source && (ATTRIBUTE_SOURCES.has(f.options_source) || CMDB_SOURCES.has(f.options_source))) {
+    return f.options_source;
+  }
   return f.labels === "user" ? "user" : null;
 }
 

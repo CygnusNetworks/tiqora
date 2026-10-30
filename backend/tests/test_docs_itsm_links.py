@@ -4,6 +4,9 @@ import re
 from pathlib import Path
 from urllib.parse import unquote
 
+from tests.test_znuny_itsm_stats_inventory import TITLES
+from tests.test_znuny_itsm_stats_parity import PARITY
+
 REPO = Path(__file__).resolve().parents[2]
 ITSM_MD = REPO / "docs" / "itsm.md"
 
@@ -94,3 +97,15 @@ def test_every_itsm_anchor_resolves() -> None:
     assert any(a == "koexistenz-mit-znuny" for _, a in refs)  # parallel-operation.md points here
     missing = [(str(p.relative_to(REPO)), a) for p, a in refs if a not in known]
     assert not missing, missing
+
+
+def test_compatibility_table_lists_every_shipped_stat_as_mapped() -> None:
+    text = (REPO / "docs" / "compatibility.md").read_text(encoding="utf-8")
+    assert len(PARITY) == 47
+    for name, (_, source, dims, measures) in PARITY.items():
+        number = name.split("-")[1]
+        row = (
+            f"| {number} | {TITLES[name]} | `{source}` | "
+            f"{', '.join(f'`{d}`' for d in dims)} | {', '.join(f'`{m}`' for m in measures)} | "
+        )
+        assert row in text, name

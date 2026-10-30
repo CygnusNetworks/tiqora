@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, FromClause, and_, false, not_, or_, true
 
 from tiqora.db.tiqora.models import TiqoraReportTicketFact
+from tiqora.reporting.itsm_roles import itsm_role_dim
 from tiqora.reporting.semantic import BoolFn, CompileContext, Measure, ReportSource
 from tiqora.reporting.sources._common import (
     CHANNELS,
@@ -89,6 +90,11 @@ def _fcr(ctx: CompileContext) -> ColumnElement[bool]:
     return and_(_c("close_count") > 0, _c("reopen_count") == 0, _c("article_out_count") <= 1)
 
 
+def _first_level(ctx: CompileContext) -> ColumnElement[bool]:
+    # NULL = fact row not yet upgraded to version 3: neither solved nor unsolved
+    return _c("first_level_solved").is_(true())
+
+
 def _stat(key: str, agg: Any, column: str, unit: Any = "minutes") -> Measure:
     return measure(key, agg, expr=col(F, column), unit=unit)
 
@@ -164,6 +170,16 @@ def _measures() -> tuple[Measure, ...]:
         measure(
             "pingpong_tickets", "count_if", condition=lambda ctx: _c("queue_pingpong").is_(true())
         ),
+        measure("first_level_solved", "count_if", condition=_first_level),
+        measure(
+            "first_level_solution_rate",
+            "rate",
+            condition=_first_level,
+            denominator=lambda ctx: _c("first_level_solved").is_not(None),
+            unit="percent",
+        ),
+        _stat("itsm_solution_avg", "avg", "itsm_solution_working_minutes"),
+        _stat("itsm_solution_p50", "p50", "itsm_solution_working_minutes"),
     )
 
 
@@ -186,6 +202,7 @@ def tickets_source() -> ReportSource:
             ),
             attribute_dim("priority", col(F, "priority_id"), "priority"),
             attribute_dim("type", col(F, "type_id"), "type"),
+            itsm_role_dim("itsm_role", col(F, "type_id")),
             attribute_dim("service", col(F, "service_id"), "service"),
             attribute_dim("sla", col(F, "sla_id"), "sla"),
             dim("owner", "id", col(F, "owner_id"), labels="user"),

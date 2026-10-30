@@ -17,7 +17,16 @@ if TYPE_CHECKING:
     from tiqora.extensions.registry import Registry
 
 ReportCategory = Literal[
-    "overview", "volume", "backlog", "sla", "quality", "agents", "time", "customers", "patterns"
+    "overview",
+    "volume",
+    "backlog",
+    "sla",
+    "quality",
+    "agents",
+    "time",
+    "customers",
+    "patterns",
+    "itsm",
 ]
 _PREFIX = "builtin."
 PLUGIN_PREFIX = "plugin."
@@ -79,13 +88,16 @@ def active_builtins(registry: Registry) -> list[BuiltinReport]:
     return [r.item for r in registry.registrations(BUILTIN_REPORTS) if owner_is_active(r.owner)]
 
 
-#: Field of the ``queues`` runtime parameter per source (every built-in is queue-scoped).
+#: Field of the ``queues`` runtime parameter per source (every queue-scoped built-in).
 QUEUE_PARAM_FIELD = {
     "tickets": "queue",
     "ticket_events": "ticket_queue",
     "daily_snapshot": "queue",
     "accounted_time": "queue",
     "open_tickets": "queue",
+    "changes": "queue",
+    "change_events": "queue",
+    "ci_tickets": "queue",
 }
 
 LAST_30_DAYS: dict[str, Any] = {

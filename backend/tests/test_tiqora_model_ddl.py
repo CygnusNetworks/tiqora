@@ -96,6 +96,20 @@ def test_report_fact_columns_ddl() -> None:
         Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0063_reporting_facts.py"
     ).read_text()
     assert 'sa.Column("backfill_run_token", sa.String(36), nullable=True)' in migration
+    for dialect, boolean in ((postgresql.dialect(), "BOOLEAN"), (mysql.dialect(), "BOOL")):
+        fls = _column_ddl(fact, "first_level_solved", dialect)
+        assert boolean in fls and "NOT NULL" not in fls and "DEFAULT" not in fls
+        itsm = _column_ddl(fact, "itsm_solution_working_minutes", dialect)
+        assert "INTEGER" in itsm and "NOT NULL" not in itsm and "DEFAULT" not in itsm
+    itsm_migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261010_0085_report_fact_itsm.py"
+    ).read_text()
+    assert 'revision: str = "20261010_0085"' in itsm_migration
+    assert 'down_revision: str | None = "20261010_0084"' in itsm_migration
+    assert 'sa.Column("first_level_solved", sa.Boolean(), nullable=True)' in itsm_migration
+    assert (
+        'sa.Column("itsm_solution_working_minutes", sa.Integer(), nullable=True)' in itsm_migration
+    )
     assert "MEDIUMTEXT" in _column_ddl(TiqoraReportState.__table__, "gap_ids", mysql.dialect())
     assert "MEDIUMTEXT" not in _column_ddl(
         TiqoraReportState.__table__, "gap_ids", postgresql.dialect()

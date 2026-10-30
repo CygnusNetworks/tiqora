@@ -41,6 +41,9 @@ class FactsStatusOut(BaseModel):
     backfill_job_id: int | None
     #: 0..1 while the backfill runs, otherwise ``None``
     backfill_progress: float | None
+    #: fact rows still waiting for the version upgrade; ``None`` on a report result, which takes
+    #: the status from the loaded state row and does not count
+    outdated_rows: int | None = None
 
 
 class ReportingStatusOut(FactsStatusOut):
@@ -259,5 +262,8 @@ class ReportSourceOut(BaseModel):
     measures: list[SourceMeasureOut]
     filter_fields: list[SourceDimensionOut]
     default_time_field: str | None
+    #: offered now (CI and change sources only in ITSM mode ``tiqora``); a report on an
+    #: unavailable source still runs, the builder just does not offer the source for new reports
+    available: bool
     #: dashboard filter key (``COMMON_FILTER_KEYS``) -> field key of this source
     common_fields: dict[str, str] = Field(default_factory=dict)

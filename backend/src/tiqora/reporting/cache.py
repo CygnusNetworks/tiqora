@@ -6,7 +6,9 @@ applied), the viewer's queue-id set, whether archived tickets are included
 (admins only), the internal ``extra_filter`` of the ``/stats`` wrappers, the
 last snapshot date (it moves the stock dates), the near-miss percentage, the
 window, the zone, the row cap and ``compare_previous``. All of them are
-required arguments so no caller can forget one. Cache failures never fail a
+required arguments so no caller can forget one. The viewer's CMDB classes
+(class-scoped sources only) and the ITSM type roles enter the key when given, so
+all other keys stay what they were. Cache failures never fail a
 report: errors are logged and treated as a miss.
 
 Generation: the stored key is ``<key>:g<n>`` with ``n`` the value of
@@ -22,7 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping
 from datetime import date
 from typing import Any, Final, Protocol, cast
 
@@ -101,9 +103,11 @@ class ReportCache:
         extra_filter: Filter | None,
         last_snapshot_date: date | None,
         near_miss_percent: int,
+        cmdb_class_ids: Iterable[int] | None,
+        type_roles: Mapping[int, str] | None,
     ) -> str:
         """``CACHE_PREFIX`` + sha256 over every input that changes a viewer's result."""
-        payload = {
+        payload: dict[str, Any] = {
             "definition": definition_hash,
             "queues": sorted({int(q) for q in queue_ids}),
             "window": None
@@ -119,6 +123,10 @@ class ReportCache:
             else last_snapshot_date.isoformat(),
             "near_miss_percent": near_miss_percent,
         }
+        if cmdb_class_ids is not None:
+            payload["classes"] = sorted({int(c) for c in cmdb_class_ids})
+        if type_roles:
+            payload["roles"] = sorted([int(t), role] for t, role in type_roles.items())
         digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
         return CACHE_PREFIX + digest
 

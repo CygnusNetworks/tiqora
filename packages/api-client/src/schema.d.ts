@@ -22614,6 +22614,8 @@ export interface components {
              * @enum {string}
              */
             backfill_status: "pending" | "running" | "done";
+            /** Outdated Rows */
+            outdated_rows?: number | null;
             /** Ready */
             ready: boolean;
         };
@@ -29585,6 +29587,8 @@ export interface components {
         };
         /** ReportSourceOut */
         ReportSourceOut: {
+            /** Available */
+            available: boolean;
             /** Common Fields */
             common_fields?: {
                 [key: string]: string;
@@ -29645,6 +29649,8 @@ export interface components {
             last_history_id: number;
             /** Last Snapshot Date */
             last_snapshot_date: string | null;
+            /** Outdated Rows */
+            outdated_rows?: number | null;
             /** Ready */
             ready: boolean;
             /** Snapshot Time Zone */

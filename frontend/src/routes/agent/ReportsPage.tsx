@@ -48,6 +48,7 @@ const REPORT_CATEGORIES = [
   "time",
   "customers",
   "patterns",
+  "itsm",
 ] as const;
 
 const headerBtnCls =

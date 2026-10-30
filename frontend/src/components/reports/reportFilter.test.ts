@@ -20,8 +20,15 @@ describe("runtime parameters in the run request", () => {
     const body = toRunIn("7", { ...EMPTY_FILTER, queues: [1], params: { ch: ["email"], arch: true } }, defWith([
       ch,
       P({ key: "arch", field: "archived", op: "is_true" }),
+      P({ key: "queues", field: "queue" }),
     ]));
     expect(body.parameters).toEqual({ ch: ["email"], arch: true, queues: [1] });
+  });
+
+  it("sends no queues to a report without a queue parameter", () => {
+    // e.g. a hand-edited ?queues= URL on a CI report: the server would refuse the unknown parameter
+    const body = toRunIn("7", { ...EMPTY_FILTER, queues: [1] }, defWith([ch]));
+    expect(body.parameters).toBeUndefined();
   });
 
   it("drops empty, switched-off and unknown values", () => {

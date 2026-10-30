@@ -59,6 +59,8 @@ def _key(**over: Any) -> str:
         "extra_filter": None,
         "last_snapshot_date": None,
         "near_miss_percent": 10,
+        "cmdb_class_ids": None,
+        "type_roles": None,
     }
     args.update(over)
     return ReportCache.key_for(**args)
@@ -144,6 +146,22 @@ def test_key_for_requires_the_scope_inputs() -> None:
             row_cap=10,
             compare_previous=False,
         )
+    complete: dict[str, Any] = {
+        "definition_hash": "h",
+        "queue_ids": [1],
+        "window": None,
+        "time_zone": "UTC",
+        "row_cap": 10,
+        "compare_previous": False,
+        "include_archived": False,
+        "extra_filter": None,
+        "last_snapshot_date": None,
+        "near_miss_percent": 10,
+    }
+    with pytest.raises(TypeError):
+        ReportCache.key_for(**complete, type_roles=None)
+    with pytest.raises(TypeError):
+        ReportCache.key_for(**complete, cmdb_class_ids=None)
 
 
 async def test_round_trip_and_ttl_zero() -> None:

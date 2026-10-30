@@ -49,6 +49,7 @@ from tiqora.reporting.dirty import mark_tickets_dirty
 from tiqora.reporting.state import (
     STATE_NAME,
     facts_status,
+    facts_status_of,
     is_deadlock,
     load_state,
     reporting_status,
@@ -586,6 +587,10 @@ async def test_facts_status(url_fixture: str, request: pytest.FixtureRequest) ->
             assert full.gap_count == 2 and full.dirty_count == 0
             assert full.history_lag > 0  # the seeded history ids are far above 1
             assert full.fact_rows == 0 and full.event_rows == 0
+            assert st.outdated_rows == 0 and full.outdated_rows == 0
+            # a report run takes the status from the loaded row and does not count
+            state = await load_state(s)
+            assert facts_status_of(state).outdated_rows is None
     finally:
         await engine.dispose()
 

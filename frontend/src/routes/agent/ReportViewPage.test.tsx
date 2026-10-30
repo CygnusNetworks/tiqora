@@ -55,13 +55,15 @@ vi.mock("@/auth/AuthContext", () => ({
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const tree = () => (
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
         <ReportViewPage />
       </I18nextProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(tree());
+  return { ...view, update: () => view.rerender(tree()) };
 }
 
 beforeAll(async () => {
@@ -113,6 +115,38 @@ describe("ReportViewPage", () => {
     } finally {
       authFlags.canViewReports = true;
     }
+  });
+
+  it("during the fact upgrade one filter change sends one run and the notice stays", async () => {
+    vi.mocked(reportsApi.factsStatus).mockResolvedValue({ ...DEMO_FACTS, outdated_rows: 12345 });
+    const { update } = renderPage();
+    await screen.findByTestId("report-view-chart");
+    const banner = await screen.findByTestId("reports-facts-banner");
+    expect(reportsApi.run).toHaveBeenCalledTimes(1);
+    const statusCalls = vi.mocked(reportsApi.factsStatus).mock.calls.length;
+
+    let release: (v: Awaited<ReturnType<typeof reportsApi.run>>) => void = () => {};
+    vi.mocked(reportsApi.run).mockImplementationOnce(() => new Promise((res) => (release = res)));
+    searchParams = { preset: "custom", from: "2026-09-01", to: "2026-09-30" };
+    update();
+    await waitFor(() => expect(reportsApi.run).toHaveBeenCalledTimes(2));
+    // the running request has no result yet: the upgrade is not over because of that
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId("reports-facts-banner")).toBe(banner);
+    release(resolveReportRun(vi.mocked(reportsApi.run).mock.calls[1][0]));
+    await screen.findByTestId("report-view-chart");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reportsApi.run).toHaveBeenCalledTimes(2);
+    expect(reportsApi.sources).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("reports-facts-banner")).toBe(banner);
+    // the count is not read again for a filter change
+    expect(vi.mocked(reportsApi.factsStatus).mock.calls.length).toBe(statusCalls);
+  });
+
+  it("says on the page when the report's data basis is hidden", async () => {
+    vi.mocked(reportsApi.sources).mockResolvedValue(demoSources().map((src) => ({ ...src, available: false })));
+    renderPage();
+    expect(await screen.findByTestId("report-view-source-unavailable")).toHaveTextContent("nur gepflegt, solange Tiqora das ITSM führt");
   });
 
   it("loads the definition, runs it and exports XLSX via a background job", async () => {

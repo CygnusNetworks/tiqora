@@ -23102,6 +23102,17 @@
             "title": "Backfill Status",
             "type": "string"
           },
+          "outdated_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outdated Rows"
+          },
           "ready": {
             "title": "Ready",
             "type": "boolean"
@@ -43735,6 +43746,10 @@
       },
       "ReportSourceOut": {
         "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
           "common_fields": {
             "additionalProperties": {
               "type": "string"
@@ -43789,7 +43804,8 @@
           "dimensions",
           "measures",
           "filter_fields",
-          "default_time_field"
+          "default_time_field",
+          "available"
         ],
         "title": "ReportSourceOut",
         "type": "object"
@@ -43954,6 +43970,17 @@
               }
             ],
             "title": "Last Snapshot Date"
+          },
+          "outdated_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outdated Rows"
           },
           "ready": {
             "title": "Ready",

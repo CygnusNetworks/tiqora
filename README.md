@@ -113,8 +113,9 @@ Questions, ideas, war stories from your OTRS migration:
   filters, report widgets, SLA gauge, backlog aging, heatmap, drill-down to tickets),
   role templates for admins, TV mode and public read-only **wallboard links** —
   [dashboards](./docs/dashboards.md) (German, English summary).
-- **Reporting** — a report **builder** with saved and shared reports, **25 built-in
-  reports** (volume, backlog, SLA, quality, agents, time accounting, customers, patterns),
+- **Reporting** — a report **builder** with saved and shared reports, **25 core and 16
+  ITSM built-in reports** (volume, backlog, SLA, quality, agents, time accounting, customers, patterns;
+  ticket types, first-level solution, CIs, changes),
   runtime parameters, XLSX / CSV / **PDF** export, **import of Znuny statistics** and
   search profiles, and **scheduled delivery** by e-mail with run history —
   [reporting](./docs/reporting.md), [differences to Znuny stats](./docs/compatibility.md#reporting-differences-to-znuny-stats).
@@ -267,7 +268,7 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 | SSE realtime + agent presence | Live updates on ticket zoom |
 | CSV ticket export | Permission-filtered streaming export |
 | ITSM and CMDB | Incident / problem / major incident, priority matrix, link types, Tiqora CMDB (Mode B), read-only Znuny CMDB (Mode A), ITSM importer, `tiqora itsm` CLI — [docs/itsm.md](./docs/itsm.md), [docs/cmdb.md](./docs/cmdb.md), [docs/itsm-import.md](./docs/itsm-import.md) |
-| Reporting | Report builder, 25 built-in reports, saved reports, Znuny stats import, PDF / XLSX / CSV, schedules, report data backfill (`tiqora report`) — [docs/reporting.md](./docs/reporting.md) |
+| Reporting | Report builder, 25 core + 16 ITSM built-in reports, saved reports, Znuny stats import, PDF / XLSX / CSV, schedules, report data backfill (`tiqora report`) — [docs/reporting.md](./docs/reporting.md) |
 | Dashboards and wallboards | Widget dashboards, role templates, TV mode, public wallboard links — [docs/dashboards.md](./docs/dashboards.md) |
 | Web chat | Website widget, chat inbox, AI first line with handoff, recognised visitors, portal chat — [docs/guide/webchat.md](./docs/guide/webchat.md) |
 | Plugins | SDK 0.2.0, signed `.tqplugin` packages, repositories, safe mode, `tiqora plugins` CLI — [docs/plugins.md](./docs/plugins.md) |
@@ -515,7 +516,7 @@ not implemented:
 | Customer portal print view | missing |
 | Follow-up as a new ticket (`queue.follow_up_id == 3`) | missing (behaves like reopen) |
 | Process transitions after every ticket change | missing (evaluated after process dialogs and new process tickets) |
-| ITSM change management (changes, work orders), service catalogue, approvals | planned (wave 5) |
+| ITSM service catalogue | planned (wave 5); change management and approvals are available ([itsm.md](./docs/itsm.md)) |
 | SysConfig edit/deploy UI | by design (settings are read from `sysconfig_*`) |
 | Perl OPM packages / Package Manager | by design (replaced by [plugins](./docs/plugins.md)) |
 

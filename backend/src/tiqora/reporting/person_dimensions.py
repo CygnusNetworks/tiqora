@@ -14,7 +14,17 @@ __all__ = ["NON_PERSON_DIMENSIONS", "PERSON_DIMENSIONS"]
 
 #: values are users, customer companies / customer users, or ticket titles (``ticket``)
 PERSON_DIMENSIONS: Final[frozenset[str]] = frozenset(
-    {"owner", "responsible", "actor", "agent", "customer", "customer_user", "ticket"}
+    {
+        "owner",
+        "responsible",
+        "actor",
+        "agent",
+        "customer",
+        "customer_user",
+        "ticket",
+        "created_by",
+        "ci",
+    }
 )
 
 NON_PERSON_DIMENSIONS: Final[frozenset[str]] = frozenset(
@@ -35,6 +45,28 @@ NON_PERSON_DIMENSIONS: Final[frozenset[str]] = frozenset(
         "ticket_priority",
         "type",
         "ticket_type",
+        "itsm_role",
+        "class",
+        "deployment_state",
+        "incident_state",
+        "deployment_category",
+        "incident_category",
+        "changed",
+        "phase",
+        "from_phase",
+        "to_phase",
+        "outcome",
+        "change_status",
+        "change_type",
+        "risk_level",
+        "ci_class",
+        "ci_deployment_state",
+        "ci_incident_state",
+        "ci_incident_category",
+        "link_type",
+        "change_phase",
+        "planned_start",
+        "actual_end",
         "service",
         "sla",
         "channel",

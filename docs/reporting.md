@@ -30,17 +30,20 @@ Related documents:
 10. [Scheduled delivery](#scheduled-delivery)
 11. [Saved searches](#saved-searches)
 12. [Time accounting](#time-accounting)
-13. [How the numbers are produced](#how-the-numbers-are-produced)
-14. [Administration](#administration)
-15. [Developers: APIs and extension points](#developers-apis-and-extension-points)
-16. [Limits and what is not there](#limits-and-what-is-not-there)
+13. [ITSM reports and data bases](#itsm-reports-and-data-bases)
+14. [How the numbers are produced](#how-the-numbers-are-produced)
+15. [Administration](#administration)
+16. [Developers: APIs and extension points](#developers-apis-and-extension-points)
+17. [Limits and what is not there](#limits-and-what-is-not-there)
 
 ## Overview
 
 Reporting in Tiqora has five parts:
 
-- **Built-in reports**: a fixed catalogue of 25 reports for volume, backlog, SLA, quality, agent
-  activity, booked time, customers and arrival patterns.
+- **Built-in reports**: a fixed catalogue of 25 core reports for volume, backlog, SLA, quality,
+  agent activity, booked time, customers and arrival patterns, plus 16 ITSM reports (ticket types,
+  first-level solution, solution time, configuration items, changes; see
+  [ITSM reports and data bases](#itsm-reports-and-data-bases)).
 - **The report builder** ("Bericht erstellen"): define your own report from a data basis,
   groupings, values, a filter and a period, preview it live, and save it as a *saved report*,
   optionally shared with groups.
@@ -52,8 +55,10 @@ Reporting in Tiqora has five parts:
   fact tables current (see [How the numbers are produced](#how-the-numbers-are-produced)).
 
 A report always runs **with the viewer's own queue rights**: it only counts tickets in queues the
-viewer may read (`ro`). A report shared with others therefore shows different numbers to different
-people. Scheduled mails run with the rights of the schedule's owner.
+viewer may read (`ro`). The reports on configuration items additionally need the right to read
+the CI class (see [ITSM reports and data bases](#itsm-reports-and-data-bases)). A report shared with
+others therefore shows different numbers to different people. Scheduled mails run with the rights
+of the schedule's owner.
 
 ## Who may do what
 
@@ -104,8 +109,10 @@ Below, in this order:
 
 ## Built-in reports
 
-The catalogue has **25 reports** in nine categories. Every built-in report has a queue filter that
-you can change when viewing it; its default period is part of its definition and can be changed too.
+The catalogue has **25 core reports** in nine categories and **16 ITSM reports** in a tenth
+("ITSM", below). Every built-in report on a ticket-based or queue-scoped data basis has a queue
+filter that you can change when viewing it (the two reports on configuration items have none); its
+default period is part of its definition and can be changed too.
 A plugin may add more reports, which appear in the same catalogue (see
 [plugins.md](plugins.md#reporting)). Titles are shown in the UI language; the German title comes
 first here.
@@ -137,6 +144,39 @@ first here.
 | | "Gebuchte Zeit je Agent und Monat" / per agent and month | Cross table, last 12 months, with totals |
 | "Kunden" (customers) | "Top-Kunden" / top customers | Top 20 by tickets, last 3 months |
 | "Muster" (patterns) | "Wann Tickets eingehen" / when tickets arrive | Heatmap weekday by hour, last 12 weeks |
+
+**Category "ITSM".** Sixteen further reports, shown in the catalogue after the core categories. The
+first eight run on ticket data and are listed in every ITSM mode except "Aus" (off); the other eight
+read Tiqora's own CMDB and change records, are listed only in Mode B and hold data only once Tiqora has
+led the ITSM ("Tiqora führt das ITSM"). While
+the ITSM mode is off, the category is not listed at all; in Mode A (Znuny führt das ITSM) it lists
+the ticket-based reports only. Details: [ITSM reports and data bases](#itsm-reports-and-data-bases).
+
+| Report (German title / English gloss) | Shows | Data base |
+|---|---|---|
+| "Tickets nach Typ" / tickets by type | Tickets per ticket type and priority (switchable to state, queue, service), created in the last month | Tickets |
+| "Neue Tickets je Tag nach Typ" / new tickets per day by type | Stacked daily bars by ticket type, last month | Tickets |
+| "Offene Tickets nach Typ" / open tickets by type | Currently open tickets per type and priority (switchable to queue, service) | Offene Tickets (jetzt) |
+| "First-Level-Lösungsquote" / first-level solution rate | Closed incidents, major incidents and service requests created in the last month: tickets, solved at first contact, rate; per type (switchable to priority, queue, service) | Tickets |
+| "First-Level-Lösungsquote im Verlauf" / first-level solution rate over time | The rate per creation day, last month | Tickets |
+| "Lösungszeit (ITSM)" / solution time (ITSM) | Average and median working time that closed tickets were open, per type, last month | Tickets |
+| "Lösungszeit (ITSM) im Verlauf" / solution time over time | The average per creation day, last month | Tickets |
+| "Störungen, Anfragen, Probleme und Changes" / incidents, requests, problems and changes | New tickets per day by ITSM role ("ITSM-Art": incident, major incident, service request, problem, change, change task), last month | Tickets |
+| "CIs nach Klasse und Status" / CIs by class and state | All CIs per CI class and deployment state (switchable to incident state and the two state groups); only classes you may see | Configuration Items (CMDB) |
+| "Neue CIs je Tag" / new CIs per day | CIs created per day and class, last month | Configuration Items (CMDB) |
+| "Changes nach Status" / changes by status | Changes created per day and change status, last month (switchable to phase, change type, risk) | Changes |
+| "Ergebnis der Changes" / change outcomes | Per change type, last 3 months: changes, successful, failed or backed out, success rate, currently rejected, finished later than planned | Changes |
+| "Abgelehnte und abgebrochene Changes" / rejected and cancelled changes | Changes moved into "Abgelehnt" or "Abgebrochen" per day (measure "Changes": each change once per day and phase), last month | Change-Statuswechsel |
+| "Changes je Antragsteller" / changes per requester | Top 20 customer users by new changes, last month (switchable to creating agent, owner) | Changes |
+| "Changes je CI-Klasse" / changes per CI class | Changes of the last month per class of the linked CIs; a change counts once per class | CIs und verknüpfte Tickets |
+| "Störungsanfällige CIs" / incident-prone CIs | The 20 CIs with the most linked incidents in the last 3 months, with the still open ones | CIs und verknüpfte Tickets |
+
+The two first-level reports and the two solution-time reports restrict to **closed** tickets (the
+first-level reports also to incidents, major incidents and service requests). Znuny's shipped
+statistics restrict to the two states "closed successful" and "closed with workaround" instead, so a
+ticket that was closed unsuccessfully is counted by the Tiqora reports and not by Znuny's. Imported
+statistics keep Znuny's exact state ids (see
+[compatibility.md](compatibility.md#importing-znuny-statistics)).
 
 ## Viewing a report
 
@@ -200,7 +240,7 @@ a **live preview** ("Vorschau") that refreshes while you edit and shows at most 
 
 | Panel (German) | Meaning |
 |---|---|
-| "Datenbasis" (data basis) | One of five sources (below) |
+| "Datenbasis" (data basis) | One of the sources below (five ticket-related ones, four ITSM ones) |
 | "Zeilen" / "Spalten" (rows / columns) | The groupings; rows and columns together at most three. Date groupings have a time grain ("Zeitauflösung"); each grouping may offer alternatives ("Beim Aufruf umschaltbar", at most ten) and a top-N limit ("Nur die größten zeigen", 1 to 100; the rest becomes "Weitere") |
 | "Werte" (values) | The measures, 1 to 10, for example tickets, closed tickets, median first-response time, SLA met rate, booked time |
 | "Filter" | Conditions on the source's fields |
@@ -221,6 +261,19 @@ groupings, or a key-figure display, which must have no grouping.
 | "Tagesstände" (daily snapshots) | open tickets per day, queue, state type and priority | Backlog history |
 | "Zeitbuchungen" (time bookings) | a Znuny time-accounting booking | Includes archived tickets |
 | "Offene Tickets (jetzt)" (open tickets now) | an open ticket | Live, with age buckets, escalated and unassigned counts |
+| "Configuration Items (CMDB)" | a configuration item | Mode B only; see [ITSM reports and data bases](#itsm-reports-and-data-bases) |
+| "Changes" | a change record | Mode B only |
+| "Change-Statuswechsel" (phase changes of changes) | one phase change of a change | Mode B only |
+| "CIs und verknüpfte Tickets" (CIs and linked tickets) | a pair of a CI and a ticket linked to it | Mode B only |
+
+The four ITSM data bases appear in the "Datenbasis" picker only while Tiqora leads the ITSM
+(Mode B). A saved or imported report on one of them still opens in other modes, read-only, with the
+note "Diese Datenbasis gibt es erst, wenn Tiqora das ITSM führt (Modus B)."; running it is not
+blocked. The data bases read Tiqora's own tables, which hold data only once Tiqora has led the ITSM:
+without Mode B the result has no rows, and after a switch back from Mode B to Mode A the report
+counts whatever rows remain in those tables. The ticket reports above (including the ITSM measures
+on "Tickets") can be used in any mode; their built-in reports are listed in every mode except "Aus"
+(off).
 
 Save with **"Speichern"** (a name is required; the dialog "Bericht speichern" asks for sharing) or
 "Als Kopie speichern". Unsaved changes ask for confirmation before you leave ("Änderungen
@@ -303,7 +356,9 @@ it to yourself). All recipients receive the mail in blind copy, so nobody sees t
 without a mailing address are skipped and noted in the run; at most "Höchstzahl Empfänger pro
 Versand" (default 50) addresses are used.
 
-**Rights of the owner.** A schedule runs with the owner's queue scope; the mail footer says so. If
+**Rights of the owner.** A schedule runs with the owner's queue scope; the mail footer says so.
+The same holds for CI classes: the recipients of a report on configuration items see the figures the
+owner may see, not their own. Wallboard links work the same way with the rights of the link's creator. If
 the owner loses report access or the share right, or a report is no longer available, the run fails
 as a whole and the owner is mailed. After **3** failed scheduled runs in a row the schedule pauses
 itself ("Angehalten: …"); "Fortsetzen" resumes it. A schedule whose stored recurrence or time zone
@@ -369,10 +424,109 @@ bar chart "Einheiten pro Tag" and the bookings grouped by day, 100 per page. It 
 Queue, Agent, Typ", which opens the report category "Zeitbuchungen" (five built-in reports on the
 data basis "Zeitbuchungen").
 
+## ITSM reports and data bases
+
+The category "ITSM" and the ITSM measures answer the questions Znuny's ITSMServiceLevelManagement
+package answers with its 47 shipped statistics. Znuny ships no availability statistics, and Tiqora
+has none either.
+
+**Ticket-based (every ITSM mode except "Aus").** On the data bases "Tickets" and "Offene Tickets
+(jetzt)":
+
+- Dimension **"ITSM-Art"** (`itsm_role`): the role of the ticket type, taken from the ticket types
+  set under Admin "ITSM" (incident, major incident, service request, problem, change, change task);
+  other types have no role. Also available on "CIs und verknüpfte Tickets".
+- Measure **"Im ersten Kontakt gelöst"** (`first_level_solved`) counts the tickets solved at first
+  contact; **"First-Level-Lösungsquote"** (`first_level_solution_rate`) is that count divided by
+  the tickets of the group whose flag is already known. The rule is Znuny's, applied to the
+  articles visible to the customer: a ticket is solved at first contact when it has exactly one such
+  article from the customer or an agent, or exactly two, the first from the customer and the second
+  from an agent. Anything else is not solved: a system article first (an auto reply before the
+  agent), an agent article followed by more, three or more visible articles. Internal notes are not
+  counted. The measure judges every ticket; the built-in reports restrict to incidents, major
+  incidents and service requests and to closed tickets.
+- Measures **"Lösungszeit (ITSM) Ø"** and **"Lösungszeit (ITSM) Median"** (`itsm_solution_avg`,
+  `itsm_solution_p50`): the working time during which a ticket was open, summed over its open spans.
+  A span starts when the ticket is created or reopened and ends at the next close; time between a
+  close and a reopening does not count, and a span that is still running is not counted. A ticket
+  that was never closed has no value. A ticket created already closed and never reopened counts
+  three minutes, as in Znuny. Working time uses the calendar of the ticket's SLA, else of its queue,
+  like Znuny.
+
+**Data bases for Mode B.** The four data bases read Tiqora's own tables (`tiqora_*`), never
+Znuny's `configitem*` and `change_*` tables; they are available only while Tiqora leads the ITSM
+(Mode B, [itsm.md](itsm.md)).
+
+| Data basis (German) | One row is | Groupings (examples) | Values |
+|---|---|---|---|
+| "Configuration Items (CMDB)" | a CI | "CI-Klasse", "Verwendungsstatus", "Vorfallsstatus", "Verwendung (Gruppe)", "Vorfall (Gruppe)", "Erstellt", "Geändert", "Angelegt von" | "CIs", "CIs mit Störung", "CIs mit Warnung", "Produktive CIs", "Versionen Ø" |
+| "Changes" | a change | "Phase", "Ergebnis", "Change-Status", "Change-Art", "Risiko", queue, priority, service, SLA, owner, customer, "Ansprechpartner", dates | "Changes", "Offene Changes", "Erfolgreich", "Fehlgeschlagen oder zurückgerollt", "Erfolgsquote", "Notfall-Changes", "Derzeit abgelehnt", "Später fertig als geplant" |
+| "Change-Statuswechsel" | one phase change of a change | "Zeitpunkt", "Von Phase", "Nach Phase", "Change-Art", queue, priority, service | "Statuswechsel", "Changes" (each change once) |
+| "CIs und verknüpfte Tickets" | a CI linked to a ticket | "CI", "CI-Klasse", "CI-Verwendungsstatus", "CI-Vorfallsstatus", "Verknüpfungsart", ticket type, "ITSM-Art", status type, "Change-Phase", queue, priority, service | "Tickets", "CIs", "Offen", "Changes", "Störungen", "Offene Störungen" |
+
+Rules worth knowing:
+
+- "Offene Changes" counts every change that is not in a final phase. A rejected change can be
+  reworked, so it counts as open until it is closed or cancelled; "Derzeit abgelehnt" counts the ones
+  that are rejected right now.
+- "Change-Statuswechsel" counts the phase changes after creation; the creation of a change (no
+  previous phase) is not a change of phase. A change that is rejected, reworked and rejected again is
+  two "Statuswechsel" and one "Changes".
+- The filters on "CI" and "Verknüpfungsart" are free input: the builder asks for a CI id or a link
+  type name, there is no picker.
+- A change is counted in the queue its ticket has now, and only once its ticket is in the report data
+  (see the upgrade note below). Archived tickets are not counted.
+- Changes per CI class count the CIs linked to the **change ticket**, which is where Tiqora's impact
+  and the CI picker link them. A CI linked only to a change task is not counted. A ticket and CI
+  linked through two link types are still one ticket and one CI.
+- The CI incident state in "CIs und verknüpfte Tickets" is the **current** one, not the one at the
+  time of the period.
+- Changes from before the switch to Mode B, copied from Znuny into the read-only change archive
+  ([itsm.md](itsm.md)), are not part of these data bases.
+
+**Who sees what.** Reports on tickets and changes use the viewer's queue rights (`ro`), as always.
+Reports on CIs use the **CI classes** the viewer may read: `ro` in the Znuny group the class names
+(administrators: all classes; the optional CMDB access group applies as in the CMDB), the same
+rule as the CMDB list. "CIs und verknüpfte Tickets" applies
+both rules, so a row needs a readable ticket queue and a readable CI class. A viewer with class
+rights but no queue rights therefore still sees the reports on "Configuration Items (CMDB)"; on
+"CIs und verknüpfte Tickets" that viewer sees nothing. The two built-in reports on
+"Configuration Items (CMDB)" have no queue filter, because a CI has no queue. Scheduled mails and
+wallboards use the CI classes of the schedule's owner or the link's creator (see
+[Scheduled delivery](#scheduled-delivery)); a plugin cannot add a CI-scoped data base.
+
+**Mode A and off.** In Mode A only the ticket-based ITSM reports are listed; with the ITSM mode
+"Aus" none is. The four data bases are hidden in the builder, and the built-in reports on them are
+not listed. A saved or imported report on one of them is not an error: it opens, read-only with a
+note in the builder, and runs: it reads Tiqora's own tables, which hold data only once Tiqora has led the
+ITSM. Without Mode B it shows no rows; after a switch back from Mode B to Mode A it counts the rows that
+remain. The report page and a dashboard tile show the same note ("Diese Datenbasis wird nur gepflegt,
+solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein."); a wallboard link
+does not. A dashboard tile or a schedule on such a report keeps running; the mail carries no note and goes
+out empty unless "only if non-empty" is set. Statistics over Znuny's own CMDB and change tables in Mode A
+are not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
+
+**Period of a tile or a schedule.** "CIs nach Klasse und Status" has no period of its own. A dashboard
+period or a schedule's "Zeitraum für den Versand" narrows it, like every CI report, to the CIs created
+in that period, the same rule as for "Offene Tickets (jetzt)".
+
+**After the update.** This version adds two columns to the ticket facts ("first level solved" and
+"ITSM solution time") and raises the report fact version. The report worker recomputes all ticket
+facts in batches of 500 per run; until it has finished, tickets not yet recomputed are in neither the
+count nor the rate of the first-level measures and have no ITSM solution time, so the figures cover
+only the recomputed tickets and grow to the full numbers on their own; the newest tickets go first.
+The upgrade recomputes old tickets with today's configuration, so existing breach and working-minute
+figures can shift on sites that changed a calendar or an SLA since. Reports show "Die Kennzahlen werden
+nach dem Update neu berechnet. First-Level- und ITSM-Lösungszeit-Werte sind bis dahin unvollständig."
+while more than 500 rows are left. No admin rebuild is needed for this. Operating notes: [deployment.md](deployment.md#reporting-data).
+
 ## How the numbers are produced
 
-Reports do not query live tickets (except "Offene Tickets (jetzt)" and "Zeitbuchungen"). The worker
-service `report_facts` derives and maintains three things from the Znuny ticket history:
+Reports do not query live tickets (except "Offene Tickets (jetzt)" and "Zeitbuchungen"). The ITSM
+data bases "Configuration Items (CMDB)", "Changes", "Change-Statuswechsel" and "CIs und verknüpfte
+Tickets" read Tiqora's own CMDB and change tables instead (joined with the ticket facts where they
+need a queue). The worker service `report_facts` derives and maintains three things from the Znuny
+ticket history:
 
 - **Facts**: one row per ticket with its attributes and derived times (first response, solution,
   close, reopenings, queue moves, breach flags).
@@ -388,7 +542,8 @@ minutes. A target of 0 means "no SLA".
 
 On the first start after an upgrade the worker runs a **backfill** over the whole ticket history.
 Until it has finished, reports show "Die Berichtsdaten werden noch aufgebaut ({{percent}} %). Die
-Zahlen sind bis dahin unvollständig." Afterwards the worker follows new history rows continuously.
+Zahlen sind bis dahin unvollständig." (a fact upgrade after an update has its own notice, see "After
+the update"). Afterwards the worker follows new history rows continuously.
 Changes that write no history row are **not** picked up: calendar, SLA or escalation settings
 (working minutes stay as built), a change of the report time zone (older snapshots keep the old
 zone), and direct SQL changes. After such a change an administrator rebuilds the data (below).
@@ -436,6 +591,10 @@ Dashboards show reports as tiles (widgets "Bericht", "SLA-Erfüllung", "Rücksta
 [dashboards.md](dashboards.md#berichte-als-widgets). Plugins can add report sources and built-in
 reports ([plugins.md](plugins.md#reporting)).
 
+Drilling from a dashboard tile into the matching tickets works only for the ticket sources and
+dimensions that map to a ticket search; the ITSM role ("ITSM-Art", `itsm_role`) and the four ITSM
+data bases are not drillable.
+
 ## Developers: APIs and extension points
 
 All paths are below `/api/v1`.
@@ -467,7 +626,7 @@ integrations should use `POST /reports/run`. Differences in figures to Znuny:
 
 | Limit | Value |
 |---|---|
-| Built-in reports | 25 (plus plugin reports) |
+| Built-in reports | 25 core + 16 ITSM (plus plugin reports) |
 | Groupings / values per report | 3 / 10 |
 | Runtime parameters per report | 10 |
 | Period | at most 3,660 days |
@@ -477,7 +636,10 @@ integrations should use `POST /reports/run`. Differences in figures to Znuny:
 | Inline run budget | 75 s |
 | Groups loaded by one report query | 200,000; a wider result is cut and flagged |
 
-Tiqora does not offer natural-language questions to reports, MCP tools for reports, statistics on
-ITSM data (configuration items, changes), cron expressions for schedules (only the presets above),
-dynamic fields as report dimensions, or writing statistics back to Znuny. Znuny's "show as
+Tiqora does not offer natural-language questions to reports, MCP tools for reports, cron
+expressions for schedules (only the presets above), dynamic fields as report dimensions, CI
+attributes as report dimensions, availability statistics for services (Znuny ships none either),
+or writing statistics back to Znuny. Reports on configuration items and changes exist for Mode B
+only, and changes archived from Znuny are not counted (see
+[ITSM reports and data bases](#itsm-reports-and-data-bases)). Znuny's "show as
 dashboard widget" is not imported; add the report as a widget on a dashboard instead.

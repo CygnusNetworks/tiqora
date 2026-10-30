@@ -117,6 +117,11 @@ def register_core(registry: Registry) -> None:
     for r in core_builtin_reports():
         registry.add(BUILTIN_REPORTS, r)
 
+    from tiqora.reporting.catalogue_itsm import itsm_builtin_reports
+
+    for r in itsm_builtin_reports():
+        registry.add(BUILTIN_REPORTS, r)
+
     from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, core_providers
 
     for p in core_providers():

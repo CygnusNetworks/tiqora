@@ -30,6 +30,7 @@ const SRC = {
   key: "tickets",
   label_key: "reports.sources.tickets",
   default_time_field: "created",
+  available: true,
   common_fields: {},
   dimensions: [
     dim("queue", "id", ["eq", "in"]),

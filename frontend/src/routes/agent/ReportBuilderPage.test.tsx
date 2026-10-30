@@ -141,7 +141,84 @@ async function pickSource(label: string) {
   await user.click(screen.getByRole("option", { name: label }));
 }
 
+/** Mode A site: the CMDB and change data bases exist, but are not available. */
+function withUnavailable(...keys: string[]) {
+  vi.spyOn(reportsApi, "sources").mockResolvedValue(demoSources().map((src) => ({ ...src, available: !keys.includes(src.key) })));
+}
+
 describe("ReportBuilderPage", () => {
+  it("offers only the available data bases", async () => {
+    withUnavailable("config_items", "changes", "change_events", "ci_tickets");
+    renderAt("/agent/reports/new", CAN);
+    await user.click(await screen.findByTestId("builder-source"));
+    expect(screen.getByRole("option", { name: "Tickets" })).toBeInTheDocument();
+    for (const name of ["Configuration Items (CMDB)", "Changes", "Change-Statuswechsel", "CIs und verknüpfte Tickets"]) {
+      expect(screen.queryByRole("option", { name }), name).not.toBeInTheDocument();
+    }
+  });
+
+  it("offers the ITSM data bases with German labels where they are available", async () => {
+    renderAt("/agent/reports/new", CAN);
+    await user.click(await screen.findByTestId("builder-source"));
+    for (const name of ["Configuration Items (CMDB)", "Changes", "CIs und verknüpfte Tickets"]) {
+      expect(screen.getByRole("option", { name }), name).toBeInTheDocument();
+    }
+  });
+
+  it("opens a report on an unavailable data basis read-only with the Mode B hint", async () => {
+    withUnavailable("changes");
+    vi.spyOn(reportsApi, "get").mockResolvedValue(saved({ definition: demoReport("builtin.itsm_changes_by_status")!.definition }));
+    renderAt("/agent/reports/41/edit", CAN);
+    const hint = await screen.findByTestId("builder-source-unavailable");
+    expect(hint).toHaveTextContent("Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein.");
+    expect(screen.getByTestId("builder-source")).toHaveTextContent("Changes");
+    expect(screen.getByTestId("builder-source")).toBeDisabled();
+    expect(screen.getByTestId("builder-save")).toBeDisabled();
+    expect(screen.getByTestId("builder-save-copy")).toBeDisabled();
+    expect(screen.getByTestId("builder-load-file")).toBeDisabled();
+    expect(screen.getByTestId("builder-name")).toHaveAttribute("readonly");
+    // nothing can complete the report further, so the preview does not promise that
+    expect(screen.getByTestId("builder-preview-unavailable")).toHaveTextContent("Diese Datenbasis wird nur gepflegt, solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein.");
+    expect(screen.queryByTestId("builder-preview-issues")).not.toBeInTheDocument();
+    expect(screen.getByTestId("builder-preview")).not.toHaveTextContent("sobald der Bericht vollständig ist");
+  });
+
+  it("keeps 'Aus Datei laden' for a new report loaded from a file on a hidden data basis", async () => {
+    withUnavailable("changes");
+    vi.spyOn(reportsApi, "importFile").mockResolvedValue({
+      name: "Aus Datei",
+      description: null,
+      definition: demoReport("builtin.itsm_changes_by_status")!.definition,
+    } as never);
+    renderAt("/agent/reports/new", CAN);
+    const file = new File(["{}"], "bericht.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => "{}" });
+    fireEvent.change(await screen.findByTestId("builder-file-input"), { target: { files: [file] } });
+    await screen.findByTestId("builder-source-unavailable");
+    expect(screen.getByTestId("builder-save")).toBeDisabled();
+    expect(screen.getByTestId("builder-load-file")).toBeEnabled();
+  });
+
+  it("waits for the data bases before the editor opens, then locks an unavailable one at once", async () => {
+    let release: (v: ReturnType<typeof demoSources>) => void = () => {};
+    vi.spyOn(reportsApi, "sources").mockReturnValue(new Promise((res) => (release = res)));
+    vi.spyOn(reportsApi, "get").mockResolvedValue(saved({ definition: demoReport("builtin.itsm_changes_by_status")!.definition }));
+    renderAt("/agent/reports/41/edit", CAN);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByTestId("builder-save")).not.toBeInTheDocument();
+    await act(async () => release(demoSources().map((src) => ({ ...src, available: src.key !== "changes" }))));
+    expect(await screen.findByTestId("builder-source-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("builder-save")).toBeDisabled();
+  });
+
+  it("shows no hint and saves normally on an available data basis", async () => {
+    withUnavailable("changes");
+    renderAt("/agent/reports/41/edit", CAN);
+    await screen.findByTestId("builder-save");
+    expect(screen.queryByTestId("builder-source-unavailable")).not.toBeInTheDocument();
+    expect(screen.getByTestId("builder-save")).toBeEnabled();
+  });
+
   it("builds a report and saves it privately", async () => {
     const create = vi.spyOn(reportsApi, "create").mockResolvedValue({ key: "41", kind: "saved", id: 41 } as never);
     renderAt("/agent/reports/new", { can_create_reports: true, can_share_reports: false });

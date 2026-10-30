@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { SourceUnavailableHint } from "@/components/reports/SourceUnavailableHint";
 import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
@@ -112,6 +113,10 @@ function Editor({
   });
   const sources = sourcesQ.data ?? [];
   const source = sources.find((s) => s.key === state.source);
+  // A saved or imported report on a data basis that exists only in Mode B opens read-only.
+  // Until the sources are known the report cannot be told available: stay read-only, hint only once known.
+  const unavailable = source !== undefined && !source.available;
+  const locked = unavailable || sourcesQ.isPending;
 
   const issues = useMemo(() => validate(state, source), [state, source]);
   const definition = useMemo(() => (issues.length === 0 ? toDefinition(state) : null), [issues, state]);
@@ -196,7 +201,7 @@ function Editor({
   };
 
   const title = mode === "edit" ? t("reports.builder.editTitle") : t("reports.builder.newTitle");
-  const canSave = definition !== null;
+  const canSave = definition !== null && !locked;
 
   return (
     <div className="mx-auto w-full max-w-[96rem] space-y-4 px-4 py-6" data-testid="report-builder-page">
@@ -218,6 +223,7 @@ function Editor({
               className={`${inputCls} mt-2 w-full max-w-xl`}
               value={state.name}
               maxLength={200}
+              readOnly={locked}
               placeholder={t("reports.builder.namePlaceholder")}
               onChange={(e) => dispatch({ type: "setMeta", name: e.target.value })}
               data-testid="builder-name"
@@ -243,7 +249,12 @@ function Editor({
                 if (file) void loadFile(file);
               }}
             />
-            <Button onClick={() => fileInput.current?.click()} data-testid="builder-load-file">
+            <Button
+              onClick={() => fileInput.current?.click()}
+              // a new report on a hidden data basis has nothing to lose: another file may replace it
+              disabled={mode === "new" ? sourcesQ.isPending : locked}
+              data-testid="builder-load-file"
+            >
               {t("reports.builder.loadFile")}
             </Button>
             {mode === "edit" && (
@@ -274,11 +285,16 @@ function Editor({
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)_16rem] xl:grid-cols-[22rem_minmax(0,1fr)_18rem]">
+      {unavailable && <SourceUnavailableHint testId="builder-source-unavailable" />}
+
+      <fieldset
+        disabled={locked}
+        className="m-0 grid min-w-0 gap-6 border-0 p-0 lg:grid-cols-[20rem_minmax(0,1fr)_16rem] xl:grid-cols-[22rem_minmax(0,1fr)_18rem]"
+      >
         <BuilderFieldsPanel state={state} dispatch={dispatch} sources={sources} source={source} issues={issues} />
-        <BuilderPreview definition={definition} issues={issues} />
+        <BuilderPreview definition={locked ? null : definition} issues={issues} unavailable={unavailable} />
         <BuilderOptionsPanel state={state} dispatch={dispatch} source={source} />
-      </div>
+      </fieldset>
 
       <SaveReportDialog
         open={dialog !== null}

@@ -26,6 +26,7 @@ export const DEMO_FACTS: FactsStatus = {
   backfill_status: "done",
   backfill_job_id: null,
   backfill_progress: 1,
+  outdated_rows: 0,
 };
 
 /** Facts while the first build runs (demo switch `?demo_facts=building`, see handlers.ts). */
@@ -35,6 +36,7 @@ export const DEMO_FACTS_BUILDING: FactsStatus = {
   backfill_status: "running",
   backfill_job_id: 9203,
   backfill_progress: 0.42,
+  outdated_rows: 0,
 };
 
 let factsBuilding = false;
@@ -99,6 +101,31 @@ const DIM_TYPE: Record<string, [ColType, string | null]> = {
   owner: ["id", null],
   service: ["id", null],
   sla: ["id", null],
+  changed: ["date", null],
+  planned_start: ["date", null],
+  actual_end: ["date", null],
+  class: ["id", null],
+  deployment_state: ["id", null],
+  incident_state: ["id", null],
+  created_by: ["id", null],
+  ci: ["id", null],
+  ci_class: ["id", null],
+  ci_deployment_state: ["id", null],
+  ci_incident_state: ["id", null],
+  ticket_type: ["id", null],
+  link_type: ["string", null],
+  itsm_role: ["enum", "reports.values.itsm_role"],
+  deployment_category: ["enum", "reports.values.deployment_category"],
+  incident_category: ["enum", "reports.values.incident_category"],
+  ci_incident_category: ["enum", "reports.values.incident_category"],
+  phase: ["enum", "reports.values.change_phase"],
+  from_phase: ["enum", "reports.values.change_phase"],
+  to_phase: ["enum", "reports.values.change_phase"],
+  change_phase: ["enum", "reports.values.change_phase"],
+  outcome: ["enum", "reports.values.change_outcome"],
+  change_status: ["enum", "reports.values.change_status"],
+  change_type: ["enum", "reports.values.change_type"],
+  risk_level: ["enum", "reports.values.risk_level"],
 };
 
 /** type, base value, amplitude */
@@ -135,17 +162,42 @@ const MEASURE: Record<string, [ColType, number, number]> = {
   age_30d_plus: ["count", 2, 1],
   time_units: ["units", 22.5, 8],
   bookings: ["count", 18, 6],
+  first_level_solved: ["count", 21, 6],
+  first_level_solution_rate: ["percent", 0.58, 0.1],
+  itsm_solution_avg: ["minutes", 760, 220],
+  itsm_solution_p50: ["minutes", 540, 160],
+  config_items: ["count", 64, 20],
+  cis_in_incident: ["count", 3, 2],
+  cis_in_warning: ["count", 5, 2],
+  productive_cis: ["count", 48, 14],
+  versions_avg: ["number", 3.4, 1.2],
+  changes: ["count", 14, 5],
+  open_changes: ["count", 6, 3],
+  successful_changes: ["count", 9, 3],
+  failed_changes: ["count", 2, 1.5],
+  change_success_rate: ["percent", 0.84, 0.08],
+  emergency_changes: ["count", 1, 1],
+  rejected_changes: ["count", 1, 1],
+  late_changes: ["count", 2, 1.5],
+  phase_changes: ["count", 11, 4],
+  cis: ["count", 9, 3],
+  incidents: ["count", 7, 3],
+  open_incidents: ["count", 2, 1.5],
 };
 
 // --- sources (measure aggregations, mirrors backend reporting/sources) ---------
 
 /** `measure:agg` pairs per source (strings, not object literals: the secret scan flags long snake_case keys). */
 const SOURCE_AGGS: Record<string, string> = {
-  tickets: "tickets:count closed_tickets:count_if open_tickets:count_if reopened_tickets:count_if reopen_rate:rate fcr_rate:rate first_response_avg:avg first_response_p50:p50 first_response_p90:p90 first_response_clock_avg:avg first_response_clock_p50:p50 solution_avg:avg solution_p50:p50 solution_p90:p90 solution_clock_avg:avg solution_clock_p50:p50 response_breaches:count_if response_breach_rate:rate solution_breaches:count_if solution_breach_rate:rate update_breaches:sum update_breached_tickets:count_if response_near_misses:count_if solution_near_misses:count_if sla_met_rate:rate accounted_time:sum agent_touches_avg:avg queue_moves_avg:avg pingpong_tickets:count_if",
+  tickets: "tickets:count closed_tickets:count_if open_tickets:count_if reopened_tickets:count_if reopen_rate:rate fcr_rate:rate first_response_avg:avg first_response_p50:p50 first_response_p90:p90 first_response_clock_avg:avg first_response_clock_p50:p50 solution_avg:avg solution_p50:p50 solution_p90:p90 solution_clock_avg:avg solution_clock_p50:p50 response_breaches:count_if response_breach_rate:rate solution_breaches:count_if solution_breach_rate:rate update_breaches:sum update_breached_tickets:count_if response_near_misses:count_if solution_near_misses:count_if sla_met_rate:rate accounted_time:sum agent_touches_avg:avg queue_moves_avg:avg pingpong_tickets:count_if first_level_solved:count_if first_level_solution_rate:rate itsm_solution_avg:avg itsm_solution_p50:p50",
   ticket_events: "events:count tickets:count_distinct dwell_avg_hours:avg dwell_p50_hours:p50 dwell_p90_hours:p90",
   daily_snapshot: "open_tickets:sum age_0_1d:sum age_1_3d:sum age_3_7d:sum age_7_30d:sum age_30d_plus:sum",
   accounted_time: "time_units:sum bookings:count tickets:count_distinct",
   open_tickets: "tickets:count age_0_1d:count_if age_1_3d:count_if age_3_7d:count_if age_7_30d:count_if age_30d_plus:count_if escalated:count_if unassigned:count_if",
+  config_items: "config_items:count cis_in_incident:count_if cis_in_warning:count_if productive_cis:count_if versions_avg:avg",
+  changes: "changes:count open_changes:count_if successful_changes:count_if failed_changes:count_if change_success_rate:rate emergency_changes:count_if rejected_changes:count_if late_changes:count_if",
+  change_events: "phase_changes:count changes:count_distinct",
+  ci_tickets: "tickets:count_distinct cis:count_distinct open_tickets:count_distinct changes:count_distinct incidents:count_distinct open_incidents:count_distinct",
 };
 
 /**
@@ -154,14 +206,22 @@ const SOURCE_AGGS: Record<string, string> = {
  */
 const SOURCE_DIMS: Record<string, string> = {
   tickets:
-    "queue:id:queue:queue queue_at_create:id:queue:queue state:id:state:state state_type:enum:none:- priority:id:priority:priority type:id:type:type service:id:service:service sla:id:sla:sla owner:id:user:- responsible:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- channel:enum:none:- created:date:none:- closed:date:none:- first_response:date:none:- created_hour:hour:none:- created_weekday:weekday:none:- process:string:none:-",
+    "queue:id:queue:queue queue_at_create:id:queue:queue state:id:state:state state_type:enum:none:- priority:id:priority:priority type:id:type:type itsm_role:enum:none:- service:id:service:service sla:id:sla:sla owner:id:user:- responsible:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- channel:enum:none:- created:date:none:- closed:date:none:- first_response:date:none:- created_hour:hour:none:- created_weekday:weekday:none:- process:string:none:-",
   ticket_events:
     "kind:enum:none:- occurred:date:none:- occurred_hour:hour:none:- occurred_weekday:weekday:none:- actor:id:user:- queue:id:queue:queue from_queue:id:queue:queue to_queue:id:queue:queue from_state:id:state:state to_state:id:state:state ticket_queue:id:queue:queue ticket_state:id:state:state ticket_priority:id:priority:priority ticket_type:id:type:type customer:string:customer_company:-",
   daily_snapshot: "snapshot:local_date:none:- queue:id:queue:queue state_type:enum:none:- priority:id:priority:priority",
   accounted_time:
     "agent:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- queue:id:queue:queue type:id:type:type service:id:service:service ticket:id:ticket:- booked:date:none:- booked_weekday:weekday:none:-",
   open_tickets:
-    "queue:id:queue:queue state:id:state:state priority:id:priority:priority type:id:type:type service:id:service:service sla:id:sla:sla owner:id:user:- responsible:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- created:date:none:-",
+    "queue:id:queue:queue state:id:state:state priority:id:priority:priority type:id:type:type itsm_role:enum:none:- service:id:service:service sla:id:sla:sla owner:id:user:- responsible:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- created:date:none:-",
+  config_items:
+    "class:id:cmdb_class:cmdb_class deployment_state:id:cmdb_catalog:cmdb_deployment_state incident_state:id:cmdb_catalog:cmdb_incident_state deployment_category:enum:none:- incident_category:enum:none:- created:date:none:- changed:date:none:- created_by:id:user:-",
+  changes:
+    "phase:enum:none:- outcome:enum:none:- change_status:enum:none:- change_type:enum:none:- risk_level:enum:none:- queue:id:queue:queue priority:id:priority:priority service:id:service:service sla:id:sla:sla owner:id:user:- created_by:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- created:date:none:- closed:date:none:- planned_start:date:none:- actual_end:date:none:-",
+  change_events:
+    "occurred:date:none:- from_phase:enum:none:- to_phase:enum:none:- change_type:enum:none:- queue:id:queue:queue priority:id:priority:priority service:id:service:service",
+  ci_tickets:
+    "ci:id:cmdb_ci:- ci_class:id:cmdb_class:cmdb_class ci_deployment_state:id:cmdb_catalog:cmdb_deployment_state ci_incident_state:id:cmdb_catalog:cmdb_incident_state ci_incident_category:enum:none:- link_type:string:none:- ticket_type:id:type:type itsm_role:enum:none:- state_type:enum:none:- queue:id:queue:queue priority:id:priority:priority service:id:service:service change_phase:enum:none:- created:date:none:- closed:date:none:-",
 };
 const DEFAULT_TIME_FIELD: Record<string, string | null> = {
   tickets: "created",
@@ -169,13 +229,48 @@ const DEFAULT_TIME_FIELD: Record<string, string | null> = {
   daily_snapshot: "snapshot",
   accounted_time: "booked",
   open_tickets: null,
+  config_items: null,
+  changes: "created",
+  change_events: "occurred",
+  ci_tickets: "created",
 };
+const ITSM_ROLES = ["incident", "major_incident", "service_request", "problem", "change", "change_task"];
+const CHANGE_PHASES = ["draft", "submitted", "assessment", "approval", "scheduled", "implementing", "review", "closed", "rejected", "cancelled"];
+const INCIDENT_CATEGORIES = ["operational", "warning", "incident"];
 const ENUM_VALUES: Record<string, string[]> = {
   state_type: ["new", "open", "pending reminder", "closed"],
   channel: ["email", "phone", "telegram", "webchat"],
   kind: ["create", "close", "reply", "note"],
+  itsm_role: ITSM_ROLES,
+  deployment_category: ["preproductive", "productive", "postproductive"],
+  incident_category: INCIDENT_CATEGORIES,
+  ci_incident_category: INCIDENT_CATEGORIES,
+  phase: CHANGE_PHASES,
+  from_phase: CHANGE_PHASES,
+  to_phase: CHANGE_PHASES,
+  change_phase: CHANGE_PHASES,
+  outcome: ["successful", "failed", "backed_out"],
+  change_status: [...CHANGE_PHASES, "closed_successful", "closed_failed", "closed_backed_out"],
+  change_type: ["standard", "normal", "emergency"],
+  risk_level: ["low", "medium", "high", "very_high"],
 };
-const ENUM_LABELS: Record<string, string> = { state_type: "state_type", channel: "channel", kind: "event_kind" };
+const ENUM_LABELS: Record<string, string> = {
+  state_type: "state_type",
+  channel: "channel",
+  kind: "event_kind",
+  itsm_role: "itsm_role",
+  deployment_category: "deployment_category",
+  incident_category: "incident_category",
+  ci_incident_category: "incident_category",
+  phase: "change_phase",
+  from_phase: "change_phase",
+  to_phase: "change_phase",
+  change_phase: "change_phase",
+  outcome: "change_outcome",
+  change_status: "change_status",
+  change_type: "change_type",
+  risk_level: "risk_level",
+};
 const FILTER_TYPE: Record<string, string | null> = {
   id: "id",
   string: "string",
@@ -213,6 +308,7 @@ export function demoSources(): ReportSource[] {
     key,
     label_key: `reports.sources.${key}`,
     default_time_field: DEFAULT_TIME_FIELD[key] ?? null,
+    available: true,
     common_fields: {},
     dimensions: sourceDimensions(key),
     filter_fields: [],
@@ -249,6 +345,16 @@ const STATES: Record<string, string> = { "1": "Neu", "2": "Offen", "3": "Wartet"
 const PRIORITIES: Record<string, string> = { "2": "2 niedrig", "3": "3 normal", "4": "4 hoch", "5": "5 sehr hoch" };
 const SERVICES: Record<string, string> = { "1": "E-Mail", "2": "Netzwerk", "3": "Drucker" };
 const SLAS: Record<string, string> = { "1": "Standard", "2": "Premium" };
+const CI_CLASSES: Record<string, string> = { "1": "Server", "2": "Standort", "3": "Netzwerkgerät" };
+const DEPLOYMENT_STATES: Record<string, string> = { "1": "Geplant", "2": "Produktiv", "3": "Außer Betrieb" };
+const INCIDENT_STATES: Record<string, string> = { "11": "Betriebsbereit", "12": "Warnung", "13": "Vorfall" };
+const CIS: Record<string, string> = {
+  "101": "srv-db-01.example.org",
+  "102": "srv-web-01.example.org",
+  "103": "srv-mail-01.example.org",
+  "104": "sw-core-01.example.org",
+  "105": "fw-edge-01.example.org",
+};
 
 function ymd(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
@@ -274,6 +380,28 @@ const DIM_VALUES: Record<string, string[]> = {
   owner: Object.keys(AGENTS),
   service: Object.keys(SERVICES),
   sla: Object.keys(SLAS),
+  itsm_role: ITSM_ROLES,
+  deployment_category: ENUM_VALUES.deployment_category,
+  incident_category: INCIDENT_CATEGORIES,
+  ci_incident_category: INCIDENT_CATEGORIES,
+  phase: CHANGE_PHASES,
+  from_phase: CHANGE_PHASES,
+  to_phase: ["rejected", "cancelled"],
+  change_phase: CHANGE_PHASES,
+  outcome: ENUM_VALUES.outcome,
+  change_status: ENUM_VALUES.change_status,
+  change_type: ENUM_VALUES.change_type,
+  risk_level: ENUM_VALUES.risk_level,
+  class: Object.keys(CI_CLASSES),
+  ci_class: Object.keys(CI_CLASSES),
+  deployment_state: Object.keys(DEPLOYMENT_STATES),
+  ci_deployment_state: Object.keys(DEPLOYMENT_STATES),
+  incident_state: Object.keys(INCIDENT_STATES),
+  ci_incident_state: Object.keys(INCIDENT_STATES),
+  ci: Object.keys(CIS),
+  ticket_type: Object.keys(TYPES),
+  created_by: Object.keys(AGENTS),
+  link_type: ["ConnectedTo", "DependsOn"],
 };
 const KIND_BY_REPORT: Record<string, string[]> = {
   "builtin.volume": ["create", "close"],
@@ -293,9 +421,18 @@ const LABELS: Record<string, Record<string, string>> = {
   owner: AGENTS,
   service: SERVICES,
   sla: SLAS,
+  class: CI_CLASSES,
+  ci_class: CI_CLASSES,
+  deployment_state: DEPLOYMENT_STATES,
+  ci_deployment_state: DEPLOYMENT_STATES,
+  incident_state: INCIDENT_STATES,
+  ci_incident_state: INCIDENT_STATES,
+  ci: CIS,
+  ticket_type: TYPES,
+  created_by: AGENTS,
 };
 
-const DATE_KEYS = new Set(["occurred", "created", "closed", "snapshot", "booked"]);
+const DATE_KEYS = new Set(["occurred", "created", "closed", "snapshot", "booked", "changed", "planned_start", "actual_end"]);
 /** Above this many days a run answers 202 with a background job, like a costly real run. */
 const JOB_THRESHOLD_DAYS = 200;
 const MAX_BUCKETS = 120;

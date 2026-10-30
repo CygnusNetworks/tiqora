@@ -28,6 +28,7 @@ from tiqora.reporting.catalogue import (
     BuiltinReport,
     core_builtin_reports,
 )
+from tiqora.reporting.catalogue_itsm import ITSM_EXPECTED
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import TimeRange, validate_definition
 from tiqora.reporting.engine import run_report
@@ -120,7 +121,9 @@ def _to_async_url(sync_url: str) -> str:
 
 def test_catalogue_keys_and_order() -> None:
     reg = _registry()
-    assert [r.key for r in reg.items(BUILTIN_REPORTS)] == [f"builtin.{k}" for k in EXPECTED]
+    assert [r.key for r in reg.items(BUILTIN_REPORTS)] == [
+        f"builtin.{k}" for k in EXPECTED + ITSM_EXPECTED
+    ]
 
 
 def test_every_builtin_validates_and_has_queue_parameter() -> None:
@@ -128,11 +131,14 @@ def test_every_builtin_validates_and_has_queue_parameter() -> None:
     for r in reg.items(BUILTIN_REPORTS):
         src = validate_definition(r.definition, reg)
         assert r.definition.time_zone is None
-        assert [p.key for p in r.definition.parameters] == ["queues"]
-        param = r.definition.parameters[0]
-        assert (param.field, param.op) == (QUEUE_PARAM_FIELD[r.definition.source], "in")
-        assert param.label_key == "reports.parameters.queues"
-        assert src.filter_spec(param.field) is not None
+        if r.definition.source not in QUEUE_PARAM_FIELD:
+            assert r.definition.parameters == [], r.key
+        else:
+            assert [p.key for p in r.definition.parameters] == ["queues"]
+            param = r.definition.parameters[0]
+            assert (param.field, param.op) == (QUEUE_PARAM_FIELD[r.definition.source], "in")
+            assert param.label_key == "reports.parameters.queues"
+            assert src.filter_spec(param.field) is not None
         name = r.key.removeprefix("builtin.")
         assert r.title_key == f"reports.builtin.{name}.title"
         assert r.description_key == f"reports.builtin.{name}.description"

@@ -102,6 +102,25 @@ beforeEach(() => {
   vi.mocked(reportsApi.factsStatus).mockReset().mockResolvedValue(DEMO_FACTS);
 });
 
+const ITSM_KEYS = [
+  "itsm_tickets_by_type",
+  "itsm_created_by_type",
+  "itsm_open_by_type",
+  "itsm_first_level_solution",
+  "itsm_first_level_trend",
+  "itsm_solution_time",
+  "itsm_solution_time_trend",
+  "itsm_tickets_by_role",
+  "cmdb_cis_by_class",
+  "cmdb_cis_created",
+  "itsm_changes_by_status",
+  "itsm_change_outcomes",
+  "itsm_change_transitions",
+  "itsm_change_requesters",
+  "itsm_changes_per_ci_class",
+  "itsm_incident_prone_cis",
+];
+
 describe("ReportsPage", () => {
   it("loads plugin i18n for plugin reports", async () => {
     const plugin = { id: "org.example.points", version: "1.0.0", locales: ["de", "en"] };
@@ -273,8 +292,22 @@ describe("ReportsPage", () => {
     expect(within(sla).getByRole("heading")).toHaveTextContent("SLA");
     expect(within(sla).getByTestId("reports-card-builtin.sla_times")).toBeInTheDocument();
     expect(within(sla).queryByTestId("reports-card-builtin.volume")).not.toBeInTheDocument();
-    // all 25 built-ins are listed
-    expect(screen.getAllByTestId(/^reports-card-builtin\./)).toHaveLength(25);
+    // all 25 core and 16 ITSM built-ins are listed
+    expect(screen.getAllByTestId(/^reports-card-builtin\./)).toHaveLength(41);
+  });
+
+  it("lists the ITSM category last with its 16 built-ins in catalogue order", async () => {
+    renderPage();
+    const itsm = await screen.findByTestId("reports-category-itsm");
+    expect(within(itsm).getByRole("heading")).toHaveTextContent("ITSM");
+    const cards = within(itsm).getAllByTestId(/^reports-card-builtin\./);
+    expect(cards.map((c) => c.getAttribute("data-testid"))).toEqual(
+      ITSM_KEYS.map((k) => `reports-card-builtin.${k}`),
+    );
+    expect(cards[0]).toHaveTextContent("Tickets nach Typ");
+    expect(cards[12]).toHaveTextContent("Abgelehnte und abgebrochene Changes");
+    const groups = screen.getAllByTestId(/^reports-category-/).map((g) => g.getAttribute("data-testid"));
+    expect(groups[groups.length - 1]).toBe("reports-category-itsm");
   });
 
   it("highlights and scrolls to the category from ?category=", async () => {

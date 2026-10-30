@@ -29,6 +29,13 @@ from tiqora.reporting.definition import (
 )
 from tiqora.reporting.sources._common import STATE_TYPES
 from tiqora.reporting.sql import Grain
+from tiqora.reporting.znuny_stats.change_states import (
+    CHANGE_OUTCOMES_COLLAPSED,
+    CHANGE_STATE_MAPPED,
+    CHANGE_STATE_UNKNOWN,
+    ZNUNY_CHANGE_STATES,
+    to_phase,
+)
 from tiqora.reporting.znuny_stats.model import StatElement, ZnunyStat
 from tiqora.saved_searches.znuny_import import ZnunyLookups
 
@@ -64,12 +71,28 @@ class StatLookups:
     group_ids_by_name: Mapping[str, int]  # casefolded group name -> id (file Permission)
     default_time_zone: str  # the importing agent's zone
     search: ZnunyLookups  # wave-2 lookups for map_search_profile (TicketList)
+    itsm_mode: str = "off"  # tiqora.cmdb.gate.current_itsm_mode
+    cmdb_class_by_znuny_id: Mapping[int, int] = field(default_factory=dict)  # import map "class"
+    cmdb_catalog_by_znuny_id: Mapping[int, int] = field(
+        default_factory=dict
+    )  # import map "catalog"
+    cmdb_class_ids_by_name: Mapping[str, int] = field(default_factory=dict)  # casefolded name/key
+    change_state_names: Mapping[int, str] = field(default_factory=dict)  # Znuny change states
 
 
 @dataclass(frozen=True, slots=True)
 class FieldMap:
     field: str  # Tiqora source field key
-    kind: Literal["id", "string", "state_type", "time"]
+    kind: Literal[
+        "id",
+        "string",
+        "state_type",
+        "time",
+        "cmdb_class",
+        "cmdb_catalog",
+        "change_state",
+        "change_phase",
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,7 +198,14 @@ _DROPPED_PREFIXES: Final = (
     ("MIMEBase_", _NOT_SUPPORTED),
     ("DynamicField_", "Dynamische Felder stehen in Berichten noch nicht zur Verfügung."),
 )
-_FILE_IDS_REASON: Final = "IDs aus einer Exportdatei – bitte die Auswahl prüfen."
+_FILE_IDS_REASON: Final = (
+    "IDs aus einer Exportdatei lassen sich nicht zuordnen. "
+    "Solange Sie keine Auswahl treffen, zählt der Bericht alle Werte."
+)
+_STATE_TYPE_IDS_REASON: Final = (
+    "Status-Typ-IDs aus einer Exportdatei wurden auf die Status-Typen dieses Systems abgebildet. "
+    "Bitte prüfen Sie die Auswahl."
+)
 
 
 def dropped_reason(
@@ -190,14 +220,82 @@ def dropped_reason(
     return default
 
 
-def file_ids_unreliable(stat: ZnunyStat, el: StatElement, fmap: FieldMap) -> bool:
-    """File origin, ``id`` element not exported by name: the ids are foreign (ruling 16)."""
-    return stat.origin == "file" and fmap.kind == "id" and el.element not in FILE_NAME_ELEMENTS
+_CMDB_KINDS: Final = ("cmdb_class", "cmdb_catalog")
+_CHANGE_KINDS: Final = ("change_state", "change_phase")
+
+
+def file_ids_unreliable(
+    stat: ZnunyStat, el: StatElement, fmap: FieldMap, *, names_in_file: bool = True
+) -> bool:
+    """File origin, ids not exported by name: the ids are foreign (ruling 16).
+
+    ``names_in_file=False`` (the ITSM objects, whose wrappers keep ids) makes every ``id``
+    element of a file unreliable. CMDB kinds are unreliable when a value is a number.
+    """
+    if stat.origin != "file":
+        return False
+    if fmap.kind == "id":
+        return not names_in_file or el.element not in FILE_NAME_ELEMENTS
+    if fmap.kind in (*_CMDB_KINDS, *_CHANGE_KINDS):
+        return any(_int(raw) is not None for raw in el.selected)
+    return False
 
 
 def _int(value: object) -> int | None:
     text = str(value).strip()
     return int(text) if text.isascii() and text.isdigit() else None
+
+
+def _resolve_cmdb(
+    raw: str,
+    ref: str,
+    fmap: FieldMap,
+    lookups: StatLookups,
+    out: list[int | str],
+    issues: list[ImportIssue],
+) -> None:
+    number = _int(raw)
+    found: int | None
+    if fmap.kind == "cmdb_class":
+        if number is not None:
+            found = lookups.cmdb_class_by_znuny_id.get(number)
+            reason = "Diese CI-Klasse wurde nicht nach Tiqora übernommen."
+        else:
+            found = lookups.cmdb_class_ids_by_name.get(raw.strip().casefold())
+            reason = f"„{raw[:80]}“ gibt es in diesem System nicht."
+    else:
+        found = lookups.cmdb_catalog_by_znuny_id.get(number) if number is not None else None
+        reason = (
+            "Diesen Status gibt es in der Tiqora-CMDB nicht."
+            if number is not None
+            else f"„{raw[:80]}“ ist keine gültige Nummer."
+        )
+    if found is None:
+        issues.append(make_issue(ref, raw, reason, "dropped"))
+    else:
+        out.append(found)
+
+
+def _resolve_change_state(
+    raw: str,
+    ref: str,
+    fmap: FieldMap,
+    lookups: StatLookups,
+    out: list[int | str],
+    issues: list[ImportIssue],
+) -> bool:
+    """One Znuny change state in Tiqora's spelling; ``True`` when something mapped."""
+    number = _int(raw)
+    name = lookups.change_state_names.get(number) if number is not None else raw.strip()
+    mapped = ZNUNY_CHANGE_STATES.get(name.casefold()) if name is not None else None
+    if mapped is None:
+        issues.append(make_issue(ref, raw, CHANGE_STATE_UNKNOWN, "dropped"))
+        return False
+    for status in mapped:
+        value = to_phase(status) if fmap.kind == "change_phase" else status
+        if value not in out:
+            out.append(value)
+    return True
 
 
 def resolve_values(
@@ -206,12 +304,14 @@ def resolve_values(
     stat: ZnunyStat,
     lookups: StatLookups,
     issues: list[ImportIssue],
+    *,
+    names_in_file: bool = True,
 ) -> list[int | str]:
     """The element's selected values in Tiqora's spelling; unusable ones become issues."""
     ref = element_ref(el)
     out: list[int | str] = []
     by_name: Mapping[str, int] | None = None
-    if stat.origin == "file" and fmap.kind == "id":
+    if names_in_file and stat.origin == "file" and fmap.kind == "id":
         kind = FILE_NAME_ELEMENTS.get(el.element)
         if kind is not None:
             by_name = {
@@ -220,8 +320,13 @@ def resolve_values(
                 "priority": lookups.priority_ids_by_name,
                 "user": lookups.user_ids_by_login,
             }[kind]
+    any_state = False
     for raw in el.selected:
-        if fmap.kind == "id":
+        if fmap.kind in _CMDB_KINDS:
+            _resolve_cmdb(raw, ref, fmap, lookups, out, issues)
+        elif fmap.kind in _CHANGE_KINDS:
+            any_state |= _resolve_change_state(raw, ref, fmap, lookups, out, issues)
+        elif fmap.kind == "id":
             if by_name is not None:
                 found = by_name.get(raw.strip().casefold())
                 if found is None:
@@ -261,8 +366,16 @@ def resolve_values(
                 )
             elif raw.strip():
                 out.append(raw)
+    if any_state:
+        issues.append(make_issue(ref, ", ".join(el.selected), CHANGE_STATE_MAPPED, "approximated"))
+    if fmap.kind == "change_phase" and "closed" in out:
+        issues.append(
+            make_issue(ref, ", ".join(el.selected), CHANGE_OUTCOMES_COLLAPSED, "approximated")
+        )
     if stat.origin == "file" and fmap.kind == "state_type" and out:
-        issues.append(make_issue(ref, ", ".join(el.selected), _FILE_IDS_REASON, "approximated"))
+        issues.append(
+            make_issue(ref, ", ".join(el.selected), _STATE_TYPE_IDS_REASON, "approximated")
+        )
     return out
 
 
@@ -506,6 +619,7 @@ def map_axes(
     *,
     skip: Collection[str] = (),
     default_dropped: str = "Unbekanntes Element.",
+    names_in_file: bool = True,
 ) -> MappedAxes:
     """Axes, fixed filters, runtime parameters and the period of a dynamic matrix statistic."""
     out = MappedAxes()
@@ -580,12 +694,14 @@ def map_axes(
                         "approximated",
                     )
                 )
-        foreign = file_ids_unreliable(stat, el, fmap) and bool(el.selected)
+        foreign = file_ids_unreliable(stat, el, fmap, names_in_file=names_in_file) and bool(
+            el.selected
+        )
         if foreign:
             issues.append(make_issue(ref, ", ".join(el.selected), _FILE_IDS_REASON, "approximated"))
             values: list[int | str] = []
         else:
-            values = resolve_values(el, fmap, stat, lookups, issues)
+            values = resolve_values(el, fmap, stat, lookups, issues, names_in_file=names_in_file)
         if not el.fixed or foreign:
             if len(out.parameters) >= MAX_PARAMETERS:
                 issues.append(

@@ -332,7 +332,8 @@ export function BuilderFieldsPanel({
     <div className="space-y-5" data-testid="builder-fields">
       <Section title={t("reports.builder.dataBasis")}>
         <SelectField
-          items={sources.map((s) => ({ value: s.key, label: t(s.label_key) }))}
+          // only data bases that exist now; a report that already uses an unavailable one keeps it visible (read-only)
+          items={sources.filter((s) => s.available || s.key === state.source).map((s) => ({ value: s.key, label: t(s.label_key) }))}
           value={state.source}
           onChange={(key) => dispatch({ type: "setSource", source: key })}
           placeholder={t("reports.builder.dataBasisPlaceholder")}

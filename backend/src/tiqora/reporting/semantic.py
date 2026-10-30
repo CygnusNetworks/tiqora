@@ -38,11 +38,16 @@ LabelSource = Literal[
     "customer_user",
     "ticket",
     "none",
+    "cmdb_class",
+    "cmdb_catalog",
+    "cmdb_ci",
 ]
 MeasureAgg = Literal[
     "count", "count_if", "count_distinct", "sum", "avg", "min", "max", "p50", "p90", "rate"
 ]
 MeasureUnit = Literal["count", "number", "minutes", "hours", "days", "units", "percent"]
+ScopeKind = Literal["queue", "cmdb_class"]
+SourceAvailability = Literal["always", "itsm_tiqora"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +57,8 @@ class CompileContext:
     tz: tuple[TzSegment, ...]  # for to_local
     near_miss_percent: int
     window: TimeWindow | None
+    #: ticket_type.id -> ITSM role (itsm_roles.ITSM_ROLES); empty = no ITSM type configured/found
+    type_roles: Mapping[int, str] = field(default_factory=dict)
 
 
 ExprFn = Callable[[CompileContext], ColumnElement[Any]]
@@ -103,7 +110,7 @@ class ReportSource:
     key: str
     label_key: str
     from_clause: Callable[[CompileContext], FromClause]
-    scope_column: ExprFn  # queue id column checked against the viewer's queues
+    scope_column: ExprFn  # id column of ``scope_kind`` checked against the viewer's ids
     dimensions: tuple[Dimension, ...]
     measures: tuple[Measure, ...]
     filter_fields: tuple[FilterOnlyField, ...] = ()
@@ -120,6 +127,17 @@ class ReportSource:
     #: dashboard filter key (``run_service.COMMON_FILTER_KEYS``) -> this source's filterable
     #: field key; a key a source does not list cannot be applied to it
     common_fields: Mapping[str, str] = field(default_factory=dict)
+    #: what ``scope_column`` holds: queue ids (viewer's ro queues) or CMDB class ids (readable
+    #: classes)
+    scope_kind: ScopeKind = "queue"
+    #: further columns ANDed with the viewer's ids of their kind (``ci_tickets``: the CI class)
+    extra_scopes: tuple[tuple[ScopeKind, ExprFn], ...] = ()
+    #: ``itsm_tiqora``: listed only while ``itsm.mode == "tiqora"``; runs stay possible
+    availability: SourceAvailability = "always"
+
+    def scope_kinds(self) -> frozenset[ScopeKind]:
+        """Every id kind the compiler checks for this source."""
+        return frozenset({self.scope_kind, *(kind for kind, _ in self.extra_scopes)})
 
     def dimension(self, key: str) -> Dimension | None:
         for d in self.dimensions:
