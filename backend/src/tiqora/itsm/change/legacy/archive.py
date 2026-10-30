@@ -121,8 +121,9 @@ KEY_CHANGED_MESSAGE: Final = (
     "ungeschwärzt ins Archiv zurück, deshalb wird nichts mehr geschrieben; das Archiv bleibt "
     "lesbar und geschwärzt. Haben Sie den bisherigen Schlüssel noch und lief seit dem Wechsel "
     "keine Löschung: Setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen "
-    "TIQORA_SECRET_KEY und starten Sie den Vorgang erneut. Ist er verloren oder liefen inzwischen Löschungen: Weitere "
-    "Archiv-Läufe sind nicht möglich, Löschungen funktionieren weiter."
+    "TIQORA_SECRET_KEY und starten Sie den Vorgang erneut. Ist er verloren oder liefen "
+    "inzwischen Löschungen: Weitere Archiv-Läufe sind nicht möglich, Löschungen funktionieren "
+    "weiter."
 )
 #: output of an erasure that ran under a changed key (CLI); the job has ``KEY_CHANGED_COUNT``
 KEY_CHANGED_WARNING: Final = (
