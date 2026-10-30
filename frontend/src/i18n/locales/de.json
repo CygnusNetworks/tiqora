@@ -9988,7 +9988,8 @@
           "task_outside": "Außerhalb des Zeitfensters:",
           "no_window": "Kein Zeitfenster gesetzt",
           "freeze_truncated": "Zu viele Sperrzeiträume: nicht alle wurden geprüft",
-          "overlap_truncated": "Zu viele Changes im Zeitraum: nicht alle wurden geprüft"
+          "overlap_truncated": "Zu viele Changes im Zeitraum: nicht alle wurden geprüft",
+          "freeze_unverified": "Sperrzeitraum für einen Service: noch nicht geprüft, die Auswirkung wird noch berechnet"
         },
         "severity": {
           "info": "Hinweis",

@@ -9980,7 +9980,8 @@
           "task_outside": "Task outside the window",
           "no_window": "No window set",
           "freeze_truncated": "Too many freeze windows: not all were checked",
-          "overlap_truncated": "Too many changes in the period: not all were checked"
+          "overlap_truncated": "Too many changes in the period: not all were checked",
+          "freeze_unverified": "Freeze window for a service: not checked yet, the impact is still being calculated"
         },
         "severity": {
           "info": "Note",
