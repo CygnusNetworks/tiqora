@@ -112,6 +112,8 @@ function Editor({
   });
   const sources = sourcesQ.data ?? [];
   const source = sources.find((s) => s.key === state.source);
+  // A saved or imported report on a data basis that exists only in Mode B opens read-only.
+  const unavailable = source !== undefined && !source.available;
 
   const issues = useMemo(() => validate(state, source), [state, source]);
   const definition = useMemo(() => (issues.length === 0 ? toDefinition(state) : null), [issues, state]);
@@ -196,7 +198,7 @@ function Editor({
   };
 
   const title = mode === "edit" ? t("reports.builder.editTitle") : t("reports.builder.newTitle");
-  const canSave = definition !== null;
+  const canSave = definition !== null && !unavailable;
 
   return (
     <div className="mx-auto w-full max-w-[96rem] space-y-4 px-4 py-6" data-testid="report-builder-page">
@@ -218,6 +220,7 @@ function Editor({
               className={`${inputCls} mt-2 w-full max-w-xl`}
               value={state.name}
               maxLength={200}
+              readOnly={unavailable}
               placeholder={t("reports.builder.namePlaceholder")}
               onChange={(e) => dispatch({ type: "setMeta", name: e.target.value })}
               data-testid="builder-name"
@@ -243,7 +246,7 @@ function Editor({
                 if (file) void loadFile(file);
               }}
             />
-            <Button onClick={() => fileInput.current?.click()} data-testid="builder-load-file">
+            <Button onClick={() => fileInput.current?.click()} disabled={unavailable} data-testid="builder-load-file">
               {t("reports.builder.loadFile")}
             </Button>
             {mode === "edit" && (
@@ -274,11 +277,24 @@ function Editor({
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)_16rem] xl:grid-cols-[22rem_minmax(0,1fr)_18rem]">
+      {unavailable && (
+        <p
+          className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-ink"
+          role="status"
+          data-testid="builder-source-unavailable"
+        >
+          {t("reports.builder.sourceUnavailable")}
+        </p>
+      )}
+
+      <fieldset
+        disabled={unavailable}
+        className="m-0 grid min-w-0 gap-6 border-0 p-0 lg:grid-cols-[20rem_minmax(0,1fr)_16rem] xl:grid-cols-[22rem_minmax(0,1fr)_18rem]"
+      >
         <BuilderFieldsPanel state={state} dispatch={dispatch} sources={sources} source={source} issues={issues} />
-        <BuilderPreview definition={definition} issues={issues} />
+        <BuilderPreview definition={unavailable ? null : definition} issues={issues} />
         <BuilderOptionsPanel state={state} dispatch={dispatch} source={source} />
-      </div>
+      </fieldset>
 
       <SaveReportDialog
         open={dialog !== null}

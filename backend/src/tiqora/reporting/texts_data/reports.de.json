@@ -16,11 +16,59 @@
       "channel_mix": {
         "title": "Kanalverteilung"
       },
+      "cmdb_cis_by_class": {
+        "title": "CIs nach Klasse und Status"
+      },
+      "cmdb_cis_created": {
+        "title": "Neue CIs je Tag"
+      },
       "created_heatmap": {
         "title": "Wann Tickets eingehen"
       },
       "first_contact_resolution": {
         "title": "Lösung im ersten Kontakt"
+      },
+      "itsm_change_outcomes": {
+        "title": "Ergebnis der Changes"
+      },
+      "itsm_change_requesters": {
+        "title": "Changes je Antragsteller"
+      },
+      "itsm_change_transitions": {
+        "title": "Abgelehnte und abgebrochene Changes"
+      },
+      "itsm_changes_by_status": {
+        "title": "Changes nach Status"
+      },
+      "itsm_changes_per_ci_class": {
+        "title": "Changes je CI-Klasse"
+      },
+      "itsm_created_by_type": {
+        "title": "Neue Tickets je Tag nach Typ"
+      },
+      "itsm_first_level_solution": {
+        "title": "First-Level-Lösungsquote"
+      },
+      "itsm_first_level_trend": {
+        "title": "First-Level-Lösungsquote im Verlauf"
+      },
+      "itsm_incident_prone_cis": {
+        "title": "Störungsanfällige CIs"
+      },
+      "itsm_open_by_type": {
+        "title": "Offene Tickets nach Typ"
+      },
+      "itsm_solution_time": {
+        "title": "Lösungszeit (ITSM)"
+      },
+      "itsm_solution_time_trend": {
+        "title": "Lösungszeit (ITSM) im Verlauf"
+      },
+      "itsm_tickets_by_role": {
+        "title": "Störungen, Anfragen, Probleme und Changes"
+      },
+      "itsm_tickets_by_type": {
+        "title": "Tickets nach Typ"
       },
       "open_now": {
         "title": "Offene Tickets jetzt"
@@ -79,6 +127,7 @@
     },
     "dimensions": {
       "actor": "Agent",
+      "actual_end": "Tatsächliches Ende",
       "agent": "Agent",
       "ai_auto_replied": "Von der KI beantwortet",
       "ai_handed_off": "An Agent übergeben",
@@ -86,30 +135,53 @@
       "archived": "Archiviert",
       "booked": "Gebucht",
       "booked_weekday": "Wochentag der Buchung",
+      "change_phase": "Change-Phase",
+      "change_status": "Change-Status",
+      "change_type": "Change-Art",
+      "changed": "Geändert",
       "channel": "Kanal",
+      "ci": "CI",
+      "ci_class": "CI-Klasse",
+      "ci_deployment_state": "CI-Verwendungsstatus",
+      "ci_incident_category": "CI-Vorfall (Gruppe)",
+      "ci_incident_state": "CI-Vorfallsstatus",
+      "class": "CI-Klasse",
       "closed": "Geschlossen",
       "created": "Erstellt",
+      "created_by": "Angelegt von",
       "created_hour": "Uhrzeit der Erstellung",
       "created_weekday": "Wochentag der Erstellung",
       "customer": "Kunde",
       "customer_user": "Ansprechpartner",
+      "deployment_category": "Verwendung (Gruppe)",
+      "deployment_state": "Verwendungsstatus",
       "first_response": "Erstreaktion",
+      "from_phase": "Von Phase",
       "from_queue": "Von Queue",
       "from_state": "Von Status",
       "from_state_type": "Von Statustyp",
       "has_first_response": "Mit Erstreaktion",
+      "incident_category": "Vorfall (Gruppe)",
+      "incident_state": "Vorfallsstatus",
+      "is_change": "Ist ein Change",
+      "itsm_role": "ITSM-Art",
       "kind": "Ereignis",
+      "link_type": "Verknüpfungsart",
       "merged": "Zusammengeführt",
       "occurred": "Zeitpunkt",
       "occurred_hour": "Uhrzeit",
       "occurred_weekday": "Wochentag",
+      "outcome": "Ergebnis",
       "owner": "Besitzer",
+      "phase": "Phase",
+      "planned_start": "Geplanter Beginn",
       "priority": "Priorität",
       "process": "Prozess",
       "queue": "Queue",
       "queue_at_create": "Queue bei Erstellung",
       "reopened": "Wiedereröffnet",
       "responsible": "Verantwortlicher",
+      "risk_level": "Risiko",
       "service": "Service",
       "sla": "SLA",
       "snapshot": "Stichtag",
@@ -120,6 +192,7 @@
       "ticket_queue": "Queue des Tickets",
       "ticket_state": "Status des Tickets",
       "ticket_type": "Typ des Tickets",
+      "to_phase": "Nach Phase",
       "to_queue": "Nach Queue",
       "to_state": "Nach Status",
       "to_state_type": "Nach Statustyp",
@@ -135,21 +208,40 @@
       "age_7_30d": "7 bis 30 Tage",
       "agent_touches_avg": "Agenten pro Ticket (Durchschnitt)",
       "bookings": "Buchungen",
+      "change_success_rate": "Erfolgsquote",
+      "changes": "Changes",
+      "cis": "CIs",
+      "cis_in_incident": "CIs mit Störung",
+      "cis_in_warning": "CIs mit Warnung",
       "closed_tickets": "Geschlossen",
+      "config_items": "CIs",
       "dwell_avg_hours": "Verweildauer (Durchschnitt)",
       "dwell_p50_hours": "Verweildauer (Median)",
       "dwell_p90_hours": "Verweildauer (langsamste 10 %)",
+      "emergency_changes": "Notfall-Changes",
       "escalated": "Eskaliert",
       "events": "Ereignisse",
+      "failed_changes": "Gescheitert oder zurückgerollt",
       "fcr_rate": "Im ersten Kontakt gelöst",
+      "first_level_solution_rate": "First-Level-Lösungsquote",
+      "first_level_solved": "Im ersten Kontakt gelöst",
       "first_response_avg": "Erstreaktion (Durchschnitt)",
       "first_response_clock_avg": "Erstreaktion rund um die Uhr (Durchschnitt)",
       "first_response_clock_p50": "Erstreaktion rund um die Uhr (Median)",
       "first_response_p50": "Erstreaktion (Median)",
       "first_response_p90": "Erstreaktion (langsamste 10 %)",
+      "incidents": "Störungen",
+      "itsm_solution_avg": "Lösungszeit (ITSM) Ø",
+      "itsm_solution_p50": "Lösungszeit (ITSM) Median",
+      "late_changes": "Später fertig als geplant",
+      "open_changes": "Offene Changes",
+      "open_incidents": "Offene Störungen",
       "open_tickets": "Offen",
+      "phase_changes": "Statuswechsel",
       "pingpong_tickets": "Tickets mit Hin und Her",
+      "productive_cis": "Produktive CIs",
       "queue_moves_avg": "Queue-Wechsel pro Ticket (Durchschnitt)",
+      "rejected_changes": "Derzeit abgelehnt",
       "reopen_rate": "Wiedereröffnungsquote",
       "reopened_tickets": "Wiedereröffnet",
       "response_breach_rate": "Quote verletzter Erstreaktion",
@@ -164,15 +256,21 @@
       "solution_near_misses": "Lösungszeit knapp eingehalten",
       "solution_p50": "Lösungszeit (Median)",
       "solution_p90": "Lösungszeit (langsamste 10 %)",
+      "successful_changes": "Erfolgreich",
       "tickets": "Tickets",
       "time_units": "Gebuchte Zeit",
       "unassigned": "Ohne Besitzer",
       "update_breached_tickets": "Tickets mit verletzter Aktualisierungszeit",
-      "update_breaches": "Aktualisierungszeit verletzt"
+      "update_breaches": "Aktualisierungszeit verletzt",
+      "versions_avg": "Versionen Ø"
     },
     "other": "Weitere",
     "sources": {
       "accounted_time": "Zeitbuchungen",
+      "change_events": "Change-Statuswechsel",
+      "changes": "Changes",
+      "ci_tickets": "CIs und verknüpfte Tickets",
+      "config_items": "Configuration Items (CMDB)",
       "daily_snapshot": "Tagesstände",
       "open_tickets": "Offene Tickets (jetzt)",
       "ticket_events": "Ticketereignisse",
@@ -180,6 +278,43 @@
     },
     "totals": "Summe",
     "values": {
+      "change_outcome": {
+        "backed_out": "Zurückgerollt",
+        "failed": "Gescheitert",
+        "successful": "Erfolgreich"
+      },
+      "change_phase": {
+        "approval": "Freigabe",
+        "assessment": "Bewertung",
+        "cancelled": "Abgebrochen",
+        "closed": "Abgeschlossen",
+        "draft": "Entwurf",
+        "implementing": "Umsetzung",
+        "rejected": "Abgelehnt",
+        "review": "Nachbetrachtung",
+        "scheduled": "Geplant",
+        "submitted": "Eingereicht"
+      },
+      "change_status": {
+        "approval": "Freigabe",
+        "assessment": "Bewertung",
+        "cancelled": "Abgebrochen",
+        "closed": "Abgeschlossen",
+        "closed_backed_out": "Abgeschlossen – zurückgerollt",
+        "closed_failed": "Abgeschlossen – gescheitert",
+        "closed_successful": "Abgeschlossen – erfolgreich",
+        "draft": "Entwurf",
+        "implementing": "Umsetzung",
+        "rejected": "Abgelehnt",
+        "review": "Nachbetrachtung",
+        "scheduled": "Geplant",
+        "submitted": "Eingereicht"
+      },
+      "change_type": {
+        "emergency": "Notfall-Change",
+        "normal": "Normaler Change",
+        "standard": "Standard-Change"
+      },
       "channel": {
         "email": "E-Mail",
         "internal": "Intern",
@@ -188,6 +323,11 @@
         "telegram": "Telegram",
         "webchat": "Webchat",
         "whatsapp": "WhatsApp"
+      },
+      "deployment_category": {
+        "postproductive": "Außer Betrieb",
+        "preproductive": "Vor dem Betrieb",
+        "productive": "Im Betrieb"
       },
       "event_kind": {
         "close": "Geschlossen",
@@ -206,6 +346,25 @@
         "sla": "SLA-Wechsel",
         "state": "Statuswechsel",
         "type": "Typwechsel"
+      },
+      "incident_category": {
+        "incident": "Störung",
+        "operational": "Betriebsbereit",
+        "warning": "Warnung"
+      },
+      "itsm_role": {
+        "change": "Change",
+        "change_task": "Change-Aufgabe",
+        "incident": "Störung",
+        "major_incident": "Schwere Störung",
+        "problem": "Problem",
+        "service_request": "Service-Anfrage"
+      },
+      "risk_level": {
+        "high": "Hoch",
+        "low": "Niedrig",
+        "medium": "Mittel",
+        "very_high": "Sehr hoch"
       },
       "state_type": {
         "closed": "Geschlossen",

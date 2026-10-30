@@ -1,9 +1,9 @@
 import type { BuiltinReport } from "@/lib/reportsApi";
 
-/** What the 25 literals below spell out; `builtinReport` adds the fields every entry shares. */
+/** What the 41 literals below spell out; `builtinReport` adds the fields every entry shares. */
 type BuiltinBase = Pick<BuiltinReport, "key" | "category" | "title_key" | "description_key" | "definition" | "overview">;
 
-/** The 25 built-in reports as `GET /api/v1/reports` serves them (definitions mirror
+/** The 25 core and 16 ITSM built-in reports as `GET /api/v1/reports` serves them (definitions mirror
  * `backend/src/tiqora/reporting/catalogue.py`). */
 // m() and d() build the measure and dimension references: the pre-commit secret scan
 // flags long `key: "<snake_case>"` literals as API keys.
@@ -983,6 +983,660 @@ const BUILTIN_BASE: (BuiltinBase & { read_only: true })[] = [
       },
       visualization: {
         type: "heatmap",
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_tickets_by_type",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_tickets_by_type.title",
+    description_key: "reports.builtin.itsm_tickets_by_type.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("type", {choices: []}), d("priority", {choices: ["state", "queue", "service"]})],
+      measures: [m("tickets")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "pivot",
+      },
+      sort: [],
+      totals: {
+        grand: true,
+        rows: true,
+        columns: true,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_created_by_type",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_created_by_type.title",
+    description_key: "reports.builtin.itsm_created_by_type.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("created", {grain: "day", choices: []}), d("type", {choices: ["priority", "state", "queue", "service"]})],
+      measures: [m("tickets")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "stacked_bar",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_open_by_type",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_open_by_type.title",
+    description_key: "reports.builtin.itsm_open_by_type.description",
+    definition: {
+      schema_version: 1,
+      source: "open_tickets",
+      dimensions: [d("type", {choices: []}), d("priority", {choices: ["queue", "service"]})],
+      measures: [m("tickets")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      visualization: {
+        type: "pivot",
+      },
+      sort: [],
+      totals: {
+        grand: true,
+        rows: true,
+        columns: true,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_first_level_solution",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_first_level_solution.title",
+    description_key: "reports.builtin.itsm_first_level_solution.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("type", {choices: ["priority", "queue", "service"]})],
+      measures: [m("tickets"), m("first_level_solved"), m("first_level_solution_rate")],
+      filter: {
+        version: 1,
+        where: {
+          all: [
+            {
+              field: "itsm_role",
+              op: "in",
+              value: ["incident", "major_incident", "service_request"],
+            },
+            {
+              field: "state_type",
+              op: "in",
+              value: ["closed"],
+            },
+          ],
+        },
+      },
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "table",
+      },
+      sort: [],
+      totals: {
+        grand: true,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_first_level_trend",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_first_level_trend.title",
+    description_key: "reports.builtin.itsm_first_level_trend.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("created", {grain: "day", choices: []}), d("type", {choices: ["priority", "queue", "service"]})],
+      measures: [m("first_level_solution_rate")],
+      filter: {
+        version: 1,
+        where: {
+          all: [
+            {
+              field: "itsm_role",
+              op: "in",
+              value: ["incident", "major_incident", "service_request"],
+            },
+            {
+              field: "state_type",
+              op: "in",
+              value: ["closed"],
+            },
+          ],
+        },
+      },
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "line",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_solution_time",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_solution_time.title",
+    description_key: "reports.builtin.itsm_solution_time.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("type", {choices: ["priority", "queue", "service"]})],
+      measures: [m("tickets"), m("itsm_solution_avg"), m("itsm_solution_p50")],
+      filter: {
+        version: 1,
+        where: {
+          field: "state_type",
+          op: "in",
+          value: ["closed"],
+        },
+      },
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "table",
+      },
+      sort: [],
+      totals: {
+        grand: true,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_solution_time_trend",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_solution_time_trend.title",
+    description_key: "reports.builtin.itsm_solution_time_trend.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("created", {grain: "day", choices: []}), d("type", {choices: ["priority", "queue", "service"]})],
+      measures: [m("itsm_solution_avg")],
+      filter: {
+        version: 1,
+        where: {
+          field: "state_type",
+          op: "in",
+          value: ["closed"],
+        },
+      },
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "line",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_tickets_by_role",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_tickets_by_role.title",
+    description_key: "reports.builtin.itsm_tickets_by_role.description",
+    definition: {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [d("created", {grain: "day", choices: []}), d("itsm_role", {choices: []})],
+      measures: [m("tickets")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "stacked_bar",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.cmdb_cis_by_class",
+    category: "itsm",
+    title_key: "reports.builtin.cmdb_cis_by_class.title",
+    description_key: "reports.builtin.cmdb_cis_by_class.description",
+    definition: {
+      schema_version: 1,
+      source: "config_items",
+      dimensions: [d("class", {choices: []}), d("deployment_state", {choices: ["incident_state", "deployment_category", "incident_category"]})],
+      measures: [m("config_items")],
+      parameters: [],
+      visualization: {
+        type: "pivot",
+      },
+      sort: [],
+      totals: {
+        grand: true,
+        rows: true,
+        columns: true,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.cmdb_cis_created",
+    category: "itsm",
+    title_key: "reports.builtin.cmdb_cis_created.title",
+    description_key: "reports.builtin.cmdb_cis_created.description",
+    definition: {
+      schema_version: 1,
+      source: "config_items",
+      dimensions: [d("created", {grain: "day", choices: []}), d("class", {choices: ["deployment_state", "incident_state"]})],
+      measures: [m("config_items")],
+      parameters: [],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "stacked_bar",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_changes_by_status",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_changes_by_status.title",
+    description_key: "reports.builtin.itsm_changes_by_status.description",
+    definition: {
+      schema_version: 1,
+      source: "changes",
+      dimensions: [d("created", {grain: "day", choices: []}), d("change_status", {choices: ["phase", "change_type", "risk_level"]})],
+      measures: [m("changes")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "stacked_bar",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_change_outcomes",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_change_outcomes.title",
+    description_key: "reports.builtin.itsm_change_outcomes.description",
+    definition: {
+      schema_version: 1,
+      source: "changes",
+      dimensions: [d("change_type", {choices: ["risk_level", "service", "queue"]})],
+      measures: [m("changes"), m("successful_changes"), m("failed_changes"), m("change_success_rate"), m("rejected_changes"), m("late_changes")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 3,
+        include_current: false,
+      },
+      visualization: {
+        type: "table",
+      },
+      sort: [],
+      totals: {
+        grand: true,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_change_transitions",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_change_transitions.title",
+    description_key: "reports.builtin.itsm_change_transitions.description",
+    definition: {
+      schema_version: 1,
+      source: "change_events",
+      dimensions: [d("occurred", {grain: "day", choices: []}), d("to_phase", {choices: []})],
+      measures: [m("changes")],
+      filter: {
+        version: 1,
+        where: {
+          field: "to_phase",
+          op: "in",
+          value: ["rejected", "cancelled"],
+        },
+      },
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "stacked_bar",
+        series_dimension: 1,
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_change_requesters",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_change_requesters.title",
+    description_key: "reports.builtin.itsm_change_requesters.description",
+    definition: {
+      schema_version: 1,
+      source: "changes",
+      dimensions: [d("customer_user", {choices: ["created_by", "owner"], top_n: 20})],
+      measures: [m("changes")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "bar",
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_changes_per_ci_class",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_changes_per_ci_class.title",
+    description_key: "reports.builtin.itsm_changes_per_ci_class.description",
+    definition: {
+      schema_version: 1,
+      source: "ci_tickets",
+      dimensions: [d("ci_class", {choices: []})],
+      measures: [m("changes"), m("cis")],
+      filter: {
+        version: 1,
+        where: {
+          field: "is_change",
+          op: "is_true",
+        },
+      },
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 1,
+        include_current: false,
+      },
+      visualization: {
+        type: "bar",
+        chart_measures: [0],
+      },
+      sort: [],
+      totals: {
+        grand: false,
+        rows: false,
+        columns: false,
+      },
+    },
+    overview: false,
+    read_only: true,
+  },
+  {
+    key: "builtin.itsm_incident_prone_cis",
+    category: "itsm",
+    title_key: "reports.builtin.itsm_incident_prone_cis.title",
+    description_key: "reports.builtin.itsm_incident_prone_cis.description",
+    definition: {
+      schema_version: 1,
+      source: "ci_tickets",
+      dimensions: [d("ci", {choices: ["ci_class"], top_n: 20})],
+      measures: [m("incidents"), m("open_incidents"), m("tickets")],
+      parameters: [
+        {
+          key: "queues",
+          field: "queue",
+          op: "in",
+          label_key: "reports.parameters.queues",
+          required: false,
+        },
+      ],
+      time_range: {
+        kind: "relative",
+        unit: "month",
+        count: 3,
+        include_current: false,
+      },
+      visualization: {
+        type: "bar",
+        chart_measures: [0],
       },
       sort: [],
       totals: {

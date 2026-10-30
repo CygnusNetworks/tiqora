@@ -7110,7 +7110,8 @@
       "agents": "Agents",
       "time": "Time booking",
       "customers": "Customers",
-      "patterns": "Patterns"
+      "patterns": "Patterns",
+      "itsm": "ITSM"
     },
     "builtin": {
       "ticket_kpis": {
@@ -7212,6 +7213,70 @@
       "created_heatmap": {
         "title": "When tickets arrive",
         "description": "Tickets by weekday and hour of the day (last 12 complete weeks) – shows when it is busiest."
+      },
+      "itsm_tickets_by_type": {
+        "title": "Tickets by type",
+        "description": "Tickets per ticket type and priority (switchable to state, queue or service), created in the last month."
+      },
+      "itsm_created_by_type": {
+        "title": "New tickets per day by type",
+        "description": "Newly created tickets per day and ticket type in the last month; switchable to priority, state, queue or service."
+      },
+      "itsm_open_by_type": {
+        "title": "Open tickets by type",
+        "description": "All tickets that are open right now per ticket type and priority (switchable to queue or service)."
+      },
+      "itsm_first_level_solution": {
+        "title": "First-level solution rate",
+        "description": "Incidents and service requests solved at first contact: at most two customer-visible articles, one customer message and one agent reply (same rule as Znuny). Closed tickets created in the last month."
+      },
+      "itsm_first_level_trend": {
+        "title": "First-level solution rate over time",
+        "description": "The first-level solution rate per creation day in the last month, per ticket type (switchable to priority, queue or service)."
+      },
+      "itsm_solution_time": {
+        "title": "Solution time (ITSM)",
+        "description": "Average and median of the working time closed tickets were open (time between closing and reopening does not count), per ticket type; created in the last month."
+      },
+      "itsm_solution_time_trend": {
+        "title": "Solution time (ITSM) over time",
+        "description": "Average solution time (ITSM) per creation day in the last month, per ticket type."
+      },
+      "itsm_tickets_by_role": {
+        "title": "Incidents, requests, problems and changes",
+        "description": "New incidents, major incidents, service requests, problems, changes and change tasks per day in the last month. You set the ticket types under Admin “ITSM”."
+      },
+      "cmdb_cis_by_class": {
+        "title": "CIs by class and state",
+        "description": "All configuration items per CI class and deployment state (switchable to incident state). Only classes you may see."
+      },
+      "cmdb_cis_created": {
+        "title": "New CIs per day",
+        "description": "Newly created configuration items per day and CI class in the last month."
+      },
+      "itsm_changes_by_status": {
+        "title": "Changes by status",
+        "description": "Newly created changes per day and status in the last month; switchable to phase, change type or risk."
+      },
+      "itsm_change_outcomes": {
+        "title": "Change outcomes",
+        "description": "Changes of the last three months per change type: successful, failed or backed out, success rate, rejected and finished later than planned."
+      },
+      "itsm_change_transitions": {
+        "title": "Rejected and cancelled changes",
+        "description": "Changes that were rejected or cancelled in the last month, per day (like Znuny's statistics “rejected” and “retracted changes”)."
+      },
+      "itsm_change_requesters": {
+        "title": "Changes per requester",
+        "description": "The 20 customer users with the most new changes in the last month; switchable to the creating agents or the owners."
+      },
+      "itsm_changes_per_ci_class": {
+        "title": "Changes per CI class",
+        "description": "Changes of the last month per class of the linked CIs; a change counts once per class."
+      },
+      "itsm_incident_prone_cis": {
+        "title": "Incident-prone CIs",
+        "description": "The 20 CIs with the most linked incidents in the last three months, including the ones still open."
       }
     },
     "dimensions": {
@@ -7260,7 +7325,32 @@
       "has_first_response": "With first response",
       "ai_triaged": "Sorted by AI",
       "ai_auto_replied": "Answered by AI",
-      "ai_handed_off": "Handed over to an agent"
+      "ai_handed_off": "Handed over to an agent",
+      "itsm_role": "ITSM type",
+      "class": "CI class",
+      "deployment_state": "Deployment state",
+      "incident_state": "Incident state",
+      "deployment_category": "Deployment (group)",
+      "incident_category": "Incident (group)",
+      "changed": "Changed",
+      "created_by": "Created by",
+      "phase": "Phase",
+      "outcome": "Outcome",
+      "change_status": "Change status",
+      "change_type": "Change type",
+      "risk_level": "Risk",
+      "planned_start": "Planned start",
+      "actual_end": "Actual end",
+      "from_phase": "From phase",
+      "to_phase": "To phase",
+      "ci": "CI",
+      "ci_class": "CI class",
+      "ci_deployment_state": "CI deployment state",
+      "ci_incident_state": "CI incident state",
+      "ci_incident_category": "CI incident (group)",
+      "link_type": "Link type",
+      "change_phase": "Change phase",
+      "is_change": "Is a change"
     },
     "measures": {
       "tickets": "Tickets",
@@ -7304,7 +7394,28 @@
       "escalated": "Escalated",
       "unassigned": "Unassigned",
       "time_units": "Booked time",
-      "bookings": "Bookings"
+      "bookings": "Bookings",
+      "first_level_solved": "Solved at first contact",
+      "first_level_solution_rate": "First-level solution rate",
+      "itsm_solution_avg": "Solution time (ITSM) avg",
+      "itsm_solution_p50": "Solution time (ITSM) median",
+      "config_items": "CIs",
+      "cis_in_incident": "CIs with an incident",
+      "cis_in_warning": "CIs with a warning",
+      "productive_cis": "Productive CIs",
+      "versions_avg": "Versions avg",
+      "changes": "Changes",
+      "open_changes": "Open changes",
+      "successful_changes": "Successful",
+      "failed_changes": "Failed or backed out",
+      "change_success_rate": "Success rate",
+      "emergency_changes": "Emergency changes",
+      "rejected_changes": "Currently rejected",
+      "late_changes": "Finished later than planned",
+      "phase_changes": "Status changes",
+      "cis": "CIs",
+      "incidents": "Incidents",
+      "open_incidents": "Open incidents"
     },
     "parameters": {
       "queues": "Queues"
@@ -7354,6 +7465,67 @@
         "5": "Friday",
         "6": "Saturday",
         "7": "Sunday"
+      },
+      "itsm_role": {
+        "incident": "Incident",
+        "major_incident": "Major incident",
+        "service_request": "Service request",
+        "problem": "Problem",
+        "change": "Change",
+        "change_task": "Change task"
+      },
+      "deployment_category": {
+        "preproductive": "Pre-productive",
+        "productive": "Productive",
+        "postproductive": "Post-productive"
+      },
+      "incident_category": {
+        "operational": "Operational",
+        "warning": "Warning",
+        "incident": "Incident"
+      },
+      "change_phase": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "assessment": "Assessment",
+        "approval": "Approval",
+        "scheduled": "Scheduled",
+        "implementing": "Implementation",
+        "review": "Review",
+        "closed": "Closed",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "change_outcome": {
+        "successful": "Successful",
+        "failed": "Failed",
+        "backed_out": "Backed out"
+      },
+      "change_status": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "assessment": "Assessment",
+        "approval": "Approval",
+        "scheduled": "Scheduled",
+        "implementing": "Implementation",
+        "review": "Review",
+        "closed": "Closed",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "closed_successful": "Closed – successful",
+        "closed_failed": "Closed – failed",
+        "closed_backed_out": "Closed – backed out"
+      },
+      "change_type": {
+        "standard": "Standard change",
+        "normal": "Normal change",
+        "emergency": "Emergency change"
+      },
+      "risk_level": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "very_high": "Very high"
       }
     },
     "presets": {
@@ -7518,14 +7690,19 @@
         "donut": "Donut chart",
         "heatmap": "Heatmap",
         "kpi": "Key figures"
-      }
+      },
+      "sourceUnavailable": "This data basis only exists once Tiqora leads the ITSM (mode B)."
     },
     "sources": {
       "tickets": "Tickets",
       "ticket_events": "Ticket events",
       "daily_snapshot": "Daily snapshots",
       "accounted_time": "Time bookings",
-      "open_tickets": "Open tickets (now)"
+      "open_tickets": "Open tickets (now)",
+      "config_items": "Configuration items (CMDB)",
+      "changes": "Changes",
+      "change_events": "Change status changes",
+      "ci_tickets": "CIs and linked tickets"
     },
     "share": {
       "title": "Sharing",

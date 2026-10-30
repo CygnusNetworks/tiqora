@@ -7,9 +7,9 @@ import en from "@/i18n/locales/en.json";
 import type { ReportRunIn } from "@/lib/reportsApi";
 
 describe("report demo mocks", () => {
-  it("serves the 25 built-ins plus the demo saved reports, with ready facts", () => {
+  it("serves the 25 core and 16 ITSM built-ins plus the demo saved reports, with ready facts", () => {
     const cat = resolveData("/api/v1/reports", "GET") as { reports: { kind?: string }[]; facts: { ready: boolean } };
-    expect(cat.reports.filter((r) => r.kind !== "saved")).toHaveLength(25);
+    expect(cat.reports.filter((r) => r.kind !== "saved")).toHaveLength(41);
     expect(cat.reports.filter((r) => r.kind === "saved").length).toBeGreaterThanOrEqual(2);
     expect(cat.facts.ready).toBe(true);
     expect(resolveData("/api/v1/reports/builtin.volume", "GET")).toMatchObject({ key: "builtin.volume" });
@@ -30,6 +30,32 @@ describe("report demo mocks", () => {
       expect(res!.rows.every((r) => r.length === res!.columns.length), report.key).toBe(true);
       expect(res!.row_count).toBe(res!.rows.length);
       expect(res!.facts.ready).toBe(true);
+    }
+  });
+
+  it("gives every ITSM entry a German title, description, source, dimension and measure label", () => {
+    const itsm = DEMO_REPORTS.filter((r) => r.category === "itsm");
+    expect(itsm).toHaveLength(16);
+    const sources = resolveData("/api/v1/reporting/sources", "GET") as {
+      key: string;
+      label_key: string;
+      available: boolean;
+      dimensions: { label_key: string }[];
+      measures: { label_key: string }[];
+    }[];
+    for (const key of ["config_items", "changes", "change_events", "ci_tickets"]) {
+      expect(sources.find((s) => s.key === key)?.available, key).toBe(true);
+    }
+    const texts = de as unknown as Record<string, unknown>;
+    const has = (path: string) => path.split(".").reduce<unknown>((n, p) => (n as Record<string, unknown> | undefined)?.[p], texts);
+    for (const r of itsm) {
+      expect(has(r.title_key), r.key).toEqual(expect.any(String));
+      expect(has(r.description_key), r.key).toEqual(expect.any(String));
+    }
+    for (const s of sources) {
+      expect(has(s.label_key), s.key).toEqual(expect.any(String));
+      for (const d of s.dimensions) expect(has(d.label_key), d.label_key).toEqual(expect.any(String));
+      for (const m of s.measures) expect(has(m.label_key), m.label_key).toEqual(expect.any(String));
     }
   });
 
