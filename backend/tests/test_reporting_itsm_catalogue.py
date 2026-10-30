@@ -17,6 +17,7 @@ Tickets (ids 972510-972520), created in June 2024 unless noted, all with priorit
             972515 change C1 06-05 (normal, closed successful, one rejection on 06-08 reworked)
             972516 change C2 06-12 (emergency, closed backed_out, finished late)
             972517 change C3 06-20 (normal, currently rejected, risk overridden to very_high)
+            972521 change C4 06-24 (normal, cancelled from draft on 06-25, ticket closed then)
   QUEUE_Q2  972520 incident 05-20 (May), open: the only ticket outside the June window
   QUEUE_HIDDEN 972518 incident 06-03 closed after 30 min, 972519 change (rejected, reworked,
             cancelled): foreign, must be invisible everywhere.
@@ -39,8 +40,9 @@ from typing import Any
 
 import pytest
 from pydantic import TypeAdapter
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
+import tiqora.reporting.delivery as delivery
 from tests import _cmdb_helpers
 from tests._cmdb_helpers import (
     GROUP_RO,
@@ -55,14 +57,36 @@ from tests._cmdb_helpers import (
     make_class,
     set_mode,
 )
+from tests._dashboard_helpers import run_widget_fn
+from tiqora.channels.email.smtp import CapturingMailSender
 from tiqora.cmdb.gate import reset_mode_cache
-from tiqora.db.tiqora.models import TiqoraSettings
+from tiqora.config import Settings
+from tiqora.dashboard.kiosk import redact_result
+from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, core_providers
+from tiqora.db.tiqora.models import (
+    TiqoraJob,
+    TiqoraReportRun,
+    TiqoraReportSchedule,
+    TiqoraReportScheduleItem,
+    TiqoraReportScheduleRecipient,
+    TiqoraSettings,
+)
+from tiqora.extensions import get_registry
+from tiqora.extensions.registry import Registry
+from tiqora.jobs.runner import JobRunner
+from tiqora.jobs.service import utc_now
+from tiqora.reporting.cache import GENERATION_KEY, ReportCache
 from tiqora.reporting.catalogue import BuiltinReport
 from tiqora.reporting.catalogue_itsm import ITSM_EXPECTED, itsm_builtin_reports
 from tiqora.reporting.compiler import ReportCompileError, RunParams
-from tiqora.reporting.definition import TimeRange
-from tiqora.reporting.engine import run_report
+from tiqora.reporting.definition import ReportDefinition, TimeRange
+from tiqora.reporting.delivery import create_run, enqueue_delivery
+from tiqora.reporting.engine import QueryBudget, run_report
 from tiqora.reporting.facts_store import rebuild_ticket_facts
+from tiqora.reporting.rights import ReportRights
+from tiqora.reporting.run_service import RunOverrides, run_report_ref
+from tiqora.reporting.saved import SavedReportIn, create_saved_report
+from tiqora.reporting.schedules import load_schedule
 from tiqora.reporting.schemas import ReportResultOut
 from tiqora.reporting.settings import ReportingSettings
 
@@ -86,7 +110,8 @@ QUEUE_Q2 = 972501
     C_HID,
     T_Q2,
 ) = range(972510, 972521)
-TICKETS = tuple(range(972510, 972521))
+C4 = 972521
+TICKETS = tuple(range(972510, 972522))
 BUILT = datetime(2024, 7, 1, 9, 0)
 NOW = datetime(2024, 7, 1, 10, 0)
 STAMP = datetime(2024, 6, 1, 8, 0)
@@ -156,6 +181,10 @@ _TICKET_SPEC: list[tuple[Any, ...]] = [
     ),
     (C3, CHG, QUEUE_RW, _at(20), None, [("agent", 0, False)], [("open", 60)]),
     (
+        C4, CHG, QUEUE_RW, _at(24), "ist972.cust@example.org",
+        [("agent", 0, False)], [("failed", 1560)],
+    ),
+    (
         T_HID_INC, INC, QUEUE_HIDDEN, _at(3), "ist972.cust@example.org",
         [("customer", 0, True), ("agent", 30, True)], [("closed", 30)],
     ),
@@ -172,6 +201,7 @@ _CHANGE_SPEC: list[tuple[Any, ...]] = [
     (C1, "normal", "closed", "successful", "medium", None, _at(20, 10), _at(17, 9), _at(19, 8)),
     (C2, "emergency", "closed", "backed_out", "high", None, _at(25, 10), _at(13, 8), _at(26, 8)),
     (C3, "normal", "rejected", None, "low", "very_high", _at(30, 10), None, None),
+    (C4, "normal", "cancelled", None, "low", None, None, None, None),
     (C_HID, "normal", "cancelled", None, "low", None, None, None, None),
 ]  # fmt: skip
 
@@ -212,6 +242,8 @@ _EVENTS: list[tuple[Any, ...]] = [
     (C3, "phase", "assessment", "approval", _at(21, 9)),
     (C3, "approval_outcome", None, None, _at(21, 15, 55)),
     (C3, "phase", "approval", "rejected", _at(21, 16)),
+    *_creation(C4, _at(24)),
+    (C4, "phase", "draft", "cancelled", _at(25, 10)),
     # foreign: rejected on the same day as C1, so a leak would show as a count of 2
     *_creation(C_HID, _at(6)),
     (C_HID, "phase", "draft", "submitted", _at(6, 9)),
@@ -541,7 +573,7 @@ WORLD_OPEN = ["Unclassified", PRIO, 1]
 #: one exact row list per ITSM built-in, computed by hand from the seeds above (labels, not ids)
 EXPECTED_ROWS: dict[str, list[list[Any]]] = {
     # June: incidents 510, 512, 513, 514; request 511; changes 515, 516, 517
-    "itsm_tickets_by_type": [[I_, PRIO, 4], [R_, PRIO, 1], [C_, PRIO, 3]],
+    "itsm_tickets_by_type": [[I_, PRIO, 4], [R_, PRIO, 1], [C_, PRIO, 4]],
     "itsm_created_by_type": [
         ["2024-06-03", I_, 1],
         ["2024-06-03", R_, 1],
@@ -551,6 +583,7 @@ EXPECTED_ROWS: dict[str, list[list[Any]]] = {
         ["2024-06-12", C_, 1],
         ["2024-06-17", I_, 1],
         ["2024-06-20", C_, 1],
+        ["2024-06-24", C_, 1],
     ],
     # open now: incidents 514 and 520 (May, queue Q2), change 517, the world's ticket 740300
     "itsm_open_by_type": [WORLD_OPEN, [I_, PRIO, 2], [C_, PRIO, 1]],
@@ -566,7 +599,7 @@ EXPECTED_ROWS: dict[str, list[list[Any]]] = {
     "itsm_solution_time": [
         [I_, 3, 150.0, 120.0],
         [R_, 1, 60.0, 60.0],
-        [C_, 2, 20310.0, 20310.0],
+        [C_, 3, 14060.0, 20220.0],
     ],
     "itsm_solution_time_trend": [
         ["2024-06-03", I_, 120.0],
@@ -575,6 +608,7 @@ EXPECTED_ROWS: dict[str, list[list[Any]]] = {
         ["2024-06-05", C_, 20220.0],
         ["2024-06-10", I_, 90.0],
         ["2024-06-12", C_, 20400.0],
+        ["2024-06-24", C_, 1560.0],
     ],
     "itsm_tickets_by_role": [
         ["2024-06-03", "incident", 1],
@@ -585,6 +619,7 @@ EXPECTED_ROWS: dict[str, list[list[Any]]] = {
         ["2024-06-12", "change", 1],
         ["2024-06-17", "incident", 1],
         ["2024-06-20", "change", 1],
+        ["2024-06-24", "change", 1],
     ],
     # CIs: two in srv (production), one in net (planned); the sec CI is not readable
     "cmdb_cis_by_class": [[SRV, "Production", 2], [NET, "Planned", 1]],
@@ -597,19 +632,23 @@ EXPECTED_ROWS: dict[str, list[list[Any]]] = {
         ["2024-06-05", "closed_successful", 1],
         ["2024-06-12", "closed_backed_out", 1],
         ["2024-06-20", "rejected", 1],
+        ["2024-06-24", "cancelled", 1],
     ],
-    # normal: C1 (successful, on time) and C3 (rejected, no outcome yet): rate 1 of 1 decided
+    # normal: C1 (successful, on time), C3 (rejected) and C4 (cancelled), no outcome yet on the
+    # last two: rate 1 of 1 decided
     # emergency: C2 backed out (failed), finished a day late
     "itsm_change_outcomes": [
-        ["normal", 2, 1, 0, 1.0, 1, 0],
+        ["normal", 3, 1, 0, 1.0, 1, 0],
         ["emergency", 1, 0, 1, 0.0, 0, 1],
     ],
-    # C1 on 06-08 and C3 on 06-21; the foreign change was rejected on 06-08 too
+    # C1 on 06-08 and C3 on 06-21 rejected, C4 cancelled on 06-25; the foreign change was
+    # rejected on 06-08 and cancelled on 06-09 too
     "itsm_change_transitions": [
         ["2024-06-08", "rejected", 1],
         ["2024-06-21", "rejected", 1],
+        ["2024-06-25", "cancelled", 1],
     ],
-    "itsm_change_requesters": [["ist972.cust@example.org", 2], [None, 1]],
+    "itsm_change_requesters": [["ist972.cust@example.org", 3], [None, 1]],
     # srv: C1 (db, web) and C3 (db); net: C2 (core); the sec CI and the foreign change are out
     "itsm_changes_per_ci_class": [[SRV, 2, 2], [NET, 1, 1]],
     # db: incidents 510, 512, 514 (open) + changes 515, 517; web: incidents 513, 514 (open)
@@ -644,33 +683,49 @@ async def test_every_itsm_builtin_runs_and_has_exact_values(world: CmdbWorld) ->
             assert g == [pytest.approx(c) if isinstance(c, float) else c for c in w], (r.key, g)
 
 
-#: what the foreign queue / classes would leak: their names, the secret CI and its class
-_FOREIGN_MARKERS = (
-    SECRET,
-    SEC,
-    "vault-01",
-    f"cmdb4-queue-{QUEUE_HIDDEN}",
-    str(T_HID_INC),
-    str(C_HID),
-)
+#: what a leak of the foreign class / CI would print: labels of the CI reports
+_FOREIGN_MARKERS = (SECRET, SEC, "vault-01")
 
 
 async def test_itsm_builtins_hide_foreign_queue_and_class(world: CmdbWorld) -> None:
-    """A: no foreign ticket / change / CI anywhere (the exact values already pin the counts).
+    """A: no foreign CI anywhere; B: no QUEUE_RW ticket, no CI of ist972srv, in any of the 16.
 
-    B reads only QUEUE_Q2 and class net: no QUEUE_RW ticket, no CI of ist972srv, in any of the
-    16 results. A wide window (May and June) makes B's one ticket (created in May) visible.
+    The ticket side of the hiding is pinned by the exact row lists (a foreign ticket changes a
+    count); the names checked here are the ones the CI reports would print. A wide window (May
+    and June) makes B's one ticket (created in May) visible.
     """
-    for result in (await _run_all(world, USER_A)).values():
+    results_a = await _run_all(world, USER_A)
+    for result in results_a.values():
         dumped = result.model_dump_json()
         for marker in _FOREIGN_MARKERS:
             assert marker not in dumped, marker
+    # the markers could be found: the dump holds the labels (A reads srv, B reads net)
+    assert SRV in results_a["cmdb_cis_by_class"].model_dump_json()
+    assert DB in results_a["itsm_incident_prone_cis"].model_dump_json()
     results = await _run_all(world, USER_B, time_range=MAY_JUNE)
     by_name = {r.name: r for r in itsm_builtin_reports()}
     for name, res in results.items():
         dumped = res.model_dump_json()
-        for marker in (*_FOREIGN_MARKERS, SRV, DB, WEB, f"cmdb4-queue-{QUEUE_RW}"):
+        for marker in (*_FOREIGN_MARKERS, SRV, DB, WEB):
             assert marker not in dumped, (name, marker)
+    assert NET in results["cmdb_cis_by_class"].model_dump_json()
+    # canary: with a grant on the foreign group the same run does print the foreign names
+    world.sql(
+        "INSERT INTO group_user (user_id, group_id, permission_key, create_time, create_by,"
+        " change_time, change_by) VALUES (:u, :g, 'ro', :t, 1, :t, 1)",
+        u=USER_B,
+        g=_cmdb_helpers.GROUP_HIDDEN,
+        t=STAMP,
+    )
+    try:
+        granted = await _run(world, by_name["cmdb_cis_by_class"], USER_B)
+        assert SECRET in granted.model_dump_json()
+    finally:
+        world.sql(
+            "DELETE FROM group_user WHERE user_id = :u AND group_id = :g",
+            u=USER_B,
+            g=_cmdb_helpers.GROUP_HIDDEN,
+        )
     expected_b: dict[str, list[list[Any]]] = {
         "itsm_tickets_by_type": [[I_, PRIO, 1]],
         "itsm_created_by_type": [["2024-05-20", I_, 1]],
@@ -694,10 +749,6 @@ async def test_itsm_builtins_hide_foreign_queue_and_class(world: CmdbWorld) -> N
     for name, rows in expected_b.items():
         got = _shown(by_name[name], results[name])
         assert got == _sorted(rows), name
-
-
-def _narrowed(rows: dict[str, list[list[Any]]], **overrides: list[list[Any]]) -> dict[str, Any]:
-    return {**rows, **overrides}
 
 
 async def _assert_exact(
@@ -738,15 +789,12 @@ async def test_itsm_builtins_with_queues_parameter(world: CmdbWorld) -> None:
     # without a parameter the May incident adds to the open and created figures
     wide = await _run_all(world, time_range=MAY_JUNE)
     assert _shown(every["itsm_tickets_by_type"], wide["itsm_tickets_by_type"]) == _sorted(
-        [[I_, PRIO, 5], [R_, PRIO, 1], [C_, PRIO, 3]]
+        [[I_, PRIO, 5], [R_, PRIO, 1], [C_, PRIO, 4]]
     )
     # QUEUE_RW only: the June figures, the May incident is gone
     await _assert_exact(
         world,
-        _narrowed(
-            EXPECTED_ROWS,
-            itsm_open_by_type=[WORLD_OPEN, [I_, PRIO, 1], [C_, PRIO, 1]],
-        ),
+        {**EXPECTED_ROWS, "itsm_open_by_type": [WORLD_OPEN, [I_, PRIO, 1], [C_, PRIO, 1]]},
         time_range=MAY_JUNE,
         parameters={"queues": [QUEUE_RW]},
     )
@@ -772,3 +820,255 @@ async def test_itsm_builtins_with_queues_parameter(world: CmdbWorld) -> None:
     # the foreign queue is no queue of A: nothing, and no leak
     nothing = {n: ([] if n not in cmdb_only else cmdb_rows[n]) for n in EXPECTED_ROWS}
     await _assert_exact(world, nothing, time_range=MAY_JUNE, parameters={"queues": [QUEUE_HIDDEN]})
+
+
+# --- the class scope in shared, scheduled and wallboard runs --------------------------------
+
+
+class _MemoryCache:
+    """In-memory stand-in for the Redis result cache (``get`` / ``set(ex=)``)."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    async def set(self, key: str, value: str, ex: int) -> None:
+        self.store[key] = value
+
+
+_CI_CLASS_DEFINITION = {
+    "source": "config_items",
+    "dimensions": [{"key": "class"}],
+    "measures": [{"key": "config_items"}],
+    "totals": {"grand": True},
+    "visualization": {"type": "table"},
+}
+
+
+async def test_shared_config_items_report_keeps_the_viewers_class_scope(world: CmdbWorld) -> None:
+    """A shares a CI report: B (no right on srv) sees neither its rows, labels nor totals, and
+    the two do not share a cache entry (the key carries the readable class ids)."""
+    rights = ReportRights(view=True, create=True, share=True, admin=False)
+    async with world.factory() as session:
+        saved = await create_saved_report(
+            session,
+            USER_A,
+            rights,
+            SavedReportIn(
+                name="ist972 shared ci report",
+                definition=ReportDefinition.model_validate(_CI_CLASS_DEFINITION),
+                visibility="all",
+                group_ids=[],
+            ),
+            registry=get_registry(),
+        )
+        await session.commit()
+    backend = _MemoryCache()
+    reporting = ReportingSettings()
+
+    async def run_as(user: int) -> Any:
+        loop = asyncio.get_running_loop()
+        async with world.factory() as session:
+            outcome = await run_report_ref(
+                session,
+                user_id=user,
+                report_key=str(saved.id),
+                definition=None,
+                overrides=RunOverrides(time_zone="UTC"),
+                reporting=reporting,
+                cache=ReportCache(backend, 300),
+                budget=QueryBudget(30, deadline=loop.time() + 60, clock=loop.time),
+            )
+        assert outcome.result is not None
+        return outcome.result
+
+    try:
+        owner = await run_as(USER_A)
+        assert not owner.cached
+        assert _data_rows(owner, 1) == _sorted([[SRV, 2], [NET, 1]])
+        assert owner.totals is not None and owner.totals.grand[-1] == 3
+        viewer = await run_as(USER_B)
+        assert not viewer.cached  # not the owner's cache entry
+        assert _data_rows(viewer, 1) == [[NET, 1]]
+        assert viewer.totals is not None and viewer.totals.grand[-1] == 1
+        dumped = viewer.model_dump_json()
+        for marker in (SRV, SECRET, DB, WEB, SEC):
+            assert marker not in dumped, marker
+        assert len(viewer.labels["class"]) == 1
+        again = await run_as(USER_A)  # the owner's own entry is still the full one
+        assert again.cached and again.totals is not None and again.totals.grand[-1] == 3
+        keys = [k for k in backend.store if k != GENERATION_KEY]
+        assert len(keys) == 2
+    finally:
+        world.sql("DELETE FROM tiqora_report_group WHERE report_id = :i", i=saved.id)
+        world.sql("DELETE FROM tiqora_report WHERE id = :i", i=saved.id)
+
+
+class _Widget:
+    def __init__(self, settings: dict[str, Any]) -> None:
+        self.id = "ist972wid"
+        self.type_key = "core.report"
+        self.type_version = 1
+        self.settings = settings
+        self.pinned = False
+
+
+async def test_wallboard_report_runs_with_the_creators_class_scope(world: CmdbWorld) -> None:
+    """A kiosk link runs its widgets as the link's creator and redacts as before: with the
+    creator B the CI report shows class net only, with details off as well."""
+    reg = Registry()
+    for provider in core_providers():
+        reg.add(DASHBOARD_PROVIDERS, provider)
+    reg.freeze()
+
+    async def tile(user: int) -> Any:
+        out = await run_widget_fn(
+            world.factory,
+            reg,
+            user,
+            _Widget({"report_key": "builtin.cmdb_cis_by_class"}),
+            app_settings=Settings(environment="test"),
+            report_cache_backend=_MemoryCache(),
+            kiosk=True,
+        )
+        assert out is not None and out.status == "ok", out
+        return out
+
+    creator_a = await tile(USER_A)
+    assert SRV in creator_a.model_dump_json()
+    out = await tile(USER_B)
+    for show_details in (True, False):
+        redacted = redact_result("core.report", out, show_details)
+        assert redacted.status == "ok", (show_details, redacted)
+        dumped = redacted.model_dump_json()
+        assert NET in dumped
+        for marker in (SRV, SECRET, DB, WEB, SEC):
+            assert marker not in dumped, (show_details, marker)
+        assert redacted.data is not None
+        assert [row[-1] for row in redacted.data["result"]["rows"]] == [1]
+
+
+_DELIVERY_CLEANUP = (
+    "DELETE FROM tiqora_report_run_file WHERE run_id IN"
+    " (SELECT id FROM tiqora_report_run WHERE owner_user_id IN (:a, :b))",
+    "DELETE FROM tiqora_report_run WHERE owner_user_id IN (:a, :b)",
+    "DELETE FROM tiqora_job_file WHERE job_id IN"
+    " (SELECT id FROM tiqora_job WHERE kind = 'core.report_delivery')",
+    "DELETE FROM tiqora_job WHERE kind = 'core.report_delivery'",
+    "DELETE FROM tiqora_mail_log WHERE detail LIKE 'report_run %'",
+    "DELETE FROM tiqora_report_schedule_recipient WHERE schedule_id IN"
+    " (SELECT id FROM tiqora_report_schedule WHERE owner_user_id IN (:a, :b))",
+    "DELETE FROM tiqora_report_schedule_item WHERE schedule_id IN"
+    " (SELECT id FROM tiqora_report_schedule WHERE owner_user_id IN (:a, :b))",
+    "DELETE FROM tiqora_report_schedule WHERE owner_user_id IN (:a, :b)",
+    "DELETE FROM user_preferences WHERE user_id IN (:a, :b) AND preferences_key = 'UserEmail'",
+)
+
+
+async def test_scheduled_config_items_report_uses_the_owners_class_scope(
+    world: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same schedule content, delivered to owner A and to owner B: the CSV of B holds class
+    net only (the delivery job runs every report as the owner, at run time)."""
+    sender = CapturingMailSender()
+
+    async def fake_build(*args: Any, **kwargs: Any) -> CapturingMailSender:
+        return sender
+
+    monkeypatch.setattr(delivery, "build_outbound_sender", fake_build)
+    key = "`key`" if world.dialect == "mysql" else '"key"'
+    ids = {"a": USER_A, "b": USER_B}
+
+    def clean() -> None:
+        for stmt in _DELIVERY_CLEANUP:
+            world.sql(stmt, **ids)
+        world.sql(f"DELETE FROM tiqora_settings WHERE {key} = 'notification.sender_email'")
+
+    async def deliver(owner: int) -> str:
+        async with world.factory() as session:
+            row = TiqoraReportSchedule(
+                owner_user_id=owner,
+                name="ist972 CI schedule",
+                format="csv",
+                recurrence='{"kind": "daily", "time": "07:00"}',
+                time_zone="UTC",
+                language="de",
+                subject="",
+                body="",
+                active=True,
+                next_run_at=None,
+                created_at=NOW,
+                changed_at=NOW,
+            )
+            session.add(row)
+            await session.flush()
+            session.add(
+                TiqoraReportScheduleItem(
+                    schedule_id=row.id, position=0, report_key="builtin.cmdb_cis_by_class"
+                )
+            )
+            session.add(
+                TiqoraReportScheduleRecipient(schedule_id=row.id, kind="user", ref_id=owner)
+            )
+            await session.commit()
+            schedule = await load_schedule(session, int(row.id))
+            assert schedule is not None
+            run = await create_run(
+                session, schedule, run_kind="manual", owner_only=True, due_at=None, now=utc_now()
+            )
+            job = await enqueue_delivery(session, run, dedupe_key=f"ist972-run-{run.id}")
+            await session.commit()
+            run_id, job_id = int(run.id), int(job.id)
+        runner = JobRunner(
+            session_factory=world.factory,
+            settings=Settings(environment="test"),
+            registry=get_registry(),
+        )
+        async with world.factory() as session:
+            kind, payload, created_by = (
+                await session.execute(
+                    select(TiqoraJob.kind, TiqoraJob.payload, TiqoraJob.created_by).where(
+                        TiqoraJob.id == job_id
+                    )
+                )
+            ).one()
+        attempt = await runner._claim(job_id)
+        assert attempt, "the job could not be claimed"
+        await runner._execute(job_id, kind, payload, created_by, attempt=attempt)
+        async with world.factory() as session:
+            status = (
+                await session.execute(
+                    select(TiqoraReportRun.status)
+                    .where(TiqoraReportRun.id == run_id)
+                    .execution_options(populate_existing=True)
+                )
+            ).scalar_one()
+        assert status == "succeeded", status
+        attachment = next(iter(sender.sent[-1].iter_attachments()))
+        payload_bytes = attachment.get_payload(decode=True)
+        assert isinstance(payload_bytes, bytes)
+        return payload_bytes.decode("utf-8-sig")
+
+    clean()
+    try:
+        world.sql(
+            f"INSERT INTO tiqora_settings ({key}, value)"
+            " VALUES ('notification.sender_email', 'reports@example.org')"
+        )
+        for uid, address in ((USER_A, "ist972.a@example.org"), (USER_B, "ist972.b@example.org")):
+            world.sql(
+                "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+                " VALUES (:u, 'UserEmail', :v)",
+                u=uid,
+                v=address.encode(),
+            )
+        owner_a = await deliver(USER_A)
+        assert SRV in owner_a and NET in owner_a
+        owner_b = await deliver(USER_B)
+        assert NET in owner_b
+        for marker in (SRV, SECRET, DB, WEB, SEC):
+            assert marker not in owner_b, marker
+    finally:
+        clean()

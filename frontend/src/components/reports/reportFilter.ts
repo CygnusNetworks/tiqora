@@ -127,7 +127,10 @@ export function toRunIn(
   const parameters: NonNullable<ReportRunIn["parameters"]> = definition
     ? effectiveParams(definition, state.params)
     : {};
-  if (state.queues.length > 0) parameters.queues = state.queues;
+  // a report without a queue parameter (the CI reports) would answer a stray `queues` with 422
+  if (state.queues.length > 0 && (!definition || hasQueueParameter(definition))) {
+    parameters.queues = state.queues;
+  }
   if (Object.keys(parameters).length > 0) body.parameters = parameters;
   return body;
 }
