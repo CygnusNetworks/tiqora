@@ -10,6 +10,11 @@ import { reportsApi, type FactsStatus } from "@/lib/reportsApi";
 const FACTS_POLL_MS = 15_000;
 /** The fact upgrade after an update takes hours: the count behind its notice is re-read rarely. */
 const UPGRADE_POLL_MS = 5 * 60_000;
+/**
+ * One batch of the worker (`VERSION_UPGRADE_BATCH`). A smaller remainder is gone on its next run or is
+ * tickets that keep failing, which no reader can act on: the exact count stays with the admin and the CLI.
+ */
+const UPGRADE_NOTICE_MIN_ROWS = 500;
 
 /**
  * Notice while the report data is still being built (first start, rebuild):
@@ -29,21 +34,24 @@ export function FactsBanner({
   const queryClient = useQueryClient();
   // The page's own status (catalogue/result) is read once; while building, re-read it so
   // everyone sees the percentage move and the banner goes away when the build is done.
-  // A report result carries no upgrade count, so the status is always read once.
+  // A report result carries no upgrade count, so the status is read as well, at most once per slow poll.
   const statusQ = useQuery({
     queryKey: ["reports", "facts"],
     queryFn: ({ signal }) => reportsApi.factsStatus(signal),
     enabled: facts != null,
+    staleTime: UPGRADE_POLL_MS,
     refetchInterval: (query) =>
       facts != null && !facts.ready
         ? FACTS_POLL_MS
-        : (query.state.data?.outdated_rows ?? 0) > 0
+        : (query.state.data?.outdated_rows ?? 0) > UPGRADE_NOTICE_MIN_ROWS
           ? UPGRADE_POLL_MS
           : false,
   });
   const current = facts != null && !facts.ready ? (statusQ.data ?? facts) : facts;
   const building = current != null && !current.ready;
-  const upgrading = facts != null && !building && (statusQ.data?.outdated_rows ?? facts.outdated_rows ?? 0) > 0;
+  // Not tied to `facts`: a report re-run has none for a moment, and that does not end the upgrade.
+  const outdated = statusQ.data?.outdated_rows ?? facts?.outdated_rows ?? 0;
+  const upgrading = !building && outdated > UPGRADE_NOTICE_MIN_ROWS;
   const finished = facts != null && !facts.ready && statusQ.data?.ready === true;
   const wasUpgrading = useRef(false);
   useEffect(() => {

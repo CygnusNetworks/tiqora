@@ -241,6 +241,21 @@ describe("ReportView", () => {
     expect(screen.getByTestId("report-view-chart")).toBeInTheDocument();
   });
 
+  it("keeps the result view when the hint arrives: a table opened before stays open", async () => {
+    let release: (v: ReturnType<typeof demoSources>) => void = () => {};
+    vi.mocked(reportsApi.sources).mockReturnValueOnce(new Promise((res) => (release = res)));
+    render(
+      <Providers>
+        <ReportView report={{ key: "builtin.volume", definition: volumeDef }} result={volumeResult} />
+      </Providers>,
+    );
+    fireEvent.click(screen.getByTestId("report-view-toggle-table"));
+    expect(screen.getByTestId("report-view-table")).toBeInTheDocument();
+    release(demoSources().map((s) => ({ ...s, available: false })));
+    await screen.findByTestId("report-view-source-unavailable");
+    expect(screen.getByTestId("report-view-table")).toBeInTheDocument();
+  });
+
   it("shows no such hint on an available data basis", async () => {
     render(
       <Providers>

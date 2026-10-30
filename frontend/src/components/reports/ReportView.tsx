@@ -137,10 +137,10 @@ const NO_REPORTS: readonly never[] = [];
 
 export function ReportView(props: Parameters<typeof ReportResultView>[0]) {
   const unavailable = useSourceUnavailable(props.report.definition.source);
-  if (!unavailable) return <ReportResultView {...props} />;
   return (
+    // Always the wrapper: the hint arrives with the sources and must not remount the result.
     <div className="space-y-2">
-      <SourceUnavailableHint testId={`${props.testId ?? "report-view"}-source-unavailable`} />
+      {unavailable && <SourceUnavailableHint testId={`${props.testId ?? "report-view"}-source-unavailable`} />}
       <ReportResultView {...props} />
     </div>
   );
