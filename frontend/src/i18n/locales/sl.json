@@ -951,9 +951,9 @@
       "prev": "Prejšnji zahtevek na seznamu",
       "next": "Naslednji zahtevek na seznamu"
     },
-    "stateGroup": {
-      "pending": "V teku",
-      "closed": "Zaprto"
+    "statusAction": {
+      "pending": "Odloži…",
+      "close": "Zapri…"
     },
     "signatureAppended": "Podpis · se doda ob pošiljanju",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Ticket trước trong danh sách",
       "next": "Ticket tiếp theo trong danh sách"
     },
-    "stateGroup": {
-      "pending": "Đang chờ xử lý",
-      "closed": "Đã đóng"
+    "statusAction": {
+      "pending": "Hoãn lại…",
+      "close": "Đóng…"
     },
     "signatureAppended": "Chữ ký · được thêm khi gửi",
     "replyNext": {

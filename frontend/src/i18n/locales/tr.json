@@ -951,9 +951,9 @@
       "prev": "Listedeki önceki bilet",
       "next": "Listedeki sonraki bilet"
     },
-    "stateGroup": {
-      "pending": "Beklemede",
-      "closed": "Kapalı"
+    "statusAction": {
+      "pending": "Ertele…",
+      "close": "Kapat…"
     },
     "signatureAppended": "İmza · gönderirken eklenir",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Претходен тикет на листата",
       "next": "Следен тикет на листата"
     },
-    "stateGroup": {
-      "pending": "Во очекување",
-      "closed": "Затворен"
+    "statusAction": {
+      "pending": "Одложи…",
+      "close": "Затвори…"
     },
     "signatureAppended": "Потпис · се додава при испраќање",
     "replyNext": {

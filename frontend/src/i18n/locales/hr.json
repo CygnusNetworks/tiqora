@@ -951,9 +951,9 @@
       "prev": "Prethodna ulaznica na popisu",
       "next": "Sljedeća ulaznica na popisu"
     },
-    "stateGroup": {
-      "pending": "Na čekanju",
-      "closed": "Zatvoreno"
+    "statusAction": {
+      "pending": "Odgodi…",
+      "close": "Zatvori…"
     },
     "signatureAppended": "Potpis · dodaje se pri slanju",
     "replyNext": {

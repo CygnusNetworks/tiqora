@@ -951,9 +951,9 @@
       "prev": "Előző jegy a listában",
       "next": "Következő jegy a listában"
     },
-    "stateGroup": {
-      "pending": "Függőben",
-      "closed": "Lezárva"
+    "statusAction": {
+      "pending": "Elhalasztás…",
+      "close": "Lezárás…"
     },
     "signatureAppended": "Aláírás · küldéskor hozzáfűzve",
     "replyNext": {

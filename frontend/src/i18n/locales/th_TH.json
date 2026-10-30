@@ -951,9 +951,9 @@
       "prev": "ตั๋วก่อนหน้าในรายการ",
       "next": "ตั๋วถัดไปในรายการ"
     },
-    "stateGroup": {
-      "pending": "รอดำเนินการ",
-      "closed": "ปิดแล้ว"
+    "statusAction": {
+      "pending": "เลื่อน…",
+      "close": "ปิด…"
     },
     "signatureAppended": "ลายเซ็น · ต่อท้ายเมื่อส่ง",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Predchádzajúci ticket v zozname",
       "next": "Ďalší ticket v zozname"
     },
-    "stateGroup": {
-      "pending": "Čaká na spracovanie",
-      "closed": "Zavreté"
+    "statusAction": {
+      "pending": "Odložiť…",
+      "close": "Uzavrieť…"
     },
     "signatureAppended": "Podpis · pripojí sa pri odoslaní",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Edellinen tiketti listassa",
       "next": "Seuraava tiketti listassa"
     },
-    "stateGroup": {
-      "pending": "Odottaa",
-      "closed": "Suljettu"
+    "statusAction": {
+      "pending": "Siirrä odottamaan…",
+      "close": "Sulje…"
     },
     "signatureAppended": "Allekirjoitus · lisätään lähetyksessä",
     "replyNext": {

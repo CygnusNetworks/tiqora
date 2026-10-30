@@ -951,9 +951,9 @@
       "prev": "Iepriekšējā biļete sarakstā",
       "next": "Nākamā biļete sarakstā"
     },
-    "stateGroup": {
-      "pending": "Gaida",
-      "closed": "Aizvērtas"
+    "statusAction": {
+      "pending": "Atlikt…",
+      "close": "Aizvērt…"
     },
     "signatureAppended": "Paraksts · pievieno nosūtot",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Boleto anterior de la lista",
       "next": "Boleto siguiente de la lista"
     },
-    "stateGroup": {
-      "pending": "Pendiente",
-      "closed": "Cerrado"
+    "statusAction": {
+      "pending": "Posponer…",
+      "close": "Cerrar…"
     },
     "signatureAppended": "Firma · se agrega al enviar",
     "replyNext": {

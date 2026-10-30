@@ -951,9 +951,9 @@
       "prev": "Ankstesnis sąrašo bilietas",
       "next": "Kitas sąrašo bilietas"
     },
-    "stateGroup": {
-      "pending": "Laukiama",
-      "closed": "Uždaryta"
+    "statusAction": {
+      "pending": "Atidėti…",
+      "close": "Uždaryti…"
     },
     "signatureAppended": "Parašas · pridedamas siunčiant",
     "replyNext": {

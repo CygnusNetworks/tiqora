@@ -951,9 +951,9 @@
       "prev": "Forrige sak i listen",
       "next": "Neste sak i listen"
     },
-    "stateGroup": {
-      "pending": "Venter",
-      "closed": "Stengt"
+    "statusAction": {
+      "pending": "Utsett…",
+      "close": "Lukk…"
     },
     "signatureAppended": "Signatur · legges til ved sending",
     "replyNext": {

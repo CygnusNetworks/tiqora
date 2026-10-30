@@ -951,9 +951,9 @@
       "prev": "목록의 이전 티켓",
       "next": "목록의 다음 티켓"
     },
-    "stateGroup": {
-      "pending": "보류 중",
-      "closed": "닫힘"
+    "statusAction": {
+      "pending": "보류…",
+      "close": "닫기…"
     },
     "signatureAppended": "서명 · 보낼 때 추가됩니다",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Föregående ärende i listan",
       "next": "Nästa ärende i listan"
     },
-    "stateGroup": {
-      "pending": "Väntar",
-      "closed": "Stängt"
+    "statusAction": {
+      "pending": "Skjut upp…",
+      "close": "Stäng…"
     },
     "signatureAppended": "Signatur · läggs till vid sändning",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Ticket anterior na lista",
       "next": "Ticket seguinte na lista"
     },
-    "stateGroup": {
-      "pending": "Pendente",
-      "closed": "Fechado"
+    "statusAction": {
+      "pending": "Adiar…",
+      "close": "Fechar…"
     },
     "signatureAppended": "Assinatura · acrescentada no envio",
     "replyNext": {

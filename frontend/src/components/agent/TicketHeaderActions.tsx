@@ -51,7 +51,7 @@ import {
  *   2. title with the AI summary as subtitle; Antworten (+ AI drafts),
  *      Notiz and one ⋯ menu on the right
  *   3. AI banners that need attention (paused, hand-over, triage) — only if present
- *   4. status bar (Neu · Offen · Wartend ⌄ · Geschlossen ⌄); priority,
+ *   4. status bar (Neu · Offen · Zurückstellen… · Schließen…); priority,
  *      type/service/SLA pickers and the SLA chip on the right
  *   5. queue, people, customer and similar tickets; counters + timestamp right
  *
@@ -518,7 +518,7 @@ export function TicketHeaderActions({
               disabled={!perms.rw}
               onClick={() => setDialog("pending")}
             >
-              {inPending ? stateLabel(t, ticket.state) : t("ticket.stateGroup.pending")} ⌄
+              {inPending ? `${stateLabel(t, ticket.state)} ⌄` : t("ticket.statusAction.pending")}
             </StatusSegment>
           )}
           {closedStates.length > 0 && can("AgentTicketClose") && (
@@ -534,7 +534,7 @@ export function TicketHeaderActions({
                   buttonRef={ref}
                   toggleProps={toggleProps}
                 >
-                  {inClosed ? stateLabel(t, ticket.state) : t("ticket.stateGroup.closed")} ⌄
+                  {inClosed ? `${stateLabel(t, ticket.state)} ⌄` : t("ticket.statusAction.close")}
                 </StatusSegment>
               )}
             >

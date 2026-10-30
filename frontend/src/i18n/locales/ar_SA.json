@@ -951,9 +951,9 @@
       "prev": "التذكرة السابقة في القائمة",
       "next": "التذكرة التالية في القائمة"
     },
-    "stateGroup": {
-      "pending": "في انتظار",
-      "closed": "مغلقة"
+    "statusAction": {
+      "pending": "تأجيل…",
+      "close": "إغلاق…"
     },
     "signatureAppended": "التوقيع · يُلحَق عند الإرسال",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Předchozí tiket v seznamu",
       "next": "Další tiket v seznamu"
     },
-    "stateGroup": {
-      "pending": "Čekající",
-      "closed": "Uzavřené"
+    "statusAction": {
+      "pending": "Odložit…",
+      "close": "Uzavřít…"
     },
     "signatureAppended": "Podpis · připojí se při odeslání",
     "replyNext": {

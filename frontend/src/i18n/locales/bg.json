@@ -951,9 +951,9 @@
       "prev": "Предишен билет в списъка",
       "next": "Следващ билет в списъка"
     },
-    "stateGroup": {
-      "pending": "В очакване",
-      "closed": "Затворен"
+    "statusAction": {
+      "pending": "Отлагане…",
+      "close": "Затваряне…"
     },
     "signatureAppended": "Подпис · добавя се при изпращане",
     "replyNext": {

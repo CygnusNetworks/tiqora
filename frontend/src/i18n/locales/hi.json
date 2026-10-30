@@ -951,9 +951,9 @@
       "prev": "सूची का पिछला टिकट",
       "next": "सूची का अगला टिकट"
     },
-    "stateGroup": {
-      "pending": "लंबित",
-      "closed": "बंद"
+    "statusAction": {
+      "pending": "स्थगित करें…",
+      "close": "बंद करें…"
     },
     "signatureAppended": "हस्ताक्षर · भेजते समय जुड़ता है",
     "replyNext": {

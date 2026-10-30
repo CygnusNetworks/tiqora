@@ -951,9 +951,9 @@
       "prev": "Eelmine pilet loendis",
       "next": "Järgmine pilet loendis"
     },
-    "stateGroup": {
-      "pending": "Ootel",
-      "closed": "Suletud"
+    "statusAction": {
+      "pending": "Lükka edasi…",
+      "close": "Sulge…"
     },
     "signatureAppended": "Allkiri · lisatakse saatmisel",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "列表中的上一張工單",
       "next": "列表中的下一張工單"
     },
-    "stateGroup": {
-      "pending": "待定",
-      "closed": "已關閉"
+    "statusAction": {
+      "pending": "擱置…",
+      "close": "關閉…"
     },
     "signatureAppended": "簽名 · 發送時附加",
     "replyNext": {

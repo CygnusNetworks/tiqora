@@ -951,9 +951,9 @@
       "prev": "Предыдущая заявка в списке",
       "next": "Следующая заявка в списке"
     },
-    "stateGroup": {
-      "pending": "В ожидании",
-      "closed": "Закрытые"
+    "statusAction": {
+      "pending": "Отложить…",
+      "close": "Закрыть…"
     },
     "signatureAppended": "Подпись · добавляется при отправке",
     "replyNext": {

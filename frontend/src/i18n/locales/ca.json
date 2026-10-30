@@ -951,9 +951,9 @@
       "prev": "Tiquet anterior de la llista",
       "next": "Tiquet següent de la llista"
     },
-    "stateGroup": {
-      "pending": "Pendent",
-      "closed": "Tancat"
+    "statusAction": {
+      "pending": "Posposa…",
+      "close": "Tanca…"
     },
     "signatureAppended": "Signatura · s'afegeix en enviar",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Tikiti iliyotangulia kwenye orodha",
       "next": "Tikiti inayofuata kwenye orodha"
     },
-    "stateGroup": {
-      "pending": "Inasubiri",
-      "closed": "Imefungwa"
+    "statusAction": {
+      "pending": "Ahirisha…",
+      "close": "Funga…"
     },
     "signatureAppended": "Sahihi · huongezwa wakati wa kutuma",
     "replyNext": {

@@ -951,9 +951,9 @@
       "prev": "Vorheriges Ticket der Liste",
       "next": "Nächstes Ticket der Liste"
     },
-    "stateGroup": {
-      "pending": "Wartend",
-      "closed": "Geschlossen"
+    "statusAction": {
+      "pending": "Zurückstellen…",
+      "close": "Schließen…"
     },
     "signatureAppended": "Signatur · wird beim Senden angehängt",
     "replyNext": {

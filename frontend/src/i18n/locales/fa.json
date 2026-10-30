@@ -951,9 +951,9 @@
       "prev": "تیکت قبلی در فهرست",
       "next": "تیکت بعدی در فهرست"
     },
-    "stateGroup": {
-      "pending": "در انتظار",
-      "closed": "بسته‌شده"
+    "statusAction": {
+      "pending": "تعویق…",
+      "close": "بستن…"
     },
     "signatureAppended": "امضا · هنگام ارسال افزوده می‌شود",
     "replyNext": {

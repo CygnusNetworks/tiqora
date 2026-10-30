@@ -951,9 +951,9 @@
       "prev": "הפנייה הקודמת ברשימה",
       "next": "הפנייה הבאה ברשימה"
     },
-    "stateGroup": {
-      "pending": "בהמתנה",
-      "closed": "סגור"
+    "statusAction": {
+      "pending": "דחייה…",
+      "close": "סגירה…"
     },
     "signatureAppended": "חתימה · מצורפת בשליחה",
     "replyNext": {

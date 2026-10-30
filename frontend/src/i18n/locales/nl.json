@@ -951,9 +951,9 @@
       "prev": "Vorig ticket in de lijst",
       "next": "Volgend ticket in de lijst"
     },
-    "stateGroup": {
-      "pending": "In behandeling",
-      "closed": "Gesloten"
+    "statusAction": {
+      "pending": "Uitstellen…",
+      "close": "Sluiten…"
     },
     "signatureAppended": "Handtekening · wordt bij het verzenden toegevoegd",
     "replyNext": {

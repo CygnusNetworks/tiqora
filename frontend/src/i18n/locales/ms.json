@@ -951,9 +951,9 @@
       "prev": "Tiket sebelumnya dalam senarai",
       "next": "Tiket seterusnya dalam senarai"
     },
-    "stateGroup": {
-      "pending": "Belum selesai",
-      "closed": "Ditutup"
+    "statusAction": {
+      "pending": "Tangguhkan…",
+      "close": "Tutup…"
     },
     "signatureAppended": "Tandatangan · dilampirkan semasa hantar",
     "replyNext": {

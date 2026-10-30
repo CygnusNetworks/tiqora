@@ -951,9 +951,9 @@
       "prev": "Poprzedni ticket na liście",
       "next": "Następny ticket na liście"
     },
-    "stateGroup": {
-      "pending": "Oczekujące",
-      "closed": "Zamknięte"
+    "statusAction": {
+      "pending": "Odłóż…",
+      "close": "Zamknij…"
     },
     "signatureAppended": "Podpis · dołączany przy wysyłce",
     "replyNext": {

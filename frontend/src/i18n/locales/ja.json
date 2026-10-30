@@ -951,9 +951,9 @@
       "prev": "一覧の前のチケット",
       "next": "一覧の次のチケット"
     },
-    "stateGroup": {
-      "pending": "保留",
-      "closed": "クローズ"
+    "statusAction": {
+      "pending": "保留…",
+      "close": "クローズ…"
     },
     "signatureAppended": "署名 · 送信時に付加",
     "replyNext": {

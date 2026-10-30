@@ -951,9 +951,9 @@
       "prev": "列表中的上一个工单",
       "next": "列表中的下一个工单"
     },
-    "stateGroup": {
-      "pending": "挂起",
-      "closed": "已关闭"
+    "statusAction": {
+      "pending": "挂起…",
+      "close": "关闭…"
     },
     "signatureAppended": "签名 · 发送时附加",
     "replyNext": {

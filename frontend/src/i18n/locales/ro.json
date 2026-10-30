@@ -951,9 +951,9 @@
       "prev": "Tichetul anterior din listă",
       "next": "Tichetul următor din listă"
     },
-    "stateGroup": {
-      "pending": "În așteptare",
-      "closed": "Închis"
+    "statusAction": {
+      "pending": "Amână…",
+      "close": "Închide…"
     },
     "signatureAppended": "Semnătură · adăugată la trimitere",
     "replyNext": {

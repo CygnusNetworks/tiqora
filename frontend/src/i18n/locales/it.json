@@ -951,9 +951,9 @@
       "prev": "Ticket precedente nell'elenco",
       "next": "Ticket successivo nell'elenco"
     },
-    "stateGroup": {
-      "pending": "In sospeso",
-      "closed": "Chiuso"
+    "statusAction": {
+      "pending": "Metti in attesa…",
+      "close": "Chiudi…"
     },
     "signatureAppended": "Firma · aggiunta all'invio",
     "replyNext": {

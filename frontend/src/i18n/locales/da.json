@@ -951,9 +951,9 @@
       "prev": "Forrige sag på listen",
       "next": "Næste sag på listen"
     },
-    "stateGroup": {
-      "pending": "Afventer",
-      "closed": "Lukket"
+    "statusAction": {
+      "pending": "Udsæt…",
+      "close": "Luk…"
     },
     "signatureAppended": "Signatur · tilføjes ved afsendelse",
     "replyNext": {
