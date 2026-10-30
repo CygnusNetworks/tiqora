@@ -8,7 +8,7 @@ working hours), like Znuny's stats; targets of 0 mean "no SLA" and leave every
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, fields
 from datetime import datetime
 from decimal import Decimal
@@ -23,7 +23,10 @@ from tiqora.reporting.working_time import (
 )
 
 #: 2: rows a ticket merge moved in no longer drive the event diff
-FACT_VERSION: Final = 2
+#: 3: first_level_solved, itsm_solution_working_minutes
+FACT_VERSION: Final = 3
+#: Znuny's solution time of a ticket created closed (and never reopened)
+ITSM_SOLUTION_CREATED_CLOSED_MINUTES: Final = 3
 CHANNEL_KEYS: Final[dict[str, str]] = {
     "Email": "email",
     "Phone": "phone",
@@ -109,6 +112,8 @@ class FactRow:
     owner_change_count: int
     article_in_count: int
     article_out_count: int
+    first_level_solved: bool
+    itsm_solution_working_minutes: int | None
     note_count: int
     agent_touch_count: int
     accounted_time: Decimal
@@ -146,6 +151,51 @@ def _has_queue_pingpong(queues: Sequence[int]) -> bool:
             return True
         seen.add(queue)
     return False
+
+
+def first_level_solved(articles: Sequence[ArticleRow]) -> bool:
+    """Znuny's first-level rule on the customer-visible articles (in order).
+
+    Solved at first contact: one article from the customer or an agent, or a customer
+    article answered by exactly one agent article. Anything else (system first, an
+    agent article followed by more, an auto reply after the customer) is not.
+    """
+    senders = [a.sender_type for a in articles if a.visible]
+    if len(senders) == 1:
+        return senders[0] in ("customer", "agent")
+    return senders == ["customer", "agent"]
+
+
+def open_span_minutes(
+    created: datetime,
+    events: Sequence[EventRow],
+    measure: Callable[[datetime, datetime], int],
+) -> int | None:
+    """Time the ticket was open, summed over its open spans (Znuny's solution time).
+
+    A span starts at creation and at every reopen and ends at the next close; a
+    trailing span (reopened, not closed again) is not counted. ``None`` when the
+    ticket was never closed. A ticket created closed and never reopened counts
+    ``ITSM_SOLUTION_CREATED_CLOSED_MINUTES``.
+    """
+    changes = sorted(
+        (e for e in events if e.kind in ("close", "reopen")),
+        key=lambda e: (e.occurred_at, e.history_id or 0),
+    )
+    if not any(e.kind == "close" for e in changes):
+        return None
+    created_closed = changes[0].kind == "close" and changes[0].occurred_at <= created
+    if created_closed and not any(e.kind == "reopen" for e in changes):
+        return ITSM_SOLUTION_CREATED_CLOSED_MINUTES
+    total = 0
+    opened_at: datetime | None = created
+    for e in changes:
+        if e.kind == "close" and opened_at is not None:
+            total += measure(opened_at, max(e.occurred_at, opened_at))
+            opened_at = None
+        elif e.kind == "reopen" and opened_at is None:
+            opened_at = e.occurred_at
+    return total
 
 
 def compute_fact(inp: FactInputs) -> FactRow:
@@ -265,6 +315,10 @@ def compute_fact(inp: FactInputs) -> FactRow:
         owner_change_count=sum(1 for e in inp.events if e.kind == "owner"),
         article_in_count=sum(1 for a in articles if a.sender_type == "customer"),
         article_out_count=len(responses),
+        first_level_solved=first_level_solved(articles),
+        itsm_solution_working_minutes=open_span_minutes(
+            created, inp.events, lambda a, b: span(a, b)[2]
+        ),
         note_count=sum(1 for a in agent_articles if not a.visible),
         agent_touch_count=len({a.create_by for a in agent_articles}),
         accounted_time=inp.accounted_time,

@@ -411,7 +411,7 @@ def test_config_values_broken_topics_yield_empty_list_not_an_error() -> None:
 
 def test_chat_channel_reports_as_webchat() -> None:
     assert channel_key("WebChat") == "webchat"
-    assert FACT_VERSION == 2  # no bump: no WebChat rows exist before this deploy
+    assert FACT_VERSION == 3  # 3: ITSM columns; webchat added no bump
     assert LIST_CHANNELS["WebChat"] == "webchat"
 
 

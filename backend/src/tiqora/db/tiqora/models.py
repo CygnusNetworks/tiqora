@@ -1396,6 +1396,8 @@ class TiqoraReportTicketFact(TiqoraBase):
     article_out_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
+    first_level_solved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    itsm_solution_working_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     note_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     agent_touch_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
