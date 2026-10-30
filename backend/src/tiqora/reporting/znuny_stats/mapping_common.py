@@ -182,7 +182,10 @@ _DROPPED_PREFIXES: Final = (
     ("MIMEBase_", _NOT_SUPPORTED),
     ("DynamicField_", "Dynamische Felder stehen in Berichten noch nicht zur Verfügung."),
 )
-_FILE_IDS_REASON: Final = "IDs aus einer Exportdatei – bitte die Auswahl prüfen."
+_FILE_IDS_REASON: Final = (
+    "IDs aus einer Exportdatei lassen sich nicht zuordnen. "
+    "Solange Sie keine Auswahl treffen, zählt der Bericht alle Werte."
+)
 
 
 def dropped_reason(
@@ -195,6 +198,9 @@ def dropped_reason(
         if element.startswith(prefix):
             return reason
     return default
+
+
+_CMDB_KINDS: Final = ("cmdb_class", "cmdb_catalog")
 
 
 def file_ids_unreliable(
@@ -212,9 +218,6 @@ def file_ids_unreliable(
     if fmap.kind in _CMDB_KINDS:
         return any(_int(raw) is not None for raw in el.selected)
     return False
-
-
-_CMDB_KINDS: Final = ("cmdb_class", "cmdb_catalog")
 
 
 def _int(value: object) -> int | None:

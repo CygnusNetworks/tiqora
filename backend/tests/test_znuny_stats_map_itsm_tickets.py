@@ -96,10 +96,16 @@ def test_first_level_file_adds_closed_default() -> None:
     assert m.target == "report" and m.definition is not None
     d = m.definition
     assert sorted(p.field for p in d.parameters) == ["state", "type"]
+    assert (
+        "UseAsRestriction.StateIDs",
+        "Der Bericht zählt immer nur geschlossene Tickets; "
+        "wählen Sie einen offenen Status, bleibt das Ergebnis leer.",
+    ) in _issues(m, "approximated")
     assert all(p.default is None and p.op == "in" for p in d.parameters)
     assert (
         "UseAsRestriction.StateIDs",
-        "IDs aus einer Exportdatei – bitte die Auswahl prüfen.",
+        "IDs aus einer Exportdatei lassen sich nicht zuordnen. "
+        "Solange Sie keine Auswahl treffen, zählt der Bericht alle Werte.",
     ) in (_issues(m, "approximated"))
     assert d.filter is not None
     conds = _conditions(d.filter.where)

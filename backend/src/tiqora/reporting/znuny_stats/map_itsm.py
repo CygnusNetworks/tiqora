@@ -88,6 +88,18 @@ def _ticket_itsm(
         # Znuny counts closed tickets; a state selection that became a runtime parameter, or
         # none at all, must never let open tickets in.
         axes.conditions.append(Condition(field="state_type", op="in", value=["closed"]))
+        for el in stat.elements:
+            fmap = ELEMENT_FIELDS_TICKETS.get(el.element)
+            if fmap is not None and fmap.field in _STATE_FIELDS and el.selected:
+                issues.append(
+                    make_issue(
+                        element_ref(el),
+                        ", ".join(el.selected),
+                        "Der Bericht zählt immer nur geschlossene Tickets; "
+                        "wählen Sie einen offenen Status, bleibt das Ergebnis leer.",
+                        "approximated",
+                    )
+                )
     if axes.time_range is None:
         issues.append(make_issue("UseAsRestriction", "", _NO_PERIOD, "approximated"))
     n_dims = len(axes.dimensions)

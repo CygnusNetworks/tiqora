@@ -516,7 +516,6 @@ _ITSM_TARGET_CLASS, _ITSM_TARGET_CATALOG = 972701, 972711
 _ITSM_CLEANUP = (
     "DELETE FROM tiqora_itsm_import_map WHERE source_id IN ('972707', '972721', 'x972')",
     "DELETE FROM tiqora_cmdb_class WHERE id = 972741",
-    "DELETE FROM tiqora_settings WHERE {key} = 'itsm.mode'",
 )
 
 
