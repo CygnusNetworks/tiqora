@@ -543,6 +543,27 @@ async def _resolve_recipients(
     return recipients
 
 
+async def _event_actor(
+    session: AsyncSession, ticket: dict[str, object], article_id: int | None
+) -> int | None:
+    """The agent behind the event, for ``<OTRS_CURRENT_*>`` (Znuny: the event's UserID).
+
+    The outbox does not carry it: an article event belongs to the article's
+    author, any other event to the ticket's last editor (who just changed it).
+    """
+    if article_id is not None:
+        author = (
+            await session.execute(
+                text("SELECT create_by FROM article WHERE id = :aid AND ticket_id = :tid"),
+                {"aid": article_id, "tid": ticket["id"]},
+            )
+        ).scalar_one_or_none()
+        if author is not None:
+            return int(author)
+    editor = ticket.get("change_by")
+    return _as_int(editor) if editor else None
+
+
 async def _build_notification_context(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -552,6 +573,7 @@ async def _build_notification_context(
     article_id: int | None,
     recipient_kind: str,
     time_zone: str,
+    actor_id: int | None = None,
 ) -> PlaceholderContext:
     """Placeholder context for one event, one recipient *kind* and one *time_zone*.
 
@@ -562,8 +584,10 @@ async def _build_notification_context(
     kind and zone keeps a notification to 30-odd queue subscribers from
     replaying the same ticket/queue/customer lookups for every single mail.
     """
+    # Without the actor, <OTRS_CURRENT_*> would fall back to the owner: a note
+    # by one agent then read "<owner> wrote" in the owner's own mail.
     context = await load_placeholder_context(
-        session, ticket_id=_as_int(ticket["id"]), time_zone=time_zone
+        session, ticket_id=_as_int(ticket["id"]), user_id=actor_id, time_zone=time_zone
     )
     context.ticket_id = _as_int(ticket["id"])  # plugin placeholders read it
     # An absent/deleted article must not silently quote a later ticket message.
@@ -1040,6 +1064,7 @@ async def process_event(
     hook_cfg = await load_subject_config(session, sysconfig)
 
     event_article_id = _as_int(payload["article_id"]) if payload.get("article_id") else None
+    actor_id = await _event_actor(session, ticket, event_article_id)
     # Dates are written in each reader's zone: an agent's own preference, else
     # the system default (customers always get the default).
     default_zone = await default_time_zone(sysconfig)
@@ -1081,6 +1106,7 @@ async def process_event(
                         settings or get_settings(),
                         ticket=ticket,
                         article_id=event_article_id,
+                        actor_id=actor_id,
                         recipient_kind=recipient.kind,
                         time_zone=zone,
                     )
