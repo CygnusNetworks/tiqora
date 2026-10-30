@@ -345,7 +345,7 @@ const SERVICES: Record<string, string> = { "1": "E-Mail", "2": "Netzwerk", "3": 
 const SLAS: Record<string, string> = { "1": "Standard", "2": "Premium" };
 const CI_CLASSES: Record<string, string> = { "1": "Server", "2": "Standort", "3": "Netzwerkgerät" };
 const DEPLOYMENT_STATES: Record<string, string> = { "1": "Geplant", "2": "Produktiv", "3": "Außer Betrieb" };
-const INCIDENT_STATES: Record<string, string> = { "11": "Betriebsbereit", "12": "Warnung", "13": "Störung" };
+const INCIDENT_STATES: Record<string, string> = { "11": "Betriebsbereit", "12": "Warnung", "13": "Vorfall" };
 const CIS: Record<string, string> = {
   "101": "srv-db-01.example.org",
   "102": "srv-web-01.example.org",

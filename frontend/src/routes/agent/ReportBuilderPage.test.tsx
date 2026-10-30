@@ -179,6 +179,18 @@ describe("ReportBuilderPage", () => {
     expect(screen.getByTestId("builder-name")).toHaveAttribute("readonly");
   });
 
+  it("waits for the data bases before the editor opens, then locks an unavailable one at once", async () => {
+    let release: (v: ReturnType<typeof demoSources>) => void = () => {};
+    vi.spyOn(reportsApi, "sources").mockReturnValue(new Promise((res) => (release = res)));
+    vi.spyOn(reportsApi, "get").mockResolvedValue(saved({ definition: demoReport("builtin.itsm_changes_by_status")!.definition }));
+    renderAt("/agent/reports/41/edit", CAN);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByTestId("builder-save")).not.toBeInTheDocument();
+    await act(async () => release(demoSources().map((src) => ({ ...src, available: src.key !== "changes" }))));
+    expect(await screen.findByTestId("builder-source-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("builder-save")).toBeDisabled();
+  });
+
   it("shows no hint and saves normally on an available data basis", async () => {
     withUnavailable("changes");
     renderAt("/agent/reports/41/edit", CAN);
