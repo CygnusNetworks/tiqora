@@ -59,10 +59,12 @@ from tiqora.db.tiqora.models import TiqoraItsmImportMap, TiqoraJob, TiqoraSettin
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import get_registry, set_registry_for_tests
 from tiqora.gdpr.anonymize import anonymize_customer
-from tiqora.gdpr.erasure import rollback_job, run_erasure
+from tiqora.gdpr.erasure import ErasureError, rollback_job, run_erasure
 from tiqora.itsm.change.legacy import reader
 from tiqora.itsm.change.legacy.archive import (
     ARCHIVE_JOB_KIND,
+    KEY_CHANGED_MESSAGE,
+    KEY_CHECK_KIND,
     KIND_LEGACY_CHANGE,
     MODE_B_ONLY,
     NO_CHANGE_TABLES,
@@ -71,6 +73,7 @@ from tiqora.itsm.change.legacy.archive import (
     archive_blocker,
     archive_changes,
     change_from_data,
+    erase_legacy_change_customers,
     run_legacy_archive_job,
     with_ci_refs,
 )
@@ -80,6 +83,7 @@ from tiqora.itsm.change.legacy.redact import (
     TombstoneRedactor,
     erased_hash,
     erased_key,
+    key_check,
     redact_data,
 )
 from tiqora.itsm.change.legacy.sources import ArchiveSource, get_legacy_source, visible_links
@@ -414,7 +418,9 @@ async def test_archive_writes_no_znuny_change_table(
 # --- importer step ---------------------------------------------------------------------------
 
 
-def _step_ctx(w: World, *, run_id: int, dry_run: bool = False) -> StepContext:
+def _step_ctx(
+    w: World, *, run_id: int, dry_run: bool = False, settings: Settings = SETTINGS
+) -> StepContext:
     return StepContext(
         session_factory=w.factory,
         ports_for=lambda _s: pytest.fail("the change step needs no ports"),
@@ -427,7 +433,7 @@ def _step_ctx(w: World, *, run_id: int, dry_run: bool = False) -> StepContext:
         user_id=ADMIN,
         writer_for=lambda _s: pytest.fail("the change step writes no CI"),
         mapstore_for=lambda s: MapStore(s, run_id=run_id, read_only=dry_run),
-        settings=SETTINGS,
+        settings=settings,
     )
 
 
@@ -775,11 +781,24 @@ async def test_gdpr_erasure_anonymises_cab_customer(
 
 
 async def _tombstones(w: World) -> list[tuple[str, str]]:
+    """The tombstones (not the key check row)."""
     async with w.factory() as s:
         rows = await s.execute(
-            select(TiqoraItsmLegacyErased.identifier_hash, TiqoraItsmLegacyErased.kind)
+            select(TiqoraItsmLegacyErased.identifier_hash, TiqoraItsmLegacyErased.kind).where(
+                TiqoraItsmLegacyErased.kind != KEY_CHECK_KIND
+            )
         )
         return sorted((str(h).strip(), str(k)) for h, k in rows.all())
+
+
+async def _key_checks(w: World) -> list[str]:
+    async with w.factory() as s:
+        rows = await s.execute(
+            select(TiqoraItsmLegacyErased.identifier_hash).where(
+                TiqoraItsmLegacyErased.kind == KEY_CHECK_KIND
+            )
+        )
+        return sorted(str(h).strip() for (h,) in rows.all())
 
 
 async def _customer(s: AsyncSession, login: str, email: str) -> int:
@@ -966,7 +985,9 @@ async def test_erasure_of_numeric_login_leaves_links_intact(
 async def _tombstone_jobs(w: World) -> list[tuple[str, int | None]]:
     async with w.factory() as s:
         rows = await s.execute(
-            select(TiqoraItsmLegacyErased.identifier_hash, TiqoraItsmLegacyErased.job_id)
+            select(TiqoraItsmLegacyErased.identifier_hash, TiqoraItsmLegacyErased.job_id).where(
+                TiqoraItsmLegacyErased.kind != KEY_CHECK_KIND
+            )
         )
         return sorted(
             ((str(h).strip(), None if j is None else int(j)) for h, j in rows.all()),
@@ -1159,3 +1180,159 @@ async def test_cli_anonymisation_also_leaves_tombstones(
         await _edit_mail(w, 8)
         assert _counts(await _archive(w)) == (0, 1, 2, 0)
         assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+
+
+# --- final review: the tombstone key (B-I2), tombstones during a page (B-M4) -----------------
+
+#: the site secret after a rotation; with ``itsm_legacy_erased_key`` = the old secret
+_AFTER_ROTATION = "chg94" + "-rotated" * 5
+ROTATED = Settings(environment="test", secret_key=_AFTER_ROTATION)
+PINNED = Settings(
+    environment="test", secret_key=_AFTER_ROTATION, itsm_legacy_erased_key=SETTINGS.secret_key
+)
+CUSTOMER4, CUSTOMER4_MAIL = "chg94.vierte", "chg94-vierte@example.org"
+
+
+async def _stored(w: World) -> dict[int, tuple[str, str]]:
+    return {z: (r.data, r.fingerprint) for z, r in (await _rows(w)).items()}
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_rotated_key_refuses_instead_of_unredacting(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """``TIQORA_SECRET_KEY`` rotated: the admin job fails, the import step reports
+    ``archive_key_changed``, an erasure is refused; nothing is written. With
+    ``TIQORA_ITSM_LEGACY_ERASED_KEY`` = the old secret the archive runs and stays redacted."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            customer_id = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            other_id = await _customer(s, CUSTOMER4, CUSTOMER4_MAIL)
+            await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+            await s.commit()
+        await _archive(w)
+        await _erase(w, customer_id)
+        # the first tombstone stored the check value of the key it was written with
+        assert await _key_checks(w) == [key_check(erased_key(SETTINGS))]
+        assert key_check(erased_key(ROTATED)) != key_check(erased_key(SETTINGS))
+        assert erased_key(PINNED) == erased_key(SETTINGS)
+        await _edit_mail(w, 8)  # Znuny changed: a run would rewrite the row from Znuny
+        before = await _stored(w)
+
+        with pytest.raises(JobFailed) as failed:
+            await run_legacy_archive_job(
+                JobContext(
+                    job_id=0,
+                    kind=ARCHIVE_JOB_KIND,
+                    created_by=ADMIN,
+                    settings=ROTATED,
+                    session_factory=w.factory,
+                ),
+                LegacyArchivePayload(user_id=ADMIN),
+            )
+        assert failed.value.message == KEY_CHANGED_MESSAGE
+        assert "TIQORA_ITSM_LEGACY_ERASED_KEY" in KEY_CHANGED_MESSAGE
+
+        ctx = _step_ctx(w, run_id=RUN_ARCHIVE + 7, settings=ROTATED)
+        await run_changes(ctx)
+        issues = [i for i in ctx.report.issues if i.step == STEP_CHANGES]
+        assert [i.code for i in issues] == ["archive_key_changed"]
+        counts = ctx.report.steps[STEP_CHANGES]
+        assert (counts.created, counts.updated, counts.unchanged, counts.problems) == (0, 0, 0, 1)
+
+        with pytest.raises(ErasureError) as refused:
+            await run_erasure(
+                w.factory,
+                ROTATED,
+                customer_user_ids=[other_id],
+                mode="anonymize",
+                seed=7,
+                force_parallel=True,
+                actor="test",
+            )
+        assert str(refused.value) == KEY_CHANGED_MESSAGE
+        async with w.factory() as s:
+            login = (
+                await s.execute(
+                    text("SELECT login FROM customer_user WHERE id = :i"), {"i": other_id}
+                )
+            ).scalar_one()
+        assert login == CUSTOMER4  # the erasure rolled back as a whole
+        assert await _stored(w) == before  # nothing rewritten anywhere
+
+        report = await archive_changes(
+            w.factory,
+            run_id=RUN_ARCHIVE,
+            dry_run=False,
+            page_size=2,
+            progress=_noop,
+            check_cancelled=_noop,
+            report=ArchiveReport(),
+            settings=PINNED,
+        )
+        assert _counts(report) == (0, 1, 2, 0)
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+        assert ("customer_user", CUSTOMER2, 0) not in await _refs(w, MAIL)
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_tombstone_committed_during_a_page_counts(
+    dialect: str, profile: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B-M4: the tombstones are read again (in a session of their own) after the Znuny read,
+    right before the page writes; an erasure that committed meanwhile is redacted at once."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+            await s.commit()
+        real = reader.read_changes
+        erased: list[bool] = []
+
+        async def read_then_erase(session: AsyncSession, ids: Any) -> Any:
+            found = await real(session, ids)
+            if not erased:  # a concurrent erasure commits while the page is being read
+                erased.append(True)
+                async with w.factory() as other:
+                    other.add(
+                        TiqoraItsmLegacyErased(
+                            identifier_hash=erased_hash(erased_key(SETTINGS), CUSTOMER2),
+                            kind="login",
+                            job_id=None,
+                            created=at(6, 1),
+                        )
+                    )
+                    await other.commit()
+            return found
+
+        monkeypatch.setattr(reader, "read_changes", read_then_erase)
+        await _archive(w, page_size=500)
+        stored = (await _rows(w))[MAIL]
+        assert _absent(stored.data, CUSTOMER2)
+        assert ("customer_user", CUSTOMER2, 0) not in await _refs(w, MAIL)
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_tombstones_without_a_job_are_not_duplicated(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """The unique key (hash, job) treats NULL jobs as distinct; the writer's existence check
+    keeps one CLI tombstone per identifier, and one key check row."""
+    async with archive_world(request, dialect, profile) as w:
+        for _ in range(2):
+            async with w.factory() as s:
+                counts = await erase_legacy_change_customers(
+                    s,
+                    replacements={CUSTOMER2: "chg94-token"},
+                    emails=[CUSTOMER2_MAIL],
+                    add_backup=_noop,
+                    settings=SETTINGS,
+                    job_id=None,
+                )
+                await s.commit()
+        assert counts["tiqora_itsm_legacy_erased"] == 0  # the second run added none
+        key = erased_key(SETTINGS)
+        assert await _tombstone_jobs(w) == sorted(
+            [(erased_hash(key, CUSTOMER2), None), (erased_hash(key, CUSTOMER2_MAIL), None)],
+            key=lambda t: (t[0], t[1] or 0),
+        )
+        assert await _key_checks(w) == [key_check(key)]

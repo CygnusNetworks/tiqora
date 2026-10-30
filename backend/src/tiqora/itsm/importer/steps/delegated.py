@@ -6,7 +6,8 @@ of ``service``) through itsm1's import functions (facades); they work without th
 dry run only counts the source rows (``skipped``). ``changes`` archives Znuny's changes with their
 work orders read-only into Tiqora (``tiqora.itsm.change.legacy.archive``; created / updated /
 unchanged per change) and reports the templates, conditions and notification rules it leaves in
-Znuny (``not_archived``). ``deleted_in_znuny`` only reports: a CI that was
+Znuny (``not_archived``); under a changed tombstone key it archives nothing and reports
+``archive_key_changed``. ``deleted_in_znuny`` only reports: a CI that was
 imported and is gone from Znuny stays in Tiqora. ``incident_states`` runs cmdb's ``finish_import``
 (search index, class counters, derived incident states) for every CI marked unfinished (map kind
 ``finish``): new versions or new CI links of this run or of an earlier run that ended early.
@@ -17,7 +18,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from tiqora.db.tiqora.models import TiqoraCmdbCi
-from tiqora.itsm.change.legacy.archive import ArchiveReport, archive_changes
+from tiqora.itsm.change.legacy.archive import ArchiveReport, ErasedKeyChanged, archive_changes
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.mapstore import fingerprint
 from tiqora.itsm.importer.steps import KIND_FINISH, StepContext
@@ -117,16 +118,30 @@ async def run_changes(ctx: StepContext) -> None:
     nothing."""
     ctx.report.start_step(STEP_CHANGES)
     await ctx.check_cancelled()
-    archived = await archive_changes(
-        ctx.session_factory,
-        run_id=ctx.run_id,
-        dry_run=ctx.dry_run,
-        page_size=ctx.page_size,
-        progress=ctx.progress,
-        check_cancelled=ctx.check_cancelled,
-        report=ArchiveReport(),
-        settings=ctx.settings,
-    )
+    try:
+        archived = await archive_changes(
+            ctx.session_factory,
+            run_id=ctx.run_id,
+            dry_run=ctx.dry_run,
+            page_size=ctx.page_size,
+            progress=ctx.progress,
+            check_cancelled=ctx.check_cancelled,
+            report=ArchiveReport(),
+            settings=ctx.settings,
+        )
+    except ErasedKeyChanged:
+        # nothing was written; the other steps of the run go on
+        ctx.report.issue(
+            STEP_CHANGES,
+            "archive_key_changed",
+            "TIQORA_ITSM_LEGACY_ERASED_KEY",
+            "Change-Archiv nicht aktualisiert: der Schlüssel für gelöschte Kunden hat sich "
+            "geändert; setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen "
+            "TIQORA_SECRET_KEY",
+        )
+        ctx.report.count(STEP_CHANGES, "problems")
+        await ctx.progress(1, 1, STEP_CHANGES)
+        return
     for name in ("created", "updated", "unchanged", "skipped"):
         ctx.report.count(STEP_CHANGES, name, getattr(archived, name))
     for kind in sorted(archived.not_archived):

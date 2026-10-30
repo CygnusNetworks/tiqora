@@ -47,6 +47,7 @@ and never commit real credentials.
 | `MEILI_URL` | `http://meilisearch:7700` | |
 | `MEILI_MASTER_KEY` | strong secret | Production required |
 | `TIQORA_SECRET_KEY` | random 32+ bytes | Cookie/session material |
+| `TIQORA_ITSM_LEGACY_ERASED_KEY` | *(empty)* | Optional. Key of the GDPR tombstones in the archive of Znuny changes; empty means `TIQORA_SECRET_KEY`. After rotating `TIQORA_SECRET_KEY`, set it to the **previous** `TIQORA_SECRET_KEY` (see below). Secret like the others; never logged. |
 | `TIQORA_LOG_LEVEL` | `INFO` | |
 | `TIQORA_CORS_ORIGINS` | `https://helpdesk.example.com` | Comma-separated |
 | `TIQORA_SESSION_TTL` | `3600` | Session lifetime in seconds (1h). **Sliding** — renewed on every authenticated request, so effectively the max idle time. SSO/Kerberos agents re-auth transparently on expiry. Also governs customer-portal sessions. |
@@ -606,8 +607,11 @@ in the `worker` (`core.itsm_change_tasks`, `core.itsm_change_impact`, and
 |---|---|---|
 | `TIQORA_ITSM_CHANGE_INTERVAL` | `3600` (60-86400) | Seconds between two ticks of the worker service `itsm_change` ("Change-Auswirkung aktualisieren"). A tick queues the impact job for active changes whose stored impact is older than `itsm_change.impact_refresh_hours` (default 24), at most 200 per tick. The Dienste page can override the interval (`daemon.itsm_change.interval_seconds`) and switch the service off (`daemon.itsm_change.enabled`, default on). Outside Mode B a tick does nothing. |
 
-The legacy change archive stores hashes of erased customers keyed with `TIQORA_SECRET_KEY`; rotating the
-key makes those tombstones unusable, so erased customers can reappear with the next archive run (see
+The legacy change archive stores hashes of erased customers keyed with `TIQORA_ITSM_LEGACY_ERASED_KEY`, or
+`TIQORA_SECRET_KEY` while that is empty, plus a check value of the key. After a rotation of
+`TIQORA_SECRET_KEY` the archive job fails, the import step `changes` reports `archive_key_changed` and GDPR
+erasures and their rollback are refused (nothing is written, so no erased customer reappears) until
+`TIQORA_ITSM_LEGACY_ERASED_KEY` is set to the previous `TIQORA_SECRET_KEY` on API and worker (see
 [itsm-import.md](itsm-import.md)).
 
 ## Upgrading to v0.19.0 (wave 4)

@@ -1161,8 +1161,11 @@ Hintergrundaufträge verfolgen Sie über `GET /api/v1/jobs/{id}`. Zeiten sind UT
 - **Change-Archiv.** Wird ein Kunde gelöscht, ersetzt Tiqora seinen Login und seine Adresse in
   archivierten Znuny-Changes (CAB, Verlauf, Texte) durch das Pseudonym seiner Tickets beziehungsweise
   „[gelöscht]“ und merkt sich nur einen geschlüsselten Hash. Ein späterer Archiv-Lauf holt die Person
-  deshalb nicht zurück. Der Schlüssel ist `TIQORA_SECRET_KEY`: Wird er gewechselt, greifen die
-  Merkzettel nicht mehr, und gelöschte Kunden können mit einem neuen Archiv-Lauf zurückkommen.
+  deshalb nicht zurück. Der Schlüssel ist `TIQORA_ITSM_LEGACY_ERASED_KEY`, ohne diese Variable
+  `TIQORA_SECRET_KEY`. Tiqora speichert einen Prüfwert des Schlüssels: Wird `TIQORA_SECRET_KEY`
+  gewechselt, schreiben Archiv-Lauf und Import-Schritt nichts (Meldung `archive_key_changed`), und
+  Löschungen und ihre Rücknahme werden abgelehnt, bis `TIQORA_ITSM_LEGACY_ERASED_KEY` auf den
+  bisherigen `TIQORA_SECRET_KEY` gesetzt ist; gelöschte Kunden kommen so nicht ungeschwärzt zurück.
   Benachrichtigungszeilen im Znuny-Verlauf enthalten Empfängeradressen und werden genauso behandelt.
 - Znunys eigene Tabellen `change_*` berührt die Löschung nie: In Modus A führt Znuny, dort löschen Sie
   selbst.

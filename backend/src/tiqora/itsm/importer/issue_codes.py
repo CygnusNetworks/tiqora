@@ -71,4 +71,9 @@ ISSUE_CODES: dict[str, str] = {
         "Change-Vorlagen, Bedingungen und Benachrichtigungsregeln von Znuny werden nicht "
         "übernommen, sie wurden nur gezählt"
     ),
+    "archive_key_changed": (
+        "Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (TIQORA_SECRET_KEY "
+        "gewechselt); das Archiv wurde nicht aktualisiert, damit gelöschte Kunden nicht "
+        "zurückkommen. TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY setzen"
+    ),
 }

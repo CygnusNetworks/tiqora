@@ -476,17 +476,21 @@ class TiqoraItsmLegacyErased(TiqoraBase):
     Only a keyed hash (HMAC-SHA256 of the lowercased identifier,
     ``tiqora.itsm.change.legacy.redact.erased_hash``) is stored, never the identifier itself.
     One row per erasure job and identifier: rolling one job back removes its rows only, so an
-    identifier another erasure still holds stays erased.
+    identifier another erasure still holds stays erased. One more row of kind ``check`` holds the
+    check value of the key the tombstones were written with (``redact.key_check``): a run under
+    another key refuses.
     """
 
     __tablename__ = "tiqora_itsm_legacy_erased"
     __table_args__ = (
+        # NULL job ids (the CLI anonymisation, the key check) are distinct for the unique key on
+        # both dialects: the writer looks for an existing row first (``archive._add_tombstones``)
         UniqueConstraint("identifier_hash", "job_id", name="uq_tiqora_itsm_legacy_erased_hash_job"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     identifier_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
-    #: ``login`` | ``email``
+    #: ``login`` | ``email`` | ``check`` (the key check row, not a tombstone)
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     #: ``tiqora_gdpr_job.id`` (by value); ``NULL`` for the CLI anonymisation, which has no job
     #: and no rollback

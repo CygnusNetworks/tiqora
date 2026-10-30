@@ -59,7 +59,11 @@ from tiqora.gdpr.saved_criteria import (
 )
 from tiqora.gi.debug_store import delete_debug_entries_for_tickets
 from tiqora.itsm.change.legacy.archive import GDPR_TABLES as LEGACY_CHANGE_GDPR_TABLES
-from tiqora.itsm.change.legacy.archive import erase_legacy_change_customers, redact_restored_changes
+from tiqora.itsm.change.legacy.archive import (
+    ErasedKeyChanged,
+    erase_legacy_change_customers,
+    redact_restored_changes,
+)
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -2578,8 +2582,8 @@ async def run_erasure(
         # recipients (S5) is pseudonymised / redacted, their lookup rows go, and a tombstone
         # keeps them out of every later archive run (rollback deletes the new tombstones).
         if await _table_exists(session, "tiqora_itsm_legacy_change"):
-            counts.update(
-                await erase_legacy_change_customers(
+            try:
+                erased_legacy = await erase_legacy_change_customers(
                     session,
                     replacements=login_to_new,
                     emails=erased_emails,
@@ -2587,7 +2591,9 @@ async def run_erasure(
                     settings=settings,
                     job_id=job_id,
                 )
-            )
+            except ErasedKeyChanged as exc:  # the whole erasure rolls back (fail closed)
+                raise ErasureError(exc.message) from exc
+            counts.update(erased_legacy)
         # GenericInterface debugger lines hold payloads of these tickets (customer names,
         # addresses). Debug logs are disposable, so they go in every mode, without backup.
         if ticket_ids:
@@ -2897,9 +2903,12 @@ async def rollback_job(
                         created=backup_now,
                     )
 
-            await redact_restored_changes(
-                session, legacy_change_ids, settings=settings, add_backup_for=_backup_for
-            )
+            try:
+                await redact_restored_changes(
+                    session, legacy_change_ids, settings=settings, add_backup_for=_backup_for
+                )
+            except ErasedKeyChanged as exc:  # the rollback rolls back as a whole
+                raise ErasureError(exc.message) from exc
 
         # Fix anonymize-mode login renames on related tables: after customer_user
         # is restored, rename related user_id from new→old using job.resolved_logins

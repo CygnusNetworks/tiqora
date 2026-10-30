@@ -449,9 +449,13 @@ Change management ([itsm.md](itsm.md#8-change-management), Mode B) keeps a recor
   `[gelöscht]`, and the `customer_user` lookup rows are deleted. A tombstone
   (`tiqora_itsm_legacy_erased`: an HMAC-SHA256 of the lowercased login or address keyed with the site
   secret, never the value) makes every later archive write redact the person again, also in changes
-  archived for the first time later. Rotating `TIQORA_SECRET_KEY` invalidates the tombstones, so erased
-  customers can come back with the next archive run. Rollback restores the rows and deletes the job's
-  tombstones.
+  archived for the first time later. The key is `TIQORA_ITSM_LEGACY_ERASED_KEY`, else
+  `TIQORA_SECRET_KEY`; the first tombstone stores a check value of it (a row of kind `check`). After
+  `TIQORA_SECRET_KEY` is rotated the check no longer matches: archive runs (admin job and import step
+  `changes`, issue `archive_key_changed`), erasures and their rollback refuse and write nothing, instead
+  of letting erased customers come back unredacted. Set `TIQORA_ITSM_LEGACY_ERASED_KEY` to the previous
+  `TIQORA_SECRET_KEY` to go on. Rollback restores the rows and deletes the job's tombstones (the check
+  row stays).
 - Znuny's own `change_*` tables are never touched (in Mode A Znuny leads; erase there).
 
 ### Caveats

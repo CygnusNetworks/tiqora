@@ -58,15 +58,25 @@ _CHANGE_TEXTS: Final = ("title", "description", "justification")
 _WORD: Final = re.compile(r"[\w.@+-]+")
 _EDGES: Final = ".-"
 _KEY_LABEL: Final = b"itsm-legacy-erased-v1"
+#: upper case: :func:`erased_hash` lowercases every identifier, so no identifier hashes to it
+_CHECK_LABEL: Final = b"ITSM-LEGACY-ERASED-KEY-CHECK-V1"
 
 
 def erased_key(settings: Settings) -> bytes:
-    """The tombstone HMAC key, derived from the site secret (``TIQORA_SECRET_KEY``).
+    """The tombstone HMAC key, derived from ``TIQORA_ITSM_LEGACY_ERASED_KEY``, else from the
+    site secret (``TIQORA_SECRET_KEY``).
 
     The one source of the key: the erasure, the archive job and the importer step all pass
     their settings here, so their hashes agree. Derive it once per run, not per word.
     """
-    return hmac.new(settings.secret_key.encode("utf-8"), _KEY_LABEL, hashlib.sha256).digest()
+    secret = settings.itsm_legacy_erased_key or settings.secret_key
+    return hmac.new(secret.encode("utf-8"), _KEY_LABEL, hashlib.sha256).digest()
+
+
+def key_check(key: bytes) -> str:
+    """The check value of a tombstone key (HMAC-SHA256 hex of a fixed label), stored once next
+    to the tombstones: a run under another key finds a different value and refuses."""
+    return hmac.new(key, _CHECK_LABEL, hashlib.sha256).hexdigest()
 
 
 def erased_hash(key: bytes, identifier: str) -> str:

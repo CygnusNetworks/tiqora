@@ -746,9 +746,13 @@ Benachrichtigungsregeln, die in Znuny bleiben. Ein Probelauf zählt genauso und 
   es läuft also immer nur ein ITSM-Massenauftrag.
 - **Datenschutz.** Wird ein Kunde gelöscht, ersetzt Tiqora seinen Login (CAB, Verlauf, Texte) durch das Pseudonym
   seiner Tickets und seine Adresse durch „[gelöscht]“ und hinterlegt einen geschlüsselten Hash (HMAC mit
-  `TIQORA_SECRET_KEY`, nie den Wert selbst). Jeder spätere Lauf schreibt gegen diese Hashes geschwärzt, auch einen
-  Change, der erst danach ins Archiv kommt. Wird `TIQORA_SECRET_KEY` gewechselt, passen die Hashes nicht mehr, und
-  gelöschte Kunden können mit dem nächsten Lauf zurückkommen. Znunys Tabellen `change_*` ändert die Löschung nie.
+  `TIQORA_ITSM_LEGACY_ERASED_KEY`, ohne diese Variable mit `TIQORA_SECRET_KEY`; nie den Wert selbst). Jeder spätere
+  Lauf schreibt gegen diese Hashes geschwärzt, auch einen Change, der erst danach ins Archiv kommt. Mit dem ersten
+  Hash speichert Tiqora einen Prüfwert des Schlüssels. Wird `TIQORA_SECRET_KEY` gewechselt, passt der Prüfwert nicht
+  mehr: Der Schritt schreibt dann nichts und meldet `archive_key_changed` (der eigenständige Archiv-Auftrag schlägt
+  mit derselben Meldung fehl, Löschungen und ihre Rücknahme werden abgelehnt), statt gelöschte Kunden wieder
+  ungeschwärzt zu speichern. Setzen Sie dann `TIQORA_ITSM_LEGACY_ERASED_KEY` auf den bisherigen
+  `TIQORA_SECRET_KEY`. Znunys Tabellen `change_*` ändert die Löschung nie.
 
 ### Wiederholen und Abgleich
 
@@ -788,6 +792,7 @@ einen Text. Die Codes bedeuten:
 | `priority_matrix_invalid` | Die Prioritätsmatrix von Znuny verweist auf eine Priorität, die es nicht gibt; die Matrix wurde nicht übernommen |
 | `service_unknown` | Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden nicht übernommen |
 | `not_archived` | Change-Vorlagen, Bedingungen und Benachrichtigungsregeln von Znuny werden nicht übernommen, sie wurden nur gezählt |
+| `archive_key_changed` | Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (`TIQORA_SECRET_KEY` gewechselt); der Schritt hat nichts geschrieben, damit gelöschte Kunden nicht zurückkommen. Setzen Sie `TIQORA_ITSM_LEGACY_ERASED_KEY` auf den bisherigen `TIQORA_SECRET_KEY` und wiederholen Sie den Import |
 
 Die Codes und Erklärungen stehen auch in `backend/src/tiqora/itsm/importer/issue_codes.py`; ein Test
 (`test_itsm_import_issue_codes.py`) stellt sicher, dass Code, Tabelle und Importer übereinstimmen.

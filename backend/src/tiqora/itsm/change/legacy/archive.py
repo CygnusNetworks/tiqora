@@ -23,7 +23,11 @@ Notification history rows hold recipient addresses (ruling S5): nothing here log
 history values. :func:`erase_legacy_change_customers` removes an erased customer from the archive
 and leaves a tombstone (``tiqora_itsm_legacy_erased``, a keyed hash only); every write of the
 archive redacts against all tombstones (:mod:`tiqora.itsm.change.legacy.redact`), so the person
-never re-enters it, also through a change archived for the first time later. The fingerprint is
+never re-enters it, also through a change archived for the first time later. The tombstones are
+keyed (:func:`~tiqora.itsm.change.legacy.redact.erased_key`); a key check row (``kind="check"``)
+written with the first tombstone makes a run under another key (``TIQORA_SECRET_KEY`` rotated
+without ``TIQORA_ITSM_LEGACY_ERASED_KEY``) refuse instead of storing erased customers again
+(:class:`ErasedKeyChanged`; nothing is written). The fingerprint is
 taken of the unredacted form; a row is written again when its fingerprint or the set of
 tombstones it was redacted for (``data["redacted"]``) differs.
 
@@ -60,6 +64,7 @@ from tiqora.itsm.change.legacy.redact import (
     TombstoneRedactor,
     erased_hash,
     erased_key,
+    key_check,
     redact_data,
     redacted_hashes,
 )
@@ -103,6 +108,25 @@ REF_CUSTOMER: Final = "customer_user"
 GDPR_TABLES: Final = ("tiqora_itsm_legacy_change", "tiqora_itsm_legacy_change_ref")
 #: backup table name of a tombstone the erasure created (``rollback_job`` deletes it again)
 TOMBSTONE_CREATED: Final = "tiqora_itsm_legacy_erased:created"
+#: ``tiqora_itsm_legacy_erased.kind`` of the key check row (:func:`redact.key_check`); it is not
+#: a tombstone, has no job and is never backed up, so a rollback keeps it
+KEY_CHECK_KIND: Final = "check"
+KEY_CHANGED_MESSAGE: Final = (
+    "Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (wurde "
+    "TIQORA_SECRET_KEY gewechselt?). Mit dem neuen Schlüssel kämen gelöschte Kunden "
+    "unredigiert ins Archiv zurück, deshalb wird nichts geschrieben. Setzen Sie "
+    "TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY und starten Sie den "
+    "Vorgang erneut."
+)
+
+
+class ErasedKeyChanged(Exception):
+    """Tombstones exist under another key than the current one (see the module docstring)."""
+
+    def __init__(self) -> None:
+        super().__init__(KEY_CHANGED_MESSAGE)
+        self.message = KEY_CHANGED_MESSAGE
+
 
 _TITLE_MAX: Final = 250
 _NAME_MAX: Final = 200
@@ -314,8 +338,46 @@ def _stored_hashes(raw: str) -> set[str]:
 
 async def load_tombstones(session: AsyncSession) -> set[str]:
     """Every erased identifier's hash (distinct; one row per erasure job and identifier)."""
-    rows = await session.execute(select(TiqoraItsmLegacyErased.identifier_hash).distinct())
+    table = TiqoraItsmLegacyErased
+    rows = await session.execute(
+        select(table.identifier_hash).where(table.kind != KEY_CHECK_KIND).distinct()
+    )
     return {str(r[0]).strip() for r in rows}
+
+
+async def _has_tombstones(session: AsyncSession) -> bool:
+    table = TiqoraItsmLegacyErased
+    found = await session.execute(select(table.id).where(table.kind != KEY_CHECK_KIND).limit(1))
+    return found.first() is not None
+
+
+async def _stored_checks(session: AsyncSession) -> set[str]:
+    table = TiqoraItsmLegacyErased
+    rows = await session.execute(select(table.identifier_hash).where(table.kind == KEY_CHECK_KIND))
+    return {str(r[0]).strip() for r in rows}
+
+
+async def require_erased_key(session: AsyncSession, key: bytes) -> None:
+    """Raise :class:`ErasedKeyChanged` when tombstones exist and the stored key check is not the
+    one of ``key`` (reads only). Without a check row there is nothing to compare."""
+    checks = await _stored_checks(session)
+    if checks and key_check(key) not in checks and await _has_tombstones(session):
+        raise ErasedKeyChanged
+
+
+async def _ensure_key_check(session: AsyncSession, key: bytes) -> None:
+    """Before a tombstone is written: refuse under a changed key, else make sure the check row
+    of ``key`` exists (a stale one without any tombstone left is replaced)."""
+    await require_erased_key(session, key)
+    check = key_check(key)
+    checks = await _stored_checks(session)
+    if check in checks:
+        return
+    table = TiqoraItsmLegacyErased
+    if checks:
+        await session.execute(delete(table).where(table.kind == KEY_CHECK_KIND))
+    session.add(table(identifier_hash=check, kind=KEY_CHECK_KIND, job_id=None, created=utc_now()))
+    await session.flush()
 
 
 def redact_for_storage(
@@ -367,11 +429,13 @@ async def _archive_batch(
     dry_run: bool,
     report: ArchiveReport,
     key: bytes,
-    tombstones: Collection[str],
+    tombstones: Callable[[], Awaitable[Collection[str]]],
 ) -> None:
-    """At most :data:`reader.MAX_READ` changes (flush only)."""
+    """At most :data:`reader.MAX_READ` changes (flush only). ``tombstones`` is called after the
+    Znuny read, right before the writes: an erasure committed while the page was read counts."""
     changes = await reader.read_changes(session, ids)
     report.skipped += len(ids) - len(changes)
+    erased = await tombstones()
     ci_keys = sorted({li.key for c in changes for li in c.links if li.object == reader.CI_OBJECT})
     targets = {k: e.target_id for k, e in (await store.get_many(KIND_CI, ci_keys)).items()}
     known = await store.get_many(KIND_LEGACY_CHANGE, [str(c.znuny_change_id) for c in changes])
@@ -390,7 +454,7 @@ async def _archive_batch(
         source_id = str(change.znuny_change_id)
         stored = with_ci_refs(change, targets)
         fp = fingerprint(stored)  # of the unredacted form: Znuny unchanged -> unchanged
-        data, hits = redact_for_storage(stored, key, tombstones)
+        data, hits = redact_for_storage(stored, key, erased)
         row = rows.get(change.znuny_change_id)
         if row is not None and row.fingerprint == fp and _stored_hashes(row.data) == hits:
             report.unchanged += 1
@@ -436,15 +500,24 @@ async def archive_changes(
 ) -> ArchiveReport:
     """Archive every Znuny change into ``report`` (one session and commit per page of
     ``page_size`` ids; cancellation is checked before each page). Without the change tables
-    nothing happens. ``settings`` give the tombstone key (:func:`redact.erased_key`)."""
+    nothing happens. ``settings`` give the tombstone key (:func:`redact.erased_key`); under a
+    changed key the run refuses before it writes anything (:class:`ErasedKeyChanged`)."""
     key = erased_key(settings)
     async with session_factory() as session:
         if not await reader.change_tables_present(session):
             return report
+        await require_erased_key(session, key)
         total = await reader.count_changes(session)
         report.not_archived = {
             kind: n for kind, n in (await reader.not_archived_counts(session)).items() if n > 0
         }
+
+    async def fresh_tombstones() -> set[str]:
+        # a session of its own: a fresh snapshot on both dialects (the page's transaction keeps
+        # its first one on MariaDB, REPEATABLE READ)
+        async with session_factory() as fresh:
+            return await load_tombstones(fresh)
+
     after = 0
     done = 0
     await progress(0, total, PROGRESS_LABEL)
@@ -459,7 +532,6 @@ async def archive_changes(
                 run_id=STANDALONE_RUN_ID if run_id is None else run_id,
                 read_only=dry_run,
             )
-            tombstones = await load_tombstones(session)
             for part in chunks(ids, reader.MAX_READ):
                 await _archive_batch(
                     session,
@@ -469,7 +541,7 @@ async def archive_changes(
                     dry_run=dry_run,
                     report=report,
                     key=key,
-                    tombstones=tombstones,
+                    tombstones=fresh_tombstones,
                 )
             if dry_run:
                 await session.rollback()
@@ -531,16 +603,19 @@ async def run_legacy_archive_job(ctx: JobContext, payload: Any) -> dict[str, Any
         blocked = await archive_blocker(session)
     if blocked is not None:
         raise JobFailed(blocked.message)
-    report = await archive_changes(
-        ctx.session_factory,
-        run_id=None,
-        dry_run=payload.dry_run,
-        page_size=payload.page_size,
-        progress=ctx.progress,
-        check_cancelled=ctx.check_cancelled,
-        report=ArchiveReport(),
-        settings=ctx.settings,
-    )
+    try:
+        report = await archive_changes(
+            ctx.session_factory,
+            run_id=None,
+            dry_run=payload.dry_run,
+            page_size=payload.page_size,
+            progress=ctx.progress,
+            check_cancelled=ctx.check_cancelled,
+            report=ArchiveReport(),
+            settings=ctx.settings,
+        )
+    except ErasedKeyChanged as exc:
+        raise JobFailed(exc.message) from exc
     return {"dry_run": payload.dry_run, **report.as_dict()}
 
 
@@ -637,11 +712,16 @@ async def _add_tombstones(
 ) -> int:
     """One tombstone of this job per ``(kind, identifier)``; each new one is backed up as
     created, so a rollback of the job deletes its own rows only and an identifier another
-    erasure also holds stays erased."""
+    erasure also holds stays erased. Rows without a job (the CLI anonymisation) are matched
+    with ``job_id IS NULL`` before the insert: the unique key treats NULLs as distinct.
+    Refuses (:class:`ErasedKeyChanged`) when the tombstones were written under another key."""
     wanted: dict[str, str] = {}
     for kind, identifier in identifiers:
         if identifier and identifier.strip():
             wanted.setdefault(erased_hash(key, identifier), kind)
+    if not wanted:
+        return 0
+    await _ensure_key_check(session, key)
     table = TiqoraItsmLegacyErased
     mine = table.job_id.is_(None) if job_id is None else table.job_id == job_id
     known: set[str] = set()
@@ -766,7 +846,10 @@ async def _tombstone_holders(session: AsyncSession) -> dict[str, set[int]]:
     """Each erased hash -> the erasure jobs holding it (empty: only the CLI anonymisation)."""
     holders: dict[str, set[int]] = {}
     table = TiqoraItsmLegacyErased
-    for digest, job in await session.execute(select(table.identifier_hash, table.job_id)):
+    rows = await session.execute(
+        select(table.identifier_hash, table.job_id).where(table.kind != KEY_CHECK_KIND)
+    )
+    for digest, job in rows:
         jobs = holders.setdefault(str(digest).strip(), set())
         if job is not None:
             jobs.add(int(job))
@@ -794,6 +877,8 @@ async def redact_restored_changes(
     if not holders:
         return 0
     key = erased_key(settings)
+    # under a changed key nothing would match: the restored rows would stay unredacted
+    await require_erased_key(session, key)
     changed = 0
     table = TiqoraItsmLegacyChange
     ref = TiqoraItsmLegacyChangeRef
