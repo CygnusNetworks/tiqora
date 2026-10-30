@@ -26,7 +26,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -51,6 +51,7 @@ from tiqora.reporting.definition import (
     shift_unit,
     unit_start,
 )
+from tiqora.reporting.itsm_roles import load_type_roles
 from tiqora.reporting.labels import resolve_labels
 from tiqora.reporting.schemas import (
     Cell,
@@ -61,7 +62,8 @@ from tiqora.reporting.schemas import (
     ResultColumnOut,
     TimeWindowOut,
 )
-from tiqora.reporting.semantic import Dimension, ReportSource
+from tiqora.reporting.scope import load_cmdb_class_scope
+from tiqora.reporting.semantic import Dimension, ReportSource, active_source
 from tiqora.reporting.settings import ReportingSettings
 from tiqora.reporting.sql import ReportQueryTimeout, invalidate_quietly, statement_timeout
 from tiqora.reporting.state import facts_status_of, load_state
@@ -186,6 +188,8 @@ class RunPlan:
     now: datetime = field(default_factory=utc_now)
     near_miss_percent: int = 10
     registry: Registry | None = field(default=None, repr=False)
+    cmdb_class_ids: frozenset[int] | None = field(default=None, repr=False)
+    type_roles: Mapping[int, str] = field(default_factory=dict, repr=False)
 
 
 async def plan_report(
@@ -211,6 +215,13 @@ async def plan_report(
     scope = await ticket_query_scope(session, user_id, include_archived=grant)
     state = await load_state(session)
     effective_params = replace(params, last_snapshot_date=state.last_snapshot_date)
+    src = active_source(reg, defn.source)  # unknown: compile_report's error
+    cmdb_class_ids = (
+        await load_cmdb_class_scope(session, user_id)
+        if src is not None and "cmdb_class" in src.scope_kinds()
+        else None
+    )
+    type_roles = await load_type_roles(session)
     compiled = compile_report(
         defn,
         effective_params,
@@ -218,6 +229,8 @@ async def plan_report(
         now=stamp,
         near_miss_percent=reporting.near_miss_percent,
         registry=reg,
+        cmdb_class_ids=cmdb_class_ids,
+        type_roles=type_roles,
     )
     cap = row_cap if row_cap is not None else reporting.max_result_rows
     key = ReportCache.key_for(
@@ -231,6 +244,8 @@ async def plan_report(
         extra_filter=effective_params.extra_filter,
         last_snapshot_date=effective_params.last_snapshot_date,
         near_miss_percent=reporting.near_miss_percent,
+        cmdb_class_ids=cmdb_class_ids,
+        type_roles=type_roles,
     )
     return RunPlan(
         compiled=compiled,
@@ -244,6 +259,8 @@ async def plan_report(
         now=stamp,
         near_miss_percent=reporting.near_miss_percent,
         registry=reg,
+        cmdb_class_ids=cmdb_class_ids,
+        type_roles=type_roles,
     )
 
 
@@ -258,6 +275,8 @@ def _recompile(plan: RunPlan, group_by: Sequence[int], window: TimeWindow | None
         near_miss_percent=plan.near_miss_percent,
         registry=plan.registry,
         group_by=group_by,
+        cmdb_class_ids=plan.cmdb_class_ids,
+        type_roles=plan.type_roles,
     )
 
 

@@ -4,9 +4,9 @@ A plugin source reads either Znuny tables or its own ``tqp_<short_id>_*`` tables
 ``tiqora_*`` tables and never a mix of both (prod MariaDB mixes ``general_ci``/``unicode_ci``,
 so a JOIN across the two worlds ends in error 1267). Registration checks this by compiling a
 probe statement that contains EVERY expression the source can put into a report query (scope
-column, dimensions, measures, filter-only fields, base filter, FROM clause) and walking it for
-tables. The compiler's queue scope (``scope_column IN viewer queues``) is unchanged and applies
-to plugin sources like to core ones.
+column, extra scopes, dimensions, measures, filter-only fields, base filter, FROM clause) and
+walking it for tables. The compiler's queue scope (``scope_column IN viewer queues``) is unchanged
+and applies to plugin sources like to core ones.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ MIXED_TABLES_MESSAGE: Final = (
 def _probe(source: ReportSource) -> Any:
     ctx = CompileContext(now=utc_now(), time_zone="UTC", tz=(), near_miss_percent=0, window=None)
     exprs: list[Any] = [source.scope_column(ctx)]
+    exprs.extend(fn(ctx) for _, fn in source.extra_scopes)
     exprs.extend(d.expr(ctx) for d in source.dimensions)
     for measure in source.measures:
         exprs.extend(fn(ctx) for fn in (measure.expr, measure.condition, measure.denominator) if fn)

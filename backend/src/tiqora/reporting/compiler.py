@@ -1,17 +1,19 @@
 """Report compiler: effective definition + permission scope -> SELECT statements.
 
-Permission rule: the viewer's queue scope (``source.scope_column IN queue_ids``)
-is the FIRST clause of a top-level ``AND``; every user filter, ``extra_filter``
-and runtime parameter is ANDed next to it, so no ``any`` / ``not`` can widen
-it. Archived tickets are dropped (``source.archive_exclusion``) unless the
-scope includes them — the caller grants that to admins only, like
-``GET /tickets``.
+Permission rule: the viewer's scope (``source.scope_column IN`` the viewer's ids of
+``source.scope_kind``: queues or readable CMDB classes) is the FIRST clause of a
+top-level ``AND``, followed by one such clause per ``source.extra_scopes`` entry;
+every user filter, ``extra_filter`` and runtime parameter is ANDed next to them, so
+no ``any`` / ``not`` can widen them. Archived tickets are dropped
+(``source.archive_exclusion``) unless the scope includes them — the caller grants
+that to admins only, like ``GET /tickets``.
 
 Queue-valued dimensions that are not the scope column (``queue_at_create``,
 event ``queue`` / ``from_queue`` / ``to_queue``) can name queues the viewer
 cannot see; their values outside the scope become :data:`HIDDEN_QUEUE_ID`
 (rows stay counted, the engine labels the bucket "Andere Queue"). Filters on
-those fields compare the same masked value.
+those fields compare the same masked value. The mask always compares queue ids,
+also on a class-scoped source.
 
 Each dimension expression (incl. the ``to_local`` CASE with bound ``until``
 values) is built once; GROUP BY refers to the ``d<i>`` select labels.
@@ -65,6 +67,7 @@ from tiqora.reporting.semantic import (
     MeasureAgg,
     MeasureUnit,
     ReportSource,
+    ScopeKind,
 )
 from tiqora.reporting.sql import Grain, date_bucket, date_part, to_local, tz_segments
 
@@ -134,6 +137,8 @@ def compile_report(
     near_miss_percent: int,
     registry: Registry,
     group_by: Sequence[int] | None = None,
+    cmdb_class_ids: frozenset[int] | None = None,
+    type_roles: Mapping[int, str] | None = None,
 ) -> CompiledReport:
     """Compile ``defn`` for one run inside ``scope``.
 
@@ -141,6 +146,8 @@ def compile_report(
     ``[0]`` / ``[1]``). Raises :class:`DefinitionError` for an invalid
     definition and :class:`ReportCompileError` for invalid run parameters.
     Every select has a ``n`` column (``COUNT(*)``) next to the measures.
+    ``cmdb_class_ids``: the viewer's readable classes, required for a source with a
+    ``cmdb_class`` scope. ``type_roles``: ``ticket_type.id`` -> ITSM role.
     """
     src = validate_definition(defn, registry)
     zone = valid_time_zone(params.time_zone)
@@ -163,14 +170,28 @@ def compile_report(
         else tz_segments(zone, now - _NO_WINDOW_SPAN, now)
     )
     ctx = CompileContext(
-        now=now, time_zone=zone, tz=tz, near_miss_percent=near_miss_percent, window=window
+        now=now,
+        time_zone=zone,
+        tz=tz,
+        near_miss_percent=near_miss_percent,
+        window=window,
+        type_roles=dict(type_roles or {}),
     )
     scope_col = src.scope_column(ctx)
-    scope_ids = sorted(scope.queue_ids)
+    queue_ids = sorted(scope.queue_ids)
+
+    def ids_for(kind: ScopeKind) -> list[int]:
+        if kind == "queue":
+            return queue_ids
+        if cmdb_class_ids is None:
+            raise ReportCompileError("Die CMDB-Berechtigungen fehlen.", path="source")
+        return sorted(cmdb_class_ids)
+
+    scope_ids = {kind: ids_for(kind) for kind in src.scope_kinds()}
 
     def hide(expr: ColumnElement[Any]) -> ColumnElement[Any]:
         return case(
-            (expr.in_(scope_ids), expr),
+            (expr.in_(queue_ids), expr),
             (expr.is_not(None), literal(HIDDEN_QUEUE_ID, Integer())),
             else_=null(),
         )
@@ -194,8 +215,12 @@ def compile_report(
         dim_cols.append(_bucketed(dim, ref, dim_expr(dim), ctx).label(label))
         labels.append(label)
 
-    # where: scope first, everything else ANDed next to it
-    where: list[ColumnElement[bool]] = [scope_col.in_(scope_ids), *src.base_where(ctx)]
+    # where: scopes first, everything else ANDed next to them
+    where: list[ColumnElement[bool]] = [
+        scope_col.in_(scope_ids[src.scope_kind]),
+        *(fn(ctx).in_(scope_ids[kind]) for kind, fn in src.extra_scopes),
+        *src.base_where(ctx),
+    ]
     if src.archive_exclusion is not None and not scope.include_archived:
         where.append(src.archive_exclusion(ctx))
     if window is not None and time_key is not None:
@@ -226,7 +251,7 @@ def compile_report(
             include_archived=scope.include_archived and src.archive_exclusion is not None,
         )
 
-    if not scope_ids:
+    if not all(scope_ids.values()):
         return result(None, None)
 
     from_clause = src.from_clause(ctx)

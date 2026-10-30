@@ -19,6 +19,7 @@ from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import Ticket, TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
+from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi, TiqoraCmdbClass
 from tiqora.reporting.compiler import HIDDEN_QUEUE_ID
 from tiqora.reporting.semantic import LabelSource
 
@@ -33,6 +34,8 @@ _NAME_TABLES: Final[dict[str, tuple[Any, Any]]] = {
     "type": (TicketType.id, TicketType.name),
     "service": (Service.id, Service.name),
     "sla": (Sla.id, Sla.name),
+    "cmdb_class": (TiqoraCmdbClass.id, TiqoraCmdbClass.name),
+    "cmdb_catalog": (TiqoraCmdbCatalog.id, TiqoraCmdbCatalog.name),
 }
 
 
@@ -109,6 +112,11 @@ async def resolve_labels(
             session, Ticket.id, [Ticket.tn, Ticket.title], _int_keys(wanted)
         ):
             out[str(key)] = f"{tn} {title or ''}".strip()
+    elif source == "cmdb_ci":
+        for key, number, name in await _lookup(
+            session, TiqoraCmdbCi.id, [TiqoraCmdbCi.number, TiqoraCmdbCi.name], _int_keys(wanted)
+        ):
+            out[str(key)] = f"{number} {name}"
     elif source == "customer_company":
         by_name = _by_folded(wanted)
         for key, name in await _lookup(

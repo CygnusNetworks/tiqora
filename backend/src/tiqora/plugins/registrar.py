@@ -1147,7 +1147,8 @@ class PluginRegistrar:
 
         Labels must live in the plugin's i18n namespace (``plugin.<plugin id>:...``). The source
         reads Znuny tables or the plugin's own ``tqp_<short_id>_*`` tables, never ``tiqora_*``
-        tables and never a mix; the queue scope column is enforced by the report compiler.
+        tables and never a mix; the queue scope column is enforced by the report compiler. CMDB
+        class scopes and ITSM-only availability are reserved for core sources.
         """
         short_id = self._manifest.short_id
         label_prefix = f"plugin.{self.plugin_id}:"
@@ -1178,6 +1179,15 @@ class PluginRegistrar:
                 raise RegistrationRejected(
                     f"Die Berichtsquelle „{source.key}“ darf keine Auswertungstabellen "
                     "(requires_facts) benötigen"
+                )
+            if (
+                source.scope_kind != "queue"
+                or source.extra_scopes
+                or source.availability != "always"
+            ):
+                raise RegistrationRejected(
+                    f"Die Berichtsquelle „{source.key}“ muss nach Queues berechtigt sein und "
+                    "immer verfügbar sein"
                 )
             check_plugin_source(source, short_id)
 
