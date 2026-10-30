@@ -642,11 +642,14 @@ function HeaderControls({
         <OnlineAgentsPopover />
         <ChatInboxButton variant={searchFill ? "desktop" : "mobile"} />
         <NotificationBell />
-        <HeaderIconButton onClick={onHelp} label={t("shortcuts.title")} testId="header-help">
-          <HelpIcon className="text-[18px]" />
-        </HeaderIconButton>
+        {/* Keyboard shortcuts mean nothing on a phone, and the width is needed there. */}
+        <div className="hidden sm:block">
+          <HeaderIconButton onClick={onHelp} label={t("shortcuts.title")} testId="header-help">
+            <HelpIcon className="text-[18px]" />
+          </HeaderIconButton>
+        </div>
       </div>
-      <div className="mx-1 h-6 w-px bg-hairline" aria-hidden />
+      <div className="mx-1 hidden h-6 w-px bg-hairline sm:block" aria-hidden />
       <AccountMenu logoutTestId={logoutTestId} />
     </div>
   );
@@ -719,11 +722,15 @@ export function AgentShell({ children }: { children: ReactNode }) {
             </Button>
             <Link
               to="/agent"
-              className="flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink"
+              aria-label={t("app.name")}
+              className="flex shrink-0 items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink"
             >
               <img src={logoUrl} alt="" width={20} height={20} className="rounded" />
-              {t("app.name")}
-              <BetaPill />
+              {/* On a phone the controls need the width: the logo stands for the name. */}
+              <span className="hidden items-center gap-2 sm:flex">
+                {t("app.name")}
+                <BetaPill />
+              </span>
             </Link>
             <div className="ml-auto">
               <HeaderControls onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn" />

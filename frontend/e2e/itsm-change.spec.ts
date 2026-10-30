@@ -491,14 +491,19 @@ test.describe("CAB meeting", () => {
 test.describe("agent change screens at phone width", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  // The screen itself must not grow past the viewport or scroll sideways; wide tables scroll inside their
-  // own box. (The shell's header controls are not the change screens' business: measure their root.)
+  // The page must not scroll sideways (shell header included); wide tables scroll inside their own box.
   async function fits(page: Page, rootTestId: string) {
     const root = page.getByTestId(rootTestId);
     await expect(root).toBeVisible();
-    const m = await root.evaluate((el) => ({ scroll: el.scrollWidth - el.clientWidth, right: el.getBoundingClientRect().right, vw: document.documentElement.clientWidth }));
+    const m = await root.evaluate((el) => ({
+      scroll: el.scrollWidth - el.clientWidth,
+      right: el.getBoundingClientRect().right,
+      vw: document.documentElement.clientWidth,
+      page: document.documentElement.scrollWidth,
+    }));
     expect(m.scroll).toBeLessThanOrEqual(0);
     expect(m.right).toBeLessThanOrEqual(m.vw);
+    expect(m.page).toBeLessThanOrEqual(m.vw);
   }
 
   test.beforeEach(async ({ page }) => {
@@ -506,6 +511,15 @@ test.describe("agent change screens at phone width", () => {
     await useGermanUi(page);
     await page.clock.setFixedTime(new Date("2026-10-12T08:00:00Z"));
     await loginAsAgent(page);
+  });
+
+  test("the agent start page does not scroll sideways", async ({ page }) => {
+    await page.goto("/agent");
+    await expect(page.getByTestId("agent-sidebar-toggle")).toBeVisible();
+    await expect(page.getByRole("main")).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(0);
   });
 
   test("list, detail, calendar and CAB meetings stay inside the viewport", async ({ page }) => {
