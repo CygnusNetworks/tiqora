@@ -39,47 +39,27 @@ def snapshot_max_ids(sync_url: str, tables: Sequence[str] = DEFAULT_TABLES) -> d
     """Highest existing id per table, before the module writes anything.
 
     Tables the module creates itself (the additive ``tiqora_*`` set) may not
-    exist yet at module-setup time — a module that runs first in a fresh
-    container is exactly that case. Those are skipped: anything the module
-    goes on to create it also owns entirely, so the restore has nothing older
-    to preserve.
+    exist yet at module-setup time -- a module that runs first in a fresh
+    container is exactly that case. Those get ``0``: every row they will hold
+    is the module's own.
     """
-    engine = create_engine(sync_url)
-    snapshot: dict[str, int] = {}
-    try:
-        for table in tables:
-            try:
-                with engine.begin() as conn:
-                    snapshot[table] = int(
-                        conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}")).scalar_one()
-                    )
-            except DatabaseError:
-                continue
-        return snapshot
-    finally:
-        engine.dispose()
+    return snapshot_marks(sync_url, tables)
 
 
 def delete_rows_above(
     sync_url: str, snapshot: dict[str, int], *, setting_keys: Sequence[str] = ()
 ) -> None:
     """Delete every row the module added, plus the named settings keys."""
-    engine = create_engine(sync_url)
-    try:
-        with engine.begin() as conn:
-            for table in DEFAULT_TABLES:
-                if table not in snapshot:
-                    continue
-                try:
-                    conn.execute(text(f"DELETE FROM {table} WHERE id > :m"), {"m": snapshot[table]})
-                except DatabaseError:
-                    continue
-            if setting_keys:
+    delete_above_marks(sync_url, {t: snapshot[t] for t in DEFAULT_TABLES if t in snapshot})
+    if setting_keys:
+        engine = create_engine(sync_url)
+        try:
+            with engine.begin() as conn:
                 # Via the model, not raw SQL: ``key`` is reserved in MySQL and
                 # would need backticks that PostgreSQL rejects.
                 conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.in_(setting_keys)))
-    finally:
-        engine.dispose()
+        finally:
+            engine.dispose()
 
 
 def cleanup_module(

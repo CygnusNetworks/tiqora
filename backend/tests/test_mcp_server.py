@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -26,6 +27,8 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraApiKey
 from tiqora.mcp_server.server import McpState, _resolve_api_key, mcp
 from tiqora.znuny.password import hash_password
+
+from ._row_cleanup import delete_above_marks, snapshot_marks
 
 pytestmark = pytest.mark.db
 
@@ -178,11 +181,51 @@ def _seed_mcp_data(sync_url: str) -> dict[str, Any]:
     return ids
 
 
+# Children before parents: the delete order of mcp_mariadb's teardown.
+_MCP_MARK_TABLES = (
+    "tiqora_kb_chunk",
+    "tiqora_kb_article_version",
+    "tiqora_kb_article",
+    "tiqora_kb_tag",
+    "tiqora_kb_category",
+    "tiqora_mail_log",
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "tiqora_api_key",
+    "dynamic_field_value",
+    "dynamic_field",
+    "ticket_history",
+    "article_data_mime",
+    "article",
+    "ticket",
+    "ticket_number_counter",
+    "customer_user",
+    "queue",
+    "permission_groups",
+    "users",
+)
+
+
 @pytest.fixture(scope="module")
-def mcp_mariadb(mariadb_znuny_url: str) -> dict[str, Any]:
-    """Seed MariaDB for MCP tests."""
+def mcp_mariadb(mariadb_znuny_url: str) -> Iterator[dict[str, Any]]:
+    """Seed MariaDB for MCP tests; delete everything the module committed afterwards."""
+    marks = snapshot_marks(mariadb_znuny_url, _MCP_MARK_TABLES)
     ids = _seed_mcp_data(mariadb_znuny_url)
-    return {"url": mariadb_znuny_url, "async_url": _mysql_async(mariadb_znuny_url), **ids}
+    yield {"url": mariadb_znuny_url, "async_url": _mysql_async(mariadb_znuny_url), **ids}
+    delete_above_marks(
+        mariadb_znuny_url,
+        marks,
+        first=[
+            (
+                "DELETE FROM tiqora_kb_article_tag WHERE article_id > :a",
+                {"a": marks["tiqora_kb_article"]},
+            ),
+            (
+                "DELETE FROM group_user WHERE user_id > :u OR group_id > :g",
+                {"u": marks["users"], "g": marks["permission_groups"]},
+            ),
+        ],
+    )
 
 
 # ---------------------------------------------------------------------------

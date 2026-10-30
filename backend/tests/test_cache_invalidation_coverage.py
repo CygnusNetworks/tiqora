@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import uuid
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
@@ -42,9 +43,42 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.znuny.sysconfig import SysConfig
 
+from ._row_cleanup import delete_above_marks, snapshot_marks
+
 
 def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
+
+
+# Children before parents: the delete order of the teardown below.
+_MARK_TABLES = (
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "dynamic_field_value",
+    "ticket_history",
+    "article_data_mime",
+    "article",
+    "ticket",
+    "ticket_number_counter",
+    "link_object",
+)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup(mariadb_znuny_url: str) -> Iterator[None]:
+    """Delete the tickets (and all that hangs on them) the write ops below commit."""
+    marks = snapshot_marks(mariadb_znuny_url, _MARK_TABLES)
+    yield
+    delete_above_marks(
+        mariadb_znuny_url,
+        marks,
+        first=[
+            (
+                "DELETE FROM link_relation WHERE source_object_id > :o OR target_object_id > :o",
+                {"o": marks["link_object"]},
+            )
+        ],
+    )
 
 
 def _uid() -> str:

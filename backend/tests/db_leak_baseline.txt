@@ -36,7 +36,6 @@ test_auth_me_is_admin.py
 test_autoresponse.py
 test_bootstrap_cli.py
 test_cache_invalidation.py
-test_cache_invalidation_coverage.py
 test_calendar_api.py
 test_calendar_service.py
 test_channels_phone.py
@@ -63,7 +62,6 @@ test_kb_tags.py
 test_legacy_datetime.py
 test_mail_log.py
 test_mail_outbound_admin.py
-test_mcp_server.py
 test_migrate_cli.py
 test_notifications.py
 test_outbox_drain.py
