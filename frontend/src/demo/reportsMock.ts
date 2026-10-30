@@ -213,6 +213,7 @@ export function demoSources(): ReportSource[] {
     key,
     label_key: `reports.sources.${key}`,
     default_time_field: DEFAULT_TIME_FIELD[key] ?? null,
+    available: true,
     common_fields: {},
     dimensions: sourceDimensions(key),
     filter_fields: [],

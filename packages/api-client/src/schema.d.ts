@@ -29585,6 +29585,8 @@ export interface components {
         };
         /** ReportSourceOut */
         ReportSourceOut: {
+            /** Available */
+            available: boolean;
             /** Common Fields */
             common_fields?: {
                 [key: string]: string;

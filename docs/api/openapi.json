@@ -43735,6 +43735,10 @@
       },
       "ReportSourceOut": {
         "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
           "common_fields": {
             "additionalProperties": {
               "type": "string"
@@ -43789,7 +43793,8 @@
           "dimensions",
           "measures",
           "filter_fields",
-          "default_time_field"
+          "default_time_field",
+          "available"
         ],
         "title": "ReportSourceOut",
         "type": "object"

@@ -259,5 +259,8 @@ class ReportSourceOut(BaseModel):
     measures: list[SourceMeasureOut]
     filter_fields: list[SourceDimensionOut]
     default_time_field: str | None
+    #: offered now (CI and change sources only in ITSM mode ``tiqora``); a report on an
+    #: unavailable source still runs, the builder just does not offer the source for new reports
+    available: bool
     #: dashboard filter key (``COMMON_FILTER_KEYS``) -> field key of this source
     common_fields: dict[str, str] = Field(default_factory=dict)

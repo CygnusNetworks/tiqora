@@ -436,6 +436,10 @@ Dashboards show reports as tiles (widgets "Bericht", "SLA-Erfüllung", "Rücksta
 [dashboards.md](dashboards.md#berichte-als-widgets). Plugins can add report sources and built-in
 reports ([plugins.md](plugins.md#reporting)).
 
+Drilling from a dashboard tile into the matching tickets works only for the ticket sources and
+dimensions that map to a ticket search; the ITSM role (`itsm_role`) and the CI and change sources
+are not drillable.
+
 ## Developers: APIs and extension points
 
 All paths are below `/api/v1`.
