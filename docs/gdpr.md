@@ -466,7 +466,8 @@ Change management ([itsm.md](itsm.md#8-change-management), Mode B) keeps a recor
   `TIQORA_SECRET_KEY`; the tombstones store a check value of it (a row of kind `check`). After
   `TIQORA_SECRET_KEY` is rotated the check no longer matches: archive runs (admin job and import step
   `changes`, issue `archive_key_changed`) refuse and write nothing, instead of letting erased customers
-  come back unredacted.
+  come back unredacted. A run already under way stops before its next batch when an erasure under another
+  key commits: that page rolls back, finished pages stay.
 - **A changed key never blocks an erasure.** `run_erasure` and the CLI anonymisation run to completion:
   they redact the stored archive rows by the identifiers themselves (no key involved), write their
   tombstones and a check row under the current key, log a warning, and say that archive runs stay refused

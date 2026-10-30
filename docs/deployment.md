@@ -610,7 +610,8 @@ in the `worker` (`core.itsm_change_tasks`, `core.itsm_change_impact`, and
 The legacy change archive stores hashes of erased customers keyed with `TIQORA_ITSM_LEGACY_ERASED_KEY`, or
 `TIQORA_SECRET_KEY` while that is empty, plus a check value of the key. After a rotation of
 `TIQORA_SECRET_KEY` the archive job fails and the import step `changes` reports `archive_key_changed`; nothing
-is written, so no erased customer reappears. GDPR erasures keep working under any key: they redact the archive
+more is written, so no erased customer reappears (a run under way stops before its next batch, finished pages
+stay). GDPR erasures keep working under any key: they redact the archive
 without it, write their hashes and a check value under the current key, and warn (`legacy_archive_key_changed`
 in the job counts, a warning line in the CLI output).
 

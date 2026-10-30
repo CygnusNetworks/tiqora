@@ -73,7 +73,10 @@ ISSUE_CODES: dict[str, str] = {
     ),
     "archive_key_changed": (
         "Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (TIQORA_SECRET_KEY "
-        "gewechselt); das Archiv wurde nicht aktualisiert, damit gelöschte Kunden nicht "
-        "zurückkommen. TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY setzen"
+        "gewechselt); das Archiv wird nicht weiter aktualisiert, damit gelöschte Kunden nicht "
+        "zurückkommen, und bleibt lesbar und geschwärzt. Bisheriger Schlüssel vorhanden und seit "
+        "dem Wechsel keine Löschung: TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen "
+        "TIQORA_SECRET_KEY setzen. Sonst sind keine weiteren Archiv-Läufe möglich; Löschungen "
+        "funktionieren immer"
     ),
 }

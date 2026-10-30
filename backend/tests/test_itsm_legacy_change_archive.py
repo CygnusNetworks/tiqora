@@ -1474,3 +1474,47 @@ async def test_stale_key_check_without_tombstones_is_replaced(
         await _edit_mail(w, 8)
         await _archive_with(w, ROTATED)
         assert _absent((await _rows(w))[MAIL].data, CUSTOMER4, CUSTOMER4_MAIL)
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+async def test_erasure_under_another_key_during_a_run_stops_it(
+    dialect: str, profile: str, request: pytest.FixtureRequest
+) -> None:
+    """N3: the run passed its start check when the erasure commits. Its key cannot match the new
+    tombstones, so writing the page would store the person in the clear, and the erasure's check
+    row would refuse every run that could repair it. The page rolls back instead. The erasure fires
+    before the page opens: this world's sessions share one connection, so a page rollback would
+    also undo an erasure nested inside it."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            customer_id = await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+            await s.commit()
+        await _archive(w)
+        await _edit_mail(w, 8)  # Znuny changed: the run would rewrite the row from Znuny
+        erased: list[bool] = []
+
+        async def erase_once() -> None:
+            if not erased:
+                erased.append(True)
+                await _erase(w, customer_id, ROTATED)
+
+        report = ArchiveReport()
+        with pytest.raises(ErasedKeyChanged):
+            await archive_changes(
+                w.factory,
+                run_id=RUN_ARCHIVE,
+                dry_run=False,
+                page_size=1,
+                progress=_noop,
+                check_cancelled=erase_once,
+                report=report,
+                settings=SETTINGS,
+            )
+
+        assert erased == [True]
+        assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+        assert ("customer_user", CUSTOMER2, 0) not in await _refs(w, MAIL)
+        assert report.updated == 0
+        with pytest.raises(ErasedKeyChanged):  # and the next run does not start
+            await _archive_with(w, SETTINGS)

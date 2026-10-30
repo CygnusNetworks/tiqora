@@ -27,7 +27,9 @@ never re-enters it, also through a change archived for the first time later. The
 keyed (:func:`~tiqora.itsm.change.legacy.redact.erased_key`); each key that wrote tombstones leaves
 a check row (``kind="check"``). While tombstones exist and any check row is not the one of the
 current key (``TIQORA_SECRET_KEY`` rotated without ``TIQORA_ITSM_LEGACY_ERASED_KEY``), archive runs
-refuse instead of storing erased customers again (:class:`ErasedKeyChanged`; nothing is written).
+refuse instead of storing erased customers again (:class:`ErasedKeyChanged`). The check runs at the
+start and again before each batch: a run under way stops when an erasure under another key commits;
+the page rolls back, earlier pages stay.
 An erasure never waits for the key: it works under any key, adds that key's check row and so keeps
 archive runs refused (mixed keys cannot be matched by any one key). The fingerprint is
 taken of the unredacted form; a row is written again when its fingerprint or the set of
@@ -116,9 +118,9 @@ KEY_CHECK_KIND: Final = "check"
 KEY_CHANGED_MESSAGE: Final = (
     "Der Schlüssel für gelöschte Kunden im Change-Archiv hat sich geändert (wurde "
     "TIQORA_SECRET_KEY gewechselt?). Mit dem neuen Schlüssel kämen gelöschte Kunden "
-    "ungeschwärzt ins Archiv zurück, deshalb wird nichts geschrieben; das Archiv bleibt lesbar "
-    "und geschwärzt. Haben Sie den bisherigen Schlüssel noch und lief seit dem Wechsel keine "
-    "Löschung: Setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY und "
+    "ungeschwärzt ins Archiv zurück, deshalb wird nichts mehr geschrieben; das Archiv bleibt "
+    "lesbar und geschwärzt. Haben Sie den bisherigen Schlüssel noch und lief seit dem Wechsel "
+    "keine Löschung: Setzen Sie TIQORA_ITSM_LEGACY_ERASED_KEY auf den bisherigen TIQORA_SECRET_KEY und "
     "starten Sie den Vorgang erneut. Ist er verloren oder liefen inzwischen Löschungen: Weitere "
     "Archiv-Läufe sind nicht möglich, Löschungen funktionieren weiter."
 )
@@ -519,7 +521,9 @@ async def archive_changes(
     """Archive every Znuny change into ``report`` (one session and commit per page of
     ``page_size`` ids; cancellation is checked before each page). Without the change tables
     nothing happens. ``settings`` give the tombstone key (:func:`redact.erased_key`); under a
-    changed key the run refuses before it writes anything (:class:`ErasedKeyChanged`)."""
+    changed key the run refuses before it writes anything (:class:`ErasedKeyChanged`), and a key
+    that changes during the run stops it before the next batch: that page rolls back, the pages
+    already committed are valid."""
     key = erased_key(settings)
     async with session_factory() as session:
         if not await reader.change_tables_present(session):
@@ -534,6 +538,9 @@ async def archive_changes(
         # a session of its own: a fresh snapshot on both dialects (the page's transaction keeps
         # its first one on MariaDB, REPEATABLE READ)
         async with session_factory() as fresh:
+            # an erasure under another key since the start: its hashes cannot match under this
+            # key, and its check row would refuse every run that could repair the page
+            await require_erased_key(fresh, key)
             return await load_tombstones(fresh)
 
     after = 0

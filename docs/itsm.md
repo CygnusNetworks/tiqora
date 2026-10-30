@@ -1184,7 +1184,8 @@ Hintergrundaufträge verfolgen Sie über `GET /api/v1/jobs/{id}`. Zeiten sind UT
   „[gelöscht]“ und merkt sich nur einen geschlüsselten Hash. Ein späterer Archiv-Lauf holt die Person
   deshalb nicht zurück. Der Schlüssel ist `TIQORA_ITSM_LEGACY_ERASED_KEY`, ohne diese Variable
   `TIQORA_SECRET_KEY`. Tiqora speichert einen Prüfwert des Schlüssels: Wird `TIQORA_SECRET_KEY`
-  gewechselt, schreiben Archiv-Lauf und Import-Schritt nichts (Meldung `archive_key_changed`), damit
+  gewechselt, schreiben Archiv-Lauf und Import-Schritt nichts mehr (Meldung `archive_key_changed`; ein
+  laufender Lauf stoppt vor dem nächsten Abschnitt, fertige Seiten bleiben), damit
   gelöschte Kunden nicht ungeschwärzt zurückkommen. Löschungen laufen immer, auch dann: Sie schwärzen
   das Archiv unabhängig vom Schlüssel und melden `legacy_archive_key_changed`. Haben Sie den bisherigen
   Schlüssel noch und lief seit dem Wechsel keine Löschung, setzen Sie `TIQORA_ITSM_LEGACY_ERASED_KEY` auf

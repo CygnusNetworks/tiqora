@@ -54,8 +54,9 @@ class Settings(BaseSettings):
     )
     # Key of the GDPR tombstones in the archive of Znuny changes (erased customers never
     # re-enter it). Empty: TIQORA_SECRET_KEY. After rotating TIQORA_SECRET_KEY set this to the
-    # previous TIQORA_SECRET_KEY: until then archive runs and erasures refuse, because the old
-    # tombstones would no longer match and erased customers would come back unredacted.
+    # previous TIQORA_SECRET_KEY: until then archive runs refuse, because the old tombstones would
+    # no longer match and erased customers would come back unredacted. Erasures are never blocked;
+    # one under a new key keeps archive runs refused for good.
     itsm_legacy_erased_key: str = Field(
         default="",
         validation_alias="TIQORA_ITSM_LEGACY_ERASED_KEY",

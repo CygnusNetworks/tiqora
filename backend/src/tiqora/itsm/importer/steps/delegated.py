@@ -130,7 +130,8 @@ async def run_changes(ctx: StepContext) -> None:
             settings=ctx.settings,
         )
     except ErasedKeyChanged:
-        # nothing was written; the other steps of the run go on
+        # nothing more is written (a run under way keeps its finished pages); the other steps
+        # of the run go on
         ctx.report.issue(
             STEP_CHANGES,
             "archive_key_changed",
