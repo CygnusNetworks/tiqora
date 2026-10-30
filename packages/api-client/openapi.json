@@ -16755,7 +16755,8 @@
               "task_outside",
               "no_window",
               "freeze_truncated",
-              "overlap_truncated"
+              "overlap_truncated",
+              "freeze_unverified"
             ],
             "title": "Kind",
             "type": "string"
@@ -33328,6 +33329,96 @@
           "ends_at"
         ],
         "title": "MeetingIn",
+        "type": "object"
+      },
+      "MeetingListItemOut": {
+        "description": "A meeting of the list: no agenda lines and no minutes (the minutes are on the meeting\nitself, ``GET /itsm/cab-meetings/{id}``).",
+        "properties": {
+          "agenda_count": {
+            "title": "Agenda Count",
+            "type": "integer"
+          },
+          "cab_id": {
+            "title": "Cab Id",
+            "type": "integer"
+          },
+          "cab_name": {
+            "title": "Cab Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "held",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cab_id",
+          "cab_name",
+          "title",
+          "starts_at",
+          "ends_at",
+          "location",
+          "status",
+          "agenda_count",
+          "created_at",
+          "created_by",
+          "updated_at",
+          "updated_by"
+        ],
+        "title": "MeetingListItemOut",
         "type": "object"
       },
       "MeetingOut": {
@@ -80178,14 +80269,7 @@
             "description": "Successful Response"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "Validation error, or `{\"detail\": {\"code\": \"cab_invalid\", \"reason\": ..., \"message\": ...}}`: the approval engine refuses the CAB's step. `reason` is `quorum_exceeds_members` (only users / customer users as members and fewer of them than the quorum), `invalid_definition` (another engine rule) or `invalid_member`; `message` is the engine's English text."
           }
         },
         "summary": "Put Cab",
@@ -80267,14 +80351,7 @@
             "description": "Successful Response"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "Validation error, or `{\"detail\": {\"code\": \"cab_invalid\", \"reason\": ..., \"message\": ...}}`: the approval engine refuses the CAB's step. `reason` is `quorum_exceeds_members` (only users / customer users as members and fewer of them than the quorum), `invalid_definition` (another engine rule) or `invalid_member`; `message` is the engine's English text."
           }
         },
         "summary": "Put Cab Members",
@@ -81086,7 +81163,7 @@
     },
     "/api/v1/admin/itsm/change/risk-questions/{question_id}": {
       "delete": {
-        "description": "Delete the question and the answers given to it (mark it invalid to keep them).",
+        "description": "Delete a question nobody has answered; once answered, 409 ``risk_question_in_use``\n(mark it invalid instead, which keeps the answers).",
         "operationId": "delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete",
         "parameters": [
           {
@@ -112251,7 +112328,7 @@
     },
     "/api/v1/itsm/cab-meetings": {
       "get": {
-        "description": "Meetings that overlap ``[start, end)`` (without their agenda lines); times are UTC.",
+        "description": "Meetings that overlap ``[start, end)``, without their agenda lines and minutes (both on\n``GET /cab-meetings/{id}``); times are UTC.",
         "operationId": "get_cab_meetings_api_v1_itsm_cab_meetings_get",
         "parameters": [
           {
@@ -112313,7 +112390,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/MeetingOut"
+                    "$ref": "#/components/schemas/MeetingListItemOut"
                   },
                   "title": "Response Get Cab Meetings Api V1 Itsm Cab Meetings Get",
                   "type": "array"
@@ -113079,7 +113156,7 @@
     },
     "/api/v1/itsm/change-tasks/mine": {
       "get": {
-        "description": "Change tasks the caller owns (by default only unfinished ones of live changes).",
+        "description": "Change tasks the caller owns (by default only unfinished ones of live changes), at most\n``MY_TASKS_LIMIT`` (100); the body stays a list, ``X-Tasks-Truncated: true`` says more\nexist.",
         "operationId": "get_my_change_tasks_api_v1_itsm_change_tasks_mine_get",
         "parameters": [
           {

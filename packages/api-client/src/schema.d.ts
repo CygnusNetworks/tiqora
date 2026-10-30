@@ -4661,7 +4661,8 @@ export interface paths {
         post?: never;
         /**
          * Delete Risk Question
-         * @description Delete the question and the answers given to it (mark it invalid to keep them).
+         * @description Delete a question nobody has answered; once answered, 409 ``risk_question_in_use``
+         *     (mark it invalid instead, which keeps the answers).
          */
         delete: operations["delete_risk_question_api_v1_admin_itsm_change_risk_questions__question_id__delete"];
         options?: never;
@@ -10151,7 +10152,8 @@ export interface paths {
         };
         /**
          * Get Cab Meetings
-         * @description Meetings that overlap ``[start, end)`` (without their agenda lines); times are UTC.
+         * @description Meetings that overlap ``[start, end)``, without their agenda lines and minutes (both on
+         *     ``GET /cab-meetings/{id}``); times are UTC.
          */
         get: operations["get_cab_meetings_api_v1_itsm_cab_meetings_get"];
         put?: never;
@@ -10319,7 +10321,9 @@ export interface paths {
         };
         /**
          * Get My Change Tasks
-         * @description Change tasks the caller owns (by default only unfinished ones of live changes).
+         * @description Change tasks the caller owns (by default only unfinished ones of live changes), at most
+         *     ``MY_TASKS_LIMIT`` (100); the body stays a list, ``X-Tasks-Truncated: true`` says more
+         *     exist.
          */
         get: operations["get_my_change_tasks_api_v1_itsm_change_tasks_mine_get"];
         put?: never;
@@ -20563,7 +20567,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "freeze" | "change_overlap" | "task_outside" | "no_window" | "freeze_truncated" | "overlap_truncated";
+            kind: "freeze" | "change_overlap" | "task_outside" | "no_window" | "freeze_truncated" | "overlap_truncated" | "freeze_unverified";
             /** Ref */
             ref: string | null;
             /**
@@ -26081,6 +26085,54 @@ export interface components {
             starts_at: string;
             /** Title */
             title: string;
+        };
+        /**
+         * MeetingListItemOut
+         * @description A meeting of the list: no agenda lines and no minutes (the minutes are on the meeting
+         *     itself, ``GET /itsm/cab-meetings/{id}``).
+         */
+        MeetingListItemOut: {
+            /** Agenda Count */
+            agenda_count: number;
+            /** Cab Id */
+            cab_id: number;
+            /** Cab Name */
+            cab_name: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Id */
+            id: number;
+            /** Location */
+            location: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "held" | "cancelled";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: number;
         };
         /** MeetingOut */
         MeetingOut: {
@@ -45314,14 +45366,12 @@ export interface operations {
                     "application/json": components["schemas"]["CabOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, or `{"detail": {"code": "cab_invalid", "reason": ..., "message": ...}}`: the approval engine refuses the CAB's step. `reason` is `quorum_exceeds_members` (only users / customer users as members and fewer of them than the quorum), `invalid_definition` (another engine rule) or `invalid_member`; `message` is the engine's English text. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };
@@ -45386,14 +45436,12 @@ export interface operations {
                     "application/json": components["schemas"]["CabOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, or `{"detail": {"code": "cab_invalid", "reason": ..., "message": ...}}`: the approval engine refuses the CAB's step. `reason` is `quorum_exceeds_members` (only users / customer users as members and fewer of them than the quorum), `invalid_definition` (another engine rule) or `invalid_member`; `message` is the engine's English text. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };
@@ -60144,7 +60192,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MeetingOut"][];
+                    "application/json": components["schemas"]["MeetingListItemOut"][];
                 };
             };
             /** @description Validation Error */
