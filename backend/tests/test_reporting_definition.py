@@ -120,6 +120,7 @@ def test_core_sources_registered_with_expected_keys() -> None:
         "open_tickets",
         "config_items",
         "changes",
+        "change_events",
     ]
     assert [s.key for s in reg.items(REPORT_SOURCES)] == keys
     assert [s.key for s in core_report_sources()] == keys

@@ -43,6 +43,8 @@ NON_PERSON_DIMENSIONS: Final[frozenset[str]] = frozenset(
         "incident_category",
         "changed",
         "phase",
+        "from_phase",
+        "to_phase",
         "outcome",
         "change_status",
         "change_type",

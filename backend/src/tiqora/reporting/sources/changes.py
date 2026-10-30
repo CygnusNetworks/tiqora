@@ -32,7 +32,8 @@ C = aliased(TiqoraItsmChange, "c")
 F = aliased(TiqoraReportTicketFact, "f")
 
 CHANGE_OUTCOMES: Final = OUTCOMES
-#: the phases plus ``closed`` split by outcome (``closed`` itself stays for a filter on both)
+#: the phases plus ``closed`` split by outcome; a plain ``closed`` is not a status value (filter
+#: ``phase`` for both outcomes)
 CHANGE_STATUSES: Final = (*PHASES, *(f"closed_{o}" for o in CHANGE_OUTCOMES))
 #: phases that are final; a rejected change can still be reworked, so it counts as open
 OPEN_EXCLUDED_PHASES: Final = frozenset(FINAL_PHASES)

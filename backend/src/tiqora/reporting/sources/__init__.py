@@ -7,6 +7,7 @@ from tiqora.reporting.semantic import ReportSource
 
 def core_report_sources() -> list[ReportSource]:
     from tiqora.reporting.sources.accounted_time import accounted_time_source
+    from tiqora.reporting.sources.change_events import change_events_source
     from tiqora.reporting.sources.changes import changes_source
     from tiqora.reporting.sources.config_items import config_items_source
     from tiqora.reporting.sources.daily_snapshot import daily_snapshot_source
@@ -22,4 +23,5 @@ def core_report_sources() -> list[ReportSource]:
         open_tickets_source(),
         config_items_source(),
         changes_source(),
+        change_events_source(),
     ]
