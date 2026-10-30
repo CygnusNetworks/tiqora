@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
+import { pendingIso, toLocalInputValue } from "@/lib/phoneCall";
 import { NewTicketPage } from "./NewTicketPage";
 
 const {
@@ -689,13 +690,12 @@ describe("NewTicketPage", () => {
     );
   });
 
-  it("an internal note ticket needs no customer, adds an internal note and books the time on it", async () => {
+  it("an internal note ticket needs no customer and sends ticket, note and booking in one request", async () => {
     listReferenceStates.mockResolvedValue([
       ...states,
       { id: 2, name: "closed successful", type_name: "closed" },
       { id: 6, name: "pending reminder", type_name: "pending reminder" },
     ]);
-    createArticle.mockResolvedValue({ article_id: 78 });
     createTicketTimeAccounting.mockReset().mockResolvedValue({});
     await renderReady();
     fireEvent.click(screen.getByTestId("new-ticket-type-note"));
@@ -716,31 +716,57 @@ describe("NewTicketPage", () => {
 
     await waitFor(() =>
       expect(createTicket).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "Server-Wartung", customer_user_id: null }),
-      ),
-    );
-    await waitFor(() =>
-      expect(createArticle).toHaveBeenCalledWith(
-        42,
         expect.objectContaining({
-          channel: "note",
-          is_visible_for_customer: false,
-          body: "Updates eingespielt.",
+          title: "Server-Wartung",
+          customer_user_id: null,
+          note: {
+            body: "Updates eingespielt.",
+            content_type: "text/plain",
+            time_unit: 45,
+            attachments: [],
+          },
+          // blank field: the server dates it now
+          occurred_at: null,
         }),
       ),
     );
-    expect(createArticle.mock.calls[0][1]).not.toHaveProperty("to_address");
-    await waitFor(() =>
-      expect(createTicketTimeAccounting).toHaveBeenCalledWith(42, {
-        time_unit: 45,
-        article_id: 78,
-      }),
-    );
+    expect(createArticle).not.toHaveBeenCalled();
+    expect(createTicketTimeAccounting).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith({
         to: "/agent/tickets/$ticketId",
         params: { ticketId: "42" },
       }),
+    );
+  });
+
+  it("an internal note ticket can be dated to when the work was done, never into the future", async () => {
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-note"));
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Vor-Ort-Termin" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Termin mit dem Elektriker." },
+    });
+    const field = screen.getByTestId("new-ticket-occurred-at");
+    fireEvent.change(field, {
+      target: { value: toLocalInputValue(new Date(Date.now() + 2 * 86_400_000)) },
+    });
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+
+    const past = toLocalInputValue(new Date(Date.now() - 3 * 86_400_000));
+    fireEvent.change(field, { target: { value: past } });
+    expect(field).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() =>
+      expect(createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({ occurred_at: pendingIso(past) }),
+      ),
     );
   });
 

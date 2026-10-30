@@ -30,7 +30,7 @@ import secrets
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final, Literal
 
@@ -1133,6 +1133,31 @@ async def add_time_accounting(
     )
     await _emit_event(session, "TicketAccountTime", ticket_id, {"article_id": article_id})
     return int(row[0])
+
+
+async def date_new_ticket(session: AsyncSession, *, ticket_id: int, when: datetime) -> None:
+    """Date a ticket created in the CURRENT transaction to *when* (naive UTC).
+
+    For work recorded after the fact (note tickets): the ticket's creation
+    and age (``timeout``), its articles, their attachments, booked time and
+    history rows all move from "now" to *when*, so the ticket, its time
+    accounting and every report count it on the day the work was done. Only
+    call it before commit, while every row of the ticket is still new.
+    """
+    params = {"tid": ticket_id, "t": when, "epoch": int(when.replace(tzinfo=UTC).timestamp())}
+    articles = "(SELECT id FROM article WHERE ticket_id = :tid)"
+    for sql in (
+        "UPDATE ticket SET create_time = :t, change_time = :t, timeout = :epoch WHERE id = :tid",
+        "UPDATE article SET create_time = :t, change_time = :t WHERE ticket_id = :tid",
+        "UPDATE article_data_mime SET incoming_time = :epoch, create_time = :t,"
+        f" change_time = :t WHERE article_id IN {articles}",
+        "UPDATE article_data_mime_attachment SET create_time = :t, change_time = :t"
+        f" WHERE article_id IN {articles}",
+        "UPDATE time_accounting SET create_time = :t, change_time = :t WHERE ticket_id = :tid",
+        "UPDATE ticket_history SET create_time = :t, change_time = :t WHERE ticket_id = :tid",
+    ):
+        await session.execute(text(sql), params)
+    await invalidate_ticket_cache(session, ticket_id)
 
 
 async def resume_ai_automation(

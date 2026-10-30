@@ -55,6 +55,7 @@ import {
   requestPhoneCall,
   savePhoneDraft,
   timerFromCall,
+  toLocalInputValue,
 } from "@/lib/phoneCall";
 import { EmailSecurityControl } from "@/components/agent/EmailSecurityControl";
 import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
@@ -296,6 +297,8 @@ export function NewTicketPage() {
   const [showReplyTo, setShowReplyTo] = useState(false);
   /** Time booked on the email's / note's article (phone keeps its own in phoneFields). */
   const [emailTimeUnits, setEmailTimeUnits] = useState("");
+  /** Note: when the work was done (`datetime-local`, display zone); blank = now. */
+  const [occurredAt, setOccurredAt] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
@@ -528,8 +531,17 @@ export function NewTicketPage() {
     enabled: ticketType === "email",
   });
 
+  // The server takes the past year only; a typed date outside it would 422.
+  const occurredIso = occurredAt ? pendingIso(occurredAt) : null;
+  const occurredValid =
+    !occurredAt ||
+    (occurredIso !== null &&
+      Date.parse(occurredIso) <= Date.now() &&
+      Date.parse(occurredIso) >= Date.now() - 365 * 86_400_000);
+
   const canSubmit =
     (ticketType !== "email" || emailSecurity.blocked === null) &&
+    (ticketType !== "note" || occurredValid) &&
     formUnlocked &&
     queue !== "" &&
     priority !== "" &&
@@ -592,13 +604,38 @@ export function NewTicketPage() {
         });
         return;
       }
+      if (ticketType === "note") {
+        // One request: ticket + internal note + booking, all dated to when
+        // the work was done (or now).
+        const units = Number(emailTimeUnits);
+        const { ticket_id: noteTicketId } = await api.createTicket({
+          title: subject.trim(),
+          queue_id: queue,
+          state_id: state,
+          priority_id: priority,
+          owner_id: user.id,
+          customer_id: customer?.customer_id || null,
+          customer_user_id: customer?.login ?? null,
+          note: {
+            body: text,
+            content_type: richText ? "text/html" : "text/plain",
+            time_unit: emailTimeUnits.trim() !== "" && units > 0 ? units : null,
+            attachments: attachments.payload,
+          },
+          occurred_at: occurredIso,
+        });
+        await navigate({
+          to: "/agent/tickets/$ticketId",
+          params: { ticketId: String(noteTicketId) },
+        });
+        return;
+      }
       const { ticket_id } = await api.createTicket({
         title: subject.trim(),
         queue_id: queue,
         state_id: state,
         priority_id: priority,
         owner_id: user.id,
-        customer_id: ticketType === "note" ? customer?.customer_id || null : undefined,
         customer_user_id: customer?.login ?? null,
       });
       setCreatedTicketId(ticket_id);
@@ -608,21 +645,7 @@ export function NewTicketPage() {
       // of silently losing the agent's typed message.
       let articleId: number;
       try {
-        ({ article_id: articleId } = await api.createArticle(
-          ticket_id,
-          ticketType === "note"
-            ? {
-                sender_type: "agent",
-                channel: "note",
-                is_visible_for_customer: false,
-                subject: subject.trim(),
-                body: text,
-                content_type: richText
-                  ? "text/html; charset=utf-8"
-                  : "text/plain; charset=utf-8",
-                ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
-              }
-            : {
+        ({ article_id: articleId } = await api.createArticle(ticket_id, {
           sender_type: "agent",
           channel: "email",
           is_visible_for_customer: true,
@@ -637,8 +660,7 @@ export function NewTicketPage() {
           reply_to: replyTo.trim() || null,
           email_security: emailSecurity.payload,
           ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
-              },
-        ));
+        }));
       } catch (articleErr) {
         if (!(articleErr instanceof ApiError)) throw articleErr;
         // Same reason text as the reply dialog: the server's detail, unless
@@ -652,7 +674,7 @@ export function NewTicketPage() {
         setError(reason ? `${t("newTicket.sendError")} ${reason}` : t("newTicket.sendError"));
         return;
       }
-      // The mail (or note) is out; the booking follows and may fail on its own — the
+      // The mail is out; the booking follows and may fail on its own — the
       // error then keeps the link to the new ticket to book there.
       const extras = await postComposerExtras(ticket_id, {
         articleId,
@@ -1069,6 +1091,30 @@ export function NewTicketPage() {
                 className={FIELD_CLASS}
               />
             </label>
+
+            {ticketType === "note" && (
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
+                  {t("newTicket.occurredAt")}
+                </span>
+                <input
+                  type="datetime-local"
+                  data-testid="new-ticket-occurred-at"
+                  value={occurredAt}
+                  max={toLocalInputValue(new Date())}
+                  onChange={(e) => setOccurredAt(e.target.value)}
+                  aria-invalid={!occurredValid}
+                  aria-describedby="new-ticket-occurred-at-hint"
+                  className={cn(FIELD_CLASS, "w-auto")}
+                />
+                <span
+                  id="new-ticket-occurred-at-hint"
+                  className={cn("mt-1 block text-[12px]", occurredValid ? "text-muted" : "text-danger")}
+                >
+                  {occurredValid ? t("newTicket.occurredAtHint") : t("newTicket.occurredAtInvalid")}
+                </span>
+              </label>
+            )}
 
             <TicketPropsBar
               queues={queues}
