@@ -9837,7 +9837,17 @@
         "change_not_open": "Der Change ist in einer Phase, in der er nicht mehr auf die Tagesordnung kann.",
         "range_invalid": "Der Zeitraum ist ungültig.",
         "range_too_large": "Der Zeitraum ist zu groß.",
-        "legacy_change_not_found": "Den Znuny-Change gibt es nicht."
+        "legacy_change_not_found": "Den Znuny-Change gibt es nicht.",
+        "legacy_forbidden": "Sie gehören nicht zur Gruppe, die Znuny-Changes sehen darf. Wenden Sie sich an einen Administrator.",
+        "legacy_unavailable": "Es gibt keine Znuny-Changes zum Anzeigen: Znuny hat kein Change-Management, und ein Change-Archiv gibt es nicht.",
+        "search_too_broad": "Die Suche ist zu breit. Bitte grenzen Sie sie ein.",
+        "standard_template_invalid": "Die Vorlage dieses Standard-Changes fehlt, ist ungültig oder keine Standard-Vorlage mehr; der Change ist deshalb nicht vorab freigegeben. Planen Sie ihn als normalen Change.",
+        "risk_question_in_use": "Changes haben diese Frage beantwortet, deshalb kann sie nicht gelöscht werden. Setzen Sie sie stattdessen auf ungültig.",
+        "from_ticket_mismatch": "Der Change kann nur aus dem Ticket angelegt werden, in dem Sie sind.",
+        "link_not_found": "Die Verknüpfung gibt es nicht mehr.",
+        "related_self": "Ein Change kann nicht mit sich selbst verknüpft werden.",
+        "related_is_task": "Dieses Ticket ist eine Aufgabe des Changes und schon mit ihm verknüpft.",
+        "link_refused": "Die Verknüpfung konnte nicht angelegt werden."
       },
       "transition": {
         "submit": "Ausführen",

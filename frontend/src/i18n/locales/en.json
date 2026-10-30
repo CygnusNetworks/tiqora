@@ -9837,7 +9837,17 @@
         "change_not_open": "The change is in a phase in which it can no longer be put on the agenda.",
         "range_invalid": "The time range is invalid.",
         "range_too_large": "The time range is too large.",
-        "legacy_change_not_found": "The Znuny change does not exist."
+        "legacy_change_not_found": "The Znuny change does not exist.",
+        "legacy_forbidden": "You are not in the group that may see Znuny changes. Contact an administrator.",
+        "legacy_unavailable": "There are no Znuny changes to show: Znuny has no change management and there is no change archive.",
+        "search_too_broad": "The search is too broad. Please narrow it down.",
+        "standard_template_invalid": "The template of this standard change is missing, invalid or no longer a standard template, so the change is not pre-approved. Plan it as a normal change instead.",
+        "risk_question_in_use": "Changes have answered this question, so it cannot be deleted. Mark it invalid instead.",
+        "from_ticket_mismatch": "The change can only be created from the ticket you are on.",
+        "link_not_found": "The link does not exist any more.",
+        "related_self": "A change cannot be linked to itself.",
+        "related_is_task": "This ticket is a task of the change and is already linked to it.",
+        "link_refused": "The link could not be created."
       },
       "transition": {
         "submit": "Go",
