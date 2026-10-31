@@ -658,6 +658,12 @@ Die folgenden Festlegungen gelten, solange nichts anderes beschlossen wird.
     hat den Kanal `api`.
 15. **Wer ad hoc anfordert**: Agenten mit Schreibrecht auf das Ticket, nur für den Gegenstandstyp
     „Ticket“. Änderungen, Katalog und Prozess legen ihre Anfragen selbst an.
+16. **Emoji und andere 4-Byte-Zeichen** werden wie bei Tickets beim Speichern durch das Ersatzzeichen � (U+FFFD)
+    ersetzt, auf jedem Schema, weil eine `utf8mb3`-Datenbank sie sonst mit einem Fehler 500 ablehnt. Das Zeichen
+    selbst lässt sich danach nicht wiederherstellen. Das gilt für Titel, Beschreibung und Stufennamen der Anfrage,
+    den Kommentar zur Entscheidung (REST, Portal, MCP und die öffentliche Link-Seite), Namen und Beschreibungen von
+    Vorlagen und Freigabegruppen und die Quellenbezeichnung eines Freigebers. Kennungen von Personen
+    (Agenten-Login, Kunden-Login) bleiben unverändert.
 
 **Nicht verfügbar** (nicht Teil dieses Funktionsumfangs):
 

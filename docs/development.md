@@ -343,6 +343,7 @@ disappears, so a docs edit can turn CI red:
 | `backend/tests/test_docs_itsm_links.py` | German headings in `docs/itsm.md`; every anchor link into `docs/itsm.md` used by the frontend, docs, backend and the Znuny add-on must resolve |
 | `backend/tests/test_plugins_docs_ai_worker.py` | `docs/plugins.md` and `docs/deployment.md` statements on the `ai-worker` as a plugin host and the four processes that need the plugin image |
 | `backend/tests/test_gi_docs_events.py` | the `Events` row in `docs/compatibility.md` |
+| `backend/tests/test_docs_release_v0200.py` | operator facts of `docs/releases/v0.20.0.md` and "Upgrading to v0.20.0" in `docs/deployment.md`; no production names in either |
 | `backend/tests/test_docs_release_v0190.py` | wording of `docs/releases/v0.19.0.md` and of "Upgrading to v0.19.0" and "SCIM provisioning" in `docs/deployment.md` |
 
 Run them after editing those files:

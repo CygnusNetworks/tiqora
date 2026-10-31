@@ -1225,6 +1225,17 @@ Die vollständige Liste mit Status steht in [compatibility.md](compatibility.md#
   Verknüpfungen in einer Tabelle.
 - Znunys Change-, Arbeitsauftrags- und CAB-Vorlagen werden nicht übernommen.
 
+### Emoji in Change-Texten
+
+Emoji und andere 4-Byte-Zeichen werden wie bei Tickets beim Speichern durch das Ersatzzeichen � (U+FFFD) ersetzt, auf
+jedem Schema, weil eine `utf8mb3`-Datenbank sie sonst mit einem Fehler 500 ablehnt. Das Zeichen selbst lässt sich
+danach nicht wiederherstellen. Das gilt für Begründung, Pläne, Nachbetrachtung und Risiko-Begründung des Changes, die
+Texte in der Ereignisliste, Titel und Text von Aufgaben (über das Ticket), CAB-Name und -Beschreibung, Titel, Ort,
+Protokoll und Agenda-Notizen von CAB-Sitzungen, Namen und Texte von Vorlagen (mit Vorgaben und Aufgaben) und
+Freeze-Fenstern sowie Risikofragen und ihre Antworten. Die Suche in der Change-Liste tut mit dem Suchtext dasselbe.
+Nicht betroffen sind die Daten aus Znuny im Change-Archiv: sie werden unverändert übernommen, und die Suche im Archiv
+ersetzt nichts.
+
 ## 9 ITSM-Berichte
 
 Die Berichte von Tiqora beantworten die Fragen, die Znunys ITSM-Statistiken stellen (Paket

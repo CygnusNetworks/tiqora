@@ -20,6 +20,7 @@
 | [development.md](development.md) | Local development workflow + release checklist |
 | [testing.md](testing.md) | Test suite layout, golden-master tests, testcontainers |
 | [deployment.md](deployment.md) | Production-oriented deployment notes |
+| [releases/v0.20.0.md](releases/v0.20.0.md) | Release notes of v0.20.0 (wave 5); upgrade steps and rollback in [deployment.md](deployment.md#upgrading-to-v0200-wave-5). |
 | [releases/v0.19.0.md](releases/v0.19.0.md) | Release notes of v0.19.0 (wave 4); upgrade steps in [deployment.md](deployment.md#upgrading-to-v0190-wave-4). There is no notes file for v0.18.0 (waves 0-3): its content is described by the feature-area documents below, and its tag message lists the areas |
 | [deploy/docker-compose.md](deploy/docker-compose.md) | Full Docker Compose walkthrough: services, env vars, external DB, reverse proxy, TLS, MCP streaming |
 

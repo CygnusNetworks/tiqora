@@ -640,6 +640,84 @@ in the job counts, a warning line in the CLI output).
 Rolling back an erasure is refused in this state only when it restores archive rows and hashes of other erasures
 remain, because the restored rows could not be redacted against them. See [itsm-import.md](itsm-import.md).
 
+## Upgrading to v0.20.0 (wave 5)
+
+Operator notes for the release that adds approvals, change management and the ITSM reports (release notes:
+[releases/v0.20.0.md](releases/v0.20.0.md)). Nothing here needs a config, compose, proxy or dependency change. Replace
+`registry.example.com/tiqora` below with your image.
+
+1. **Migrations.** `20261010_0083` (10 approval tables), `0084` (17 change tables) and `0085` (two nullable columns on
+   `tiqora_report_ticket_fact`). They touch no Znuny table and write no data. Expect under 5 seconds in total; the
+   `ALTER` does not scale with rows. `0085` needs a short metadata lock, so it waits for a report query still running
+   on that table, bounded by `reporting.query_timeout_seconds`, and new report reads queue behind it. Nothing else
+   is locked. New tables take the schema's default character set. After a crash inside `0083` or `0084` (MariaDB DDL
+   is not transactional), drop that revision's tables and rerun.
+2. **Fact upgrade.** `FACT_VERSION` moves to 3, and the worker recomputes the report facts by itself, newest first, 500
+   rows per tick with 60 seconds between ticks: at most 30,000 tickets per hour. It runs only when the report backfill
+   is done, and it resumes after a restart. It writes `tiqora_report_*` only. Until it finishes, reports show a notice
+   (above 500 outdated rows), and first-level and ITSM solution figures cover only recomputed tickets. Progress:
+   `tiqora report status` (`outdated_rows`) or Admin, Berichtsdaten. A ticket that keeps failing is logged as
+   `report_facts_ticket_failed` and stays outdated. To stop or slow the upgrade, no rollback is needed: use
+   `daemon.report_facts.enabled` or `daemon.report_facts.interval_seconds`.
+3. **Optional environment variables.** All have working defaults.
+
+   | Variable | Default | Meaning |
+   |---|---|---|
+   | `TIQORA_ITSM_CHANGE_INTERVAL` | `3600` (60-86400) | Seconds between ticks of the worker service `itsm_change` |
+   | `TIQORA_ITSM_LEGACY_ERASED_KEY` | empty (`TIQORA_SECRET_KEY`) | Secret; key of the legacy change archive's erasure hashes, see [ITSM change management](#itsm-change-management) |
+   | `TIQORA_APPROVALS_SWEEP_INTERVAL` | `60` (15-3600) | Seconds between ticks of the worker service `approvals` |
+   | `TIQORA_APPROVAL_LINK_FAIL_MAX` | `20` | Invalid decision links per client address before the lockout |
+   | `TIQORA_APPROVAL_LINK_FAIL_WINDOW` | `600` | Window of that count, seconds |
+   | `TIQORA_APPROVAL_LINK_LOCKOUT` | `900` | Lockout, seconds |
+
+   Decision links in approval mails need `TIQORA_PUBLIC_BASE_URL`.
+4. **Roll-out order (recommended).** Recreating all four containers at once lets the worker tick before the api has
+   migrated. No data is damaged, but the log shows up to 500 `report_facts_ticket_failed` lines, `approvals_loop_error`
+   and `itsm_change_loop_error`, and Admin, Dienste shows `itsm_change` as failed until its next tick, up to an hour
+   later. To avoid that:
+   1. tag the running image as a rollback point:
+      `docker tag registry.example.com/tiqora:latest registry.example.com/tiqora:pre-0.20.0`;
+   2. pause Watchtower, if you use it;
+   3. `docker compose pull`, then `docker compose up -d tiqora-api`;
+   4. wait until the api is healthy and `tiqora migrate current` shows `20261010_0085 (head)`;
+   5. `docker compose up -d tiqora-worker tiqora-mcp tiqora-ai-worker`;
+   6. resume Watchtower.
+
+   The compose wait from [v0.19.0](#upgrading-to-v0190-wave-4) (`service_healthy`) covers the same race when the
+   containers are started by compose.
+5. **Check afterwards.** `/health` shows the new version. `tiqora migrate current` shows `20261010_0085 (head)`, one
+   line. All four containers are healthy. `tiqora report status` shows `outdated_rows` falling. Admin, Dienste lists
+   `approvals` and `itsm_change` as running. On a real ticket the approvals panel opens without console errors, but
+   **do not** create a test request on a customer ticket: it writes `ticket_history` and sends mail. Admin, ITSM,
+   "Einrichten" creates ticket types and dynamic fields, so do not press it as a check.
+
+### Rollback from v0.20.0
+
+No data is lost, and no downgrade is needed: tables and columns stay, the old code ignores them, and the new columns
+are nullable, so its inserts work. But the v0.19.0 entrypoint runs `tiqora migrate upgrade` under `set -e` and
+crash-loops on the unknown revision `20261010_0085`. So:
+
+1. pause Watchtower (otherwise it pulls the new image again);
+2. set `TIQORA_RUN_MIGRATIONS=0` in `.env`;
+3. point all four roles to `registry.example.com/tiqora:pre-0.20.0` and run `docker compose up -d` (a Watchtower
+   recreate does not pick up an `.env` change);
+4. check `/health` and all four containers;
+5. remove `TIQORA_RUN_MIGRATIONS=0` before you move forward again.
+
+What a rollback leaves behind (read from the code, not rehearsed):
+
+- Fact rows at version 3 stay valid for the old code. Rows it rebuilds return to 2 and are upgraded again later.
+- Open approvals freeze: no sweeper, no reminders, decision links dead. The data is intact and resumes when you move
+  forward.
+- Queued jobs of the new kinds end `failed` on the old worker, including approval mail still in the queue. **Those
+  mails are lost**, not retried.
+- **GDPR gap:** an erasure run on the old code does not touch approval, change or archive rows. Run such erasures
+  again after moving forward.
+
+**Downgrade (`tiqora migrate downgrade 20261010_0082`)** drops all 27 tables, so it is only for a site that never used
+approvals or changes. It avoids the `TIQORA_RUN_MIGRATIONS` step. Check `tiqora_gdpr_backup` first: backups of those
+tables would have nothing to restore into.
+
 ## Upgrading to v0.19.0 (wave 4)
 
 Operator notes for the release that adds the ITSM core, the CMDB, the ITSM importer, SCIM 2.0 and the

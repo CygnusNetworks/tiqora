@@ -533,7 +533,7 @@ Full index: **[docs/README.md](./docs/README.md)**
 | [docs/support-matrix.md](./docs/support-matrix.md) · [docs/parallel-operation.md](./docs/parallel-operation.md) · [docs/cutover.md](./docs/cutover.md) | Peer support matrix, parallel-op invariants, cutover runbook |
 | [docs/development.md](./docs/development.md) · [docs/testing.md](./docs/testing.md) | Local dev, seeding/anonymizing, test suites |
 | [docs/guide/fresh-install.md](./docs/guide/fresh-install.md) | Greenfield install, then the optional building blocks (ITSM mode, reports, SSO, web chat, plugins) |
-| [docs/deployment.md](./docs/deployment.md) | Production notes, upgrade notes per release ([v0.19.0](./docs/releases/v0.19.0.md)) |
+| [docs/deployment.md](./docs/deployment.md) | Production notes, upgrade notes per release ([v0.20.0](./docs/releases/v0.20.0.md), [v0.19.0](./docs/releases/v0.19.0.md)) |
 
 **Feature areas** (guides marked *German* have an English summary block unless noted)
 
