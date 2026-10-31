@@ -239,8 +239,7 @@ describe("CustomerUsersPage", () => {
     expect(logins).toHaveLength(2);
   });
 
-  // Chunk sizes and the abort are lib/bulk.test.ts's, the "Alle" fetch over several pages is
-  // AdminResourcePage.test.tsx's: thousands of rendered rows here were only slow.
+  // Chunk sizes and the abort are lib/bulk.test.ts's: thousands of rendered rows here were only slow.
   describe("bulk action on a selection", () => {
     async function selectBoth() {
       renderPage();
@@ -253,8 +252,34 @@ describe("CustomerUsersPage", () => {
       await selectBoth();
       fireEvent.click(screen.getByTestId("admin-bulk-action-invalid"));
 
-      expect((await screen.findByTestId("admin-bulk-status")).textContent).toMatch(/2/);
+      const status = await screen.findByTestId("admin-bulk-status");
+      expect(status.textContent).toBe(i18n.t("admin.bulk.done", { count: 2 }));
       expect(bulkUpdateCustomerUsers).toHaveBeenCalledTimes(1);
+    });
+
+    it("'Alle' over two fetch pages, then select all: every id reaches the bulk call", async () => {
+      list.mockImplementation(async (params?: { page?: number; pageSize?: number }) => {
+        const page = params?.page ?? 1;
+        const pageSize = params?.pageSize ?? 100;
+        const end = Math.min(page * pageSize, 501);
+        const items = [];
+        for (let id = (page - 1) * pageSize + 1; id <= end; id++) {
+          items.push({ ...sampleRow, id, login: `edu.${id}@example.com`, email: `edu.${id}@example.com` });
+        }
+        return { items, total: 501, page, page_size: pageSize };
+      });
+      renderPage();
+      fireEvent.click(await screen.findByTestId("admin-customer-users-page-size"));
+      fireEvent.click(screen.getByTestId("admin-customer-users-page-size-menu-option-100000"));
+      await screen.findByTestId("admin-row-501");
+      fireEvent.click(screen.getByTestId("admin-select-all"));
+      await screen.findByTestId("admin-bulk-bar");
+
+      fireEvent.click(screen.getByTestId("admin-bulk-action-invalid"));
+
+      await screen.findByTestId("admin-bulk-status");
+      const sent = (bulkUpdateCustomerUsers.mock.calls[0][0] as { ids: number[] }).ids;
+      expect(new Set(sent).size).toBe(501);
     });
 
     it("reports the progress of a failed action and keeps the selection for a retry", async () => {
