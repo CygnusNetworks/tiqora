@@ -55,6 +55,7 @@ from tiqora.approvals.resolve import (
 from tiqora.approvals.settings import ApprovalSettings
 from tiqora.config import Settings
 from tiqora.db.legacy.user import Users
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import utc_now
@@ -86,9 +87,13 @@ def _info(approval: TiqoraApproval) -> ApprovalInfo:
 # --- request ---------------------------------------------------------------------------------
 
 
-def _check_text(title: str, approval_key: str, subject_ref: str | None) -> tuple[str, str]:
-    title = title.strip()
-    approval_key = approval_key.strip()
+def _check_text(
+    title: str, approval_key: str, subject_ref: str | None
+) -> tuple[str, str, str | None]:
+    # replace_non_bmp here and at the other text columns: a utf8mb3 schema refuses 4-byte text.
+    title = (replace_non_bmp(title) or "").strip()
+    approval_key = (replace_non_bmp(approval_key) or "").strip()
+    subject_ref = replace_non_bmp(subject_ref)
     if not title or len(title) > _TITLE_MAX:
         raise ApprovalError("invalid_definition", 422, f"title must be 1-{_TITLE_MAX} characters")
     if not approval_key or len(approval_key) > _KEY_MAX:
@@ -99,7 +104,7 @@ def _check_text(title: str, approval_key: str, subject_ref: str | None) -> tuple
         raise ApprovalError(
             "invalid_definition", 422, f"subject_ref must be at most {_SUBJECT_REF_MAX} characters"
         )
-    return title, approval_key
+    return title, approval_key, subject_ref
 
 
 async def _require_subject_and_ticket(
@@ -241,7 +246,8 @@ async def request_approval(
     (reason ``superseded``) and points at the new one through ``superseded_by``.
     """
     reg = registry or get_registry()
-    title, approval_key = _check_text(title, approval_key, subject_ref)
+    title, approval_key, subject_ref = _check_text(title, approval_key, subject_ref)
+    description = replace_non_bmp(description)
     await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
     asettings = await _engine.load_settings(session, settings)
     defn, template_id = await _validated_definition(
@@ -280,11 +286,11 @@ async def request_approval(
                 ticket_id=ticket_id,
                 position=position,
                 stage=spec.stage,
-                name=spec.name,
+                name=replace_non_bmp(spec.name) or "",
                 rule=spec.rule,
                 quorum=spec.quorum,
                 status="waiting",
-                spec=spec.model_dump_json(),
+                spec=replace_non_bmp(spec.model_dump_json()) or "",
             )
         )
     await session.flush()
@@ -339,7 +345,8 @@ async def record_auto_decision(
     if not _REASON_RE.fullmatch(reason):
         raise ApprovalError("invalid_definition", 422, "reason must be a short lower-case code")
     reg = registry or get_registry()
-    title, approval_key = _check_text(title, approval_key, subject_ref)
+    title, approval_key, subject_ref = _check_text(title, approval_key, subject_ref)
+    description = replace_non_bmp(description)
     await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
     asettings = await _engine.load_settings(session, settings)
     requester_key = await _requester_key(session, None, actor)
@@ -494,7 +501,7 @@ async def decide(
     """
     if decision not in _VOTED:
         raise ValueError(f"unknown decision: {decision!r}")
-    text_ = comment.strip() if comment is not None else None
+    text_ = replace_non_bmp(comment.strip()) if comment is not None else None
     if text_ is not None and len(text_) > COMMENT_MAX:
         raise ApprovalError("comment_too_long", 422, f"at most {COMMENT_MAX} characters")
     reg = registry or get_registry()

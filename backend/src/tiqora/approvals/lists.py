@@ -21,6 +21,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalListMember,
     TiqoraApprovalTemplate,
 )
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.jobs.service import utc_now
 
 _CHUNK = 500
@@ -41,7 +42,7 @@ def _chunks(ids: Sequence[int]) -> Iterable[Sequence[int]]:
 
 
 def _clean_name(name: str) -> str:
-    name = name.strip()
+    name = (replace_non_bmp(name) or "").strip()
     if not name or len(name) > 190:
         raise ApprovalError("invalid_definition", 422, "list name must be 1-190 characters")
     return name
@@ -133,7 +134,7 @@ async def create_list(
     now = utc_now()
     entity = TiqoraApprovalList(
         name=name,
-        description=description,
+        description=replace_non_bmp(description),
         valid=True,
         create_time=now,
         create_by=actor_id,
@@ -176,7 +177,7 @@ async def update_list(
     if clear_description:
         entity.description = None
     elif description is not None:
-        entity.description = description
+        entity.description = replace_non_bmp(description)
     if valid is not None:
         entity.valid = valid
     if member_ids is not None:

@@ -25,6 +25,7 @@ from tiqora.approvals.contract import (
     ApproverEntry,
 )
 from tiqora.approvals.models import TiqoraApprovalList, TiqoraApprovalTemplate
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
 
@@ -201,21 +202,23 @@ async def _template_by_key(
 ) -> TiqoraApprovalTemplate | None:
     """*lock*: a locking read, which sees rows committed after this transaction's snapshot
     (MariaDB REPEATABLE READ)."""
-    stmt = select(TiqoraApprovalTemplate).where(TiqoraApprovalTemplate.template_key == key)
+    # a 4-byte literal would fail with error 1267 against a utf8mb3 column
+    safe_key = replace_non_bmp(key)
+    stmt = select(TiqoraApprovalTemplate).where(TiqoraApprovalTemplate.template_key == safe_key)
     if lock:
         stmt = stmt.with_for_update().execution_options(populate_existing=True)
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
 def _clean_key(key: str) -> str:
-    key = key.strip()
+    key = (replace_non_bmp(key) or "").strip()
     if not key or len(key) > 100:
         raise ApprovalError("invalid_definition", 422, "template key must be 1-100 characters")
     return key
 
 
 def _clean_name(name: str) -> str:
-    name = name.strip()
+    name = (replace_non_bmp(name) or "").strip()
     if not name or len(name) > 200:
         raise ApprovalError("invalid_definition", 422, "template name must be 1-200 characters")
     return name
@@ -293,9 +296,9 @@ async def create_template(
     entity = TiqoraApprovalTemplate(
         template_key=key,
         name=name,
-        description=description,
+        description=replace_non_bmp(description),
         subject_types=_dump_subjects(types),
-        definition=parsed.model_dump_json(),
+        definition=replace_non_bmp(parsed.model_dump_json()) or "",
         origin="admin",
         valid=True,
         create_time=now,
@@ -353,11 +356,11 @@ async def update_template(
     if clear_description:
         entity.description = None
     elif description is not None:
-        entity.description = description
+        entity.description = replace_non_bmp(description)
     if valid is not None:
         entity.valid = valid
     entity.subject_types = _dump_subjects(types)
-    entity.definition = parsed.model_dump_json()
+    entity.definition = replace_non_bmp(parsed.model_dump_json()) or ""
     entity.change_time = utc_now().replace(microsecond=0)
     entity.change_by = actor_id
     await session.flush()
@@ -402,9 +405,9 @@ async def ensure_template(
     entity = TiqoraApprovalTemplate(
         template_key=key,
         name=_clean_name(name),
-        description=description,
+        description=replace_non_bmp(description),
         subject_types=_dump_subjects(subject_types),
-        definition=definition.model_dump_json(),
+        definition=replace_non_bmp(definition.model_dump_json()) or "",
         origin=origin,
         valid=True,
         create_time=now,

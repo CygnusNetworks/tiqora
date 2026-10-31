@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.cmdb.impact import services_reached_from
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_access import CHUNK, readable_tickets
 from tiqora.extensions import ExtensionPoint, get_registry
@@ -250,7 +251,7 @@ def _question_out(row: TiqoraItsmChangeRiskQuestion) -> ChangeRiskQuestionOut:
 
 
 def _dump_answers(answers: Sequence[ChangeRiskAnswerDef]) -> str:
-    return json.dumps([a.model_dump() for a in answers], ensure_ascii=False)
+    return replace_non_bmp(json.dumps([a.model_dump() for a in answers], ensure_ascii=False)) or ""
 
 
 async def _question_rows(
@@ -301,8 +302,8 @@ async def create_question(
     now = utc_now()
     row = TiqoraItsmChangeRiskQuestion(
         question_key=data.question_key,
-        question=data.question,
-        help=data.help,
+        question=replace_non_bmp(data.question) or "",
+        help=replace_non_bmp(data.help),
         answers=_dump_answers(data.answers),
         position=await _next_position(session),
         valid=data.valid,
@@ -323,8 +324,8 @@ async def update_question(
     row = await _question(session, question_id)
     if data.question_key != row.question_key:
         raise ChangeError("risk_question_key_immutable", 422)
-    row.question = data.question
-    row.help = data.help
+    row.question = replace_non_bmp(data.question) or ""
+    row.help = replace_non_bmp(data.help)
     row.answers = _dump_answers(data.answers)
     row.valid = data.valid
     row.updated_at = utc_now()
@@ -769,7 +770,7 @@ async def _run_checks(session: AsyncSession, inp: RiskInput) -> list[RiskFinding
 
 
 def _dump_findings(findings: Sequence[RiskFinding]) -> str:
-    return json.dumps(
+    dumped = json.dumps(
         [
             {
                 "check_key": f.check_key,
@@ -785,6 +786,7 @@ def _dump_findings(findings: Sequence[RiskFinding]) -> str:
         sort_keys=True,
         default=str,
     )
+    return replace_non_bmp(dumped) or ""
 
 
 def _load_findings(raw: str | None) -> tuple[RiskFinding, ...]:
@@ -939,7 +941,7 @@ async def override_level(
         raise ChangeError("forbidden", 403)
     if level is not None and level not in RISK_LEVELS:
         raise ChangeError("risk_level_invalid", 422)
-    text_reason = reason.strip()
+    text_reason = (replace_non_bmp(reason) or "").strip()
     if not text_reason:
         raise ChangeError("risk_override_reason_required", 422)
     if len(text_reason) > 1000:

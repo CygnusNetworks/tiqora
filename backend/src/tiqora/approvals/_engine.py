@@ -51,6 +51,7 @@ from tiqora.approvals.resolve import (
 )
 from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
 from tiqora.config import Settings, get_settings
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import enqueue_job, utc_now
@@ -306,7 +307,9 @@ async def add_approver(
         customer_login=resolved.principal.login,
         source_kind=resolved.source_kind,
         source_ref=resolved.source_ref,
-        source_label=resolved.source_label[:200] if resolved.source_label else None,
+        source_label=replace_non_bmp(resolved.source_label[:200])
+        if resolved.source_label
+        else None,
         decisive=False,
         status="pending",
         added_at=now,

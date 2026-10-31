@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.calendar.recurrence import MAX_OCCURRENCES, expand_occurrences, to_utc_naive
 from tiqora.calendar.schemas import RecurrenceIn
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.ticket_access import CHUNK
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.models import TiqoraItsmChangeFreeze, TiqoraItsmChangeFreezeService
@@ -164,8 +165,8 @@ async def _validated(session: AsyncSession, data: FreezeIn) -> list[int]:
 
 
 def _apply(row: TiqoraItsmChangeFreeze, data: FreezeIn) -> None:
-    row.name = data.name
-    row.note = data.note
+    row.name = replace_non_bmp(data.name) or ""
+    row.note = replace_non_bmp(data.note)
     row.enforcement = data.enforcement
     row.allow_emergency = data.allow_emergency
     row.scope = data.scope

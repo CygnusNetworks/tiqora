@@ -59,6 +59,7 @@ from tiqora.approvals.templates import validate_definition_refs
 from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.user import PermissionGroups, Roles, RoleUser, Users
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.ticket_access import readable_tickets
 from tiqora.extensions.core import get_registry
 from tiqora.itsm.change.approval_port import SUBJECT_TYPE, ApprovalSnapshot, get_approval_port
@@ -468,8 +469,8 @@ async def create_cab(session: AsyncSession, *, data: CabIn, user_id: int) -> Cab
     """Admin. A new CAB has no members yet."""
     now = utc_now()
     cab = TiqoraItsmCab(
-        name=data.name,
-        description=data.description,
+        name=replace_non_bmp(data.name) or "",
+        description=replace_non_bmp(data.description),
         rule=data.rule,
         quorum=data.quorum,
         is_emergency=data.is_emergency,
@@ -492,12 +493,14 @@ async def update_cab(session: AsyncSession, *, cab_id: int, data: CabIn, user_id
     cab = await _cab(session, cab_id)
     check_definition(data.name, data.rule, data.quorum, await _stored_members(session, cab_id))
     taken = await session.execute(
-        select(TiqoraItsmCab.id).where(TiqoraItsmCab.name == data.name, TiqoraItsmCab.id != cab_id)
+        select(TiqoraItsmCab.id).where(
+            TiqoraItsmCab.name == replace_non_bmp(data.name), TiqoraItsmCab.id != cab_id
+        )
     )
     if taken.first() is not None:  # before touching the row: a refused update leaves it clean
         raise ChangeError("cab_name_exists", 409)
-    cab.name = data.name
-    cab.description = data.description
+    cab.name = replace_non_bmp(data.name) or ""
+    cab.description = replace_non_bmp(data.description)
     cab.rule = data.rule
     cab.quorum = data.quorum
     cab.is_emergency = data.is_emergency
@@ -775,10 +778,10 @@ async def create_meeting(
     now = utc_now()
     meeting = TiqoraItsmCabMeeting(
         cab_id=cab.id,
-        title=data.title,
+        title=replace_non_bmp(data.title) or "",
         starts_at=to_utc_naive(data.starts_at),
         ends_at=to_utc_naive(data.ends_at),
-        location=(data.location or "").strip() or None,
+        location=(replace_non_bmp(data.location) or "").strip() or None,
         status="planned",
         created_at=now,
         created_by=user_id,
@@ -808,15 +811,15 @@ async def update_meeting(
     if ends <= starts:
         raise ChangeError("range_invalid", 422)
     if data.title is not None:
-        meeting.title = data.title
+        meeting.title = replace_non_bmp(data.title) or ""
     meeting.starts_at = starts
     meeting.ends_at = ends
     if "location" in sent:
-        meeting.location = (data.location or "").strip() or None
+        meeting.location = (replace_non_bmp(data.location) or "").strip() or None
     if data.status is not None:
         meeting.status = data.status
     if "minutes" in sent:
-        meeting.minutes = data.minutes or None
+        meeting.minutes = replace_non_bmp(data.minutes) or None
     meeting.updated_at = utc_now()
     meeting.updated_by = user_id
     await session.flush()
@@ -881,7 +884,9 @@ async def set_agenda(
     await session.execute(
         delete(TiqoraItsmCabAgendaItem).where(TiqoraItsmCabAgendaItem.meeting_id == meeting_id)
     )
-    lines = [(i.change_ticket_id, (i.note or "").strip() or None) for i in items] + kept_hidden
+    lines = [
+        (i.change_ticket_id, (replace_non_bmp(i.note) or "").strip() or None) for i in items
+    ] + kept_hidden
     for position, (tid, note) in enumerate(lines, start=1):
         session.add(
             TiqoraItsmCabAgendaItem(

@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.dynamic_field_values import get_df_values, load_dynamic_field
 from tiqora.domain.ticket_access import (
     CHUNK,
@@ -302,7 +303,11 @@ async def record_event(
         event=event,
         from_phase=from_phase,
         to_phase=to_phase,
-        detail=None if detail is None else json.dumps(detail, ensure_ascii=False, sort_keys=True),
+        detail=(
+            None
+            if detail is None
+            else replace_non_bmp(json.dumps(detail, ensure_ascii=False, sort_keys=True))
+        ),
     )
     session.add(row)
     await session.flush()
@@ -362,7 +367,8 @@ async def _drift(
 
 
 def _clean(value: str | None) -> str | None:
-    value = (value or "").strip()
+    # replace_non_bmp here and at the other text columns: a utf8mb3 schema refuses 4-byte text.
+    value = (replace_non_bmp(value) or "").strip()
     return value or None
 
 

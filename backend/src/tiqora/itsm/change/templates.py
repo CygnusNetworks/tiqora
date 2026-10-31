@@ -31,6 +31,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.ticket_access import CHUNK
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.models import (
@@ -399,7 +400,7 @@ async def _validated(
     clash = (
         await session.execute(
             select(TiqoraItsmChangeTemplate.id).where(
-                TiqoraItsmChangeTemplate.name == data.name,
+                TiqoraItsmChangeTemplate.name == replace_non_bmp(data.name),
                 TiqoraItsmChangeTemplate.id != (own_id or 0),
             )
         )
@@ -409,11 +410,17 @@ async def _validated(
 
 
 def _dump_defaults(data: TemplateIn) -> str:
-    return json.dumps(data.defaults.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
+    dumped = json.dumps(data.defaults.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
+    return replace_non_bmp(dumped) or ""
 
 
 def _dump_tasks(data: TemplateIn) -> str:
-    return json.dumps([t.model_dump(mode="json") for t in data.tasks], ensure_ascii=False)
+    return (
+        replace_non_bmp(
+            json.dumps([t.model_dump(mode="json") for t in data.tasks], ensure_ascii=False)
+        )
+        or ""
+    )
 
 
 async def create_template(
@@ -423,8 +430,8 @@ async def create_template(
     await _validated(session, settings, data, own_id=None)
     now = utc_now()
     row = TiqoraItsmChangeTemplate(
-        name=data.name,
-        description=data.description,
+        name=replace_non_bmp(data.name) or "",
+        description=replace_non_bmp(data.description),
         change_type=data.change_type,
         is_standard=data.is_standard,
         valid=data.valid,
@@ -456,8 +463,8 @@ async def update_template(
     if row is None:
         raise ChangeError("template_not_found", 404)
     await _validated(session, settings, data, own_id=template_id)
-    row.name = data.name
-    row.description = data.description
+    row.name = replace_non_bmp(data.name) or ""
+    row.description = replace_non_bmp(data.description)
     row.change_type = data.change_type
     row.is_standard = data.is_standard
     row.valid = data.valid

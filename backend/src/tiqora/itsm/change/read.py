@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.cmdb.impact import services_reached_per_ci
 from tiqora.config import get_settings
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.ticket_access import CHUNK, TicketFacts, readable_tickets
 from tiqora.itsm.change.conflicts import (
     OVERLAP_PHASES,
@@ -506,7 +507,8 @@ async def list_changes(session: AsyncSession, q: ChangeQuery, *, user_id: int) -
     ch = TiqoraItsmChange
     where: list[ColumnElement[bool]] = []
     candidates_truncated = False
-    needle = (q.text or "").strip()
+    # A 4-byte needle would fail with error 1267 against a utf8mb3 column.
+    needle = (replace_non_bmp(q.text) or "").strip()
     if needle:
         found, candidates_truncated = await _text_candidates(session, needle)
         if not found:
