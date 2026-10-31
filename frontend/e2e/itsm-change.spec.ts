@@ -529,7 +529,7 @@ test.describe("agent change screens at phone width", () => {
     await fits(page, "changeListPage");
   });
 
-  for (const width of [320, 390, 430]) {
+  for (const width of [320, 390, 430, 700]) {
     test(`every header popup stays inside the viewport at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 });
       await page.route("**/api/v1/queues", (route) =>

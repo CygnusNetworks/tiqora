@@ -255,8 +255,9 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
         "relative",
         fill
           ? "w-full"
-          : // On a phone the open search covers the header's controls instead of widening the page.
-            "max-sm:fixed max-sm:z-50 max-sm:inset-x-2 max-sm:top-2 sm:min-w-[22rem]",
+          : // Only the mobile header has this variant: the open search covers its controls
+            // instead of widening the page.
+            "max-md:fixed max-md:inset-x-2 max-md:top-2 max-md:z-50",
       )}
     >
       <SmartSearchBar
