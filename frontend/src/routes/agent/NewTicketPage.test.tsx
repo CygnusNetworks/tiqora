@@ -903,7 +903,7 @@ describe("NewTicketPage", () => {
     await waitFor(() => expect(screen.getByTestId("new-ticket-retry-send")).toBeDisabled());
   });
 
-  async function failSend() {
+  async function failSendOnce() {
     createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
     await fillEmail();
     await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
@@ -917,7 +917,7 @@ describe("NewTicketPage", () => {
   }
 
   it("'+ New' with another queue after a failed send starts over with an empty form and no second ticket", async () => {
-    await failSend();
+    await failSendOnce();
     navigateSameRoute({ queue_id: 1 });
 
     await waitFor(() => expect(screen.queryByTestId("new-ticket-error")).not.toBeInTheDocument());
@@ -928,8 +928,52 @@ describe("NewTicketPage", () => {
     expect(createTicket).toHaveBeenCalledTimes(1);
   });
 
+  it("a send that fails after '+ New' during it keeps the message and the link, until the next change", async () => {
+    let failSend = (_err: Error) => {};
+    createArticle.mockImplementationOnce(() => new Promise((_resolve, reject) => (failSend = reject)));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+
+    navigateSameRoute({ queue_id: 1 });
+    await act(async () => {
+      failSend(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+      await Promise.resolve();
+    });
+
+    const error = await screen.findByTestId("new-ticket-error");
+    expect(error).toHaveTextContent(/SMTP refused/);
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-retry-send")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    expect(createTicket).toHaveBeenCalledTimes(1);
+
+    navigateSameRoute({ queue_id: 2 });
+    await waitFor(() => expect(screen.queryByTestId("new-ticket-error")).not.toBeInTheDocument());
+    expect(screen.getByTestId("new-ticket-subject")).toHaveValue("");
+  });
+
+  it("a retried send that fails after a search change keeps the message and the link", async () => {
+    const retry = await failSendOnce();
+    let failRetry = (_err: Error) => {};
+    createArticle.mockImplementationOnce(() => new Promise((_resolve, reject) => (failRetry = reject)));
+    fireEvent.click(retry);
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(2));
+
+    navigateSameRoute({ queue_id: 1 });
+    await act(async () => {
+      failRetry(new TypeError("Failed to fetch"));
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByTestId("new-ticket-error")).toHaveTextContent(i18n.t("newTicket.sendError"));
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-retry-send")).toBeInTheDocument();
+  });
+
   it("identical search params keep the failure view", async () => {
-    await failSend();
+    await failSendOnce();
     navigateSameRoute({});
     await act(async () => {
       await Promise.resolve();
@@ -940,7 +984,7 @@ describe("NewTicketPage", () => {
   });
 
   it("a search change during a retry's navigation neither creates nor unlocks", async () => {
-    const retry = await failSend();
+    const retry = await failSendOnce();
     navigate.mockImplementation(() => new Promise(() => {})); // the router is still loading
     fireEvent.click(retry);
     await waitFor(() => expect(navigate).toHaveBeenCalled());

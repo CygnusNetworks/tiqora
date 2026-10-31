@@ -332,17 +332,18 @@ function NewTicketForm({ onStartOver }: { onStartOver: () => void }) {
   const submittedSearch = useRef(search);
   // Same route, other search ("+ New", an accepted call): the agent wants a new ticket and this
   // form's content is in the one that exists. Running steps finish first, the form stays locked.
+  // Only a search change after the agent saw the failure counts: one that came before it must
+  // not swallow the message that the mail did not go out.
   const searchKey = JSON.stringify(search);
+  const seenFailure = useRef<{ failure: FailedStep; searchKey: string } | null>(null);
   useEffect(() => {
-    if (
-      createdTicketId !== null &&
-      !submitting &&
-      !retrying &&
-      JSON.stringify(submittedSearch.current) !== searchKey
-    ) {
-      onStartOver();
+    if (failedStep === null) return;
+    if (seenFailure.current?.failure !== failedStep) {
+      seenFailure.current = { failure: failedStep, searchKey };
+      return;
     }
-  }, [createdTicketId, submitting, retrying, searchKey, onStartOver]);
+    if (!submitting && !retrying && seenFailure.current.searchKey !== searchKey) onStartOver();
+  }, [failedStep, submitting, retrying, searchKey, onStartOver]);
 
   // Unlocked once a customer is chosen, or the agent explicitly opts to
   // continue without one — the escape hatch button stays outside this gate.
