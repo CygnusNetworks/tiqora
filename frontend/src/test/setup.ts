@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
+
+// The 1 s default fails a slow render on a busy machine; see testTimeout in vitest.config.ts.
+configure({ asyncUtilTimeout: 5_000 });
 
 // jsdom doesn't implement scrollIntoView; components call it on focus
 if (typeof Element.prototype.scrollIntoView !== "function") {

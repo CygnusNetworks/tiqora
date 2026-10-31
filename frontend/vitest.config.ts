@@ -13,6 +13,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // CPU-bound tests slow down with the machine (8 parallel runs: about 10x), and these budgets
+    // only exist to catch a hang: a passing test still ends as soon as it is done.
+    testTimeout: 30_000,
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
       provider: "v8",

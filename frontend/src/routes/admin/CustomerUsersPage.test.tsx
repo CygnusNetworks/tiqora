@@ -239,92 +239,34 @@ describe("CustomerUsersPage", () => {
     expect(logins).toHaveLength(2);
   });
 
-  describe("bulk chunking over the 1000-id backend cap", () => {
-    /** Synthetic customer_user row matching CustomerUserAdminOut. */
-    function makeRow(id: number) {
-      return {
-        ...sampleRow,
-        id,
-        login: `edu.${id}@example.com`,
-        email: `edu.${id}@example.com`,
-      };
-    }
-
-    /** Chunked "Alle" list mock serving `total` rows in 500-row pages. */
-    function makeAllListMock(total: number) {
-      return vi.fn().mockImplementation(async (params?: { page?: number; pageSize?: number }) => {
-        const page = params?.page ?? 1;
-        const pageSize = params?.pageSize ?? 100;
-        const start = (page - 1) * pageSize;
-        const end = Math.min(start + pageSize, total);
-        const items = [];
-        for (let i = start; i < end; i++) items.push(makeRow(i + 1));
-        return { items, total, page, page_size: pageSize };
-      });
-    }
-
-    async function selectAllViaAllePageSize(total: number) {
-      list.mockImplementation(makeAllListMock(total));
+  // Chunk sizes and the abort are lib/bulk.test.ts's, the "Alle" fetch over several pages is
+  // AdminResourcePage.test.tsx's: thousands of rendered rows here were only slow.
+  describe("bulk action on a selection", () => {
+    async function selectBoth() {
       renderPage();
-      await waitFor(() => {
-        expect(screen.getByTestId("admin-customer-users-page-size")).toBeInTheDocument();
-      });
-      fireEvent.click(screen.getByTestId("admin-customer-users-page-size"));
-      fireEvent.click(screen.getByTestId("admin-customer-users-page-size-menu-option-100000"));
-      await waitFor(() => {
-        expect(screen.getByTestId(`admin-row-${total}`)).toBeInTheDocument();
-      });
+      await screen.findByTestId("admin-row-select-42");
       fireEvent.click(screen.getByTestId("admin-select-all"));
       await screen.findByTestId("admin-bulk-bar");
     }
 
-    it("splits a 2988-id selection into 3 chunked PATCH calls (1000/1000/988)", async () => {
-      bulkUpdateCustomerUsers.mockImplementation(async (body: { ids: number[] }) => ({
-        updated: body.ids.length,
-      }));
-      await selectAllViaAllePageSize(2988);
-
-      bulkUpdateCustomerUsers.mockClear();
+    it("reports the updated count", async () => {
+      await selectBoth();
       fireEvent.click(screen.getByTestId("admin-bulk-action-invalid"));
 
-      await waitFor(() => {
-        expect(screen.getByTestId("admin-bulk-status")).toBeInTheDocument();
-      });
-      expect(bulkUpdateCustomerUsers).toHaveBeenCalledTimes(3);
-      const sizes = bulkUpdateCustomerUsers.mock.calls.map(
-        (c) => (c[0] as { ids: number[] }).ids.length,
-      );
-      expect(sizes).toEqual([1000, 1000, 988]);
-      // Every id present exactly once across the three chunks.
-      const allIds = bulkUpdateCustomerUsers.mock.calls.flatMap(
-        (c) => (c[0] as { ids: number[] }).ids,
-      );
-      expect(new Set(allIds).size).toBe(2988);
-      // Success feedback reports the summed count.
-      expect(screen.getByTestId("admin-bulk-status").textContent).toMatch(/2988/);
-    }, 60000);
+      expect((await screen.findByTestId("admin-bulk-status")).textContent).toMatch(/2/);
+      expect(bulkUpdateCustomerUsers).toHaveBeenCalledTimes(1);
+    });
 
-    it("stops after a failing chunk and reports progress in the error message", async () => {
-      await selectAllViaAllePageSize(2988);
-
-      bulkUpdateCustomerUsers
-        .mockImplementationOnce(async () => ({ updated: 1000 }))
-        .mockImplementationOnce(async () => {
-          throw new ApiError(422, "boom", "/admin/customer-users/bulk");
-        });
+    it("reports the progress of a failed action and keeps the selection for a retry", async () => {
+      await selectBoth();
+      bulkUpdateCustomerUsers.mockRejectedValueOnce(
+        new ApiError(422, "boom", "/admin/customer-users/bulk"),
+      );
       fireEvent.click(screen.getByTestId("admin-bulk-action-invalid"));
 
-      await waitFor(() => {
-        expect(screen.getByTestId("admin-bulk-status")).toBeInTheDocument();
-      });
-      // Aborted after the 2nd chunk — never reached the 3rd.
-      expect(bulkUpdateCustomerUsers).toHaveBeenCalledTimes(2);
-      const status = screen.getByTestId("admin-bulk-status").textContent ?? "";
-      expect(status).toMatch(/1000/);
-      expect(status).toMatch(/2988/);
-      // Selection is retained so the user can retry.
+      expect((await screen.findByTestId("admin-bulk-status")).textContent).toMatch(/0\/2/);
       expect(screen.getByTestId("admin-bulk-count")).toBeInTheDocument();
-    }, 60000);
+    });
   });
 
   it("sorts by login header and toggles the indicator", async () => {
