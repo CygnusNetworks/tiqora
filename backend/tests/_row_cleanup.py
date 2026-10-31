@@ -71,9 +71,19 @@ def cleanup_module(
     delete_rows_above(sync_url, snapshot, setting_keys=setting_keys)
 
 
+def _is_missing_table(exc: DatabaseError) -> bool:
+    """The driver's own "no such table": PostgreSQL 42P01, MySQL/MariaDB 1146, SQLite's text."""
+    orig = exc.orig
+    if getattr(orig, "pgcode", None) == "42P01":
+        return True
+    args = getattr(orig, "args", ())
+    return bool(args and args[0] == 1146) or "no such table" in str(orig)
+
+
 def snapshot_marks(sync_url: str, tables: Sequence[str]) -> dict[str, int]:
     """Highest id per table; a table that does not exist yet gets ``0`` (every row it will
-    hold is the module's own)."""
+    hold is the module's own). A table that cannot be read for another reason gets no mark,
+    so its rows are left alone."""
     engine = create_engine(sync_url)
     marks: dict[str, int] = {}
     try:
@@ -83,8 +93,10 @@ def snapshot_marks(sync_url: str, tables: Sequence[str]) -> dict[str, int]:
                     marks[table] = int(
                         conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}")).scalar_one()
                     )
-            except DatabaseError:
-                marks[table] = 0
+            except DatabaseError as exc:
+                # Any other error says nothing about the table's rows: no mark, no delete.
+                if _is_missing_table(exc):
+                    marks[table] = 0
         return marks
     finally:
         engine.dispose()
