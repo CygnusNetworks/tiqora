@@ -790,7 +790,7 @@ list before rolling out; every item has a failure mode that is silent until some
    v0.18.x entrypoint runs `tiqora migrate upgrade` under `set -e` and fails on the unknown revision
    `20261010_0082`, so an api on the old image crash-loops.** To roll back:
    1. pause Watchtower (otherwise it pulls the new image again);
-   2. set `TIQORA_RUN_MIGRATIONS=0` in `.env`;
+   2. set `TIQORA_RUN_MIGRATIONS=0` in `.env` and make sure it reaches the api (see the v0.20.0 rollback above);
    3. point all four roles back to the previous image (tag it before the upgrade, for example `:pre-0.19.0`)
       and `docker compose up -d`.
 
