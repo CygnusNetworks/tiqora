@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from httpx import ASGITransport, AsyncClient
@@ -159,7 +160,7 @@ def seed_world(sync_url: str) -> None:
     """Idempotent: removes the band, then inserts users, groups, queues, roles, tickets."""
     cleanup_world(sync_url)
     t = datetime(2026, 10, 1, 8, 0)
-    epoch = int(now.replace(tzinfo=UTC).timestamp())  # `now` is naive UTC
+    epoch = int(time.time())  # at seeding: `now` dates from the import, maybe hours ago
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         state = {

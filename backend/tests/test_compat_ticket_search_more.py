@@ -143,6 +143,8 @@ def _article(conn: Any, aid: int, tid: int, subject: str, created: datetime) -> 
 
 
 def _seed(sync_url: str) -> None:
+    global _NOW  # the windows are minutes wide, the import can be an hour old in a full run
+    _NOW = datetime.now(tz=UTC).replace(tzinfo=None, microsecond=0)
     _SEEDED.append(sync_url)
     engine = create_engine(sync_url)
     t0 = datetime(2024, 6, 1, 12, 0, 0)

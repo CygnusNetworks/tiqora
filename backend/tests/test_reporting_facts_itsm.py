@@ -506,7 +506,13 @@ def test_migration_adds_nullable_columns(alembic_env: str) -> None:
     url = alembic_env
     engine = create_engine(url)
     try:
-        had_version_row = "tiqora_alembic_version" in inspect(engine).get_table_names()
+        had_version_row = False
+        if "tiqora_alembic_version" in inspect(engine).get_table_names():
+            with engine.connect() as conn:  # the per-module restore empties it but keeps the table
+                had_version_row = (
+                    conn.execute(text("SELECT COUNT(*) FROM tiqora_alembic_version")).scalar_one()
+                    > 0
+                )
     finally:
         engine.dispose()
     cfg = build_alembic_config(include_owned=False)
