@@ -453,6 +453,54 @@ def _fact_columns(sync_url: str) -> dict[str, bool]:
         engine.dispose()
 
 
+_DOWNGRADE_TICKET = 985085
+
+
+def _insert_fact_v3(sync_url: str) -> None:
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO tiqora_report_ticket_fact (ticket_id, tn, created_at, created_by,"
+                    " queue_id, queue_id_at_create, state_id, state_type, priority_id, owner_id,"
+                    " channel, last_event_at, built_at, fact_version, first_level_solved,"
+                    " itsm_solution_working_minutes)"
+                    " VALUES (:t, 'down', '2026-10-26 08:00:00', 1, 1, 1, 1, 'closed', 3, 1,"
+                    " 'email', '2026-10-26 08:00:00', '2026-10-26 08:00:00', 3, :solved, 42)"
+                ),
+                {"t": _DOWNGRADE_TICKET, "solved": True},
+            )
+    finally:
+        engine.dispose()
+
+
+def _fact_version(sync_url: str) -> int:
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            return int(
+                conn.execute(
+                    text("SELECT fact_version FROM tiqora_report_ticket_fact WHERE ticket_id = :t"),
+                    {"t": _DOWNGRADE_TICKET},
+                ).scalar_one()
+            )
+    finally:
+        engine.dispose()
+
+
+def _delete_fact(sync_url: str) -> None:
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM tiqora_report_ticket_fact WHERE ticket_id = :t"),
+                {"t": _DOWNGRADE_TICKET},
+            )
+    finally:
+        engine.dispose()
+
+
 @pytest.mark.parametrize("alembic_env", URLS, indirect=True)
 def test_migration_adds_nullable_columns(alembic_env: str) -> None:
     url = alembic_env
@@ -471,9 +519,16 @@ def test_migration_adds_nullable_columns(alembic_env: str) -> None:
             "first_level_solved": True,
             "itsm_solution_working_minutes": True,
         }
+        _insert_fact_v3(url)
         command.downgrade(cfg, _PREVIOUS)
         assert _fact_columns(url) == {}
+        # on the way forward the row must count as outdated, or its new columns stay empty
+        assert _fact_version(url) == 2
+        command.upgrade(cfg, _THIS)
+        assert _fact_version(url) == 2
+        command.downgrade(cfg, _PREVIOUS)
     finally:
+        _delete_fact(url)
         command.upgrade(cfg, "head")
         delete_migration_seed_rows(url)
         if not had_version_row:

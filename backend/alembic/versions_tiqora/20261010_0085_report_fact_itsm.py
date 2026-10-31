@@ -32,5 +32,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Without this, version 3 rows would come back with empty columns on the way forward, and
+    # the upgrade (fact_version < 3) would never fill them.
+    op.execute("UPDATE tiqora_report_ticket_fact SET fact_version = 2 WHERE fact_version > 2")
     op.drop_column("tiqora_report_ticket_fact", "itsm_solution_working_minutes")
     op.drop_column("tiqora_report_ticket_fact", "first_level_solved")

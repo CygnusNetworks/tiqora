@@ -106,6 +106,8 @@ services:
       - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *tiqora-env
+      # 0 = this container does not migrate (needed to roll back to an older image).
+      TIQORA_RUN_MIGRATIONS: ${TIQORA_RUN_MIGRATIONS:-1}
     ports:
       - "127.0.0.1:${TIQORA_PORT:-8000}:8000"
     depends_on:

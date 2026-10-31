@@ -117,6 +117,8 @@ services:
     restart: unless-stopped
     command: ["api"]
     environment:
+      # 0 = this container does not migrate (needed to roll back to an older image).
+      TIQORA_RUN_MIGRATIONS: ${TIQORA_RUN_MIGRATIONS:-1}
       # PostgreSQL:
       DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
       # MariaDB alternative:
