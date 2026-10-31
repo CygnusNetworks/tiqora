@@ -317,11 +317,20 @@ export function NewTicketPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
-  /** The ticket that exists but whose link to the opening change failed: only the link is retried, never the create. */
   // The ticket exists but a step after its creation failed: only that step may run again.
   const [failedStep, setFailedStep] = useState<FailedStep | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Same route, other search ("+ New" in the header): that failure belongs to the ticket before.
+  const searchKey = JSON.stringify(search);
+  const [failureSearchKey, setFailureSearchKey] = useState(searchKey);
+  if (failureSearchKey !== searchKey) {
+    setFailureSearchKey(searchKey);
+    setFailedStep(null);
+    setCreatedTicketId(null);
+    setError(null);
+  }
 
   // Unlocked once a customer is chosen, or the agent explicitly opts to
   // continue without one — the escape hatch button stays outside this gate.
@@ -541,11 +550,11 @@ export function NewTicketPage() {
         }));
       } catch (articleErr) {
         setFailedStep({ step: "send", ticketId });
-        if (!(articleErr instanceof ApiError)) throw articleErr;
         // Same reason text as the reply dialog: the server's detail, unless
-        // it is just the bare status line.
-        const reason =
-          articleErr.status === 413
+        // it is just the bare status line. A dropped connection is no ApiError.
+        const reason = !(articleErr instanceof ApiError)
+          ? null
+          : articleErr.status === 413
             ? t("ticket.telegram.composer.attachTooLargeServer")
             : articleErr.message && !articleErr.message.startsWith("HTTP ")
               ? articleErr.message
@@ -569,7 +578,7 @@ export function NewTicketPage() {
       return;
     }
     if (!(await linkToChange(ticketId))) return;
-    setFailedStep(null);
+    // failedStep stays set: on a retry it alone keeps the create off during the navigation.
     await openTicket(ticketId);
   };
 
@@ -580,7 +589,6 @@ export function NewTicketPage() {
     try {
       if (failedStep.step === "link") {
         if (!(await linkToChange(failedStep.ticketId))) return;
-        setFailedStep(null);
         await openTicket(failedStep.ticketId);
         return;
       }
@@ -658,7 +666,11 @@ export function NewTicketPage() {
 
   // The retried mail goes out from the form as it stands now: it must still be sendable.
   const canResend =
-    subject.trim().length > 0 && body.trim().length > 0 && to.length > 0 && !attachments.encoding;
+    subject.trim().length > 0 &&
+    body.trim().length > 0 &&
+    to.length > 0 &&
+    !attachments.encoding &&
+    emailSecurity.blocked === null;
 
   const canSubmit =
     (ticketType !== "email" || emailSecurity.blocked === null) &&
@@ -1047,7 +1059,7 @@ export function NewTicketPage() {
           <fieldset
             disabled={!formUnlocked}
             className={cn(
-              "space-y-4 rounded-xl border border-hairline bg-surface p-5",
+              "min-w-0 space-y-4 rounded-xl border border-hairline bg-surface p-5",
               !formUnlocked && "pointer-events-none opacity-50",
             )}
           >

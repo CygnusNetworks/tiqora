@@ -7,6 +7,19 @@ import { ApiError } from "@/lib/api";
 import { pendingIso, toLocalInputValue } from "@/lib/phoneCall";
 import { NewTicketPage } from "./NewTicketPage";
 
+const emailSecurityState = vi.hoisted(() => ({ blocked: null as string | null }));
+
+vi.mock("@/components/agent/useEmailSecurity", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/agent/useEmailSecurity")>();
+  return {
+    ...actual,
+    useEmailSecurity: (...args: Parameters<typeof actual.useEmailSecurity>) => {
+      const real = actual.useEmailSecurity(...args);
+      return emailSecurityState.blocked ? { ...real, blocked: emailSecurityState.blocked } : real;
+    },
+  };
+});
+
 const {
   navigate,
   listQueues,
@@ -336,6 +349,7 @@ describe("NewTicketPage", () => {
 
   beforeEach(() => {
     navigate.mockReset();
+    emailSecurityState.blocked = null;
     listQueues.mockReset().mockResolvedValue([queue]);
     listReferencePriorities.mockReset().mockResolvedValue(priorities);
     listReferenceStates.mockReset().mockResolvedValue(states);
@@ -828,6 +842,79 @@ describe("NewTicketPage", () => {
       expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/$ticketId", params: { ticketId: "42" } }),
     );
     expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dropped connection on the send still offers the retry and the ticket link", async () => {
+    createArticle.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    const error = await screen.findByTestId("new-ticket-error");
+    expect(error).toHaveTextContent(i18n.t("newTicket.sendError"));
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("new-ticket-retry-send"));
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dropped connection on the retried send keeps the message, the retry and the link", async () => {
+    createArticle.mockRejectedValue(new TypeError("Failed to fetch"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    fireEvent.click(await screen.findByTestId("new-ticket-retry-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("new-ticket-error")).toHaveTextContent(i18n.t("newTicket.sendError"));
+    expect(await screen.findByTestId("new-ticket-retry-send")).toBeInTheDocument();
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("while a successful retry navigates, a submit creates no second ticket", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    const retry = await screen.findByTestId("new-ticket-retry-send");
+    navigate.mockImplementation(() => new Promise(() => {})); // the router is still loading
+    fireEvent.click(retry);
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.submit(screen.getByTestId("new-ticket-submit").closest("form")!);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("a blocked encryption choice also blocks the retried send", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    expect(await screen.findByTestId("new-ticket-retry-send")).not.toBeDisabled();
+
+    emailSecurityState.blocked = "no key for this recipient";
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Geändert." } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-retry-send")).toBeDisabled());
+  });
+
+  it("a pending failure ends when the same route opens with other search params", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
+    await fillEmail();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await screen.findByTestId("new-ticket-retry-send");
+
+    searchParams.current = { type: "phone" };
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Neu." } }); // renders with it
+
+    await waitFor(() => expect(screen.queryByTestId("new-ticket-error")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("new-ticket-retry-send")).not.toBeInTheDocument();
   });
 
   it("keeps offering the send retry when it fails again", async () => {
