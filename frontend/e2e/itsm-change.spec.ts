@@ -522,6 +522,13 @@ test.describe("agent change screens at phone width", () => {
       .toBeLessThanOrEqual(0);
   });
 
+  test("the shell fits the narrowest phones too", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/agent/itsm/changes");
+    await expect(page.getByTestId("change-list-table")).toBeVisible();
+    await fits(page, "changeListPage");
+  });
+
   test("list, detail, calendar and CAB meetings stay inside the viewport", async ({ page }) => {
     await page.goto("/agent/itsm/changes");
     await expect(page.getByTestId("change-list-table")).toBeVisible();

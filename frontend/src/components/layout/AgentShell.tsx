@@ -710,7 +710,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
         )}
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-hairline bg-surface px-3 md:hidden">
+          <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-hairline bg-surface px-2 min-[360px]:px-3 md:hidden">
             <Button
               variant="ghost"
               size="sm"
@@ -723,7 +723,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
             <Link
               to="/agent"
               aria-label={t("app.name")}
-              className="flex shrink-0 items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink"
+              className="hidden shrink-0 items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink min-[360px]:flex"
             >
               <img src={logoUrl} alt="" width={20} height={20} className="rounded" />
               {/* On a phone the controls need the width: the logo stands for the name. */}
