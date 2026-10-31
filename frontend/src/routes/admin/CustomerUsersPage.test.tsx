@@ -258,20 +258,27 @@ describe("CustomerUsersPage", () => {
     });
 
     it("'Alle' over two fetch pages, then select all: every id reaches the bulk call", async () => {
+      // total 501 means two fetch pages of 500; short pages keep the rendered table small
+      // (501 rendered rows took 39-53 s at 20 parallel runs, over the test budget).
+      const pages: Record<number, number[]> = { 1: [1, 2], 2: [3] };
       list.mockImplementation(async (params?: { page?: number; pageSize?: number }) => {
         const page = params?.page ?? 1;
-        const pageSize = params?.pageSize ?? 100;
-        const end = Math.min(page * pageSize, 501);
-        const items = [];
-        for (let id = (page - 1) * pageSize + 1; id <= end; id++) {
-          items.push({ ...sampleRow, id, login: `edu.${id}@example.com`, email: `edu.${id}@example.com` });
-        }
-        return { items, total: 501, page, page_size: pageSize };
+        const items = (pages[page] ?? []).map((id) => ({
+          ...sampleRow,
+          id,
+          login: `edu.${id}@example.com`,
+          email: `edu.${id}@example.com`,
+        }));
+        return { items, total: 501, page, page_size: params?.pageSize ?? 100 };
       });
       renderPage();
       fireEvent.click(await screen.findByTestId("admin-customer-users-page-size"));
       fireEvent.click(screen.getByTestId("admin-customer-users-page-size-menu-option-100000"));
-      await screen.findByTestId("admin-row-501");
+      await screen.findByTestId("admin-row-3");
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 2, pageSize: 500 }),
+        expect.anything(),
+      );
       fireEvent.click(screen.getByTestId("admin-select-all"));
       await screen.findByTestId("admin-bulk-bar");
 
@@ -279,7 +286,7 @@ describe("CustomerUsersPage", () => {
 
       await screen.findByTestId("admin-bulk-status");
       const sent = (bulkUpdateCustomerUsers.mock.calls[0][0] as { ids: number[] }).ids;
-      expect(new Set(sent).size).toBe(501);
+      expect([...sent].sort()).toEqual([1, 2, 3]);
     });
 
     it("reports the progress of a failed action and keeps the selection for a retry", async () => {
