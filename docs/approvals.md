@@ -662,8 +662,9 @@ Die folgenden Festlegungen gelten, solange nichts anderes beschlossen wird.
     ersetzt, auf jedem Schema, weil eine `utf8mb3`-Datenbank sie sonst mit einem Fehler 500 ablehnt. Das Zeichen
     selbst lässt sich danach nicht wiederherstellen. Das gilt für Titel, Beschreibung und Stufennamen der Anfrage,
     den Kommentar zur Entscheidung (REST, Portal, MCP und die öffentliche Link-Seite), Namen und Beschreibungen von
-    Vorlagen und Freigabegruppen und die Quellenbezeichnung eines Freigebers. Kennungen von Personen
-    (Agenten-Login, Kunden-Login) bleiben unverändert.
+    Vorlagen und Freigabegruppen und die Quellenbezeichnung eines Freigebers. Filter der Übersicht tun mit ihrem Wert
+    dasselbe. Kennungen von Personen bleiben unverändert: ein Freigeber-Eintrag mit einem solchen Zeichen
+    (etwa ein Kunden-Login) wird mit einem Fehler 422 abgelehnt.
 
 **Nicht verfügbar** (nicht Teil dieses Funktionsumfangs):
 

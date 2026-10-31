@@ -539,7 +539,8 @@ streaming connections.
 ## Running migrations on first start
 
 The API container entrypoint runs `python -m tiqora.main migrate upgrade`
-before serving traffic, unless `TIQORA_RUN_MIGRATIONS=0` is set. Worker,
+before serving traffic, unless `TIQORA_RUN_MIGRATIONS=0` reaches the container (the service's
+`environment:` or `env_file`; `.env` alone only fills in `${...}` in the compose file). Worker,
 AI-worker and MCP roles do not run migrations. Both ownership gates still control whether
 the owned migration chain is available.
 

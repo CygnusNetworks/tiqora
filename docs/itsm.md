@@ -1232,9 +1232,10 @@ jedem Schema, weil eine `utf8mb3`-Datenbank sie sonst mit einem Fehler 500 ableh
 danach nicht wiederherstellen. Das gilt für Begründung, Pläne, Nachbetrachtung und Risiko-Begründung des Changes, die
 Texte in der Ereignisliste, Titel und Text von Aufgaben (über das Ticket), CAB-Name und -Beschreibung, Titel, Ort,
 Protokoll und Agenda-Notizen von CAB-Sitzungen, Namen und Texte von Vorlagen (mit Vorgaben und Aufgaben) und
-Freeze-Fenstern sowie Risikofragen und ihre Antworten. Die Suche in der Change-Liste tut mit dem Suchtext dasselbe.
-Nicht betroffen sind die Daten aus Znuny im Change-Archiv: sie werden unverändert übernommen, und die Suche im Archiv
-ersetzt nichts.
+Freeze-Fenstern sowie Risikofragen und ihre Antworten. Die Suche in der Change-Liste und in den Changes aus Znuny tut
+mit dem Suchtext dasselbe. Nicht betroffen sind die Daten aus Znuny im Change-Archiv: sie werden unverändert
+übernommen. Ein Kunden-Login oder eine andere Kennung als CAB-Mitglied wird nicht ersetzt, sondern mit einem Fehler 422
+abgelehnt.
 
 ## 9 ITSM-Berichte
 

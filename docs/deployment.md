@@ -669,15 +669,20 @@ Operator notes for the release that adds approvals, change management and the IT
    | `TIQORA_APPROVAL_LINK_FAIL_MAX` | `20` | Invalid decision links per client address before the lockout |
    | `TIQORA_APPROVAL_LINK_FAIL_WINDOW` | `600` | Window of that count, seconds |
    | `TIQORA_APPROVAL_LINK_LOCKOUT` | `900` | Lockout, seconds |
+   | `TIQORA_RUN_MIGRATIONS` | `1` | `0`: the api container does not migrate on start; needed to roll back to an older image |
 
-   Decision links in approval mails need `TIQORA_PUBLIC_BASE_URL`.
+   Decision links in approval mails need `TIQORA_PUBLIC_BASE_URL`. Compose passes a variable to a container only
+   when the service's `environment:` names it or the file uses `env_file`, so setting it in `.env` alone may do
+   nothing: add it to the service. `docker compose config` shows what arrives. From this release the example and
+   quickstart files name `TIQORA_RUN_MIGRATIONS` on `tiqora-api`.
 4. **Roll-out order (recommended).** Recreating all four containers at once lets the worker tick before the api has
    migrated. No data is damaged, but the log shows up to 500 `report_facts_ticket_failed` lines, `approvals_loop_error`
    and `itsm_change_loop_error`, and Admin, Dienste shows `itsm_change` as failed until its next tick, up to an hour
    later. To avoid that:
-   1. tag the running image as a rollback point:
-      `docker tag registry.example.com/tiqora:latest registry.example.com/tiqora:pre-0.20.0`;
-   2. pause Watchtower, if you use it;
+   1. pause Watchtower, if you use it, before the new image is published: otherwise it can recreate all four
+      containers at once;
+   2. tag the image the api is running as the rollback point (`:latest` may already be the new one):
+      `docker tag "$(docker inspect --format '{{.Image}}' "$(docker compose ps -q tiqora-api)")" registry.example.com/tiqora:pre-0.20.0`;
    3. `docker compose pull`, then `docker compose up -d tiqora-api`;
    4. wait until the api is healthy and `tiqora migrate current` shows `20261010_0085 (head)`;
    5. `docker compose up -d tiqora-worker tiqora-mcp tiqora-ai-worker`;
@@ -698,7 +703,8 @@ are nullable, so its inserts work. But the v0.19.0 entrypoint runs `tiqora migra
 crash-loops on the unknown revision `20261010_0085`. So:
 
 1. pause Watchtower (otherwise it pulls the new image again);
-2. set `TIQORA_RUN_MIGRATIONS=0` in `.env`;
+2. set `TIQORA_RUN_MIGRATIONS=0` in `.env`, and make sure it reaches the api: `tiqora-api` must name it under
+   `environment:` (the example and quickstart files of this release do) or the compose file must use `env_file`;
 3. point all four roles to `registry.example.com/tiqora:pre-0.20.0` and run `docker compose up -d` (a Watchtower
    recreate does not pick up an `.env` change);
 4. check `/health` and all four containers;
@@ -716,7 +722,15 @@ What a rollback leaves behind (read from the code, not rehearsed):
 
 **Downgrade (`tiqora migrate downgrade 20261010_0082`)** drops all 27 tables, so it is only for a site that never used
 approvals or changes. It avoids the `TIQORA_RUN_MIGRATIONS` step. Check `tiqora_gdpr_backup` first: backups of those
-tables would have nothing to restore into.
+tables would have nothing to restore into. **Run it from the new image, before switching**; the old image does not know
+revision `20261010_0085` and fails the same way as its entrypoint. Stop the other roles first, because they would fail
+against the missing tables:
+
+1. `docker compose stop tiqora-worker tiqora-mcp tiqora-ai-worker`;
+2. `docker compose exec tiqora-api tiqora migrate downgrade 20261010_0082`;
+3. keep Watchtower paused, point all four roles to the old image and run `docker compose up -d`.
+
+The downgrade also sets the report facts back to version 2, so the upgrade recomputes them when you move forward again.
 
 ## Upgrading to v0.19.0 (wave 4)
 
