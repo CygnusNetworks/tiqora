@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -159,6 +159,12 @@ export type NewTicketSearch = {
 };
 
 export function NewTicketPage() {
+  // A remount is the only reset that reaches every field, attachment and hook of the form.
+  const [formKey, setFormKey] = useState(0);
+  return <NewTicketForm key={formKey} onStartOver={() => setFormKey((k) => k + 1)} />;
+}
+
+function NewTicketForm({ onStartOver }: { onStartOver: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -322,15 +328,21 @@ export function NewTicketPage() {
   const [retrying, setRetrying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Same route, other search ("+ New" in the header): that failure belongs to the ticket before.
+  // The search this form's ticket was submitted under: its change link belongs to that one.
+  const submittedSearch = useRef(search);
+  // Same route, other search ("+ New", an accepted call): the agent wants a new ticket and this
+  // form's content is in the one that exists. Running steps finish first, the form stays locked.
   const searchKey = JSON.stringify(search);
-  const [failureSearchKey, setFailureSearchKey] = useState(searchKey);
-  if (failureSearchKey !== searchKey) {
-    setFailureSearchKey(searchKey);
-    setFailedStep(null);
-    setCreatedTicketId(null);
-    setError(null);
-  }
+  useEffect(() => {
+    if (
+      createdTicketId !== null &&
+      !submitting &&
+      !retrying &&
+      JSON.stringify(submittedSearch.current) !== searchKey
+    ) {
+      onStartOver();
+    }
+  }, [createdTicketId, submitting, retrying, searchKey, onStartOver]);
 
   // Unlocked once a customer is chosen, or the agent explicitly opts to
   // continue without one — the escape hatch button stays outside this gate.
@@ -508,9 +520,10 @@ export function NewTicketPage() {
   /** Opened from a failed change: link the new ticket to it (the change's related tickets).
    * The ticket exists either way; a failed link keeps the agent here with a link to it. */
   const linkToChange = async (ticketId: number): Promise<boolean> => {
-    if (!search.from_change) return true;
+    const changeId = submittedSearch.current.from_change;
+    if (!changeId) return true;
     try {
-      await changeApi.addRelated(search.from_change, ticketId);
+      await changeApi.addRelated(changeId, ticketId);
       return true;
     } catch {
       setCreatedTicketId(ticketId);
@@ -687,11 +700,13 @@ export function NewTicketPage() {
     !attachments.encoding &&
     // The ticket exists already (only a later step failed): no second create.
     failedStep === null &&
+    !retrying &&
     !submitting;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (failedStep !== null) return;
+    submittedSearch.current = search;
     setError(null);
     setCreatedTicketId(null);
     // `canSubmit` already asserts queue/priority/state are set (TS narrows

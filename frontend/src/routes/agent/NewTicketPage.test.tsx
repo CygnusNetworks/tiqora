@@ -903,18 +903,68 @@ describe("NewTicketPage", () => {
     await waitFor(() => expect(screen.getByTestId("new-ticket-retry-send")).toBeDisabled());
   });
 
-  it("a pending failure ends when the same route opens with other search params", async () => {
+  async function failSend() {
     createArticle.mockRejectedValueOnce(new ApiError(502, "SMTP refused", "/api/v1/tickets/42/articles"));
     await fillEmail();
     await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("new-ticket-submit"));
-    await screen.findByTestId("new-ticket-retry-send");
+    return screen.findByTestId("new-ticket-retry-send");
+  }
+  // The mocked useSearch is read on render: any input change renders with the new params.
+  function navigateSameRoute(search: Record<string, unknown>) {
+    searchParams.current = search;
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Getippt" } });
+  }
 
-    searchParams.current = { type: "phone" };
-    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Neu." } }); // renders with it
+  it("'+ New' with another queue after a failed send starts over with an empty form and no second ticket", async () => {
+    await failSend();
+    navigateSameRoute({ queue_id: 1 });
 
     await waitFor(() => expect(screen.queryByTestId("new-ticket-error")).not.toBeInTheDocument());
-    expect(screen.queryByTestId("new-ticket-retry-send")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-subject")).toHaveValue("");
+    expect(screen.getByTestId("new-ticket-body")).toHaveValue("");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.submit(screen.getByTestId("new-ticket-submit").closest("form")!);
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("identical search params keep the failure view", async () => {
+    await failSend();
+    navigateSameRoute({});
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("new-ticket-retry-send")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-subject")).toHaveValue("Question");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+  });
+
+  it("a search change during a retry's navigation neither creates nor unlocks", async () => {
+    const retry = await failSend();
+    navigate.mockImplementation(() => new Promise(() => {})); // the router is still loading
+    fireEvent.click(retry);
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+
+    navigateSameRoute({ queue_id: 1 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("new-ticket-subject")).toHaveValue("Question");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.submit(screen.getByTestId("new-ticket-submit").closest("form")!);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("a half-typed form without a ticket survives a search change", async () => {
+    await fillEmail();
+    navigateSameRoute({ queue_id: 1 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("new-ticket-subject")).toHaveValue("Question");
   });
 
   it("keeps offering the send retry when it fails again", async () => {
