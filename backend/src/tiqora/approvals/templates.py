@@ -25,6 +25,7 @@ from tiqora.approvals.contract import (
     ApproverEntry,
 )
 from tiqora.approvals.models import TiqoraApprovalList, TiqoraApprovalTemplate
+from tiqora.db.legacy.profile import groups_table_sql
 from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
@@ -160,13 +161,14 @@ async def validate_definition_refs(
                 else:
                     wanted[entry.kind].add(number)
 
+    groups_table = groups_table_sql(dialect=session.get_bind().dialect.name)
     present = {
         "user": await _existing_ids(
             session, "SELECT id FROM users WHERE valid_id = 1 AND id IN :ids", wanted["user"]
         ),
         "group": await _existing_ids(
             session,
-            "SELECT id FROM permission_groups WHERE valid_id = 1 AND id IN :ids",
+            f"SELECT id FROM {groups_table} WHERE valid_id = 1 AND id IN :ids",  # noqa: S608
             wanted["group"],
         ),
         "role": await _existing_ids(

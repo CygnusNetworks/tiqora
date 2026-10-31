@@ -25,6 +25,8 @@ from tests._approvals_helpers import (
 from tiqora.approvals import lists, templates
 from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
 from tiqora.approvals.models import TiqoraApprovalTemplate
+from tiqora.db.legacy import profile as legacy_profile
+from tiqora.db.legacy.profile import SchemaProfileId, profile_for_id, quote_ident
 from tiqora.jobs.service import utc_now
 
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
@@ -194,6 +196,40 @@ async def test_ensure_template_inserts_once_never_overwrites(
             )
         ).scalar_one()
         assert count == 1
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_validate_refs_finds_groups_on_the_old_table_name(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """OTRS/Znuny 6.0 calls the table ``groups``, a reserved word on MariaDB."""
+    url = request.getfixturevalue(url_fixture)
+    engine = create_async_engine(to_async_url(url), poolclass=NullPool)
+    table = quote_ident("groups", dialect=engine.dialect.name)
+    # own connection: on MariaDB DDL commits, which would end the session's savepoint
+    async with engine.begin() as conn:
+        await conn.execute(text(f"CREATE TABLE {table} (id INT PRIMARY KEY, valid_id SMALLINT)"))
+    try:
+        async with approvals_session(request, url_fixture) as session:
+            await session.execute(
+                text(f"INSERT INTO {table} (id, valid_id) VALUES (970651, 1), (970652, 2)")
+            )
+            monkeypatch.setattr(
+                legacy_profile, "_cached_profile", profile_for_id(SchemaProfileId.OTRS_ZNUNY_6_0)
+            )
+            check = await templates.validate_definition_refs(
+                session,
+                _definition(
+                    {"kind": "group", "ref": "970651"},
+                    {"kind": "group", "ref": "970652"},
+                ),
+            )
+            assert check.warnings == ["missing_group:970652"]
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text(f"DROP TABLE {table}"))
+        await engine.dispose()
 
 
 @pytest.mark.db
