@@ -107,7 +107,7 @@ export function NotificationBell() {
           />
           <div
             data-testid="notification-panel"
-            className="absolute right-0 z-40 mt-1.5 w-80 max-w-[90vw] overflow-hidden rounded-lg border border-hairline bg-surface shadow-xl"
+            className="absolute right-0 z-40 mt-1.5 w-80 max-w-[90vw] max-sm:fixed max-sm:inset-x-2 max-sm:top-12 max-sm:w-auto max-sm:max-w-none overflow-hidden rounded-lg border border-hairline bg-surface shadow-xl"
           >
             <div className="border-b border-hairline px-3 py-2 text-[12px] font-semibold text-ink">
               {t("notifications.title")}

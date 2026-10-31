@@ -529,6 +529,50 @@ test.describe("agent change screens at phone width", () => {
     await fits(page, "changeListPage");
   });
 
+  for (const width of [320, 390, 430]) {
+    test(`every header popup stays inside the viewport at ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 640 });
+      await page.route("**/api/v1/queues", (route) =>
+        route.fulfill({
+          json: [1, 2].map((id) => ({ id, name: `Queue ${id}`, group_id: 1, valid: true, type: "queue" })),
+        }),
+      );
+      await page.route("**/api/v1/chat/topics", (route) =>
+        route.fulfill({ json: [{ ref: "t1", name: "Support", entity_id: "t1" }] }),
+      );
+      await page.goto("/agent");
+      const header = page.getByRole("banner");
+
+      const inViewport = async (panelTestId: string) => {
+        const box = await page.getByTestId(panelTestId).first().boundingBox();
+        expect(box, panelTestId).not.toBeNull();
+        expect(box!.x, panelTestId).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width, panelTestId).toBeLessThanOrEqual(width);
+        expect(box!.y + box!.height, panelTestId).toBeLessThanOrEqual(640);
+      };
+
+      for (const [trigger, panel] of [
+        ["new-ticket-button", "new-ticket-queue-menu"],
+        ["online-agents-trigger", "online-agents-panel"],
+        ["chat-inbox-trigger-mobile", "chat-inbox-panel"],
+        ["notification-bell", "notification-panel"],
+        ["account-menu-trigger", "account-menu"],
+      ]) {
+        await header.getByTestId(trigger).click();
+        await expect(page.getByTestId(panel)).toBeVisible();
+        await inViewport(panel);
+        await page.keyboard.press("Escape");
+        await page.mouse.click(width / 2, 620); // the popovers without Escape close on the backdrop
+        await expect(page.getByTestId(panel)).toHaveCount(0);
+      }
+
+      // The open search replaces its button in the header: it must not widen the page.
+      await header.getByTestId("command-search-trigger").click();
+      await inViewport("command-search-form");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    });
+  }
+
   test("list, detail, calendar and CAB meetings stay inside the viewport", async ({ page }) => {
     await page.goto("/agent/itsm/changes");
     await expect(page.getByTestId("change-list-table")).toBeVisible();

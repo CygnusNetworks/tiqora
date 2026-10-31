@@ -114,6 +114,16 @@ export function Menu({
     });
   }, [open, align, maxHeight]);
 
+  // Anchored to the trigger, the panel can stick out past the viewport edge on a phone. Its
+  // width is only known once rendered: shift it back in.
+  useLayoutEffect(() => {
+    const width = panelRef.current?.getBoundingClientRect().width;
+    if (!pos || !width) return;
+    const limit = Math.max(VIEWPORT_MARGIN, window.innerWidth - VIEWPORT_MARGIN - width);
+    if (pos.right !== undefined && pos.right > limit) setPos({ ...pos, right: limit });
+    if (pos.left !== undefined && pos.left > limit) setPos({ ...pos, left: limit });
+  }, [pos]);
+
   // Outside pointer-down + Escape close, and initial focus into the panel when
   // opened by keyboard. Focus returns to the trigger on close.
   useEffect(() => {
@@ -225,7 +235,7 @@ export function Menu({
             data-testid={panelTestId}
             data-portal-menu
             onKeyDown={onPanelKeyDown}
-            style={{ position: "fixed", ...pos }}
+            style={{ position: "fixed", maxWidth: `calc(100vw - ${2 * VIEWPORT_MARGIN}px)`, ...pos }}
             className={cn(
               "z-50 min-w-[13rem] overflow-y-auto rounded-xl border border-hairline bg-surface p-1 shadow-xl animate-route-in",
               panelClassName,

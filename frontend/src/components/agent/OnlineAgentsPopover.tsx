@@ -99,7 +99,7 @@ export function OnlineAgentsPopover() {
             data-testid="online-agents-panel"
             role="dialog"
             aria-label={t("onlineAgents.title")}
-            className="absolute right-0 z-40 mt-1.5 w-72 max-w-[90vw] overflow-hidden rounded-lg border border-hairline bg-surface shadow-xl"
+            className="absolute right-0 z-40 mt-1.5 w-72 max-w-[90vw] max-sm:fixed max-sm:inset-x-2 max-sm:top-12 max-sm:w-auto max-sm:max-w-none overflow-hidden rounded-lg border border-hairline bg-surface shadow-xl"
           >
             <div className="border-b border-hairline px-3 py-2 text-[12px] font-semibold text-ink">
               {t("onlineAgents.title")}

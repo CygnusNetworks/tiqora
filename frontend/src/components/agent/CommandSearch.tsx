@@ -251,7 +251,13 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
     <div
       ref={rootRef}
       data-testid="command-search-form"
-      className={cn("relative", fill ? "w-full" : "min-w-[16rem] sm:min-w-[22rem]")}
+      className={cn(
+        "relative",
+        fill
+          ? "w-full"
+          : // On a phone the open search covers the header's controls instead of widening the page.
+            "max-sm:fixed max-sm:z-50 max-sm:inset-x-2 max-sm:top-2 sm:min-w-[22rem]",
+      )}
     >
       <SmartSearchBar
         values={values}
