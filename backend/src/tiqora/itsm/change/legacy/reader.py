@@ -26,6 +26,7 @@ from typing import Any, Final
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.itsm.change.legacy.mapping import (
     change_window,
     dynamic_field_text,
@@ -523,7 +524,8 @@ async def search(
     """
     limit = max(1, min(limit, MAX_PAGE))
     offset = max(0, offset)
-    needle = (text or "").strip()
+    # A 4-byte needle would fail with error 1267 against a utf8mb3 column.
+    needle = (replace_non_bmp(text) or "").strip()
     where = "1 = 1"
     params: dict[str, Any] = {}
     if needle:

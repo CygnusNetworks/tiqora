@@ -26,7 +26,7 @@ from datetime import datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from tiqora.extensions.registry import ExtensionPoint
 
@@ -137,6 +137,14 @@ class ApproverEntry(BaseModel):
     ref: str = Field(
         min_length=1, max_length=190
     )  # user id | group id | role id | list id | login | resolver key
+
+    @field_validator("ref")
+    @classmethod
+    def _ref_fits_utf8mb3(cls, ref: str) -> str:
+        # An identity, so it is refused and not rewritten: a utf8mb3 schema cannot hold it.
+        if any(ord(ch) > 0xFFFF for ch in ref):
+            raise ValueError("ref contains characters above U+FFFF")
+        return ref
 
 
 class StepSpec(BaseModel):

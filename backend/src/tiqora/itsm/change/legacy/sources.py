@@ -18,6 +18,7 @@ from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.domain.ticket_access import readable_tickets
 from tiqora.itsm.change.legacy import reader
 from tiqora.itsm.change.legacy.archive import REF_CI, REF_TICKET, change_from_data
@@ -101,7 +102,8 @@ class ArchiveSource:
         row = TiqoraItsmLegacyChange
         ref = TiqoraItsmLegacyChangeRef
         conditions = []
-        needle = (text or "").strip()
+        # A 4-byte needle would fail with error 1267 against a utf8mb3 column.
+        needle = (replace_non_bmp(text) or "").strip()
         if needle:
             pattern = like_contains(needle.lower())
             conditions.append(

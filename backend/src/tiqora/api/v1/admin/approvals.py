@@ -56,6 +56,7 @@ from tiqora.approvals.schemas import (
     SubjectTypeOut,
 )
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
@@ -97,10 +98,12 @@ async def get_overview(
         conditions.append(TiqoraApproval.ticket_id == ticket_id)
     if ticket_number is not None:
         # the number resolves on the Znuny side first: an IN list, no join (collation 1267)
-        found = await session.execute(select(Ticket.id).where(Ticket.tn == ticket_number.strip()))
+        # a 4-byte value would fail with error 1267 against a utf8mb3 column
+        number = (replace_non_bmp(ticket_number) or "").strip()
+        found = await session.execute(select(Ticket.id).where(Ticket.tn == number))
         conditions.append(TiqoraApproval.ticket_id.in_([int(i) for i in found.scalars()]))
     if subject_type is not None:
-        conditions.append(TiqoraApproval.subject_type == subject_type)
+        conditions.append(TiqoraApproval.subject_type == replace_non_bmp(subject_type))
     if overdue is not None:
         late = select(TiqoraApprovalStep.approval_id).where(
             TiqoraApprovalStep.status == "active",

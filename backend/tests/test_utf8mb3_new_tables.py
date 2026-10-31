@@ -31,6 +31,7 @@ from tests._approvals_helpers import (
 from tests._change_fixtures import Q_A, U_FULL, U_MANAGER, ChangeWorld, change_world, make_cab
 from tests._fake_redis import FakeRedis
 from tests.conftest import docker_available
+from tests.test_approvals_admin_api import ADMIN, _seed_admin
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
 from tiqora.approvals import lists, service, templates, tokens
@@ -49,6 +50,8 @@ from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.change.cab import CabIn, create_cab, update_cab
 from tiqora.itsm.change.freeze import FreezeIn, create_freeze, update_freeze
+from tiqora.itsm.change.legacy import reader
+from tiqora.itsm.change.legacy.sources import ArchiveSource
 from tiqora.itsm.change.models import (
     TiqoraItsmCab,
     TiqoraItsmCabAgendaItem,
@@ -567,3 +570,95 @@ async def test_cab_template_freeze_and_risk_question_admin(
         )
         await session.refresh(q_row)
         assert q_row.question == f"Neu {STORED}"
+
+
+# --- searches, filters and typed identities --------------------------------------------------
+
+
+@pytest.mark.parametrize("param", ["ticket_number", "subject_type"])
+async def test_approval_admin_filter_answers_empty(
+    request: pytest.FixtureRequest, param: str
+) -> None:
+    async with _approvals(request) as session:
+        await _seed_admin(session)
+        await session.commit()
+        await _approval(session)
+        async with await as_client(session, agent=ADMIN) as client:
+            got = await client.get("/api/v1/admin/approvals", params={param: EMOJI})
+        assert got.status_code == 200, got.text
+        assert got.json()["items"] == []
+
+
+async def test_approval_status_answers_empty(request: pytest.FixtureRequest) -> None:
+    async with _approvals(request) as session:
+        assert await service.approval_status(session, ticket_id=T1, approval_key=EMOJI) is None
+
+
+def _refused_field(response: Any) -> Any:
+    """The field a 422 from the request model names; other 422s here carry no such list."""
+    assert response.status_code == 422, response.text
+    return response.json()["detail"][0]["loc"][-1]
+
+
+async def test_approver_identity_with_emoji_is_refused(request: pytest.FixtureRequest) -> None:
+    definition = {
+        "steps": [
+            {"name": "Prüfung", "approvers": [{"kind": "customer_user", "ref": f"kunde{EMOJI}"}]}
+        ]
+    }
+    async with _approvals(request) as session:
+        await _seed_admin(session)
+        await session.commit()
+        async with await as_client(session, agent=AG1) as client:
+            got = await client.post(
+                f"/api/v1/tickets/{T1}/approvals", json={"title": "F", "definition": definition}
+            )
+        assert _refused_field(got) == "ref"
+        async with await as_client(session, agent=ADMIN) as client:
+            got = await client.post(
+                "/api/v1/admin/approvals/templates",
+                json={"template_key": "mb3-kunde", "name": "V", "definition": definition},
+            )
+        assert _refused_field(got) == "ref"
+
+
+async def test_cab_member_identity_with_emoji_is_refused(request: pytest.FixtureRequest) -> None:
+    async with _change_api(request, 1) as (world, client, _who):
+        cab_id = 946396
+        await make_cab(world.session, cab_id=cab_id, members=[("user", str(U_FULL))])
+        got = await client.put(
+            f"/api/v1/admin/itsm/change/cabs/{cab_id}/members",
+            json=[{"member_kind": "customer_user", "member_ref": f"kunde{EMOJI}"}],
+        )
+        assert _refused_field(got) == "member_ref"
+
+
+async def test_archive_search_answers_empty(request: pytest.FixtureRequest) -> None:
+    async with change_world(request, "mb3_url") as world:
+        items, total = await ArchiveSource().search(
+            world.session, text=EMOJI, ticket_id=None, ci_ref=None, limit=25, offset=0
+        )
+        assert (items, total) == ([], 0)
+
+
+async def test_live_change_search_answers_empty(request: pytest.FixtureRequest) -> None:
+    url = request.getfixturevalue("mb3_url")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE change_item (id BIGINT PRIMARY KEY, change_number VARCHAR(100),"
+                " title VARCHAR(250), description_plain TEXT, justification_plain TEXT,"
+                " change_time DATETIME)"
+            )
+        )
+    try:
+        async with change_world(request, "mb3_url") as world:
+            items, total = await reader.search(
+                world.session, text=EMOJI, ticket_id=None, ci_znuny_id=None, limit=25, offset=0
+            )
+            assert (items, total) == ([], 0)
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE change_item"))
+        engine.dispose()

@@ -851,7 +851,8 @@ async def approval_status(
         await session.execute(
             select(TiqoraApproval.status)
             .where(
-                TiqoraApproval.ticket_id == ticket_id, TiqoraApproval.approval_key == approval_key
+                TiqoraApproval.ticket_id == ticket_id,
+                TiqoraApproval.approval_key == replace_non_bmp(approval_key),
             )
             .order_by(TiqoraApproval.id.desc())
             .limit(1)

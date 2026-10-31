@@ -40,6 +40,7 @@ from pydantic import (
     Field,
     StringConstraints,
     ValidationError,
+    field_validator,
     model_validator,
 )
 from sqlalchemy import and_, delete, func, or_, select, true
@@ -129,6 +130,14 @@ class CabMemberIn(BaseModel):
     member_ref: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=190)
     ]
+
+    @field_validator("member_ref")
+    @classmethod
+    def _ref_fits_utf8mb3(cls, ref: str) -> str:
+        # An identity, so it is refused and not rewritten: a utf8mb3 schema cannot hold it.
+        if replace_non_bmp(ref) != ref:
+            raise ValueError("member_ref contains characters above U+FFFF")
+        return ref
 
 
 class ResolvedMember(BaseModel):
