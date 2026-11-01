@@ -23,7 +23,7 @@
     <meta property="og:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
     <meta property="og:locale" content="en_US" />
     <meta property="article:published_time" content="2026-10-01" />
-    <meta property="article:modified_time" content="2026-10-14" />
+    <meta property="article:modified_time" content="2026-11-01" />
     <meta property="article:author" content="Cygnus Networks GmbH" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Moving off OTRS/Znuny without a big-bang migration" />
@@ -41,7 +41,7 @@
         "description": "How to migrate from Znuny or OTRS 6 step by step: run Tiqora on the same database, move agents and background jobs over one by one, keep a rollback at every stage, and retire Znuny only at the end.",
         "image": "https://cygnusnetworks.github.io/tiqora/assets/og-image.png",
         "datePublished": "2026-10-01",
-        "dateModified": "2026-10-14",
+        "dateModified": "2026-11-01",
         "inLanguage": "en",
         "proficiencyLevel": "Expert",
         "keywords": "Znuny migration, OTRS migration, Znuny alternative, OTRS alternative, OTRS Community Edition replacement, helpdesk migration, parallel operation",
@@ -104,7 +104,7 @@
             "name": "What happens to my OPM add-ons and ITSM?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Tiqora cannot run Perl OPM packages; its own Python plugins are the replacement path, and add-on tables are left alone. Znuny's ITSM is covered: Tiqora reads the CMDB of Znuny ITSM 6.5 and 7.3 read-only (Mode A), imports it into its own CMDB and switches to Mode B, with a way back. The GenericInterface layer answers the ConfigItem* operations, and the ConfigItemUpdate process action runs in Mode B. Change management and work orders stay in Znuny. Inventory what your other add-ons do and keep, replace or retire each function before switching Znuny off."
+              "text": "Tiqora cannot run Perl OPM packages; its own Python plugins are the replacement path, and add-on tables are left alone. Znuny's ITSM is covered: Tiqora reads the CMDB of Znuny ITSM 6.5 and 7.3 read-only (Mode A), imports it into its own CMDB and switches to Mode B, with a way back. The GenericInterface layer answers the ConfigItem* operations, and the ConfigItemUpdate process action runs in Mode B. Tiqora has its own change management in Mode B, narrower than Znuny's; Znuny's changes and work orders stay read-only, live in Mode A and as an archive after the import, and Tiqora never writes them. Inventory what your other add-ons do and keep, replace or retire each function before switching Znuny off."
             }
           },
           {
@@ -597,7 +597,7 @@
             </p>
             <p class="byline">
               Cygnus Networks GmbH · <time datetime="2026-10-01">1 October 2026</time>, updated
-              <time datetime="2026-10-14">14 October 2026</time> · about 16 minutes to read
+              <time datetime="2026-11-01">1 November 2026</time> · about 16 minutes to read
             </p>
 
             <nav class="toc" aria-label="On this page">
@@ -1128,8 +1128,9 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
 
             <h3 id="itsm">ITSM and the CMDB</h3>
             <p>
-              Tiqora has incident and problem management, major incidents, a priority matrix
-              and its own CMDB. Who holds the configuration items is set by the “ITSM-Modus”
+              Tiqora has incident and problem management, major incidents, a priority matrix,
+              its own CMDB and, while it leads the ITSM, change management. Who holds the
+              configuration items is set by the “ITSM-Modus”
               (ITSM mode) under <em>Administration → ITSM</em>, and the mode is chosen automatically
               at the first start: if Znuny's ITSM tables are in the database, it is
               <strong>Mode A</strong>, “Znuny führt das ITSM (nur lesen)” (Znuny leads the
@@ -1151,7 +1152,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                 “Probelauf” (dry run) reads and counts and writes nothing; “Übernehmen”
                 (import) copies the catalog, classes, CIs with all versions, links,
                 attachments stored in the database, the priority matrix and the service data
-                into Tiqora's CMDB. Every further run only adds what is new. Agents keep
+                into Tiqora's CMDB, and Znuny's changes into a read-only change archive. Every further run only adds what is new. Agents keep
                 seeing Znuny's data until you switch. The same runs are available as
                 <code>tiqora itsm import --dry-run</code> and <code>tiqora itsm import</code>.
               </li>
@@ -1183,13 +1184,38 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
             <div class="callout callout-warn">
               <span class="callout-title">What stays in Znuny</span>
               <p>
-                Changes and work orders are only counted, not imported, and Tiqora has no
-                change management yet. Znuny's ITSM statistics are not taken over, and CI
-                attachments in Znuny's filesystem storage have to be copied by hand. If an
+                Znuny's change and work-order screens stay as they are and do not know Tiqora's
+                changes. Change templates, conditions and notification rules are only counted,
+                not taken over, and CI attachments in Znuny's filesystem storage have to be
+                copied by hand. If an
                 installed ITSM version cannot be read, the switch is offered without CI data
                 and you have to confirm that explicitly.
               </p>
             </div>
+
+            <h3 id="changes">Change management and approvals</h3>
+            <p>
+              Change management exists only in Mode B: a change is a ticket plus Tiqora's change
+              record (type, fixed phases, plans, time window, risk, impact), with tasks,
+              templates and standard changes, a change calendar with freeze windows and conflict
+              checks, CAB votes and CAB meetings. You set it up with the optional group
+              “Change-Management” and “Einrichten” (set up) under <em>Administration → ITSM</em>. In Mode A Tiqora shows Znuny's
+              changes live and read-only; after the import they are in the read-only change
+              archive. <strong>Tiqora never writes Znuny's <code>change_*</code> tables, in any
+              mode</strong>, so personal data in them is erased in Znuny.
+            </p>
+            <p>
+              Approvals (“Freigaben”) are a Tiqora feature and work in every mode: one engine for
+              requests on a ticket, also used by the CAB. Znuny sees only history lines on the
+              ticket and, if you enable it, an internal note. A process step cannot request one yet.
+            </p>
+            <p>
+              You can switch these off. The ITSM mode can be “Aus” (off). Change management has
+              its own switch under <em>Administration → ITSM</em>, approvals one under
+              <em>Administration → Einstellungen → Freigaben</em>. Both default to on, take effect
+              without a restart and delete nothing. Without approvals, change management is
+              unavailable too.
+            </p>
 
             <h3 id="processes">Processes and ACLs</h3>
             <p>
@@ -1207,7 +1233,10 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               On the reports page, “Statistiken aus Znuny übernehmen” (take over statistics from
               Znuny) reads Znuny statistics from the database or from an exported XML file and
               turns them into saved reports or saved searches, with a preview of what was
-              adjusted or dropped. Znuny is not changed. Scheduled e-mail delivery, which
+              adjusted or dropped. Znuny is not changed. Znuny's ITSM statistics are imported too.
+              16 built-in ITSM reports answer the questions of Znuny's 47 shipped ITSM statistics,
+              with documented differences; those on CIs and changes hold data only in Mode B and
+              do not count changes archived from Znuny. Scheduled e-mail delivery, which
               Znuny leaves to add-ons such as “Statistic Reports”, is built in: recreate those
               deliveries as schedules (“Zeitpläne”) that send PDF, XLSX or CSV; they are not
               imported. Agents bring their Znuny search profiles over with “Suchvorlagen aus Znuny
@@ -1265,7 +1294,7 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
               <p>
                 Tiqora covers everyday agent, customer-portal and admin work. Some things are
                 still missing or narrower than in Znuny. Check this list against how your team
-                actually works (as of 14 October 2026):
+                actually works (as of 1 November 2026):
               </p>
             </div>
             <div class="cards gaps">
@@ -1273,7 +1302,8 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                 <span class="chip">Missing</span>
                 <h3>Not built yet</h3>
                 <ul>
-                  <li>ITSM change management and work orders (they stay in Znuny)</li>
+                  <li>ITSM service catalogue (planned)</li>
+                  <li>Znuny's change conditions, change notification rules and configurable state machine</li>
                   <li>Admin screens for sessions, SQL box, maintenance, system log</li>
                   <li>Calendar admin and appointment rules</li>
                   <li>Portal print view</li>
@@ -1284,7 +1314,8 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                 <span class="chip">Partial</span>
                 <h3>Narrower than Znuny</h3>
                 <ul>
-                  <li>Reports: no statistics on ITSM data, no cron expressions in schedules</li>
+                  <li>Change management: Mode B only; related tickets use one link type, no link list on the change page, type and services edit only by API</li>
+                  <li>Reports: CI and change reports only in Mode B, no cron expressions in schedules</li>
                   <li>Dashboards: no customer-info or RSS widget</li>
                   <li>GenericAgent: a subset of search criteria</li>
                   <li>Bulk actions and user preferences</li>
@@ -1374,7 +1405,9 @@ tiqora ownership orphan-report   <span class="c"># optional, read-only</span></c
                     switches to Mode B, with a way back (see <a href="#itsm">ITSM and the
                     CMDB</a>). The GenericInterface layer answers the <code>ConfigItem*</code>
                     operations, and the process action <code>ConfigItemUpdate</code> runs in
-                    Mode B. Change management and work orders stay in Znuny.
+                    Mode B. Tiqora has its own change management in Mode B, narrower than
+                    Znuny's; Znuny's changes and work orders stay read-only, live in Mode A and
+                    as an archive after the import, and Tiqora never writes them.
                   </p>
                   <p>
                     The cutover runbook asks you to list everything your add-ons and custom

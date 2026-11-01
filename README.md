@@ -109,6 +109,18 @@ Questions, ideas, war stories from your OTRS migration:
   (dry run, repeatable, reversible switch) moves the data over, and the **TiqoraITSM**
   Znuny add-on keeps Znuny agents informed — [ITSM](./docs/itsm.md), [CMDB](./docs/cmdb.md)
   (German, English summary).
+- **Change management** — in Mode B a change is a ticket plus a change record (type, fixed phases,
+  plans, window, risk, impact), with tasks, templates and standard changes, a **change calendar**
+  with freeze windows and conflict checks, and **CAB** votes and meetings. Znuny's changes stay
+  read-only (live in Mode A, a **change archive** in Mode B); Tiqora never writes `change_*`. Narrower
+  than Znuny: related tickets use one link type, no link list on the change page, type and services
+  edit only by API, no Znuny change conditions or notification rules. Off-switch
+  `itsm_change.enabled` — [ITSM, chapter 8](./docs/itsm.md#8-change-management) (German, English summary).
+- **Approvals** — one engine for requests on a ticket: stages and parallel steps, rules (one, all, at
+  least n, majority), deadlines with reminders and escalation, substitutes. People decide in "Meine
+  Freigaben", in the ticket, through a **single-use e-mail link**, in the portal (customer approvers are off by default), over REST or MCP
+  (`approval_decide` is off by default). Not yet as a process step. Off-switch `approvals.enabled` —
+  [approvals](./docs/approvals.md) (German, English summary).
 - **Dashboards and wallboards** — several widget dashboards per agent (drag/resize,
   filters, report widgets, SLA gauge, backlog aging, heatmap, drill-down to tickets),
   role templates for admins, TV mode and public read-only **wallboard links** —
@@ -116,8 +128,8 @@ Questions, ideas, war stories from your OTRS migration:
 - **Reporting** — a report **builder** with saved and shared reports, **25 core and 16
   ITSM built-in reports** (volume, backlog, SLA, quality, agents, time accounting, customers, patterns;
   ticket types, first-level solution, CIs, changes),
-  runtime parameters, XLSX / CSV / **PDF** export, **import of Znuny statistics** and
-  search profiles, and **scheduled delivery** by e-mail with run history —
+  runtime parameters, XLSX / CSV / **PDF** export, **import of Znuny statistics** (ITSM ones included;
+  CI and change reports hold data only in Mode B) and search profiles, and **scheduled delivery** by e-mail with run history —
   [reporting](./docs/reporting.md), [differences to Znuny stats](./docs/compatibility.md#reporting-differences-to-znuny-stats).
 - **Process designer** — a visual designer for Znuny BPM processes and ACLs (canvas,
   validation, Znuny YAML import/export, versions with diff and restore); deploy
@@ -204,6 +216,17 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 </details>
 
 <details>
+<summary><b>Approvals</b> — inbox, ticket panel, e-mail confirm page, template editor (4)</summary>
+
+| My approvals | In the ticket |
+|---|---|
+| ![My approvals](./docs/images/agent-approvals.png) | ![Approvals in the ticket](./docs/images/agent-approvals-ticket.png) |
+| **E-mail link** | **Template editor** |
+| ![E-mail link confirm page](./docs/images/approval-confirm-page.png) | ![Approval template](./docs/images/admin-approval-template.png) |
+
+</details>
+
+<details>
 <summary><b>Chat &amp; phone</b> — Telegram chat, CTI call popup, compact phone ticket (3)</summary>
 
 | Telegram chat | CTI call popup | Phone ticket with caller lookup |
@@ -256,7 +279,7 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 |---|---|
 | Ticket write path + Znuny invariants | Golden-master multi-peer matrix (OTRS/Znuny 6.0–7.3) |
 | GenericInterface compatibility | Provider: Session*, TicketCreate/Update/Get/Search/HistoryGet, TimeAccountingGet, OutOfOffice, `ConfigItemGet/Search/Create/Update/Delete` (depending on the ITSM mode); REST + SOAP. Requester: invokers on ticket events with retries, conditions, response actions and a debugger, `ExecuteInvoker` process action — [docs/compatibility.md](./docs/compatibility.md), [docs/guide/webservices.md](./docs/guide/webservices.md) |
-| MCP tools | `ticket_*`, customer lookup, KB, read-only CMDB (`cmdb_search`, `cmdb_get`, `cmdb_impact`), plus tools from plugins — see [docs/api/mcp.md](./docs/api/mcp.md), [docs/ai-integration.md](./docs/ai-integration.md) |
+| MCP tools | `ticket_*`, customer lookup, KB, read-only CMDB (`cmdb_search`, `cmdb_get`, `cmdb_impact`), approvals (`approval_list_mine`, `approval_get`, `approval_decide`, the last off by default), plus tools from plugins — see [docs/api/mcp.md](./docs/api/mcp.md), [docs/ai-integration.md](./docs/ai-integration.md) |
 | AI assistance subsystem | Draft replies, summaries, triage, refine (diff review, call notes), auto-reply worker, human handoff, per-ticket pause, 🤖 origin traces, attachment/vision, PII masking, model catalog/profiles/task routing, per-subject ACL, cost budgets & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
 | Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
@@ -268,6 +291,8 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 | SSE realtime + agent presence | Live updates on ticket zoom |
 | CSV ticket export | Permission-filtered streaming export |
 | ITSM and CMDB | Incident / problem / major incident, priority matrix, link types, Tiqora CMDB (Mode B), read-only Znuny CMDB (Mode A), ITSM importer, `tiqora itsm` CLI — [docs/itsm.md](./docs/itsm.md), [docs/cmdb.md](./docs/cmdb.md), [docs/itsm-import.md](./docs/itsm-import.md) |
+| Change management | Mode B: changes on tickets, tasks, templates, calendar and freeze windows, risk, CAB and meetings, read-only archive of Znuny's changes, switch `itsm_change.enabled` — [docs/itsm.md](./docs/itsm.md#8-change-management) |
+| Approvals | Stages and rules, deadlines, substitutes, inbox, ticket panel, e-mail links, portal, REST and MCP, switch `approvals.enabled` — [docs/approvals.md](./docs/approvals.md) |
 | Reporting | Report builder, 25 core + 16 ITSM built-in reports, saved reports, Znuny stats import, PDF / XLSX / CSV, schedules, report data backfill (`tiqora report`) — [docs/reporting.md](./docs/reporting.md) |
 | Dashboards and wallboards | Widget dashboards, role templates, TV mode, public wallboard links — [docs/dashboards.md](./docs/dashboards.md) |
 | Web chat | Website widget, chat inbox, AI first line with handoff, recognised visitors, portal chat — [docs/guide/webchat.md](./docs/guide/webchat.md) |
@@ -501,10 +526,10 @@ explicit operator action — see [docs/cutover.md](./docs/cutover.md).
 
 ### Znuny feature parity
 
-Day-to-day agent, customer-portal and admin work is covered, and since v0.18.0 / v0.19.0
+Day-to-day agent, customer-portal and admin work is covered, and since v0.18.0 to v0.20.0
 also what used to be on the gap list: saved searches, widget dashboards, the statistics
 framework (builder, import, schedules), the process designer, the GenericInterface
-requester, SAML, web chat, ITSM / CMDB and a plugin system as the replacement for Perl OPM
+requester, SAML, web chat, ITSM / CMDB, change management and a plugin system as the replacement for Perl OPM
 add-ons. The maintained, detailed list with every status (and what is only partial) is
 [docs/compatibility.md](./docs/compatibility.md#znuny-features-not-implemented). Still
 not implemented:
@@ -516,7 +541,8 @@ not implemented:
 | Customer portal print view | missing |
 | Follow-up as a new ticket (`queue.follow_up_id == 3`) | missing (behaves like reopen) |
 | Process transitions after every ticket change | missing (evaluated after process dialogs and new process tickets) |
-| ITSM service catalogue | planned (wave 5); change management and approvals are available ([itsm.md](./docs/itsm.md)) |
+| ITSM service catalogue | planned |
+| Znuny's change conditions, change notification rules, configurable state machine | missing (fixed phases; notifications come from ticket events and approvals, [itsm.md](./docs/itsm.md#8-change-management)) |
 | SysConfig edit/deploy UI | by design (settings are read from `sysconfig_*`) |
 | Perl OPM packages / Package Manager | by design (replaced by [plugins](./docs/plugins.md)) |
 

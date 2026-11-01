@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. OTRS/Znuny 6.0–7.3 database-compatible, with ITSM &amp; CMDB, SAML/OIDC SSO with SCIM, web chat, reporting, plugins, GDPR tools and parallel operation."
+      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. OTRS/Znuny 6.0–7.3 database-compatible, with ITSM &amp; CMDB, change management, approvals, SAML/OIDC SSO with SCIM, web chat, reporting, plugins, GDPR tools and parallel operation."
     />
     <meta name="theme-color" content="#0e1015" />
     <link rel="canonical" href="https://cygnusnetworks.github.io/tiqora/" />
@@ -14,7 +14,7 @@
     <meta property="og:title" content="Tiqora — the modern helpdesk for your OTRS/Znuny database" />
     <meta
       property="og:description"
-      content="Self-hosted, AGPL-3.0 helpdesk that runs next to Znuny/OTRS 6.0–7.3 on the same database. Modern UI, AI drafts with PII masking, ITSM &amp; CMDB, SAML/OIDC + SCIM, web chat, GDPR tools, PGP/S/MIME."
+      content="Self-hosted, AGPL-3.0 helpdesk that runs next to Znuny/OTRS 6.0–7.3 on the same database. Modern UI, AI drafts with PII masking, ITSM &amp; CMDB, change management, approvals, SAML/OIDC + SCIM, web chat, GDPR tools, PGP/S/MIME."
     />
     <meta property="og:url" content="https://cygnusnetworks.github.io/tiqora/" />
     <meta property="og:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
@@ -147,8 +147,35 @@
                 CIs from Znuny ITSM 6.5/7.3 (“Znuny führt das ITSM”) or keep them in
                 Tiqora's own CMDB (“Tiqora führt das ITSM”) with versioned classes and
                 impact analysis. An importer moves them over, with a dry run and a way
-                back.
+                back. The ITSM mode can also be off.
                 <a href="#screenshots-itsm">Screens ↓</a>
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">Δ</div>
+              <h3>Change management</h3>
+              <p>
+                While Tiqora leads the ITSM: a change is a ticket plus a change record with
+                type, phases, plans, time window, risk and impact. Tasks, templates and
+                standard changes, a calendar with freeze windows and conflict checks, CAB
+                meetings with agenda and minutes. Znuny's changes stay read-only, live or in
+                an archive; Tiqora never writes them. Narrower than Znuny's: no change
+                conditions or notification rules of its own. It has its own off-switch.
+              </p>
+              <p class="feature-link">
+                <a href="./compare.html#stronger">Where Znuny is stronger →</a>
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">✓</div>
+              <h3>Approvals</h3>
+              <p>
+                One engine for approval requests on a ticket: stages and parallel steps,
+                rules (one, all, at least n, majority), deadlines with reminders and
+                escalation, substitutes. People decide in their inbox, in the ticket, through
+                a single-use e-mail link, in the portal if you allow customers, over REST or MCP. Not yet as a
+                process step. An admin switch turns the module off and deletes nothing.
+                <a href="#screenshots-approvals">Screens ↓</a>
               </p>
             </article>
             <article class="feature">
@@ -165,8 +192,9 @@
               <div class="icon">▤</div>
               <h3>Reports &amp; dashboards</h3>
               <p>
-                25 built-in reports, a report builder, saved reports and searches,
-                import of Znuny statistics, PDF/XLSX/CSV export and scheduled
+                25 core and 16 ITSM built-in reports (the ones on CIs and changes need
+                Tiqora to lead the ITSM), a report builder, saved reports and searches,
+                import of Znuny statistics including the ITSM ones, PDF/XLSX/CSV export and scheduled
                 delivery by e-mail. Widget dashboards per agent with role templates,
                 report widgets, a TV mode and read-only wallboard links.
                 <a href="#screenshots-dashboards">Screens ↓</a>
@@ -460,6 +488,26 @@
               <figure data-shot="admin-cmdb-class-editor" data-only="light">
                 <img src="./assets/screenshots/admin-cmdb-class-editor.png" alt="CMDB class editor" loading="lazy" />
                 <figcaption><strong>Class designer</strong> Typed attributes per class, saved as versioned definitions</figcaption>
+              </figure>
+            </div>
+
+            <div class="topic" data-topic="approvals" data-label="Approvals">
+              <h3 class="topic-title">Approvals</h3>
+              <figure data-shot="agent-approvals" data-only="light">
+                <img src="./assets/screenshots/agent-approvals.png" alt="My approvals with stages and approvers" loading="lazy" />
+                <figcaption><strong>My approvals</strong> Open requests with their stages, approvers and votes; approve, reject or forward (approval screens: light theme only)</figcaption>
+              </figure>
+              <figure data-shot="agent-approvals-ticket" data-only="light">
+                <img src="./assets/screenshots/agent-approvals-ticket.png" alt="Approvals panel in the ticket" loading="lazy" />
+                <figcaption><strong>In the ticket</strong> Request an approval and follow it on the ticket it belongs to</figcaption>
+              </figure>
+              <figure data-shot="approval-confirm-page" data-only="light">
+                <img src="./assets/screenshots/approval-confirm-page.png" alt="Confirm page of an e-mail link" loading="lazy" />
+                <figcaption><strong>E-mail link</strong> A single-use link opens a confirm page that decides nothing until you click</figcaption>
+              </figure>
+              <figure data-shot="admin-approval-template" data-only="light">
+                <img src="./assets/screenshots/admin-approval-template.png" alt="Approval template editor" loading="lazy" />
+                <figcaption><strong>Templates</strong> Stages, rules, approvers and what happens when a deadline passes</figcaption>
               </figure>
             </div>
 
