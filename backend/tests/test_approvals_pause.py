@@ -33,10 +33,11 @@ from tests.test_approvals_switch import SETTINGS, SUBJECT, _defn, _request, _sta
 from tiqora.approvals import inbox, service, sweep
 from tiqora.approvals.contract import JOB_MAIL, Actor, ApprovalError
 from tiqora.approvals.notify import ApprovalMailPayload, run_approval_mail
-from tiqora.domain.settings_store import get_setting
+from tiqora.domain.settings_store import get_setting, set_setting
 from tiqora.jobs.context import JobContext
 from tiqora.jobs.service import utc_now
 from tiqora.security.ratelimit import ApprovalLinkRateLimiter
+from tiqora.worker import approvals_sweep as worker_module
 
 pytestmark = pytest.mark.db
 
@@ -273,6 +274,141 @@ async def test_a_step_activated_after_switching_on_keeps_its_deadline(
             await _sweep(session, start + 2 * DAY)
             assert (await _step(session, old))["due_at"] == old_due + 2 * DAY
             assert (await _step(session, new))["due_at"] == new_due
+
+
+# --- the daemon flag ---------------------------------------------------------------------------
+
+
+async def _flag(session: AsyncSession, on: bool) -> None:
+    await set_setting(session, "daemon.approvals.enabled", "1" if on else "0")
+
+
+@pytest.fixture
+def worker_tick(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """``tick(session, now)``: the worker's tick on *session*, the daemon flag deciding."""
+
+    async def tick(session: AsyncSession, now: datetime) -> dict[str, int]:
+        await session.commit()
+        monkeypatch.setattr(
+            worker_module, "get_session_factory", lambda: shared_session_factory(session)
+        )
+        monkeypatch.setattr(worker_module, "get_pubsub_redis", lambda settings=None: None)
+        return await worker_module.run_approvals_sweep_worker_tick(SETTINGS, now=now)
+
+    return tick
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+@pytest.mark.parametrize("on_timeout", ["reject", "approve"])
+async def test_a_pause_only_ticks_with_the_daemon_off_saw_does_not_fire(
+    url_fixture: str, request: pytest.FixtureRequest, worker_tick: Any, on_timeout: str
+) -> None:
+    """Admin turns off service and module, later on again: the first real sweep decides nothing."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            start = _whole(utc_now())
+            approval_id = await _request(session, due_hours=1, on_timeout=on_timeout)
+            await _set_due(session, approval_id, start + HOUR)
+            await _flag(session, False)
+            assert await worker_tick(session, start) == {"skipped": 1}
+            await _switch(session, False)
+            assert await worker_tick(session, start + DAY) == {"skipped": 1}
+            await _switch(session, True)
+            await _flag(session, True)
+            counts = await worker_tick(session, start + 2 * DAY)
+            assert counts["timeout_decided"] == 0
+            assert await _status(session, approval_id) == "pending"
+            assert (await _step(session, approval_id))["due_at"] == start + HOUR + 2 * DAY
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_a_month_with_the_daemon_off_does_not_count_into_a_short_pause(
+    url_fixture: str, request: pytest.FixtureRequest, worker_tick: Any
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            start = _whole(utc_now())
+            approval_id = await _request(session, due_hours=1)
+            due = start + 40 * DAY
+            await _set_due(session, approval_id, due)
+            await worker_tick(session, start)
+            await _flag(session, False)
+            month = start + 30 * DAY
+            await worker_tick(session, month)
+            await _switch(session, False)
+            await _flag(session, True)
+            assert (await worker_tick(session, month + 30 * MINUTE))["paused"] == 1
+            await _switch(session, True)
+            await worker_tick(session, month + HOUR)
+            assert (await _step(session, approval_id))["due_at"] == due + HOUR
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_a_pause_ending_with_the_daemon_off_shifts_once(
+    url_fixture: str, request: pytest.FixtureRequest, worker_tick: Any
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            start = _whole(utc_now())
+            approval_id = await _request(session, due_hours=1, on_timeout="reject")
+            due = start + HOUR
+            await _set_due(session, approval_id, due)
+            await _flag(session, False)
+            await worker_tick(session, start)
+            await _switch(session, False)
+            await worker_tick(session, start + DAY)
+            await _switch(session, True)
+            await worker_tick(session, start + 2 * DAY)
+            assert (await _step(session, approval_id))["due_at"] == due + 2 * DAY
+            await _flag(session, True)
+            assert (await worker_tick(session, start + 2 * DAY + MINUTE))["timeout_decided"] == 0
+            assert (await _step(session, approval_id))["due_at"] == due + 2 * DAY
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_a_deadline_passing_with_the_daemon_off_and_the_module_on_still_fires(
+    url_fixture: str, request: pytest.FixtureRequest, worker_tick: Any
+) -> None:
+    """People could decide the whole time: the service being off moves nothing, as before."""
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            start = _whole(utc_now())
+            approval_id = await _request(session, due_hours=1, on_timeout="reject")
+            await _set_due(session, approval_id, start + HOUR)
+            await _flag(session, False)
+            await worker_tick(session, start + 2 * HOUR)
+            await _flag(session, True)
+            assert (await worker_tick(session, start + 3 * HOUR))["timeout_decided"] == 1
+            assert await _status(session, approval_id) == "rejected"
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_a_link_issued_after_switching_on_keeps_its_time(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            start = _whole(utc_now())
+            approval_id, _ = await links_kit._link(session)
+            await _pause(session, start, 2 * DAY)
+            fresh = start + 2 * DAY - MINUTE
+            expires = fresh + 7 * DAY
+            await session.execute(
+                text(
+                    "UPDATE tiqora_approval_token SET created_at = :c, expires_at = :e"
+                    " WHERE approval_id = :a"
+                ),
+                {"c": fresh, "e": expires, "a": approval_id},
+            )
+            await session.commit()
+            await _sweep(session, start + 2 * DAY)
+            got = (
+                await session.execute(
+                    text("SELECT expires_at FROM tiqora_approval_token WHERE approval_id = :a"),
+                    {"a": approval_id},
+                )
+            ).scalar_one()
+            assert got == expires
 
 
 # --- frozen with the module of the subject type -----------------------------------------------

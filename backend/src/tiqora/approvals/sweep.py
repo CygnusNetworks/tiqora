@@ -571,10 +571,22 @@ async def _shift_timers(
 ) -> int:
     """Moves deadlines, reminders and links of the open requests of a type by the pause.
 
-    Only steps active at the last paused tick: one activated after switching on keeps its fresh
-    deadline. A deadline already reported stays, and so does a link that had expired before.
+    Only steps active and links issued by the last paused tick: what came after switching on keeps
+    its fresh time. A deadline already reported stays, and so does a link that had expired before.
     """
     S, P, T = TiqoraApprovalStep, TiqoraApproval, TiqoraApprovalToken  # noqa: N806
+    open_ids = (
+        (
+            await session.execute(
+                select(P.id).where(P.subject_type == subject_type, P.status == "pending")
+            )
+        )
+        .scalars()
+        .all()
+    )
+    # the request lock first, like a vote and every sweep item, so a vote cannot deadlock with this
+    for chunk in _chunks(sorted(int(i) for i in open_ids)):
+        await session.execute(select(P.id).where(P.id.in_(chunk)).order_by(P.id).with_for_update())
     steps = (
         await session.execute(
             select(S.id, S.due_at, S.overdue_at, S.last_reminder_at, S.activated_at)
@@ -602,6 +614,7 @@ async def _shift_timers(
                 T.used_at.is_(None),
                 T.revoked_at.is_(None),
                 T.expires_at > since,
+                T.created_at <= seen,
             )
         )
     ).all()
@@ -682,6 +695,16 @@ async def _timers(
             await session.rollback()
             raise
     return frozenset(paused)
+
+
+async def track_timers(
+    *, session_factory: async_sessionmaker[AsyncSession], now: datetime | None = None
+) -> None:
+    """The pause bookkeeping alone, for ticks with ``daemon.approvals.enabled`` off: pauses are
+    measured whether or not the deadline phases run, or a pause in that time would go unseen and
+    a later pause would count the daemon's time off as well."""
+    moment = (now if now is not None else utc_now()).replace(microsecond=0)
+    await _timers(session_factory, moment, get_registry())
 
 
 # --- tick -----------------------------------------------------------------------------------

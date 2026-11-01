@@ -40,7 +40,7 @@ from tests._approvals_helpers import (
 )
 from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tests.approvals_consumer_kit import run_hook_now, shared_session_factory
-from tiqora.approvals import service, sweep
+from tiqora.approvals import _engine, service, sweep
 from tiqora.approvals.contract import (
     EVENT_DECIDED,
     EVENT_ESCALATED,
@@ -1277,3 +1277,46 @@ async def test_timeout_history_line(url_fixture: str, request: pytest.FixtureReq
                 f"Approval #{aid}: decided rejected (timeout)",
             ]
             assert render_history_entry(history_type="Misc", name=lines[-1]) == lines[-1]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_the_shift_after_a_pause_waits_for_a_vote_holding_the_request(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The request lock first, as everywhere: a vote in flight finishes, neither is a deadlock."""
+    url: str = request.getfixturevalue(url_fixture)
+    async with _committed_world(url) as factory:
+        with installed_registry(make_fake_subject_type()):
+            async with factory() as seed:
+                aid = await _request(seed, _defn(_step("CAB", AG3, AG4, rule="all", due_hours=1)))
+                await seed.commit()
+            start = utc_now().replace(microsecond=0)
+            await _sweep(factory, start)
+            async with factory() as switch:
+                await set_setting(switch, APPROVALS_SECTION.storage_key("enabled"), "0")
+            await _sweep(factory, start + timedelta(hours=1))
+            async with factory() as switch:
+                await set_setting(switch, APPROVALS_SECTION.storage_key("enabled"), "1")
+            try:
+                async with factory() as voter:
+                    await _engine.lock_approval(voter, aid)
+                    tick = asyncio.create_task(_sweep(factory, start + timedelta(hours=2)))
+                    await asyncio.sleep(1)
+                    assert not tick.done()  # it waits for the request, before any step row
+                    await service.decide(
+                        voter, aid, actor=Actor.agent(AG3), decision="approved", channel="ui"
+                    )
+                    await voter.commit()
+                counts = await asyncio.wait_for(tick, 30)
+            finally:
+                async with factory() as cleanup:
+                    await cleanup.execute(
+                        delete(TiqoraSettings).where(
+                            TiqoraSettings.key == APPROVALS_SECTION.storage_key("enabled")
+                        )
+                    )
+                    await cleanup.commit()
+            assert counts["timeout_decided"] == 0
+            async with factory() as check:
+                assert (await service.get_info(check, aid)).status == "pending"
