@@ -191,6 +191,8 @@ Tool-allowlist names: `tool:approval_list_mine`, `tool:approval_get`, `tool:appr
 | `approval_get` | One request: steps, approvers, votes and the audit trail (action, time, actor only; no detail objects). Read-only. |
 | `approval_decide` | Records a **binding** vote (`decision` `approved` or `rejected`, optional `comment` up to 2000 characters) in the name of the key's owner. **Off by default**, see below. Returns `{ok, status, step_status}` or `{"error": code}`. |
 
+With the module switched off (`approvals.enabled`) all three return `{"error": "approvals_disabled"}`.
+
 **`approval_decide` is gated three ways.** A model reads text from tickets, mails and tool results, and
 one injected sentence must never be enough to cast a vote in a change board. The tool runs only when
 

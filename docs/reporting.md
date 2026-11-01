@@ -502,9 +502,14 @@ note in the builder, and runs: it reads Tiqora's own tables, which hold data onl
 ITSM. Without Mode B it shows no rows; after a switch back from Mode B to Mode A it counts the rows that
 remain. The report page and a dashboard tile show the same note ("Diese Datenbasis wird nur gepflegt,
 solange Tiqora das ITSM führt (Modus B). Die Zahlen können leer oder veraltet sein."); a wallboard link
-does not. A dashboard tile or a schedule on such a report keeps running; the mail carries no note and goes
+does not. In Mode A a dashboard tile or a schedule on such a report keeps running; the mail carries no note and goes
 out empty unless "only if non-empty" is set. Statistics over Znuny's own CMDB and change tables in Mode A
 are not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
+
+**Switched off.** With the ITSM mode "Aus", a tile or a schedule on one of these data bases or on an ITSM built-in
+refuses to run: the tile shows an error, the schedule run fails with a message. The same goes for the change reports
+(`changes`, `change_events`, "Changes je CI-Klasse") while change management or approvals are switched off
+([itsm.md](itsm.md) chapter 8). A run through the report page or `POST /api/v1/reports/run` stays possible.
 
 **Period of a tile or a schedule.** "CIs nach Klasse und Status" has no period of its own. A dashboard
 period or a schedule's "Zeitraum für den Versand" narrows it, like every CI report, to the CIs created
