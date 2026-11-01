@@ -444,7 +444,9 @@ async def test_forward_creates_row_and_marks_old(
                 )
             )
             await session.flush()
-            new_id = await service.forward(session, old.id, actor=Actor.agent(AG3), to_user_id=AG1)
+            new_id = await service.forward(
+                session, aid, old.id, actor=Actor.agent(AG3), to_user_id=AG1
+            )
             rows = {a.id: a for a in await _approvers(session, aid)}
             assert rows[old.id].status == "forwarded"
             new = rows[new_id]
@@ -504,7 +506,7 @@ async def test_forward_not_allowed_by_step(
             )
             row = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
+                service.forward(session, aid, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
             )
             assert (err.code, err.http_status) == ("forward_not_allowed", 409)
             assert (await _status_of(session, aid))[AG3] == "pending"
@@ -517,14 +519,16 @@ async def test_forward_twice_refused(url_fixture: str, request: pytest.FixtureRe
         with installed_registry(make_fake_subject_type()):
             aid = await _request(session, _defn(_step("CAB", _user(AG3), _user(AG4), rule="all")))
             old = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
-            new_id = await service.forward(session, old.id, actor=Actor.agent(AG3), to_user_id=AG1)
+            new_id = await service.forward(
+                session, aid, old.id, actor=Actor.agent(AG3), to_user_id=AG1
+            )
             err = await _refused(
-                service.forward(session, new_id, actor=Actor.agent(AG1), to_user_id=AG7)
+                service.forward(session, aid, new_id, actor=Actor.agent(AG1), to_user_id=AG7)
             )
             assert (err.code, err.http_status) == ("forward_not_allowed", 409)
             # the already forwarded row cannot be forwarded again either
             err = await _refused(
-                service.forward(session, old.id, actor=Actor.agent(AG3), to_user_id=AG7)
+                service.forward(session, aid, old.id, actor=Actor.agent(AG3), to_user_id=AG7)
             )
             assert (err.code, err.http_status) == ("already_decided", 409)
 
@@ -541,7 +545,7 @@ async def test_forward_to_requester_refused(
             )
             row = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
+                service.forward(session, aid, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
             )
             assert (err.code, err.http_status) == ("self_approval_forbidden", 403)
             assert (await _status_of(session, aid))[AG3] == "pending"
@@ -565,7 +569,7 @@ async def test_forward_to_existing_approver_refused(
                 1,
             ):  # approver, self, invalid, unknown, root
                 err = await _refused(
-                    service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=target)
+                    service.forward(session, aid, row.id, actor=Actor.agent(AG3), to_user_id=target)
                 )
                 assert (err.code, err.http_status) == ("forward_target_invalid", 422)
             assert len(await _approvers(session, aid)) == 2
@@ -581,22 +585,22 @@ async def test_forward_refused_for_foreign_and_closed_rows(
             aid = await _request(session, _defn(_step("CAB", _user(AG3), _user(AG4), rule="all")))
             row = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.agent(AG4), to_user_id=AG1)
+                service.forward(session, aid, row.id, actor=Actor.agent(AG4), to_user_id=AG1)
             )
             assert (err.code, err.http_status) == ("not_an_approver", 403)
             err = await _refused(
-                service.forward(session, 971198, actor=Actor.agent(AG3), to_user_id=AG1)
+                service.forward(session, aid, 971198, actor=Actor.agent(AG3), to_user_id=AG1)
             )
             assert (err.code, err.http_status) == ("not_an_approver", 403)
             await _decide(session, aid, AG3)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
+                service.forward(session, aid, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
             )
             assert (err.code, err.http_status) == ("already_decided", 409)
             await _decide(session, aid, AG4, "rejected")
             other = next(a for a in await _approvers(session, aid) if a.user_id == AG4)
             err = await _refused(
-                service.forward(session, other.id, actor=Actor.agent(AG4), to_user_id=AG1)
+                service.forward(session, aid, other.id, actor=Actor.agent(AG4), to_user_id=AG1)
             )
             assert (err.code, err.http_status) == ("approval_closed", 409)
 
@@ -609,11 +613,13 @@ async def test_customer_cannot_forward(url_fixture: str, request: pytest.Fixture
             aid = await _request(session, _defn(_step("CAB", _user(AG3), _user(AG4))))
             row = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.customer("appr97-k1"), to_user_id=AG1)
+                service.forward(
+                    session, aid, row.id, actor=Actor.customer("appr97-k1"), to_user_id=AG1
+                )
             )
             assert (err.code, err.http_status) == ("forbidden", 403)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.system(), to_user_id=AG1)
+                service.forward(session, aid, row.id, actor=Actor.system(), to_user_id=AG1)
             )
             assert err.code == "forbidden"
 
@@ -731,7 +737,7 @@ async def test_refresh_skips_principals_with_any_row(
             aid = await _request(session, _defn(_step("CAB", CAB_GROUP, rule="all")))
             old = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
             forwarded_to = await service.forward(
-                session, old.id, actor=Actor.agent(AG3), to_user_id=AG1
+                session, aid, old.id, actor=Actor.agent(AG3), to_user_id=AG1
             )
             # AG3 is still in the group but already has a (forwarded) row in the step
             result = await service.refresh_approvers(session, aid, actor=Actor.agent(AG1))
@@ -865,7 +871,7 @@ async def test_forward_to_target_who_voted_on_behalf_refused(
             await _decide(session, aid, AG1)  # on behalf of AG5
             row = next(a for a in await _approvers(session, aid) if a.user_id == AG3)
             err = await _refused(
-                service.forward(session, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
+                service.forward(session, aid, row.id, actor=Actor.agent(AG3), to_user_id=AG1)
             )
             # a bad target, like every other one the UI maps (not the caller's own state)
             assert (err.code, err.http_status) == ("forward_target_invalid", 422)

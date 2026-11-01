@@ -577,7 +577,7 @@ committen nie**: Der Aufrufer committet. Sie zeigen Fehler als `ApprovalError(co
 | `record_auto_decision(session, *, ..., status, reason)` | Hält eine bereits entschiedene Anfrage ohne Schritte fest (zum Beispiel einen vorab genehmigten Standard-Change). Keine E-Mails. |
 | `cancel_approval(session, approval_id, *, actor, reason, check_permission)` | Zieht eine offene Anfrage zurück (`cancelled`, `superseded` oder `ticket_deleted`). Eine Notiz wird nicht gespeichert; wer eine braucht, schreibt eine eigene Ticketnotiz. |
 | `decide(session, approval_id, *, actor, decision, channel, ...)` | Gibt eine Stimme ab. Aufrufer aus Routen rufen zuvor `await session.rollback()` (Sperrreihenfolge, unten). |
-| `forward(session, approver_id, *, actor, to_user_id)` | Leitet eine Zeile weiter. |
+| `forward(session, approval_id, approver_id, *, actor, to_user_id)` | Leitet eine Zeile weiter. |
 | `refresh_approvers(session, approval_id, *, actor)` | „Freigeber neu ermitteln“. |
 | `get_info`, `approval_status(session, ticket_id=, approval_key=)`, `approval_statuses(session, ticket_id=)`, `list_for_ticket` | Lesen. `approval_status` liefert den Status der **jüngsten** Anfrage zum Schlüssel (oder `None`); damit können etwa Prozessbedingungen den Stand abfragen. |
 | `templates.ensure_template(session, key=, name=, definition=, origin=, subject_types=)` | Legt eine Vorlage einmal an. Existiert der Schlüssel, bleibt die Zeile unverändert (Admin-Änderungen überleben Updates). |

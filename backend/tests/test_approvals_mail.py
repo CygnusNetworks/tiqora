@@ -802,7 +802,7 @@ async def test_reminder_and_forwarded_texts(
             assert "/approve#t=" in _body(mail.sent[-1])
 
             new_id = await service.forward(
-                session, ids[f"agent:{AG3}"], actor=Actor.agent(AG3), to_user_id=AG4
+                session, approval_id, ids[f"agent:{AG3}"], actor=Actor.agent(AG3), to_user_id=AG4
             )
             await session.commit()
             await _run(session, approval_id, "forwarded", [new_id], job_id=12)

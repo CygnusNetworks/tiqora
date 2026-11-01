@@ -258,7 +258,7 @@ async def test_issue_refuses_non_pending_row(
 
             fwd = await _request(session, ONE_STEP)
             row = await _approver(session, fwd, AG3)
-            await service.forward(session, row, actor=Actor.agent(AG3), to_user_id=AG5)
+            await service.forward(session, fwd, row, actor=Actor.agent(AG3), to_user_id=AG5)
             with pytest.raises(ApprovalError) as excinfo:
                 await _issue(session, row)
             assert excinfo.value.code == "not_an_approver"
@@ -708,7 +708,7 @@ async def test_token_for_forwarded_row_dead(
             aid = await _request(session, ONE_STEP)
             row = await _approver(session, aid, AG3)
             token = await _issue(session, row)
-            await service.forward(session, row, actor=Actor.agent(AG3), to_user_id=AG5)
+            await service.forward(session, aid, row, actor=Actor.agent(AG3), to_user_id=AG5)
             await _expect(session, token, "link_invalid")
             await session.commit()
             with pytest.raises(ApprovalError) as excinfo:

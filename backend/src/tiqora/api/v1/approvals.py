@@ -437,9 +437,13 @@ async def post_forward(
         session,
         approval_id,
         actor,
-        service.forward(session, approver_id, actor=actor, to_user_id=body.user_id),
+        commit_with_retry(
+            session,
+            lambda: service.forward(
+                session, approval_id, approver_id, actor=actor, to_user_id=body.user_id
+            ),
+        ),
     )
-    await session.commit()
     await _publish(settings, await _affected_users(session, approval_id, step_id=int(owner[1])))
     return await _detail(session, approval_id, actor)
 

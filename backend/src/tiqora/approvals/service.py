@@ -646,6 +646,7 @@ async def decide(
 
 async def forward(
     session: AsyncSession,
+    approval_id: int,
     approver_id: int,
     *,
     actor: Actor,
@@ -659,30 +660,18 @@ async def forward(
     same step (decisive like the old one) and gets a ``forwarded`` mail. Only the approver
     themselves forwards (never a delegate), a forward row cannot be forwarded again, and the
     step must allow delegation. *comment* is accepted for API compatibility but not stored:
-    audit rows never carry free text. Raises ``forbidden`` (customers, system),
-    ``approval_closed``, ``not_an_approver``, ``already_decided``, ``step_not_active``,
+    audit rows never carry free text. An *approver_id* of another request is ``not_an_approver``.
+    Callers roll back first (F1(a)). Raises ``approval_not_found``, ``forbidden`` (customers,
+    system), ``approval_closed``, ``not_an_approver``, ``already_decided``, ``step_not_active``,
     ``forward_not_allowed``, ``forward_target_invalid`` and ``self_approval_forbidden``.
     """
     principal = actor.principal
     if principal is None or principal.kind != "agent" or principal.user_id is None:
         raise ApprovalError("forbidden", 403)
     reg = registry or get_registry()
-    # the request lock is the first statement; the approver id only names which request
-    approval = (
-        await session.execute(
-            select(TiqoraApproval)
-            .where(
-                TiqoraApproval.id
-                == select(TiqoraApprovalApprover.approval_id)
-                .where(TiqoraApprovalApprover.id == approver_id)
-                .scalar_subquery()
-            )
-            .with_for_update()
-            .execution_options(populate_existing=True)
-        )
-    ).scalar_one_or_none()
-    if approval is None:
-        raise ApprovalError("not_an_approver", 403)
+    # the request lock is the first statement, with no subquery: a plain read inside it would open
+    # the read view before the wait, and the vote read below would miss a vote committed meanwhile
+    approval = await _engine.lock_approval(session, approval_id)
     await require_subject_available(session, approval.subject_type, reg)
     if approval.status != "pending":
         raise ApprovalError("approval_closed", 409)

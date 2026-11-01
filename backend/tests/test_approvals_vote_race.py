@@ -7,12 +7,14 @@ again as a whole, with no double effects, on every path that decides.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Any
 
 import pytest
 from fastmcp import Client
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -23,6 +25,8 @@ from tests._approvals_helpers import (
     AG1,
     AG3,
     AG4,
+    AG5,
+    AG7,
     T1,
     T2,
     approvals_session,
@@ -32,11 +36,17 @@ from tests._approvals_helpers import (
 )
 from tests._fake_redis import FakeRedis
 from tests.test_approvals_sweep import SETTINGS, _committed_world, _defn, _request, _step
-from tiqora.approvals import _engine, service
+from tiqora.approvals import _engine, delegation, service
 from tiqora.approvals.contract import JOB_HOOK, JOB_MAIL, Actor, ApprovalError
-from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalVote
+from tiqora.approvals.models import (
+    TiqoraApproval,
+    TiqoraApprovalApprover,
+    TiqoraApprovalDelegation,
+    TiqoraApprovalVote,
+)
 from tiqora.approvals.retry import commit_with_retry
 from tiqora.db.tiqora.models import TiqoraJob
+from tiqora.jobs.service import utc_now
 from tiqora.mcp_server.server import mcp
 
 pytestmark = pytest.mark.db
@@ -62,6 +72,9 @@ async def _plain_vote(
                 settings=SETTINGS,
             )
             await session.commit()
+        except ApprovalError as err:
+            await session.rollback()
+            return err.code
         except OperationalError as exc:
             await session.rollback()
             return f"db_error:{exc.orig.args[0] if exc.orig else None}"
@@ -136,6 +149,126 @@ async def test_votes_on_one_request_see_each_other(
                 assert got == ["ok", "ok"]
                 assert await _status(factory, aid) == "approved"
                 assert await _votes(factory, aid) == 2
+
+
+@asynccontextmanager
+async def _substitutes(
+    factory: async_sessionmaker[AsyncSession], by: int, *of: int
+) -> AsyncIterator[None]:
+    """Standing delegations to *by*, removed again: the world's cleanup does not know them."""
+    async with factory() as setup:
+        for user in of:
+            await _substitute(setup, user, by)
+    try:
+        yield
+    finally:
+        async with factory() as cleanup:
+            await cleanup.execute(
+                delete(TiqoraApprovalDelegation).where(
+                    TiqoraApprovalDelegation.substitute_user_id == by
+                )
+            )
+            await cleanup.commit()
+
+
+async def _substitute(session: AsyncSession, of: int, by: int) -> None:
+    await delegation.create_delegation(
+        session,
+        user_id=of,
+        substitute_user_id=by,
+        valid_from=utc_now() - timedelta(hours=1),
+        valid_until=None,
+        created_by=of,
+    )
+    await session.commit()
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_one_substitute_voting_on_two_rows_votes_once(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """F8 reads the votes after the request lock: the second of two simultaneous votes of one
+    person must see the first, whatever the rule counts. A stale vote read gives two votes."""
+    async with _committed_world(request.getfixturevalue(url_fixture)) as factory:
+        with installed_registry(make_fake_subject_type()):
+            async with _substitutes(factory, AG5, AG3, AG4):
+                for n in range(ROUNDS):
+                    async with factory() as setup:
+                        aid = await _request(
+                            setup,
+                            _defn(_step("CAB", AG3, AG4, AG7, rule="all")),
+                            approval_key=f"sub-{n}",
+                        )
+                    got = await asyncio.gather(
+                        _plain_vote(factory, aid, AG5), _plain_vote(factory, aid, AG5)
+                    )
+                    assert sorted(got) == ["already_decided", "ok"], (n, got)
+                    assert await _votes(factory, aid) == 1
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_forward_waiting_for_a_vote_sees_it(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The target votes as a substitute while someone forwards to them. The forward must see the
+    vote it waited for, or the target holds a row F8 refuses and an ``all`` step can never end."""
+    async with _committed_world(request.getfixturevalue(url_fixture)) as factory:
+        with installed_registry(make_fake_subject_type()):
+            async with _substitutes(factory, AG5, AG3):
+                for n in range(5):
+                    async with factory() as setup:
+                        aid = await _request(
+                            setup,
+                            _defn(_step("CAB", AG3, AG4, rule="all")),
+                            approval_key=f"fwd-{n}",
+                        )
+                        row = (
+                            await setup.execute(
+                                select(TiqoraApprovalApprover.id).where(
+                                    TiqoraApprovalApprover.approval_id == aid,
+                                    TiqoraApprovalApprover.user_id == AG4,
+                                )
+                            )
+                        ).scalar_one()
+                        await setup.rollback()
+
+                    async def forward(approver_id: int = row, approval_id: int = aid) -> str:
+                        async with factory() as session:
+                            await session.rollback()  # the route's path
+                            try:
+                                await service.forward(
+                                    session,
+                                    approval_id,
+                                    approver_id,
+                                    actor=Actor.agent(AG4),
+                                    to_user_id=AG5,
+                                )
+                                await session.commit()
+                            except ApprovalError as err:
+                                await session.rollback()
+                                return err.code
+                        return "ok"
+
+                    async with factory() as voter:
+                        await voter.rollback()
+                        await service.decide(
+                            voter,
+                            aid,
+                            actor=Actor.agent(AG5),
+                            decision="approved",
+                            channel="api",
+                            settings=SETTINGS,
+                        )
+                        waiting = asyncio.create_task(forward())
+                        await asyncio.sleep(0.5)
+                        assert not waiting.done()
+                        await voter.commit()
+                    assert await asyncio.wait_for(waiting, 30) == "forward_target_invalid"
+                    assert await _status(factory, aid) == "pending"
+                    # AG4 still holds their row, so the step can end
+                    got = await _plain_vote(factory, aid, AG4)
+                    assert got == "ok"
+                    assert await _status(factory, aid) == "approved"
 
 
 # --- a forced deadlock ------------------------------------------------------------------------
@@ -384,6 +517,56 @@ async def test_mcp_vote_retries_and_says_when_out_of_attempts(
             assert done.data["ok"] is True
             assert len(attempts) == 2
             assert await _effects(session, aid) == ONCE
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_forward_retries_with_no_double_effects(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            aid = await _ask(session, AG3, AG4)
+            row = (
+                await session.execute(
+                    select(TiqoraApprovalApprover.id).where(
+                        TiqoraApprovalApprover.approval_id == aid,
+                        TiqoraApprovalApprover.user_id == AG3,
+                    )
+                )
+            ).scalar_one()
+            await session.commit()
+            attempts: list[int] = []
+            real = _engine.add_approver
+
+            async def add_then_die(*args: Any, **kwargs: Any) -> int:
+                got = await real(*args, **kwargs)
+                attempts.append(1)
+                if len(attempts) == 1:
+                    raise _deadlock()
+                return got
+
+            monkeypatch.setattr(_engine, "add_approver", add_then_die)
+            async with await as_client(session, agent=AG3) as client:
+                got = await client.post(
+                    f"{BASE}/{aid}/approvers/{row}/forward", json={"user_id": AG5}
+                )
+            assert got.status_code == 200, got.text
+            assert len(attempts) == 2
+            forwards = await session.execute(
+                text(
+                    "SELECT COUNT(*) FROM tiqora_approval_event WHERE approval_id = :a"
+                    " AND action = 'forwarded'"
+                ),
+                {"a": aid},
+            )
+            assert forwards.scalar_one() == 1
+            rows = await session.execute(
+                select(TiqoraApprovalApprover.id).where(
+                    TiqoraApprovalApprover.approval_id == aid,
+                    TiqoraApprovalApprover.user_id == AG5,
+                )
+            )
+            assert len(rows.all()) == 1
 
 
 async def test_other_database_errors_are_not_retried() -> None:
