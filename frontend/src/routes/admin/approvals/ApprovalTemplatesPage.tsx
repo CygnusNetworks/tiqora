@@ -89,6 +89,7 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
   const warnings = warningCodes.map((w) => describeCheck(w, t));
 
   const keyOk = key.trim() !== "";
+  const keyError = !editing && (touched || keyLeft) && !keyOk;
   const toggleSubject = (k: string) =>
     setSubjectTypes((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
   const complete = definitionComplete(definition);
@@ -164,16 +165,19 @@ function TemplateDialog({ template, onClose }: { template: ApprovalTemplate | nu
               readOnly={editing}
               onChange={(e) => setKey(e.target.value)}
               onBlur={() => setKeyLeft(true)}
-              aria-invalid={!editing && (touched || keyLeft) && !keyOk}
+              aria-invalid={keyError}
               data-testid="template-key"
             />
-            {!editing && (touched || keyLeft) && !keyOk && (
-              <span className="mt-1 block text-danger" role="alert" data-testid="template-key-error">
-                {t("approvals.admin.templates.keyMissing")}
+            {/* One cell for both: the form keeps its height on blur, or the control under the pointer moves away and the click is lost. */}
+            <span className="mt-1 grid text-[11px] font-normal">
+              <span className={`[grid-area:1/1] ${keyError ? "invisible" : ""}`} data-testid="template-key-hint">
+                {editing ? t("approvals.admin.templates.keyLocked") : t("approvals.admin.templates.keyHint")}
               </span>
-            )}
-            <span className="mt-1 block text-[11px] font-normal">
-              {editing ? t("approvals.admin.templates.keyLocked") : t("approvals.admin.templates.keyHint")}
+              {keyError && (
+                <span className="[grid-area:1/1] text-danger" role="alert" data-testid="template-key-error">
+                  {t("approvals.admin.templates.keyMissing")}
+                </span>
+              )}
             </span>
           </label>
           <label className="block text-xs font-medium text-muted">

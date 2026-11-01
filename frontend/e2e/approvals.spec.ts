@@ -373,6 +373,28 @@ test.describe("admin templates", () => {
   });
 });
 
+test.describe("admin template form", () => {
+  test("leaving the empty key field does not move the form, so a slow click lands", async ({ page }) => {
+    await mockAdminApi(page);
+    await useGermanUi(page);
+    await loginAsAgent(page);
+    await page.goto("/admin/approvals/templates");
+    await expect(page.getByTestId("template-row")).toHaveCount(2);
+    await page.getByTestId("template-new").click();
+    await expect(page.getByTestId("template-key")).toBeFocused();
+    const add = page.getByTestId("step-0-approvers-add");
+    await page.waitForTimeout(500); // the dialog's entrance animation moves it too
+    const before = await add.boundingBox();
+    await page.getByTestId("template-key").blur();
+    await expect(page.getByTestId("template-key-error")).toBeVisible();
+    expect(await add.boundingBox()).toEqual(before);
+
+    await page.getByTestId("template-key").focus();
+    await add.click({ delay: 100 }); // the press blurs the field, the release must find the button
+    await expect(page.getByTestId("step-0-approvers-kind-0")).toBeVisible();
+  });
+});
+
 test.describe("switched off (approvals.enabled = false)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((key) => localStorage.setItem(key, "1"), DEMO_APPROVALS_OFF_KEY);
@@ -396,10 +418,6 @@ test.describe("switched off (approvals.enabled = false)", () => {
     await page.goto("/admin/approvals/templates");
     await expect(page.getByTestId("template-row")).toHaveCount(2);
     await page.getByTestId("template-new").click();
-    await page.getByTestId("template-key").fill("cab_aus");
-    await page.getByTestId("template-name").fill("CAB aus");
-    await page.getByTestId("template-subject-ticket").check();
-    await page.getByTestId("step-0-name").fill("CAB");
     await page.getByTestId("step-0-approvers-add").click();
     await pick(page, "step-0-approvers-kind-0", "list");
     await pick(page, "step-0-approvers-ref-0", "1");

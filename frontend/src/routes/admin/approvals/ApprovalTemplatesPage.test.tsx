@@ -149,6 +149,7 @@ describe("ApprovalTemplatesPage", () => {
     expect(screen.queryByTestId("template-key-error")).toBeNull();
     fireEvent.blur(screen.getByTestId("template-key"));
     expect(await screen.findByTestId("template-key-error")).toHaveTextContent("Bitte geben Sie eine Kennung ein.");
+    expect(screen.getByTestId("template-key-hint")).toHaveClass("invisible"); // in its place, the height stays
     fireEvent.change(screen.getByTestId("template-name"), { target: { value: "Neu" } });
     fireEvent.click(screen.getByTestId("template-cancel"));
     expect(await screen.findByText("Änderungen verwerfen?")).toBeInTheDocument();
