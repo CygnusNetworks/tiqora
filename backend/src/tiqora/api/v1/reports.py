@@ -37,6 +37,7 @@ from tiqora.reporting.catalogue import (
     active_builtins,
     is_catalogue_key,
 )
+from tiqora.reporting.catalogue_itsm import CHANGE_ONLY_BUILTINS
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, validate_definition
 from tiqora.reporting.engine import QueryBudget, plan_report
@@ -289,18 +290,25 @@ def _too_many() -> NoReturn:
 async def _listed_builtins(session: DbSession) -> list[BuiltinReport]:
     """Catalogue reports to list: ITSM ones only while ITSM is on and their source is available.
 
-    ``off`` hides the whole category, Mode A keeps the ticket-based ones. Running, exporting and
-    ``GET /reports/{key}`` are not filtered.
+    ``off`` hides the whole category, Mode A keeps the ticket-based ones, the change module's
+    switch hides the change reports. Running, exporting and ``GET /reports/{key}`` are not filtered.
     """
     from tiqora.cmdb.gate import current_itsm_mode  # noqa: PLC0415 - import cycle
+    from tiqora.itsm.change.gate import change_switched_off  # noqa: PLC0415 - import cycle
 
     registry = get_registry()
     mode = await current_itsm_mode(session)
     offered = {s.key for s in await available_sources(session, registry)}
+    change_off = await change_switched_off(session) is not None
     return [
         r
         for r in active_builtins(registry)
-        if r.category != "itsm" or (mode != "off" and r.definition.source in offered)
+        if r.category != "itsm"
+        or (
+            mode != "off"
+            and r.definition.source in offered
+            and not (change_off and r.key in CHANGE_ONLY_BUILTINS)
+        )
     ]
 
 

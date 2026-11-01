@@ -91,7 +91,7 @@ def changes_source() -> ReportSource:
         label_key="reports.sources.changes",
         from_clause=_from,
         scope_column=col(F, "queue_id"),
-        availability="itsm_tiqora",
+        availability="itsm_change",
         dimensions=(
             dim(
                 "phase",

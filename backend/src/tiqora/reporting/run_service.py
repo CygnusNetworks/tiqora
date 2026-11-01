@@ -32,7 +32,7 @@ from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_qu
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import ReportCache
-from tiqora.reporting.catalogue import is_catalogue_key
+from tiqora.reporting.catalogue import active_builtin, is_catalogue_key
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, TimeRange
 from tiqora.reporting.engine import QueryBudget, estimate_rows, execute_and_store, plan_report
@@ -47,6 +47,7 @@ from tiqora.reporting.schemas import (
     ReportResultOut,
     ReportRunIn,
 )
+from tiqora.reporting.scope import switched_off_message
 from tiqora.reporting.semantic import ReportSource, active_source
 from tiqora.reporting.settings import ReportingSettings
 from tiqora.reporting.sql import Grain
@@ -222,11 +223,14 @@ async def prepare_ref(
     report_key: str | None,
     definition: ReportDefinition | None,
     overrides: RunOverrides,
+    refuse_switched_off: bool = False,
 ) -> PreparedRun:
     """Definition, run parameters and report key of a request (API, jobs, dashboards).
 
     Zone: override > definition > the viewer's zone. A saved report is resolved in the
-    viewer's visibility (unknown and invisible both answer 404, a deleted one 410).
+    viewer's visibility (unknown and invisible both answer 404, a deleted one 410). With
+    *refuse_switched_off* (dashboard tiles, schedules) a report of a switched-off module is
+    refused with 409.
     """
     if (report_key is None) == (definition is None):
         raise RequestError(
@@ -261,6 +265,11 @@ async def prepare_ref(
     source = active_source(get_registry(), defn.source)
     if source is None:
         raise DefinitionError(f"Unbekannte Datenbasis „{defn.source}“.", path="source")
+    if refuse_switched_off:
+        builtin = active_builtin(get_registry(), report_key) if report_key else None
+        message = await switched_off_message(session, source, builtin)
+        if message is not None:
+            raise RequestError(message, path="report_key", status_code=status.HTTP_409_CONFLICT)
     narrowing, ignored = common_filter(source, overrides.common)
     zone = (
         valid_time_zone(overrides.time_zone)
@@ -334,6 +343,7 @@ async def run_report_ref(
     cache: ReportCache | None,
     budget: QueryBudget,
     force_job: bool = False,
+    refuse_switched_off: bool = False,
 ) -> RunRefOutcome:
     """Prepare, plan, look in the cache, decide inline vs job, execute.
 
@@ -348,6 +358,7 @@ async def run_report_ref(
         report_key=report_key,
         definition=definition,
         overrides=overrides,
+        refuse_switched_off=refuse_switched_off,
     )
     plan = await plan_report(
         session,

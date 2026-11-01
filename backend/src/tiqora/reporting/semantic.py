@@ -47,7 +47,7 @@ MeasureAgg = Literal[
 ]
 MeasureUnit = Literal["count", "number", "minutes", "hours", "days", "units", "percent"]
 ScopeKind = Literal["queue", "cmdb_class"]
-SourceAvailability = Literal["always", "itsm_tiqora"]
+SourceAvailability = Literal["always", "itsm_tiqora", "itsm_change"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,7 +132,8 @@ class ReportSource:
     scope_kind: ScopeKind = "queue"
     #: further columns ANDed with the viewer's ids of their kind (``ci_tickets``: the CI class)
     extra_scopes: tuple[tuple[ScopeKind, ExprFn], ...] = ()
-    #: ``itsm_tiqora``: listed only while ``itsm.mode == "tiqora"``; runs stay possible
+    #: ``itsm_tiqora``: listed only while ``itsm.mode == "tiqora"``; ``itsm_change``: also only
+    #: while the change module is switched on. Runs through the API stay possible
     availability: SourceAvailability = "always"
 
     def scope_kinds(self) -> frozenset[ScopeKind]:

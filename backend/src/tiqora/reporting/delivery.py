@@ -606,6 +606,7 @@ async def _compute(ctx: JobContext, run_id: int, plan: _Plan) -> list[_Rendered]
                     report_key=item.report_key,
                     definition=None,
                     overrides=overrides,
+                    refuse_switched_off=True,
                 )
                 result = await until_cancelled(
                     ctx,

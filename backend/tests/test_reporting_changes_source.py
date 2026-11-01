@@ -387,7 +387,7 @@ def test_source_reads_only_tiqora_tables() -> None:
 
 def test_source_shape_and_classification() -> None:
     src = changes_source()
-    assert src.availability == "itsm_tiqora"
+    assert src.availability == "itsm_change"
     assert src.requires_facts is True
     assert src.default_time_field == "created"
     assert src.time_fields == ("created", "planned_start", "actual_end", "closed")

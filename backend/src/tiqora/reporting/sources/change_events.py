@@ -41,7 +41,7 @@ def change_events_source() -> ReportSource:
         from_clause=_from,
         base_where=_base_where,
         scope_column=col(F, "queue_id"),
-        availability="itsm_tiqora",
+        availability="itsm_change",
         dimensions=(
             dim("occurred", "date", col(E, "created_at")),
             dim(

@@ -35,6 +35,10 @@ ITSM_EXPECTED: Final = [
     "itsm_incident_prone_cis",
 ]
 
+#: built-ins about changes on a source that outlives the change module (``ci_tickets``); the ones on
+#: the change sources go with their source
+CHANGE_ONLY_BUILTINS: Final = frozenset({"builtin.itsm_changes_per_ci_class"})
+
 _ROLES_FLS: Final[dict[str, Any]] = {
     "field": "itsm_role",
     "op": "in",

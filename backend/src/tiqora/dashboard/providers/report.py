@@ -255,6 +255,7 @@ async def run_report_widget(
             cache=cache,
             budget=budget,
             force_job=False,
+            refuse_switched_off=True,
         )
     except RequestError as exc:
         if exc.status_code == 404:

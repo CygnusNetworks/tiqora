@@ -331,6 +331,47 @@ async def test_builtin_on_a_hidden_itsm_source_still_runs_in_mode_a(
     assert data["result"]["rows"] == []
 
 
+@pytest.mark.parametrize(
+    ("setting", "value", "report_key", "reason"),
+    [
+        ("itsm.mode", "off", "builtin.cmdb_cis_by_class", "ITSM ist ausgeschaltet."),
+        ("itsm.mode", "off", "builtin.itsm_tickets_by_type", "ITSM ist ausgeschaltet."),
+        (
+            "itsm_change.enabled",
+            "0",
+            "builtin.itsm_changes_by_status",
+            "Change-Management ist ausgeschaltet.",
+        ),
+        (
+            "itsm_change.enabled",
+            "0",
+            "builtin.itsm_changes_per_ci_class",
+            "Change-Management ist ausgeschaltet.",
+        ),
+        (
+            "approvals.enabled",
+            "0",
+            "builtin.itsm_change_outcomes",
+            "Change-Management ist ausgeschaltet.",
+        ),
+    ],
+)
+async def test_tile_of_a_switched_off_module_is_an_error_tile(
+    env: Env3, setting: str, value: str, report_key: str, reason: str
+) -> None:
+    """Unlike Mode A: nobody decided to leave Mode B there, here the module was switched off."""
+    key = "`key`" if "mysql" in env.sync_url else '"key"'
+    env.sql(f"INSERT INTO tiqora_settings ({key}, value) VALUES ('{setting}', '{value}')")
+    reset_mode_cache()
+    try:
+        out = await run_tile(env, A, {"report_key": report_key})
+    finally:
+        env.sql(f"DELETE FROM tiqora_settings WHERE {key} = '{setting}'")
+        reset_mode_cache()
+    assert out.status == "error"
+    assert reason in (out.error or "")
+
+
 async def test_report_widget_runs_as_viewer(env: Env3) -> None:
     rid = await save_report(
         env, "dash3 shared", CHANNEL_DEF, visibility="groups", groups=(GROUP_1,)
