@@ -43,7 +43,7 @@ from tiqora.domain.queue_service import OPEN_STATE_TYPES
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_access import CHUNK, readable_tickets
 from tiqora.itsm.change.errors import ChangeError
-from tiqora.itsm.change.gate import require_change_mode
+from tiqora.itsm.change.gate import change_switched_off, require_change_mode
 from tiqora.itsm.change.models import TiqoraItsmChange, TiqoraItsmChangeImpact
 from tiqora.itsm.change.phases import REOPENABLE_PHASES
 from tiqora.itsm.change.service import (
@@ -247,6 +247,8 @@ async def _enqueue(
     if mark_requested:
         # also when a job is queued or running already: its loop and the guard see the request
         _stamp_once(session, row)
+    if await change_switched_off(session) is not None:
+        return None  # the stamp stays: the first tick after switching on picks the change up
     job = await enqueue_job(
         session,
         kind=ITSM_CHANGE_IMPACT_KIND,
@@ -329,6 +331,10 @@ async def run_change_impact_job(ctx: JobContext, payload: ChangeImpactPayload) -
     """Compute the impact set; run again (up to :data:`MAX_PASSES`) while a request arrived
     during the pass. Result: counts only."""
     result: dict[str, Any] = {"passes": 0}
+    async with ctx.session_factory() as session:
+        switched_off = await change_switched_off(session)
+    if switched_off is not None:
+        return {**result, "skipped": True, "reason": switched_off}
     for _ in range(MAX_PASSES):
         async with ctx.session_factory() as session:
             outcome = await recompute_impact(

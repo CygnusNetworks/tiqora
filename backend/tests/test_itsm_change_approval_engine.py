@@ -437,6 +437,24 @@ async def test_cab_vote_majority_moves_change_to_scheduled(w: ChangeWorld) -> No
     assert len(outcome) == 1 and '"status": "approved"' in (outcome[0].detail or "")
 
 
+@pytest.mark.parametrize("section", [ITSM_CHANGE_SECTION, APPROVALS_SECTION])
+async def test_decided_vote_finishes_its_hook_while_a_switch_is_off(
+    w: ChangeWorld, section: Any
+) -> None:
+    """The outcome is not a person's step: ``on_cab_decided`` passes no module gate, so a decision
+    made just before the switch still moves the change once its job runs."""
+    tid, aid = await _to_approval(w)
+    assert await _vote(w, aid, V1, "approved") == "pending"
+    assert await _vote(w, aid, V2, "approved") == "approved"
+    await save_section_values(
+        w.session, section, {"enabled": False}, secret_key=APP_SETTINGS.secret_key
+    )
+    await w.session.commit()
+    result = await _hook(w, aid)
+    assert result["hook"] == "called"
+    assert (await _row(w, tid)).phase == "scheduled"
+
+
 async def test_rejection_moves_change_to_rejected(w: ChangeWorld) -> None:
     tid, aid = await _to_approval(w)
     before = await _ticket_state(w, tid)

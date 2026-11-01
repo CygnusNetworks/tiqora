@@ -75,7 +75,12 @@ from tiqora.itsm.change.cab import (
 from tiqora.itsm.change.conflicts import ConflictOut, read_conflicts
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.freeze import occurrences
-from tiqora.itsm.change.gate import can_see_legacy, change_availability, require_change_mode
+from tiqora.itsm.change.gate import (
+    can_see_legacy,
+    change_availability,
+    change_switched_off,
+    require_change_mode,
+)
 from tiqora.itsm.change.impact import (
     ChangeImpactOut,
     enqueue_impact,
@@ -152,12 +157,27 @@ class ChangeRiskOverrideIn(BaseModel):
     reason: str = Field(..., max_length=1000)
 
 
-router = APIRouter(prefix="/itsm", tags=["itsm-change"])
+async def require_module_on(user: CurrentUser, session: DbSession) -> None:
+    """Router dependency: 404 ``change_unavailable`` while a module switch is off, before anything
+    else is looked at (the legacy views and every invalid request too). ``user`` first, so that a
+    caller without a session gets 401; the services' own ``require_change_mode`` stays for the
+    callers outside this router.
+    """
+    _ = user
+    if await change_switched_off(session) is not None:
+        raise ChangeError("change_unavailable", 404)
+
+
+#: answers in every mode and while the module is switched off, unlike ``router``
+status_router = APIRouter(prefix="/itsm", tags=["itsm-change"])
+router = APIRouter(prefix="/itsm", tags=["itsm-change"], dependencies=[Depends(require_module_on)])
 #: ticket sub-resources (``/tickets/{id}/change``, …)
-ticket_router = APIRouter(prefix="/tickets", tags=["itsm-change"])
+ticket_router = APIRouter(
+    prefix="/tickets", tags=["itsm-change"], dependencies=[Depends(require_module_on)]
+)
 
 
-@router.get("/changes/status", response_model=ChangeStatusOut)
+@status_router.get("/changes/status", response_model=ChangeStatusOut)
 async def get_change_status(
     user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> ChangeStatusOut:

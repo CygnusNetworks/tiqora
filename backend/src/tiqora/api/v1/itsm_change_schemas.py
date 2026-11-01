@@ -43,7 +43,7 @@ from tiqora.itsm.change.transitions import ChangeApprovalView
 class ChangeStatusOut(BaseModel):
     mode: Literal["off", "znuny_readthrough", "tiqora"]
     available: bool
-    reason: Literal["ok", "itsm_off", "mode_a", "setup_missing"]
+    reason: Literal["ok", "itsm_off", "mode_a", "setup_missing", "change_off", "approvals_off"]
     legacy: Literal["none", "live", "archive"]
     can_manage: bool
     can_see_legacy: bool

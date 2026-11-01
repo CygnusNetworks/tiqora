@@ -245,6 +245,30 @@ async def test_mode_off_refuses_ci_ends_with_a_german_message(
     assert _znuny_links(cmdb_db) == 0
 
 
+@pytest.mark.parametrize(
+    ("setting", "reason"),
+    [("itsm_change.enabled", "change_off"), ("approvals.enabled", "approvals_off")],
+)
+async def test_change_link_objects_are_skipped_while_the_module_is_off(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch, setting: str, reason: str
+) -> None:
+    set_mode(cmdb_db, "znuny_readthrough")
+    spy = _LinkObjectsSpy()
+    monkeypatch.setattr(process_engine, "link_objects", spy)
+    to_change = {"TargetObject": "ITSMChange", "TargetKey": "7"}
+    assert await _link_add(cmdb_db, 1, extra=to_change) == []  # on: the Znuny path as before
+    assert spy.calls == [("Ticket", "ITSMChange")]
+    spy.calls.clear()
+    key = "`key`" if "mysql" in cmdb_db.sync_url else '"key"'
+    cmdb_db.sql(f"INSERT INTO tiqora_settings ({key}, value) VALUES ('{setting}', '0')")
+    try:
+        skipped = await _link_add(cmdb_db, 1, extra=to_change)
+    finally:
+        cmdb_db.sql(f"DELETE FROM tiqora_settings WHERE {key} = '{setting}'")
+    assert [(s.module, s.reason) for s in skipped] == [("LinkAdd", reason)]
+    assert spy.calls == []
+
+
 async def test_mode_off_still_links_tickets_with_each_other(
     cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
 ) -> None:

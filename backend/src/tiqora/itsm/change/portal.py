@@ -26,6 +26,7 @@ from tiqora.calendar.recurrence import to_utc_naive
 from tiqora.config import Settings
 from tiqora.itsm.change.conflicts import impact_sets
 from tiqora.itsm.change.errors import ChangeError
+from tiqora.itsm.change.gate import change_switched_off
 from tiqora.itsm.change.models import TiqoraItsmChange, TiqoraItsmChangeService
 from tiqora.itsm.change.read import (
     LIST_SCAN_CAP,
@@ -62,8 +63,10 @@ class PortalSchedule:
 
 
 async def schedule_enabled(session: AsyncSession, settings: Settings) -> bool:
-    """Mode B and the setting ``portal_schedule_enabled``."""
+    """Mode B, both module switches on and the setting ``portal_schedule_enabled``."""
     if (await get_itsm_mode(session)).mode != "tiqora":
+        return False
+    if await change_switched_off(session) is not None:
         return False
     return (await load_change_settings(session, settings)).portal_schedule_enabled
 

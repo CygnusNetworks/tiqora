@@ -13,11 +13,14 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
+from tiqora.domain.settings_store import get_setting_bool
 from tiqora.settings_sections.section import SettingsSection
 from tiqora.settings_sections.store import load_section_values
 
 
 class ItsmChangeSettings(BaseModel):
+    #: the module switch: off hides and refuses everything, deletes nothing (docs/itsm.md)
+    enabled: bool = True
     #: 0 = the agent picks the queue in the create dialog
     change_queue_id: int = Field(0, ge=0)
     #: 0 = queue of the change
@@ -84,3 +87,8 @@ async def load_change_settings(session: AsyncSession, settings: Settings) -> Its
     """The one way every change module loads its settings (the section has no secrets)."""
     values = await load_section_values(session, ITSM_CHANGE_SECTION, secret_key=settings.secret_key)
     return ItsmChangeSettings.model_validate(values.model_dump())
+
+
+async def change_enabled(session: AsyncSession) -> bool:
+    """The module switch alone: one row, read fresh on every call (no cache, all roles)."""
+    return await get_setting_bool(session, ITSM_CHANGE_SECTION.storage_key("enabled"), True)

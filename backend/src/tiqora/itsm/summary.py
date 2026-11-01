@@ -24,6 +24,7 @@ from typing import Final, Literal
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.itsm.change.gate import change_switched_off
 from tiqora.itsm.change.read import (
     ChangeRef,
     ChangeTaskRef,
@@ -275,9 +276,8 @@ async def ticket_itsm_summary(
         except CiUnavailable:
             out.ci_count = None
     out.dialogs = await _dialogs(session)
-    if (
-        state.mode == "tiqora"
-    ):  # both readers are empty outside Mode B: skip them (and the mode read)
+    # both readers are empty outside Mode B: skip them (and the mode read)
+    if state.mode == "tiqora" and await change_switched_off(session) is None:
         out.change = (await change_refs_for_tickets(session, [ticket_id], mode_b=True)).get(
             ticket_id
         )

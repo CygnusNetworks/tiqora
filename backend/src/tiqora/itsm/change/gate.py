@@ -3,6 +3,10 @@
 ``available`` needs Mode B (``tiqora``) and the setup group ``change`` complete (the two ticket
 types and the two fixed dynamic fields). In Mode A the Znuny changes are only shown (``legacy``
 "live"); in Mode B a legacy archive is shown when the importer has stored one ("archive").
+
+The module switches beat all of that: ``itsm_change.enabled`` off (``change_off``) or
+``approvals.enabled`` off (``approvals_off``: the approval phases need the engine) makes the module
+unavailable in every mode, the legacy views included.
 """
 
 from __future__ import annotations
@@ -13,17 +17,19 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.approvals.settings import approvals_enabled
 from tiqora.config import Settings
 from tiqora.db.legacy.user import PermissionGroups
 from tiqora.itsm.change.errors import ChangeError
 from tiqora.itsm.change.models import TiqoraItsmLegacyChange
-from tiqora.itsm.change.settings import ItsmChangeSettings, load_change_settings
+from tiqora.itsm.change.settings import ItsmChangeSettings, change_enabled, load_change_settings
 from tiqora.itsm.mode import ItsmMode, get_itsm_mode
 from tiqora.itsm.settings import load_itsm_settings
 from tiqora.itsm.setup import setup_group_complete
 from tiqora.permissions.engine import PermissionEngine
 
-Reason = Literal["ok", "itsm_off", "mode_a", "setup_missing"]
+SwitchReason = Literal["change_off", "approvals_off"]
+Reason = Literal["ok", "itsm_off", "mode_a", "setup_missing", "change_off", "approvals_off"]
 Legacy = Literal["none", "live", "archive"]
 
 
@@ -36,6 +42,15 @@ class ChangeAvailability:
     can_manage: bool  # is_change_manager
     can_see_legacy: bool
     setup_complete_change: bool
+
+
+async def change_switched_off(session: AsyncSession) -> SwitchReason | None:
+    """Why a module switch keeps change management off, ``None`` while both are on."""
+    if not await change_enabled(session):
+        return "change_off"
+    if not await approvals_enabled(session):
+        return "approvals_off"
+    return None
 
 
 async def is_change_manager(session: AsyncSession, user_id: int, cfg: ItsmChangeSettings) -> bool:
@@ -80,15 +95,20 @@ async def change_availability(
     cfg = await load_change_settings(session, settings)
     itsm_cfg = await load_itsm_settings(session, settings)
     complete = state.mode == "tiqora" and await setup_group_complete(session, itsm_cfg, "change")
+    switched_off = await change_switched_off(session)
     reason: Reason
-    if state.mode == "off":
+    if switched_off is not None:
+        reason = switched_off
+    elif state.mode == "off":
         reason = "itsm_off"
     elif state.mode == "znuny_readthrough":
         reason = "mode_a"
     else:
         reason = "ok" if complete else "setup_missing"
     legacy: Legacy = "none"
-    if state.mode == "znuny_readthrough" and state.detected.change_installed:
+    if switched_off is not None:
+        pass  # the stored archive stays, only the views go
+    elif state.mode == "znuny_readthrough" and state.detected.change_installed:
         legacy = "live"
     elif state.mode == "tiqora":
         first = (await session.execute(select(TiqoraItsmLegacyChange.id).limit(1))).first()
@@ -100,13 +120,16 @@ async def change_availability(
         reason=reason,
         legacy=legacy,
         can_manage=await is_change_manager(session, user_id, cfg),
-        can_see_legacy=await can_see_legacy(session, user_id, cfg),
+        can_see_legacy=switched_off is None and await can_see_legacy(session, user_id, cfg),
         setup_complete_change=complete,
     )
 
 
 async def require_change_mode(session: AsyncSession, settings: Settings) -> None:
-    """404 while ITSM is off, 409 in Mode A and while the change setup is incomplete."""
+    """404 while a module switch or ITSM is off, 409 in Mode A and while the change setup is
+    incomplete."""
+    if await change_switched_off(session) is not None:
+        raise ChangeError("change_unavailable", 404)
     state = await get_itsm_mode(session)
     if state.mode == "off":
         raise ChangeError("change_unavailable", 404)

@@ -238,6 +238,74 @@ async def test_require_change_mode_codes(world: Callable[..., str], url_fixture:
         await engine.dispose()
 
 
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+@pytest.mark.parametrize(
+    ("key", "reason"),
+    [("itsm_change.enabled", "change_off"), ("approvals.enabled", "approvals_off")],
+)
+async def test_switch_beats_mode_setup_and_archive(
+    world: Callable[..., str], url_fixture: str, key: str, reason: str
+) -> None:
+    """Off in every mode, with or without setup; legacy "none" although the archive stays."""
+    url = world(url_fixture, mode="tiqora")
+    when = datetime(2026, 10, 1)
+    _sql(
+        url,
+        [
+            (
+                "INSERT INTO tiqora_itsm_legacy_change (znuny_change_id, change_number, title,"
+                " znuny_created_at, znuny_changed_at, workorder_count, data, fingerprint,"
+                " imported_at) VALUES (946202, 'CHG94-2', 'Router-Tausch', :t, :t, 0, '{}',"
+                " 'f', :t)",
+                {"t": when},
+            )
+        ],
+    )
+    await _complete_setup(url)
+    assert (await _avail(url, ADMIN_ID)).reason == "ok"
+    store(url, key, "0")
+    try:
+        for mode in ("tiqora", "znuny_readthrough", "off"):
+            store(url, "itsm.mode", mode)
+            clear_detect_cache()
+            got = await _avail(url, ADMIN_ID)
+            assert (got.mode, got.available, got.reason, got.legacy, got.can_see_legacy) == (
+                mode,
+                False,
+                reason,
+                "none",
+                False,
+            )
+            engine, factory = make_factory(url)
+            try:
+                async with factory() as session:
+                    with pytest.raises(ChangeError) as err:
+                        await require_change_mode(session, SETTINGS)
+                assert (err.value.error_code, err.value.status_code) == ("change_unavailable", 404)
+            finally:
+                await engine.dispose()
+    finally:
+        store(url, key, None)
+    store(url, "itsm.mode", "tiqora")
+    clear_detect_cache()
+    back = await _avail(url, ADMIN_ID)
+    assert (back.available, back.reason, back.legacy) == (True, "ok", "archive")
+
+
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_change_switch_wins_over_the_approvals_switch(
+    world: Callable[..., str], url_fixture: str
+) -> None:
+    url = world(url_fixture, mode="tiqora")
+    store(url, "itsm_change.enabled", "0")
+    store(url, "approvals.enabled", "0")
+    try:
+        assert (await _avail(url, ADMIN_ID)).reason == "change_off"
+    finally:
+        store(url, "itsm_change.enabled", None)
+        store(url, "approvals.enabled", None)
+
+
 def test_change_error_detail_may_be_called_code() -> None:
     err = ChangeError("approval_request_failed", 409, code="no_approvers", round=2)
     assert err.status_code == 409 and err.error_code == "approval_request_failed"

@@ -1033,6 +1033,17 @@ async def _action_link_add(
         if obj == "Ticket" and not key.isdigit():
             raise RequiredFieldMissing(f"LinkAdd: {key!r} is not a ticket id")
     link_type = str(config.get("Type") or config.get("LinkType") or "Normal")
+    if _CHANGE_LINK_OBJECTS & {source_object, target_object}:
+        # lazy: tiqora.itsm.change imports the ticket write service
+        from tiqora.itsm.change.gate import change_switched_off
+
+        switched_off = await change_switched_off(session)
+        if switched_off is not None:
+            raise ActionSkipped(
+                switched_off,
+                "LinkAdd: Change-Management ist ausgeschaltet; Verknüpfungen mit Changes werden"
+                " nicht angelegt.",
+            )
     if _CI_LINK_OBJECT in (source_object, target_object):
         mode = (await get_itsm_mode(session)).mode
         if mode == "off":
@@ -1077,6 +1088,8 @@ async def _action_link_add(
 
 
 _CI_LINK_OBJECT = "ITSMConfigItem"
+#: Znuny's link objects of its own change management (ITSMChangeManagement)
+_CHANGE_LINK_OBJECTS = frozenset({"ITSMChange", "ITSMWorkOrder"})
 #: Znuny link objects Mode B can store next to a CI (``tiqora_itsm_link`` kinds)
 _CMDB_LINK_KINDS = {"ITSMConfigItem": "ci", "Ticket": "ticket", "Service": "service"}
 
@@ -1529,7 +1542,7 @@ class SkippedAction:
     """A transition action that did not run on this pass (its savepoint was rolled back)."""
 
     module: str
-    reason: str  # stable code: ``vetoed``, ``itsm_off``, ``link_refused``, ...
+    reason: str  # stable code: ``vetoed``, ``itsm_off``, ``change_off``, ``link_refused``, ...
     detail: str  # German text for the agent
 
 

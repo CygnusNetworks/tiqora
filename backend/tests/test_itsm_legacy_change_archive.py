@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, insert, select, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -1188,6 +1188,32 @@ async def test_cli_anonymisation_also_leaves_tombstones(
         await _edit_mail(w, 8)
         assert _counts(await _archive(w)) == (0, 1, 2, 0)
         assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+
+
+@pytest.mark.parametrize(("dialect", "profile"), ITSM_PARAMS)
+@pytest.mark.parametrize("setting", ["itsm_change.enabled", "approvals.enabled"])
+async def test_anonymisation_and_archive_job_work_while_the_module_is_off(
+    dialect: str, profile: str, setting: str, request: pytest.FixtureRequest
+) -> None:
+    """Off hides the views only: the stored archive stays, its job runs and GDPR reaches it."""
+    async with archive_world(request, dialect, profile) as w:
+        async with w.factory() as s:
+            await _customer(s, CUSTOMER2, CUSTOMER2_MAIL)
+            await seed_change_cab(s, change_id=MAIL, cab_id=CAB2, customer_user_id=CUSTOMER2)
+            await s.execute(insert(TiqoraSettings).values(key=setting, value="0"))
+            await s.commit()
+        try:
+            await _archive(w)
+            assert CUSTOMER2 in (await _rows(w))[MAIL].data
+            result = await anonymize_customer(
+                w.factory, SETTINGS, login=CUSTOMER2, seed=7, force_parallel=True, actor="test"
+            )
+            assert result.legacy_changes == 1
+            assert _absent((await _rows(w))[MAIL].data, CUSTOMER2, CUSTOMER2_MAIL)
+        finally:
+            async with w.factory() as s:
+                await s.execute(delete(TiqoraSettings).where(TiqoraSettings.key == setting))
+                await s.commit()
 
 
 # --- final review: the tombstone key (B-I2), tombstones during a page (B-M4) -----------------
