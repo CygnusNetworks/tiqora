@@ -33,7 +33,7 @@ from tests._approvals_helpers import (
 from tests._fake_redis import FakeRedis
 from tests.test_approvals_sweep import SETTINGS, _committed_world, _defn, _request, _step
 from tiqora.approvals import _engine, service
-from tiqora.approvals.contract import JOB_HOOK, Actor, ApprovalError
+from tiqora.approvals.contract import JOB_HOOK, JOB_MAIL, Actor, ApprovalError
 from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalVote
 from tiqora.approvals.retry import commit_with_retry
 from tiqora.db.tiqora.models import TiqoraJob
@@ -229,6 +229,47 @@ async def test_agent_vote_retries_with_no_double_effects(
             assert got.json()["status"] == "approved"
             assert len(attempts) == 3
             assert await _effects(session, aid) == ONCE
+
+
+async def _mail_jobs(session: AsyncSession) -> int:
+    rows = await session.execute(select(TiqoraJob.id).where(TiqoraJob.kind == JOB_MAIL))
+    return len(rows.all())
+
+
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_a_retried_vote_queues_the_same_mails_as_a_plain_one(
+    url_fixture: str, request: pytest.FixtureRequest, forced: Any
+) -> None:
+    async with approvals_session(request, url_fixture) as session:
+        with installed_registry(make_fake_subject_type()):
+            async with await as_client(session, agent=AG3) as client:
+                plain = await _ask(session)
+                before = await _mail_jobs(session)
+                got = await client.post(f"{BASE}/{plain}/decision", json={"decision": "approved"})
+                assert got.status_code == 200, got.text
+                queued = await _mail_jobs(session) - before
+                assert queued > 0
+
+                other = await _ask_other(session)
+                before = await _mail_jobs(session)
+                forced(2)
+                got = await client.post(f"{BASE}/{other}/decision", json={"decision": "approved"})
+                assert got.status_code == 200, got.text
+                assert await _mail_jobs(session) - before == queued
+
+
+async def _ask_other(session: AsyncSession) -> int:
+    info = await service.request_approval(
+        session,
+        ticket_id=T2,
+        subject_type="test.subject",
+        title="Freigabe appr97",
+        actor=Actor.agent(AG1),
+        definition=_defn(_step("Prüfung", AG3)),
+        settings=SETTINGS,
+    )
+    await session.commit()
+    return info.approval_id
 
 
 @pytest.mark.parametrize("url_fixture", URLS)
