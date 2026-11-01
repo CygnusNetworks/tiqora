@@ -27,6 +27,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalVote,
 )
 from tiqora.approvals.resolve import canonical_principal, customer_in_ticket_company
+from tiqora.approvals.retry import commit_with_retry
 from tiqora.approvals.schemas import (
     PortalApprovalItemOut,
     PortalApprovalOut,
@@ -210,14 +211,17 @@ async def post_decision(
     actor = Actor.customer(customer.login)
     await session.rollback()  # the request lock must be the first read (F1(a))
     try:
-        result = await service.decide(
+        result = await commit_with_retry(
             session,
-            approval_id,
-            actor=actor,
-            decision=body.decision,
-            channel="portal",
-            comment=body.comment,
-            settings=settings,
+            lambda: service.decide(
+                session,
+                approval_id,
+                actor=actor,
+                decision=body.decision,
+                channel="portal",
+                comment=body.comment,
+                settings=settings,
+            ),
         )
     except ApprovalError as err:
         await session.rollback()
@@ -237,7 +241,6 @@ async def post_decision(
         raise HTTPException(
             refusal.http_status, detail={"code": refusal.code, "detail": refusal.detail}
         ) from err
-    await session.commit()
     await publish_approval_changed(get_pubsub_redis(settings), result.affected_user_ids)
     out = await _out(session, customer, approval_id, require_company=False)
     await session.rollback()

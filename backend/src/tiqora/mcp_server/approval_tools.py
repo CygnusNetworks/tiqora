@@ -25,6 +25,7 @@ from tiqora.approvals import access, detail, inbox, service
 from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import Actor, ApprovalError
 from tiqora.approvals.models import TiqoraApproval
+from tiqora.approvals.retry import commit_with_retry
 from tiqora.approvals.settings import approvals_enabled, load_approval_settings
 from tiqora.domain.api_key_scopes import mcp_scopes_allow_write
 from tiqora.domain.ticket_write_service import TicketAccessDenied
@@ -197,14 +198,17 @@ async def approval_decide(
             return {"error": "mcp_decide_disabled"}
         await session.rollback()  # the request lock must be the first read (F1(a))
         try:
-            result = await service.decide(
+            result = await commit_with_retry(
                 session,
-                approval_id,
-                actor=actor,
-                decision=decision,
-                channel="mcp",
-                comment=comment.strip() or None,
-                settings=state.settings,
+                lambda: service.decide(
+                    session,
+                    approval_id,
+                    actor=actor,
+                    decision=decision,
+                    channel="mcp",
+                    comment=comment.strip() or None,
+                    settings=state.settings,
+                ),
             )
         except ApprovalError as err:
             await session.rollback()
@@ -219,7 +223,6 @@ async def approval_decide(
                     return dict(_NOT_FOUND)
             await session.rollback()
             return {"error": err.code}
-        await session.commit()
     await _publish(result.affected_user_ids)
     logger.info("mcp_approval_decided", approval_id=approval_id, user_id=user_id, decision=decision)
     return {"ok": True, "status": result.info.status, "step_status": result.step_status}

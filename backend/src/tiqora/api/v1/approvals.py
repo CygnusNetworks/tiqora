@@ -52,6 +52,7 @@ from tiqora.approvals.models import (
     TiqoraApprovalDelegation,
     TiqoraApprovalStep,
 )
+from tiqora.approvals.retry import commit_with_retry
 from tiqora.approvals.schemas import (
     ApprovalDetailOut,
     ApprovalInboxPage,
@@ -385,18 +386,20 @@ async def post_decision(
         session,
         approval_id,
         actor,
-        service.decide(
+        commit_with_retry(
             session,
-            approval_id,
-            actor=actor,
-            decision=body.decision,
-            channel=_channel(user),
-            comment=body.comment,
-            approver_id=body.approver_id,
-            settings=settings,
+            lambda: service.decide(
+                session,
+                approval_id,
+                actor=actor,
+                decision=body.decision,
+                channel=_channel(user),
+                comment=body.comment,
+                approver_id=body.approver_id,
+                settings=settings,
+            ),
         ),
     )
-    await session.commit()
     await _publish(settings, result.affected_user_ids)
     return await _detail(session, approval_id, actor)
 
@@ -680,8 +683,11 @@ async def post_link_decide(
     for any other dead or unknown link."""
     limiter, ip = await _link_gate(request, session, settings, redis, body.token)
     try:
-        result = await tokens.redeem_link(
-            session, body.token, decision=body.decision, comment=body.comment, settings=settings
+        result = await commit_with_retry(
+            session,
+            lambda: tokens.redeem_link(
+                session, body.token, decision=body.decision, comment=body.comment, settings=settings
+            ),
         )
     except ApprovalError as err:
         await session.rollback()  # nothing is committed after a refusal (used_at included)
@@ -690,6 +696,5 @@ async def post_link_decide(
         if isinstance(err, tokens.UnknownLinkError):
             await limiter.record_auth_failure(ip)
         raise _http(err) from err
-    await session.commit()
     await _publish(settings, result.affected_user_ids)
     return LinkDecisionOut(decision=body.decision, status=result.info.status)

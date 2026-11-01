@@ -117,6 +117,7 @@ export const approvalsApi = {
 export const APPROVAL_ERROR_CODES = [
   "approvals_disabled",
   "subject_unavailable",
+  "approval_busy",
   "approval_not_found",
   "ticket_not_found",
   "template_not_found",

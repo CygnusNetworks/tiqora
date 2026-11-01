@@ -10592,6 +10592,7 @@
       "unknown": "The approval could not be processed. Please try again.",
       "approver_invalid": "Your account is no longer active, so you cannot decide on this approval anymore.",
       "template_changed": "The template was changed in the meantime. Please reload it.",
+      "approval_busy": "Too many votes are being recorded right now. Your vote was not counted. Please try again.",
       "subject_unavailable": "This approval belongs to a module that is currently switched off. It cannot be decided at the moment.",
       "approvals_disabled": "Approvals are currently switched off."
     },

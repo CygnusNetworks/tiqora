@@ -505,8 +505,10 @@ async def decide(
     *lock_held* is accepted for ``redeem_link`` and has no effect: the request is always locked.
 
     The first statement is ``SELECT … FOR UPDATE`` on the request (callers roll back before
-    calling, F1(a)); every later read of step/approver/vote rows is a locking read, so the
-    latest committed state is evaluated, never a stale snapshot. Raises ``approval_not_found``,
+    calling, F1(a)); later reads of step and approver rows are locking reads, and votes are plain
+    reads whose view opens after that lock was granted (:func:`_engine.voters_in_step`), so the
+    latest committed state is evaluated, never a stale snapshot. Callers go through
+    :func:`~tiqora.approvals.retry.commit_with_retry`. Raises ``approval_not_found``,
     ``approval_closed``, ``not_an_approver``, ``already_decided``, ``step_not_active``,
     ``self_approval_forbidden``, ``customer_approver_outside_company``, ``forbidden`` (customer
     approvers switched off, or e-mail channel not allowed for the step) and ``comment_too_long``.
@@ -529,9 +531,9 @@ async def decide(
     principal = actor.principal
     key = actor.key if principal is None else (await canonical_principal(session, principal)).key
     voted = await session.execute(
-        select(TiqoraApprovalVote.step_id)
-        .where(TiqoraApprovalVote.approval_id == approval.id, TiqoraApprovalVote.decided_by == key)
-        .with_for_update()
+        select(TiqoraApprovalVote.step_id).where(
+            TiqoraApprovalVote.approval_id == approval.id, TiqoraApprovalVote.decided_by == key
+        )
     )
     row, on_behalf = await _pick_approver(
         session,

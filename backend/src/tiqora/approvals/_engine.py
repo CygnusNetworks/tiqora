@@ -507,12 +507,14 @@ async def activate_next_stage(
 async def step_voters(
     session: AsyncSession, step: TiqoraApprovalStep, approvers: Sequence[TiqoraApprovalApprover]
 ) -> list[rules.VoterState]:
-    """Eligible voters of the step in vote order, the ones still pending last."""
+    """Eligible voters of the step in vote order, the ones still pending last.
+
+    The votes are a plain read, see :func:`voters_in_step`.
+    """
     votes = await session.execute(
         select(TiqoraApprovalVote)
         .where(TiqoraApprovalVote.step_id == step.id)
         .order_by(TiqoraApprovalVote.id)
-        .with_for_update()
         .execution_options(populate_existing=True)
     )
     voted_at = {v.approver_id: (v.decided_at, v.id) for v in votes.scalars()}
@@ -546,11 +548,15 @@ def in_rule(row: TiqoraApprovalApprover, by_id: dict[int, TiqoraApprovalApprover
 
 
 async def voters_in_step(session: AsyncSession, step_id: int) -> set[str]:
-    """Principal keys that cast a vote in the step, on their own or on behalf (F8)."""
+    """Principal keys that cast a vote in the step, on their own or on behalf (F8).
+
+    Never a locking read on the vote table: with no vote yet, it takes the gap at the end of the
+    index, which two votes on different requests both hold and both need for their insert (MariaDB
+    1213). The request lock serialises the votes of one request, and it is taken before the first
+    plain read of the transaction (F1(a)), so this read is current.
+    """
     rows = await session.execute(
-        select(TiqoraApprovalVote.decided_by)
-        .where(TiqoraApprovalVote.step_id == step_id)
-        .with_for_update()
+        select(TiqoraApprovalVote.decided_by).where(TiqoraApprovalVote.step_id == step_id)
     )
     return {str(r) for r in rows.scalars()}
 

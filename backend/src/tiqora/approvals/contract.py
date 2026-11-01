@@ -281,6 +281,7 @@ ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
     {
         "approvals_disabled": 404,
         "subject_unavailable": 409,
+        "approval_busy": 503,
         "approval_not_found": 404,
         "ticket_not_found": 404,
         "template_not_found": 404,
