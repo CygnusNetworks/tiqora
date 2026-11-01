@@ -75,7 +75,12 @@ from tiqora.reporting.jobs import (
 )
 from tiqora.reporting.pdf import PdfMeta, PdfUnavailable, ReportSection, write_report_pdf
 from tiqora.reporting.rights import ReportRights, report_rights
-from tiqora.reporting.run_service import RequestError, RunOverrides, prepare_ref
+from tiqora.reporting.run_service import (
+    ModuleSwitchedOff,
+    RequestError,
+    RunOverrides,
+    prepare_ref,
+)
 from tiqora.reporting.schedule_schemas import (
     ScheduleRunFileOut,
     ScheduleRunOut,
@@ -582,11 +587,13 @@ async def _prepare(ctx: JobContext, run_id: int) -> _Plan | dict[str, Any]:
         )
 
 
-async def _compute(ctx: JobContext, run_id: int, plan: _Plan) -> list[_Rendered]:
-    """Step 5: every report of the bundle, for the owner, without the cache."""
+async def _compute(ctx: JobContext, run_id: int, plan: _Plan) -> tuple[list[_Rendered], list[str]]:
+    """Step 5: every report of the bundle, for the owner, without the cache; and the notes on the
+    ones left out because their module is switched off."""
     schedule, reporting = plan.schedule, plan.reporting
     cap = reporting.pdf_row_limit if schedule.format == "pdf" else reporting.export_row_limit
     out: list[_Rendered] = []
+    left_out: list[str] = []
     async with ctx.session_factory() as session:
         total = len(schedule.items)
         for index, item in enumerate(schedule.items):
@@ -622,6 +629,9 @@ async def _compute(ctx: JobContext, run_id: int, plan: _Plan) -> list[_Rendered]
                         budget=None,
                     ),
                 )
+            except ModuleSwitchedOff as exc:
+                left_out.append(f"Bericht „{title}“ wurde ausgelassen: {exc.message}")
+                continue
             except (RequestError, DefinitionError, FilterError) as exc:
                 raise await _fail(
                     ctx, run_id, f"Bericht „{title}“ ist nicht mehr verfügbar: {exc.message}"
@@ -636,7 +646,7 @@ async def _compute(ctx: JobContext, run_id: int, plan: _Plan) -> list[_Rendered]
             if prepared.saved is not None:
                 title = prepared.saved.name
             out.append(_Rendered(title, prepared.definition, result))
-    return out
+    return out, left_out
 
 
 def _period(rendered: list[_Rendered], plan: _Plan) -> str:
@@ -759,6 +769,31 @@ async def _load_files(ctx: JobContext, run_id: int) -> list[_File]:
         return [_File(r.name, r.content_type, bytes(r.data)) for r in rows]
 
 
+async def _skip_switched_off(
+    ctx: JobContext, run_id: int, plan: _Plan, left_out: list[str]
+) -> dict[str, Any]:
+    """Every report's module is off: a deliberate pause, no failure of the schedule."""
+    now = utc_now()
+    async with ctx.session_factory() as session:
+        await session.execute(
+            update(TiqoraReportRun)
+            .where(TiqoraReportRun.id == run_id)
+            .values(
+                status="skipped",
+                detail=scrub_text("\n".join(left_out), _DETAIL_MAX),
+                row_count=0,
+                finished_at=now,
+            )
+        )
+        await session.execute(
+            update(TiqoraReportSchedule)
+            .where(TiqoraReportSchedule.id == plan.schedule.id)
+            .values(last_status="skipped", last_run_at=now)
+        )
+        await session.commit()
+    return {"skipped": "switched_off"}
+
+
 async def _skip_empty(ctx: JobContext, run_id: int, plan: _Plan) -> dict[str, Any]:
     now = utc_now()
     async with ctx.session_factory() as session:
@@ -781,6 +816,7 @@ def _compose(
     ctx: JobContext,
     *,
     titles: list[str],
+    left_out: list[str],
     period: str,
     sender: str,
     addresses: tuple[str, ...],
@@ -802,7 +838,8 @@ def _compose(
         owner=plan.owner_name,
         link=_link(ctx.settings.public_base_url, schedule.id, texts),
     )
-    body = f"{apply_placeholders(body_template, values)}\n\n-- \n{footer}\n"
+    notes = "".join(f"\n\n{clean_line(line)}" for line in left_out)
+    body = f"{apply_placeholders(body_template, values)}{notes}\n\n-- \n{footer}\n"
     message = build_message(
         from_addr=sender,
         # the empty group: no recipient in the envelope but the Bcc list, none shown to anybody
@@ -893,9 +930,12 @@ async def _deliver(ctx: JobContext, run_id: int) -> dict[str, Any]:
     schedule = plan.schedule
     stamp = local_now(schedule.time_zone).date().isoformat()
     titles: list[str] = []
+    left_out: list[str] = []
     period = ""
     if not plan.existing_files:
-        rendered = await _compute(ctx, run_id, plan)
+        rendered, left_out = await _compute(ctx, run_id, plan)
+        if not rendered and left_out:
+            return await _skip_switched_off(ctx, run_id, plan, left_out)
         titles = [entry.title for entry in rendered]
         period = _period(rendered, plan)
         if schedule.only_if_nonempty and all(not entry.result.rows for entry in rendered):
@@ -935,7 +975,7 @@ async def _deliver(ctx: JobContext, run_id: int) -> dict[str, Any]:
             session, schedule, plan.reporting, owner_only=plan.owner_only
         )
         sender = await resolve_report_sender(session)
-    problems = tuple(scrub_text(line, 300) for line in resolved.problems)
+    problems = tuple(scrub_text(line, 300) for line in (*left_out, *resolved.problems))
     if not resolved.addresses:
         raise await _fail(
             ctx, run_id, NO_RECIPIENT_ADDRESS_MESSAGE, detail="\n".join(problems) or None
@@ -946,6 +986,7 @@ async def _deliver(ctx: JobContext, run_id: int) -> dict[str, Any]:
         plan,
         ctx,
         titles=titles,
+        left_out=left_out,
         period=period,
         sender=sender,
         addresses=resolved.addresses,

@@ -116,6 +116,10 @@ class RequestError(Exception):
         self.status_code = status_code
 
 
+class ModuleSwitchedOff(RequestError):
+    """The report belongs to a switched-off module: not broken, it comes back with the switch."""
+
+
 class TooManyReportJobs(Exception):  # noqa: N818 - plan D6 name
     """The user already has the maximum of report jobs queued or running (429)."""
 
@@ -269,7 +273,9 @@ async def prepare_ref(
         builtin = active_builtin(get_registry(), report_key) if report_key else None
         message = await switched_off_message(session, source, builtin)
         if message is not None:
-            raise RequestError(message, path="report_key", status_code=status.HTTP_409_CONFLICT)
+            raise ModuleSwitchedOff(
+                message, path="report_key", status_code=status.HTTP_409_CONFLICT
+            )
     narrowing, ignored = common_filter(source, overrides.common)
     zone = (
         valid_time_zone(overrides.time_zone)

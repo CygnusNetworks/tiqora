@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import io
 import zipfile
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterator, Awaitable, Callable, Generator
 from datetime import datetime
 from email.message import EmailMessage
 from email.utils import getaddresses
@@ -22,7 +22,7 @@ from typing import Any
 import aiosmtplib
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, select, text, update
+from sqlalchemy import create_engine, delete, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import tiqora.reporting.delivery as delivery
@@ -40,8 +40,10 @@ from tiqora.db.tiqora.models import (
     TiqoraReportRun,
     TiqoraReportRunFile,
     TiqoraReportSchedule,
+    TiqoraSettings,
 )
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.domain.settings_store import set_setting
 from tiqora.extensions import get_registry
 from tiqora.jobs.context import JobCancelled, JobContext
 from tiqora.jobs.runner import JobRunner
@@ -1137,3 +1139,72 @@ async def test_mail_log_row_has_no_addresses(env: Env, mail: CapturingMailSender
     assert row.to_addr == "2 Empfänger (Bcc)" and row.status == "sent"
     assert row.detail == f"report_run {acc['run_id']}"
     assert "@" not in row.to_addr and "@" not in (row.cc_addr or "")
+
+
+# --- a report refused by a module switch ------------------------------------------------------
+
+
+CHANGE_REPORT = {"report_key": "builtin.itsm_changes_by_status"}
+_SWITCH_KEYS = ("itsm.mode", "itsm_change.enabled")
+
+
+@pytest.fixture
+async def change_reports(env: Env) -> AsyncIterator[Callable[[bool], Awaitable[None]]]:
+    """ITSM led by Tiqora; the fixture's callable sets the change module's switch."""
+
+    async def put(key: str, value: str) -> None:
+        async with env.factory() as s:
+            await set_setting(s, key, value)
+
+    async def switch(on: bool) -> None:
+        await put("itsm_change.enabled", "true" if on else "false")
+
+    await put("itsm.mode", "tiqora")
+    try:
+        yield switch
+    finally:
+        async with env.factory() as s:
+            await s.execute(delete(TiqoraSettings).where(TiqoraSettings.key.in_(_SWITCH_KEYS)))
+            await s.commit()
+
+
+async def test_a_schedule_refused_by_a_switch_is_skipped_and_comes_back(
+    env: Env, mail: CapturingMailSender, change_reports: Callable[[bool], Awaitable[None]]
+) -> None:
+    sid = await env.schedule(items=[CHANGE_REPORT])
+    await change_reports(False)
+    for _ in range(FAILURES_BEFORE_PAUSE + 1):
+        _run_id, job_id = await env.queue_run(sid, owner_only=False)
+        await env.run_job(job_id)
+    assert mail.sent == []
+    row = await env.load_schedule(sid)
+    assert row.active is True and row.paused_reason is None
+    assert (row.failure_count, row.last_status) == (0, "skipped")
+    run = (await env.load_runs(sid))[0]
+    assert (run.status, run.error) == ("skipped", None)
+    assert "Change-Management ist ausgeschaltet." in (run.detail or "")
+
+    await change_reports(True)
+    _run_id, job_id = await env.queue_run(sid, owner_only=True)
+    await env.run_job(job_id)
+    assert len(mail.sent) == 1
+    assert (await env.load_schedule(sid)).last_status == "succeeded"
+
+
+async def test_a_bundle_goes_out_without_the_refused_report_and_says_so(
+    env: Env, mail: CapturingMailSender, change_reports: Callable[[bool], Awaitable[None]]
+) -> None:
+    sid = await env.schedule(items=[{"report_key": "builtin.open_now"}, CHANGE_REPORT])
+    await change_reports(False)
+    _run_id, job_id = await env.queue_run(sid, owner_only=False)
+    await env.run_job(job_id)
+    (msg,) = mail.sent
+    assert len(_attachments(msg)) == 1
+    assert (
+        "wurde ausgelassen: Change-Management ist ausgeschaltet."
+        in msg.get_body(("plain",)).get_content()
+    )  # type: ignore[union-attr]
+    run = (await env.load_runs(sid))[0]
+    assert run.status == "partial" and "ausgelassen" in (run.detail or "")
+    row = await env.load_schedule(sid)
+    assert (row.failure_count, row.active) == (0, True)
