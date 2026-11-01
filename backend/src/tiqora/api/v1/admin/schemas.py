@@ -1559,6 +1559,8 @@ class DaemonServiceOut(BaseModel):
     last_result: dict[str, Any] | None = None
     # i18n keys of warnings for this row (only "gi_requester" fills them)
     notices: list[str] = []
+    # the loop keeps ticking but does nothing because its module is switched off on purpose
+    paused_reason: Literal["change_off", "approvals_off"] | None = None
 
 
 class DaemonListOut(BaseModel):

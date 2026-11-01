@@ -6609,6 +6609,19 @@
         "title": "ApprovalTemplateOut",
         "type": "object"
       },
+      "ApprovalsStatusOut": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "ApprovalsStatusOut",
+        "type": "object"
+      },
       "ApproverEntry": {
         "additionalProperties": false,
         "properties": {
@@ -12391,7 +12404,9 @@
               "ok",
               "itsm_off",
               "mode_a",
-              "setup_missing"
+              "setup_missing",
+              "change_off",
+              "approvals_off"
             ],
             "title": "Reason",
             "type": "string"
@@ -19900,6 +19915,21 @@
             },
             "title": "Notices",
             "type": "array"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "change_off",
+                  "approvals_off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
           },
           "schedule": {
             "enum": [
@@ -100039,6 +100069,72 @@
           }
         },
         "summary": "Get Resolvers",
+        "tags": [
+          "approvals"
+        ]
+      }
+    },
+    "/api/v1/approvals/status": {
+      "get": {
+        "description": "Whether the module is switched on (the frontend hides everything otherwise).",
+        "operationId": "get_approvals_status_api_v1_approvals_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalsStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Approvals Status",
         "tags": [
           "approvals"
         ]

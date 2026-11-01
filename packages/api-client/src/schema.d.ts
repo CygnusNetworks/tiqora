@@ -7437,6 +7437,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/approvals/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Approvals Status
+         * @description Whether the module is switched on (the frontend hides everything otherwise).
+         */
+        get: operations["get_approvals_status_api_v1_approvals_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/approvals/templates": {
         parameters: {
             query?: never;
@@ -17147,6 +17167,11 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** ApprovalsStatusOut */
+        ApprovalsStatusOut: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** ApproverEntry */
         ApproverEntry: {
             /**
@@ -19044,7 +19069,7 @@ export interface components {
              * Reason
              * @enum {string}
              */
-            reason: "ok" | "itsm_off" | "mode_a" | "setup_missing";
+            reason: "ok" | "itsm_off" | "mode_a" | "setup_missing" | "change_off" | "approvals_off";
             /** Setup Complete Change */
             setup_complete_change: boolean;
         };
@@ -21516,6 +21541,8 @@ export interface components {
              * @default []
              */
             notices: string[];
+            /** Paused Reason */
+            paused_reason?: ("change_off" | "approvals_off") | null;
             /**
              * Schedule
              * @enum {string}
@@ -54311,6 +54338,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResolverOptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_approvals_status_api_v1_approvals_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalsStatusOut"];
                 };
             };
             /** @description Validation Error */

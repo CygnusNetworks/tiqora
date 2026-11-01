@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
@@ -18,6 +19,7 @@ from sqlalchemy import delete, select, text
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.schemas import DaemonListOut, DaemonServiceOut, DaemonUpdate
+from tiqora.approvals.settings import approvals_enabled
 from tiqora.config import get_settings
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.settings_store import (
@@ -25,6 +27,7 @@ from tiqora.domain.settings_store import (
     KEY_GI_REQUESTER_LAST_ENABLED_TICK,
 )
 from tiqora.gi.takeover import daemon_notices
+from tiqora.itsm.change.gate import change_switched_off
 from tiqora.worker.services import DAEMON_SERVICES, DAEMON_SERVICES_BY_SLUG, DaemonService
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -75,7 +78,10 @@ def _is_enabled(svc: DaemonService, raw: dict[str, str]) -> bool:
 
 
 def _to_out(
-    svc: DaemonService, raw: dict[str, str], notices: list[str] | None = None
+    svc: DaemonService,
+    raw: dict[str, str],
+    notices: list[str] | None = None,
+    paused_reason: Literal["change_off", "approvals_off"] | None = None,
 ) -> DaemonServiceOut:
     settings = get_settings()
 
@@ -119,6 +125,7 @@ def _to_out(
         last_error=raw.get(f"{status_base}.last_error"),
         last_result=last_result,
         notices=notices or [],
+        paused_reason=paused_reason,
     )
 
 
@@ -132,6 +139,17 @@ async def _notices(svc: DaemonService, session: DbSession) -> list[str]:
         logger.exception("gi_requester_notices_failed")
         await session.rollback()
         return []
+
+
+async def _paused_reason(
+    svc: DaemonService, session: DbSession
+) -> Literal["change_off", "approvals_off"] | None:
+    """The module switch that keeps this loop idle on purpose."""
+    if svc.slug == "itsm_change":
+        return await change_switched_off(session)
+    if svc.slug == "approvals" and not await approvals_enabled(session):
+        return "approvals_off"
+    return None
 
 
 async def _upsert_setting(session: DbSession, key: str, value: str) -> None:
@@ -167,7 +185,10 @@ async def list_daemons(admin: AdminUser, session: DbSession) -> DaemonListOut:
     _ = admin
     raw = await _raw_settings(session)
     return DaemonListOut(
-        services=[_to_out(svc, raw, await _notices(svc, session)) for svc in DAEMON_SERVICES]
+        services=[
+            _to_out(svc, raw, await _notices(svc, session), await _paused_reason(svc, session))
+            for svc in DAEMON_SERVICES
+        ]
     )
 
 
@@ -216,4 +237,4 @@ async def update_daemon(
 
     await session.commit()
     raw = await _raw_settings(session)
-    return _to_out(svc, raw, await _notices(svc, session))
+    return _to_out(svc, raw, await _notices(svc, session), await _paused_reason(svc, session))
