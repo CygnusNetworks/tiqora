@@ -697,7 +697,8 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
 - **Verborgen.** Seitenleiste, Bereich am Ticket und „Als Change führen“, Kalender, CAB, Aufgaben, die Ansichten
   der Znuny-Changes (auch der Verweis in Modus A), Wartungsfenster im Portal, die Change-Berichte und ihre
   Datenbasen (`changes`, `change_events`, der Bericht „Changes je CI-Klasse“) und Dashboard-Kacheln darauf. Eine
-  Kachel und ein geplanter Bericht mit einem solchen Bericht melden, dass das Modul aus ist.
+  Kachel meldet, dass das Modul aus ist. Ein geplanter Versand lässt einen solchen Bericht aus und sagt es; bleibt
+  nichts übrig, endet der Lauf als „übersprungen“, ohne Mail, ohne Fehlerzähler und ohne Anhalten des Zeitplans.
 - **Abgelehnt.** Alle Change-Routen und `/api/v1/itsm/legacy-changes` antworten 404 `change_unavailable`,
   `GET /api/v1/itsm/changes/status` antwortet weiter (`reason: change_off`, `legacy: none`). Die Prozess-Aktion
   `LinkAdd` zu `ITSMChange` oder `ITSMWorkOrder` steht in `skipped_actions`.
@@ -707,6 +708,13 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
 - **Dienst.** `itsm_change` zeigt in **Admin, Dienste** „Pausiert“, nicht „fehlgeschlagen“. Ändert sich unterdessen
   ein Service oder CI eines Changes, wird die Wirkungsanalyse nur vorgemerkt und läuft beim ersten Durchlauf nach
   dem Einschalten. `daemon.itsm_change.enabled` bleibt davon getrennt: Der Dienst läuft nur, wenn beide an sind.
+- **Aufgaben aus der Vorlage.** Lag der Job `core.itsm_change_tasks` beim Ausschalten noch in der Warteschlange,
+  endet er normal, und die nicht angelegten Aufgaben stehen in der Liste `failed` seines Ergebnisses. Legen Sie sie
+  nach dem Einschalten von Hand an.
+- **Offene CAB-Anfragen** stehen still: nicht in „Meine Freigaben“ und am Ticket, Stimmen und Links antworten 409
+  `subject_unavailable`, keine Erinnerungen, und die Frist läuft nicht ab. Beim Einschalten verschiebt der erste
+  Durchlauf sie um die Dauer der Pause ([approvals.md](approvals.md) Kapitel 8). Eine schon entschiedene Anfrage
+  bringt den Change noch weiter.
 
 **Abhängigkeit von Freigaben.** Jeder Weg durch die Freigabephase geht über die Freigabe-Engine (CAB, Automatik,
 Standard-Vorlage). Sind Freigaben ausgeschaltet (`approvals.enabled`, [approvals.md](approvals.md) Kapitel 8), gilt

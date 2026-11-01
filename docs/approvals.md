@@ -490,7 +490,8 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
 
 - **Oberfläche.** Kein „Meine Freigaben“, kein Bereich am Ticket, kein Eintrag im Portal. Die Admin-Seiten
   (Einstellungen, Vorlagen, Freigabegruppen, Vertretungen, Übersicht) bleiben und sagen, dass das Modul aus ist;
-  zurückziehen lässt sich in der Übersicht nichts.
+  zurückziehen lässt sich in der Übersicht nichts. Die Auswahl der Freigeber und die Details einer Anfrage in der
+  Übersicht funktionieren: `GET /api/v1/approvals/lists`, `/resolvers` und `/{id}` bleiben für Administratoren offen.
 - **Ablehnung.** Agenten- und Portal-Routen antworten 404 `approvals_disabled`, die MCP-Werkzeuge
   `{"error": "approvals_disabled"}`. Neue Anfragen lehnt schon der Dienst selbst ab (`request_approval`,
   `record_auto_decision`), also auf jedem Weg. `GET /api/v1/approvals/status` antwortet weiter.
@@ -498,15 +499,22 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
   zählen nicht gegen die Sperre. Die Seite sagt in klaren Worten, dass Freigaben ausgeschaltet sind. Ein Link
   gilt nach dem Einschalten weiter, solange er nicht abgelaufen ist.
 - **E-Mails.** Es geht keine Freigabe-Mail mehr hinaus. Eine Mail, die beim Ausschalten noch in der Warteschlange
-  lag, entfällt (Ergebnis `approvals_disabled`); die nächste Erinnerung geht nach dem Einschalten raus.
+  lag, entfällt (Ergebnis `approvals_disabled`). Eine Anfrage-Mail ersetzt später nur die nächste Erinnerung, und
+  die gibt es nur, wenn Erinnerungen eingestellt sind und ihr Maximum nicht erreicht ist. Die Mail an den
+  Anfragenden über eine Entscheidung wird nicht nachgeholt.
 - **Offene Anfragen** behalten ihren Stand. Sie blockieren am Ticket nichts: Zustand, Schließen und ACLs schauen
   nicht auf Freigaben, weder an noch aus. Die einzigen Sperren durch offene Anfragen liegen in den Change-Phasen,
   und das Change-Management steht in dieser Zeit ohnehin still.
 - **Fristen.** Fristen, Erinnerungen, Eskalation, das Entfernen ungültiger Freigeber und das Abbrechen von
-  Anfragen ohne Ticket pausieren. Die Frist selbst läuft weiter: **Was in der Pause fällig wurde, läuft beim ersten
-  Durchlauf nach dem Einschalten**, also auch ein automatisches Ablehnen oder Freigeben bei Fristablauf. Nur das
-  Löschen alter Links läuft durch (Aufbewahrung). Der Dienst zeigt in **Admin, Dienste** „Pausiert“, nicht
-  „fehlgeschlagen“.
+  Anfragen ohne Ticket pausieren. **Die Zeit steht in der Pause still:** Der erste Durchlauf nach dem Einschalten
+  verschiebt die Fristen, Erinnerungen und Entscheidungslinks offener Anfragen um die Dauer der Pause. Was in der
+  Pause fällig geworden wäre, läuft also nicht ab, weder als Ablehnen noch als Freigeben; die restliche Zeit läuft
+  danach weiter. Nur was schon vor der Pause fällig war, läuft im ersten Durchlauf. Bis zu diesem Durchlauf
+  (`TIQORA_APPROVALS_SWEEP_INTERVAL`, Vorgabe 60 Sekunden) kann eine Frist kurz als überfällig erscheinen.
+  Gemessen wird ab dem letzten Durchlauf vor dem Ausschalten: Aus und wieder an innerhalb eines Intervalls verschiebt
+  nichts oder höchstens um zwei Intervalle. Fällige Erinnerungen gehen je Schritt höchstens einmal hinaus; wer viele
+  offene Schritte hat, bekommt entsprechend viele Mails. Nur das Löschen alter Links läuft durch (Aufbewahrung). Der
+  Dienst zeigt in **Admin, Dienste** „Pausiert“, nicht „fehlgeschlagen“.
 - **Bereits entschiedene Anfragen** werden fertig: Die Nachbearbeitung (`core.approval_hook`, auch ihre
   Wiederholungen) läuft als Aufgabe, nicht im pausierten Dienst.
 - **DSGVO.** Löschung, Anonymisierung und Backup-Export erfassen die Daten auch im ausgeschalteten Zustand.
@@ -514,6 +522,12 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
 **Change-Management.** Seine Freigabephasen brauchen dieses Modul. Sind Freigaben aus, ist es nicht verfügbar
 (`reason: approvals_off`, [itsm.md](itsm.md) Kapitel 8). Beim Ausschalten fragt die Seite deshalb nach, solange
 das Change-Management aktiv ist.
+
+Umgekehrt: Ist nur das Change-Management aus, stehen seine offenen CAB-Anfragen genauso still, die anderen laufen
+weiter. Sie fehlen in „Meine Freigaben“, am Ticket und im Portal, Stimmen und Links antworten 409
+`subject_unavailable` (zählt nicht gegen die Link-Sperre, der Link bleibt gültig), es gibt keine Mails, und ihre
+Fristen werden beim Einschalten ebenso verschoben. Nichts bewegt den Change. Die Admin-Übersicht zeigt sie weiter,
+ohne Zurückziehen. Allgemein gilt das für jeden Anfragetyp mit `available` (Kapitel 9).
 
 ### Dienst „Freigaben“
 
@@ -600,6 +614,7 @@ Ein Verbraucher meldet in seinem Block von `register_core` einen `ApprovalSubjec
 | `agent_requestable` | ad hoc im Ticket anforderbar (nur `ticket`) |
 | `describe` | optionale Zusatzzeilen (reiner Text) für Freigeber und E-Mails |
 | `on_decided` | Rückruf nach der endgültigen Entscheidung |
+| `available` | Rückruf `(session) -> bool`; `False`, solange das Modul des Gegenstands ausgeschaltet ist: seine offenen Anfragen stehen still (Kapitel 8). `itsm.change` folgt damit `itsm_change.enabled`. |
 
 `on_decided(session, outcome: ApprovalOutcome)` läuft im Job **`core.approval_hook` nach dem
 Commit der Entscheidung**. Die Entscheidungstransaktion schreibt nur die Jobzeile

@@ -507,7 +507,9 @@ out empty unless "only if non-empty" is set. Statistics over Znuny's own CMDB an
 are not implemented (see [compatibility.md](compatibility.md#znuny-features-not-implemented)).
 
 **Switched off.** With the ITSM mode "Aus", a tile or a schedule on one of these data bases or on an ITSM built-in
-refuses to run: the tile shows an error, the schedule run fails with a message. The same goes for the change reports
+refuses to run. The tile shows an error. A schedule leaves that report out and says so in the run and the mail; if
+nothing remains, the run ends "skipped", with no mail, no failure count and no pause, and the schedule goes on as
+before once the module is on again. The same goes for the change reports
 (`changes`, `change_events`, "Changes je CI-Klasse") while change management or approvals are switched off
 ([itsm.md](itsm.md) chapter 8). A run through the report page or `POST /api/v1/reports/run` stays possible.
 
