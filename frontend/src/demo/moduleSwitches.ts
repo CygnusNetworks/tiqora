@@ -27,6 +27,8 @@ export type ModuleSwitches = { approvalsOn: boolean; changeOff: "change_off" | "
 export const demoModuleSwitches = (): ModuleSwitches => ({ approvalsOn: demoApprovalsOn(), changeOff: demoChangeSwitchedOff() });
 
 const APPROVALS_DISABLED = { detail: { code: "approvals_disabled", detail: null } };
+/** Reads the admin pages share with agents: the backend leaves them open for admins, and the demo user is one. */
+const ADMIN_READABLE = /\/api\/v1\/approvals\/(lists|resolvers|\d+)$/;
 const CHANGE_UNAVAILABLE = { detail: { code: "change_unavailable" } };
 const AGENT_APPROVALS = /\/api\/v1\/approvals(\/|$)|\/api\/v1\/tickets\/\d+\/approvals$/;
 const CHANGE_ROUTES =
@@ -35,7 +37,7 @@ const CHANGE_ROUTES =
 /** What the backend answers because of a module switch; `undefined` for a route the switches leave alone. */
 export function moduleSwitchReply(path: string, switches: ModuleSwitches): { status: number; body: unknown } | undefined {
   if (path.endsWith("/api/v1/approvals/status")) return { status: 200, body: { enabled: switches.approvalsOn } };
-  if (!switches.approvalsOn) {
+  if (!switches.approvalsOn && !ADMIN_READABLE.test(path)) {
     if (AGENT_APPROVALS.test(path) || path.includes("/api/portal/approvals")) return { status: 404, body: APPROVALS_DISABLED };
     if (path.includes("/api/v1/approval-links/")) return { status: 409, body: APPROVALS_DISABLED };
   }

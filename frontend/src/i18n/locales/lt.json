@@ -7736,6 +7736,7 @@
         "heatmap": "Heatmap",
         "kpi": "Key figures"
       },
+      "sourceSwitchedOff": "Change management is switched off. These figures can be empty or out of date until it is on again.",
       "sourceUnavailable": "This data basis is only maintained while Tiqora leads the ITSM (mode B). The figures may be empty or out of date."
     },
     "sources": {
@@ -10591,6 +10592,7 @@
       "unknown": "The approval could not be processed. Please try again.",
       "approver_invalid": "Your account is no longer active, so you cannot decide on this approval anymore.",
       "template_changed": "The template was changed in the meantime. Please reload it.",
+      "subject_unavailable": "This approval belongs to a module that is currently switched off. It cannot be decided at the moment.",
       "approvals_disabled": "Approvals are currently switched off."
     },
     "overdue": "overdue",

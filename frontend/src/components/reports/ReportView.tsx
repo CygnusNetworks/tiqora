@@ -140,7 +140,7 @@ export function ReportView(props: Parameters<typeof ReportResultView>[0]) {
   return (
     // Always the wrapper: the hint arrives with the sources and must not remount the result.
     <div className="space-y-2">
-      {unavailable && <SourceUnavailableHint testId={`${props.testId ?? "report-view"}-source-unavailable`} />}
+      {unavailable && <SourceUnavailableHint testId={`${props.testId ?? "report-view"}-source-unavailable`} source={props.report.definition.source} />}
       <ReportResultView {...props} />
     </div>
   );

@@ -285,7 +285,7 @@ function Editor({
         )}
       </div>
 
-      {unavailable && <SourceUnavailableHint testId="builder-source-unavailable" />}
+      {unavailable && <SourceUnavailableHint testId="builder-source-unavailable" source={definition?.source} />}
 
       <fieldset
         disabled={locked}

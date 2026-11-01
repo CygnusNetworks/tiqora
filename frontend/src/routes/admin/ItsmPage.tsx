@@ -252,7 +252,6 @@ function MatrixCard() {
   );
 }
 
-/** Change management has its own admin page (Mode B: the changes are Tiqora's). */
 /** The switch of the change module (the settings section's field, here where admins look for it). */
 function ChangeSwitchCard() {
   const { t } = useTranslation();
@@ -301,6 +300,7 @@ function ChangeSwitchCard() {
   );
 }
 
+/** Change management has its own admin page (Mode B: the changes are Tiqora's). */
 function ChangeCard() {
   const { t } = useTranslation();
   return (

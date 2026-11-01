@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { approvalsApi, approvalsKeys } from "@/lib/approvalsApi";
 
-/** The module switch `approvals.enabled`; an open page sees a change within a minute. */
+/** The module switch `approvals.enabled`; an open page sees a change within a minute, also idle. */
 export function useApprovalsStatus() {
   return useQuery({
     queryKey: approvalsKeys.status(),
     queryFn: ({ signal }) => approvalsApi.status(signal),
     retry: false,
     staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 }
 

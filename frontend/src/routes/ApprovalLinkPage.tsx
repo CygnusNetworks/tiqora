@@ -24,6 +24,7 @@ const LINK_CODES = new Set([
   "approver_invalid",
   "customer_approver_outside_company",
   "approvals_disabled",
+  "subject_unavailable",
 ]);
 
 /**

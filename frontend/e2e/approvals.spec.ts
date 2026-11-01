@@ -390,6 +390,23 @@ test.describe("switched off (approvals.enabled = false)", () => {
     await expect(page.getByTestId("approvals-page")).toContainText("Freigaben sind derzeit ausgeschaltet");
   });
 
+  test("the admin template editor still offers approval groups and dynamic sources", async ({ page }) => {
+    await mockAdminApi(page);
+    await loginAsAgent(page);
+    await page.goto("/admin/approvals/templates");
+    await expect(page.getByTestId("template-row")).toHaveCount(2);
+    await page.getByTestId("template-new").click();
+    await page.getByTestId("template-key").fill("cab_aus");
+    await page.getByTestId("template-name").fill("CAB aus");
+    await page.getByTestId("template-subject-ticket").check();
+    await page.getByTestId("step-0-name").fill("CAB");
+    await page.getByTestId("step-0-approvers-add").click();
+    await pick(page, "step-0-approvers-kind-0", "list");
+    await pick(page, "step-0-approvers-ref-0", "1");
+    await pick(page, "step-0-approvers-kind-0", "resolver");
+    await pick(page, "step-0-approvers-ref-0", "ticket.owner");
+  });
+
   test("the public link says so in plain words", async ({ page }) => {
     await mockApi(page);
     await page.goto("/approve#t=demo");

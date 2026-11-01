@@ -166,6 +166,7 @@ export function useChangeStatus() {
     queryKey: changeKeys.status(),
     queryFn: ({ signal }) => changeApi.status(signal),
     staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
     retry: false,
   });
 }

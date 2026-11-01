@@ -16,6 +16,7 @@ describe("moduleSwitchReply", () => {
     const code = { detail: { code: "approvals_disabled", detail: null } };
     expect(moduleSwitchReply("/api/v1/approvals/status", off)?.body).toEqual({ enabled: false });
     expect(moduleSwitchReply("/api/v1/approvals/inbox", off)).toEqual({ status: 404, body: code });
+    for (const read of ["lists", "resolvers", "7"]) expect(moduleSwitchReply(`/api/v1/approvals/${read}`, off)).toBeUndefined();
     expect(moduleSwitchReply("/api/v1/tickets/1/approvals", off)).toEqual({ status: 404, body: code });
     expect(moduleSwitchReply("/api/portal/approvals", off)).toEqual({ status: 404, body: code });
     expect(moduleSwitchReply("/api/v1/approval-links/inspect", off)).toEqual({ status: 409, body: code });
