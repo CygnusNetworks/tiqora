@@ -275,6 +275,7 @@ class ApprovalError(Exception):
 
 ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
     {
+        "approvals_disabled": 404,
         "approval_not_found": 404,
         "ticket_not_found": 404,
         "template_not_found": 404,

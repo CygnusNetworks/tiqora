@@ -52,7 +52,7 @@ from tiqora.approvals.resolve import (
     ResolvedApprover,
     canonical_principal,
 )
-from tiqora.approvals.settings import ApprovalSettings
+from tiqora.approvals.settings import ApprovalSettings, approvals_enabled
 from tiqora.config import Settings
 from tiqora.db.legacy.user import Users
 from tiqora.db.utf8mb3 import replace_non_bmp
@@ -219,6 +219,11 @@ async def _requester_key(session: AsyncSession, requester: Principal | None, act
     return (await canonical_principal(session, principal)).key
 
 
+async def _require_module_on(session: AsyncSession) -> None:
+    if not await approvals_enabled(session):
+        raise ApprovalError("approvals_disabled", 404)
+
+
 async def request_approval(
     session: AsyncSession,
     *,
@@ -243,8 +248,10 @@ async def request_approval(
     title, key or ``subject_ref`` that does not fit its column),
     ``template_not_found``, ``customer_approvers_not_allowed`` or ``unknown_resolver``. With
     *supersede* a pending request with the same ``(ticket_id, approval_key)`` is cancelled
-    (reason ``superseded``) and points at the new one through ``superseded_by``.
+    (reason ``superseded``) and points at the new one through ``superseded_by``. While the
+    module is switched off every path ends here with ``approvals_disabled`` (no request, no mail).
     """
+    await _require_module_on(session)
     reg = registry or get_registry()
     title, approval_key, subject_ref = _check_text(title, approval_key, subject_ref)
     description = replace_non_bmp(description)
@@ -338,8 +345,9 @@ async def record_auto_decision(
     """Records an already decided request without steps (e.g. a pre-approved standard change).
 
     Audit ``auto_decided``, outbox ``TiqoraApprovalDecided``, history line and the hook job;
-    no mails. Flushes, never commits.
+    no mails. Flushes, never commits. Raises ``approvals_disabled`` like :func:`request_approval`.
     """
+    await _require_module_on(session)
     if status not in ("approved", "rejected"):
         raise ApprovalError("invalid_definition", 422, "status must be approved or rejected")
     if not _REASON_RE.fullmatch(reason):

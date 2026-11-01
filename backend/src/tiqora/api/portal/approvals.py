@@ -45,8 +45,13 @@ def _not_found() -> NoReturn:
 
 
 async def require_portal_approvals(session: DbSession, settings: AppSettings) -> None:
-    """404 unless customers may approve, portal approvals are on and the portal itself is on."""
+    """404 unless customers may approve, portal approvals are on and the portal itself is on;
+    ``approvals_disabled`` while the module is switched off."""
     cfg = await load_approval_settings(session, settings)
+    if not cfg.enabled:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail={"code": "approvals_disabled", "detail": None}
+        )
     if not (
         cfg.customer_approvers_enabled
         and cfg.portal_approvals_enabled

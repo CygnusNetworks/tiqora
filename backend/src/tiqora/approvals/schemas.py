@@ -153,6 +153,10 @@ class ApprovalInboxPage(BaseModel):
     offset: int
 
 
+class ApprovalsStatusOut(BaseModel):
+    enabled: bool
+
+
 class InboxCountOut(BaseModel):
     pending: int
 

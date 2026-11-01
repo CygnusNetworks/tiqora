@@ -19,9 +19,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from sqlalchemy import bindparam, create_engine, text
+from sqlalchemy import bindparam, create_engine, delete, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tests._change_fixtures import make_change
 from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tests.test_gdpr_erasure import (
     NOW,
@@ -38,7 +39,14 @@ from tiqora.approvals.contract import ApprovalDefinition, ApprovalError
 from tiqora.approvals.models import APPROVAL_TICKET_TABLES
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.gdpr.erasure import build_erasure_preview_for_ids, rollback_job, run_erasure
+from tiqora.db.tiqora.models import TiqoraSettings
+from tiqora.gdpr.erasure import (
+    build_erasure_preview_for_ids,
+    load_job_backups_export,
+    rollback_job,
+    run_erasure,
+)
+from tiqora.itsm.change.models import TiqoraItsmChange
 
 pytestmark = pytest.mark.db
 
@@ -471,6 +479,50 @@ async def test_ticket_erasure_removes_approvals(
         assert _ids(rows, "tiqora_approval_vote") == {V_O}
         assert _ids(rows, "tiqora_approval_token") == {TK_AGENT}
         assert _ids(rows, "tiqora_approval_event") == {EV_O}
+
+
+@pytest.mark.parametrize("url_fixture", _URLS)
+@pytest.mark.parametrize("setting", ["approvals.enabled", "itsm_change.enabled"])
+async def test_erasure_rollback_and_preview_ignore_the_module_switches(
+    url_fixture: str, request: pytest.FixtureRequest, setting: str
+) -> None:
+    """A switched-off module is no hiding place: its rows are found, erased and backed up (the
+    backup is the export of the job) exactly as with the switch on."""
+    async with _world(url_fixture, request, "anonymize") as (factory, seed):
+        async with factory() as session:
+            await session.execute(insert(TiqoraSettings).values(key=setting, value="0"))
+            await make_change(session, seed.erased_ticket, reason="Geheimer Grund")
+            await session.commit()
+        try:
+            async with factory() as session:
+                preview = await build_erasure_preview_for_ids(
+                    session, [seed.customer_user_id], "anonymize"
+                )
+            assert preview.counts["tiqora_approval"] >= 1
+            job_id, counts = await _erase(factory, seed, "anonymize")
+            assert counts["tiqora_approval"] == 1
+            rows = await _rows(factory, seed.tickets)
+            assert _ids(rows, "tiqora_approval") == {A_O}
+            assert counts["tiqora_itsm_change"] == 1
+            async with factory() as session:
+                reason = await session.execute(
+                    select(TiqoraItsmChange.reason).where(
+                        TiqoraItsmChange.ticket_id == seed.erased_ticket
+                    )
+                )
+                assert reason.scalar_one() != "Geheimer Grund"
+                backups = await load_job_backups_export(session, job_id)
+            assert any(b["table_name"] == "tiqora_approval" for b in backups)
+            await rollback_job(factory, Settings(), job_id, force_parallel=True, actor="test")
+            rows = await _rows(factory, seed.tickets)
+            assert _ids(rows, "tiqora_approval") == {A_E, A_O}
+        finally:
+            async with factory() as session:
+                await session.execute(delete(TiqoraSettings).where(TiqoraSettings.key == setting))
+                await session.execute(
+                    delete(TiqoraItsmChange).where(TiqoraItsmChange.ticket_id == seed.erased_ticket)
+                )
+                await session.commit()
 
 
 @pytest.mark.parametrize("url_fixture", _URLS)

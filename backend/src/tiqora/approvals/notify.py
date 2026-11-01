@@ -234,6 +234,8 @@ async def _plan(
     if approval is None:  # erased with its ticket (GDPR) since the job was queued
         return _result(payload.approval_id, note="gone")
     settings = await load_approval_settings(session, ctx.settings)
+    if not settings.enabled:  # queued before the switch: no mail goes out while the module is off
+        return _result(approval.id, note="approvals_disabled")
     sender = await resolve_notification_sender_address(session)
     if sender is None:
         logger.warning("approval_mail_no_sender", approval_id=approval.id, kind=payload.kind)

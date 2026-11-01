@@ -55,6 +55,7 @@ from tiqora.approvals.schemas import (
     DelegationOut,
     SubjectTypeOut,
 )
+from tiqora.approvals.settings import approvals_enabled
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
@@ -169,6 +170,7 @@ async def _overview_items(
         for tid, number, title in rows:
             tickets[int(tid)] = (str(number), title)
     labels = await detail.principal_labels(session, [a.requester for a in approvals])
+    module_on = await approvals_enabled(session)  # withdrawing goes through the refused agent route
     return [
         ApprovalAdminItemOut(
             id=a.id,
@@ -188,7 +190,7 @@ async def _overview_items(
             requester_label=labels[a.requester],
             created_at=a.created_at,
             decided_at=a.decided_at,
-            can_cancel=a.status == "pending",
+            can_cancel=module_on and a.status == "pending",
         )
         for a in approvals
     ]

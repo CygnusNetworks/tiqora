@@ -20,6 +20,7 @@ from tiqora.api.v1._approvals_common import (
 )
 from tiqora.api.v1._approvals_common import (
     ensure_period_open,
+    require_approvals_enabled,
 )
 from tiqora.api.v1._approvals_common import http_error as _http
 from tiqora.api.v1._approvals_common import refuse as _refuse
@@ -54,6 +55,7 @@ from tiqora.approvals.schemas import (
     ApprovalInboxPage,
     ApprovalListOptionOut,
     ApprovalRequestIn,
+    ApprovalsStatusOut,
     ApprovalSummaryOut,
     ApprovalTemplateOptionOut,
     DecisionIn,
@@ -68,7 +70,7 @@ from tiqora.approvals.schemas import (
     LinkInspectOut,
     ResolverOptionOut,
 )
-from tiqora.approvals.settings import load_approval_settings
+from tiqora.approvals.settings import approvals_enabled, load_approval_settings
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.domain.ticket_access import TicketAccessDenied, require_ticket
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
@@ -77,8 +79,14 @@ from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import ApprovalLinkRateLimiter, client_ip
 
-router = APIRouter(prefix="/approvals", tags=["approvals"])
-ticket_router = APIRouter(prefix="/tickets", tags=["approvals"])
+#: answers while the module is switched off, unlike ``router``
+status_router = APIRouter(prefix="/approvals", tags=["approvals"])
+router = APIRouter(
+    prefix="/approvals", tags=["approvals"], dependencies=[Depends(require_approvals_enabled)]
+)
+ticket_router = APIRouter(
+    prefix="/tickets", tags=["approvals"], dependencies=[Depends(require_approvals_enabled)]
+)
 #: public: the link's secret is the credential (no session, no API-key scope, see CX12)
 links_router = APIRouter(prefix="/approval-links", tags=["approvals"])
 
@@ -170,6 +178,13 @@ async def _detail(session: AsyncSession, approval_id: int, actor: Actor) -> Appr
 
 
 # --- inbox -----------------------------------------------------------------------------------
+
+
+@status_router.get("/status", response_model=ApprovalsStatusOut)
+async def get_approvals_status(user: CurrentUser, session: DbSession) -> ApprovalsStatusOut:
+    """Whether the module is switched on (the frontend hides everything otherwise)."""
+    _ = user
+    return ApprovalsStatusOut(enabled=await approvals_enabled(session))
 
 
 @router.get("/inbox", response_model=ApprovalInboxPage)
@@ -550,13 +565,20 @@ async def request_ticket_approval(
 
 
 async def _link_gate(
-    request: Request, settings: AppSettings, redis: Any, token: str
+    request: Request, session: AsyncSession, settings: AppSettings, redis: Any, token: str
 ) -> tuple[ApprovalLinkRateLimiter, str]:
-    """Per-IP lock and per-link budget, before any database work (429 when exceeded)."""
+    """Per-IP lock before any database work (429), then the module switch (409
+    ``approvals_disabled``, before the token: nothing is counted against the link or the IP), then
+    the per-link budget (429).
+    """
     limiter = ApprovalLinkRateLimiter(redis, settings)
     ip = client_ip(request, settings.trusted_proxies)
     decision = await limiter.check_ip(ip)
-    if decision.allowed:  # a locked IP does not spend the link's budget
+    if decision.allowed:
+        enabled = await approvals_enabled(session)
+        await session.rollback()  # the link code opens its own transaction
+        if not enabled:
+            _refuse("approvals_disabled", status.HTTP_409_CONFLICT)
         decision = await limiter.check_token(tokens.link_digest(token))
     if not decision.allowed:
         raise HTTPException(
@@ -617,7 +639,7 @@ async def post_link_inspect(
     customer approver who could not vote through the link (customer approvers off, the ticket
     left their company) gets the vote's 403 instead, without anything about the request.
     """
-    limiter, ip = await _link_gate(request, settings, redis, body.token)
+    limiter, ip = await _link_gate(request, session, settings, redis, body.token)
     try:
         target = await tokens.inspect_link(session, body.token, settings=settings)
         out = await _link_view(session, target)
@@ -643,7 +665,7 @@ async def post_link_decide(
     """Casts the vote of the link's approver row, once (channel ``email``). 410 ``link_used``
     for a link that was already used, ``link_expired`` for one past its expiry, ``link_invalid``
     for any other dead or unknown link."""
-    limiter, ip = await _link_gate(request, settings, redis, body.token)
+    limiter, ip = await _link_gate(request, session, settings, redis, body.token)
     try:
         result = await tokens.redeem_link(
             session, body.token, decision=body.decision, comment=body.comment, settings=settings

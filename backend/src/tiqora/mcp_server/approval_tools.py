@@ -8,7 +8,8 @@ under the key owner's name, so an LLM must never be one injected sentence away f
 it runs only when the key's scopes name ``tool:approval_decide`` explicitly (or ``*``), the key
 has write scope, and an admin switched ``approvals.mcp_decide_enabled`` on. Refusals are
 ``{"error": code}`` results with the engine's own codes plus ``tool_not_allowed``,
-``write_scope_required`` and ``mcp_decide_disabled``.
+``write_scope_required`` and ``mcp_decide_disabled``. While the module is switched off every tool
+answers ``approvals_disabled``.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from sqlalchemy import select
 from tiqora.approvals import access, detail, inbox, service
 from tiqora.approvals.contract import Actor, ApprovalError
 from tiqora.approvals.models import TiqoraApproval
-from tiqora.approvals.settings import load_approval_settings
+from tiqora.approvals.settings import approvals_enabled, load_approval_settings
 from tiqora.domain.api_key_scopes import mcp_scopes_allow_write
 from tiqora.domain.ticket_write_service import TicketAccessDenied
 from tiqora.events.pubsub import get_pubsub_redis, publish_approval_changed
@@ -35,6 +36,7 @@ logger = structlog.get_logger(__name__)
 LIST_LIMIT_MAX: Final = 100
 _READONLY: Final = {"readOnlyHint": True}
 _NOT_FOUND: Final = {"error": "approval_not_found"}
+_DISABLED: Final = {"error": "approvals_disabled"}
 
 
 async def _publish(user_ids: Iterable[int]) -> None:
@@ -58,7 +60,7 @@ async def approval_list_mine(
     state: Literal["pending", "decided"] = "pending",
     limit: int = 20,
     offset: int = 0,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]] | dict[str, Any]:
     """List the caller's approvals.
 
     Args:
@@ -69,6 +71,9 @@ async def approval_list_mine(
     user_id = _server._get_user_id(ctx)
     _server._assert_tool_allowed("approval_list_mine")
     async with _server._get_state().session_factory() as session:
+        if not await approvals_enabled(session):
+            await session.rollback()
+            return dict(_DISABLED)
         page = await inbox.inbox(
             session,
             Actor.agent(user_id),
@@ -116,6 +121,9 @@ async def approval_get(ctx: Context, approval_id: int) -> dict[str, Any]:
     _server._assert_tool_allowed("approval_get")
     actor = Actor.agent(user_id)
     async with _server._get_state().session_factory() as session:
+        if not await approvals_enabled(session):
+            await session.rollback()
+            return dict(_DISABLED)
         approval = (
             await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == approval_id))
         ).scalar_one_or_none()
@@ -176,7 +184,11 @@ async def approval_decide(
     actor = Actor.agent(user_id)
     state = _server._get_state()
     async with state.session_factory() as session:
-        if not (await load_approval_settings(session, state.settings)).mcp_decide_enabled:
+        loaded = await load_approval_settings(session, state.settings)
+        if not loaded.enabled:
+            await session.rollback()
+            return dict(_DISABLED)
+        if not loaded.mcp_decide_enabled:
             await session.rollback()
             return {"error": "mcp_decide_disabled"}
         await session.rollback()  # the request lock must be the first read (F1(a))

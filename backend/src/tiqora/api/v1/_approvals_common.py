@@ -6,13 +6,15 @@ from collections.abc import Awaitable, Iterable
 from datetime import UTC, datetime
 from typing import NoReturn
 
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.approvals import detail
 from tiqora.approvals.contract import ApprovalError
 from tiqora.approvals.models import TiqoraApprovalDelegation
 from tiqora.approvals.schemas import DelegationOut
+from tiqora.approvals.settings import approvals_enabled
 from tiqora.jobs.service import utc_now
 
 
@@ -23,6 +25,19 @@ def http_error(err: ApprovalError) -> HTTPException:
 
 def refuse(code: str, http_status: int, detail_text: str | None = None) -> NoReturn:
     raise http_error(ApprovalError(code, http_status, detail_text))
+
+
+async def require_approvals_enabled(user: CurrentUser, session: DbSession) -> None:
+    """Router dependency of the agent routes: 404 ``approvals_disabled`` while the module is off.
+
+    ``user`` first, so that a caller without a session gets 401 as on every other route. Rolls the
+    read back: the routes open their own transaction and the request lock must be their first read.
+    """
+    _ = user
+    enabled = await approvals_enabled(session)
+    await session.rollback()
+    if not enabled:
+        refuse("approvals_disabled", status.HTTP_404_NOT_FOUND)
 
 
 async def run_engine[T](session: AsyncSession, operation: Awaitable[T]) -> T:

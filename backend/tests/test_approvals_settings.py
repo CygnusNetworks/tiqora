@@ -35,6 +35,7 @@ async def test_settings_defaults(url_fixture: str, request: pytest.FixtureReques
         assert stray == []
         got = await load_approval_settings(session, SETTINGS)
     assert got.model_dump() == {
+        "enabled": True,
         "default_due_hours": 0,
         "reminder_interval_hours": 24,
         "reminder_max": 3,

@@ -32,7 +32,7 @@ from tiqora.approvals.contract import (
 from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalApprover, TiqoraApprovalStep
 from tiqora.approvals.notify import enqueue_notification
 from tiqora.approvals.resolve import customer_rows, customers_in_ticket_company
-from tiqora.approvals.settings import ApprovalSettings, load_approval_settings
+from tiqora.approvals.settings import ApprovalSettings, approvals_enabled, load_approval_settings
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
@@ -555,6 +555,13 @@ async def _pages(
         after = page[-1][0]
 
 
+async def _purge(factory: async_sessionmaker[AsyncSession], moment: datetime) -> int:
+    async with factory() as session:
+        purged = await tokens.purge_links(session, older_than=moment - _LINK_RETENTION)
+        await session.commit()
+    return purged
+
+
 async def run_approvals_sweep(
     *,
     settings: Settings,
@@ -566,6 +573,10 @@ async def run_approvals_sweep(
 
     Returns ``overdue`` (steps only reported), ``escalated``, ``timeout_decided``, ``reminded``
     (steps reminded), ``removed`` (approver rows), ``cancelled`` and ``links_purged``.
+
+    While the module is switched off only the link purge runs (retention), every timer pauses and
+    the requests keep their state; the first tick after switching on runs what became due. The
+    ``on_decided`` retries of decided requests are not here: they are jobs of the job runner.
     """
     moment = (now if now is not None else utc_now()).replace(microsecond=0)
     registry = get_registry()
@@ -579,7 +590,10 @@ async def run_approvals_sweep(
         "links_purged": 0,
     }
     async with session_factory() as session:
+        enabled = await approvals_enabled(session)
         asettings = await load_approval_settings(session, settings)
+    if not enabled:
+        return {**counts, "links_purged": await _purge(session_factory, moment), "paused": 1}
 
     async def cancel(
         session: AsyncSession, approval: TiqoraApproval, loaded: ApprovalSettings
@@ -666,9 +680,5 @@ async def run_approvals_sweep(
         async with session_factory() as session:
             await set_setting(session, KEY_INVALID_CURSOR, str(cursor))
 
-    async with session_factory() as session:
-        counts["links_purged"] = await tokens.purge_links(
-            session, older_than=moment - _LINK_RETENTION
-        )
-        await session.commit()
+    counts["links_purged"] = await _purge(session_factory, moment)
     return counts
