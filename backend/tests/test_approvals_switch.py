@@ -178,7 +178,11 @@ async def test_every_agent_route_answers_404_but_the_status(
                 assert (got.status_code, got.json()) == (200, {"enabled": False})
                 routes = [
                     r
-                    for r in (*approvals_api.router.routes, *approvals_api.ticket_router.routes)
+                    for r in (
+                        *approvals_api.router.routes,
+                        *approvals_api.ticket_router.routes,
+                        *approvals_api.admin_readable_router.routes,
+                    )
                     if isinstance(r, APIRoute)
                 ]
                 assert len(routes) >= 15

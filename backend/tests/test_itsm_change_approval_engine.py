@@ -45,12 +45,14 @@ from tests.approvals_consumer_kit import (
     shared_session_factory,
     touch_ticket,
 )
+from tiqora.approvals import inbox as approval_inbox
 from tiqora.approvals import lists as approval_lists
 from tiqora.approvals import service as approval_service
 from tiqora.approvals import sweep
 from tiqora.approvals.contract import (
     Actor,
     ApprovalDefinition,
+    ApprovalError,
     ApprovalOutcome,
     ApproverEntry,
     Principal,
@@ -453,6 +455,41 @@ async def test_decided_vote_finishes_its_hook_while_a_switch_is_off(
     result = await _hook(w, aid)
     assert result["hook"] == "called"
     assert (await _row(w, tid)).phase == "scheduled"
+
+
+async def test_cab_request_is_frozen_while_change_is_off_and_approvals_are_on(
+    w: ChangeWorld,
+) -> None:
+    """Nothing moves the change: no inbox entry, no vote, no deadline; on again it goes on."""
+    tid, aid = await _to_approval(w, approval_timeout="reject", approval_due_hours=1)
+    voter = Actor.agent(V1)
+    assert await approval_inbox.pending_count(w.session, voter) == 1
+    start = utc_now().replace(microsecond=0)
+    await _sweep(w, start)
+    await _settings(w, enabled=False)
+    await w.session.commit()
+
+    assert await approval_inbox.pending_count(w.session, voter) == 0
+    with pytest.raises(ApprovalError) as refused:
+        await _vote(w, aid, V1, "approved")
+    assert refused.value.code == "subject_unavailable"
+    await w.session.rollback()
+    counts = await _sweep(w, start + timedelta(hours=2))
+    assert counts["timeout_decided"] == 0
+    assert (await approval_service.get_info(w.session, aid)).status == "pending"
+    assert await _hook_jobs(w, aid) == []
+    assert (await _row(w, tid)).phase == "approval"
+
+    await _settings(w, enabled=True)
+    await w.session.commit()
+    counts = await _sweep(w, start + timedelta(hours=3))
+    assert counts["timeout_decided"] == 0  # the hour it had left starts again
+    assert (await approval_service.get_info(w.session, aid)).status == "pending"
+    assert await approval_inbox.pending_count(w.session, voter) == 1
+    counts = await _sweep(w, start + timedelta(hours=5))
+    assert counts["timeout_decided"] == 1
+    await _hook(w, aid)
+    assert (await _row(w, tid)).phase == "rejected"
 
 
 async def test_rejection_moves_change_to_rejected(w: ChangeWorld) -> None:

@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -623,6 +623,9 @@ async def _committed_world(url: str) -> AsyncIterator[async_sessionmaker[AsyncSe
         delete_above_marks(url, marks)
         async with factory() as cleanup:
             await delete_world(cleanup)
+            await cleanup.execute(
+                delete(TiqoraSettings).where(TiqoraSettings.key == sweep.KEY_TIMERS)
+            )
             await cleanup.commit()
         await engine.dispose()
 

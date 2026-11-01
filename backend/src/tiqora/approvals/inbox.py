@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import delegation, rules
 from tiqora.approvals._engine import excluded_keys, in_rule
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import Actor, StepSpec
 from tiqora.approvals.models import (
     TiqoraApproval,
@@ -108,7 +109,7 @@ async def pending_rows(
     mine: ColumnElement[bool] = A.principal == key
     if delegators:
         mine = or_(mine, A.user_id.in_(sorted(delegators)))
-    scope: list[ColumnElement[bool]] = []
+    scope: list[ColumnElement[bool]] = [P.subject_type.not_in(await frozen_subject_types(session))]
     if approval_ids is not None:
         scope.append(P.id.in_(sorted(set(approval_ids))))
     if ticket_ids is not None:
@@ -147,7 +148,10 @@ async def _decided_rows(
     offset: int,
     ticket_ids: Collection[int] | None = None,
 ) -> tuple[list[_Row], int]:
-    where: list[ColumnElement[bool]] = [_decided_filter(key)]
+    where: list[ColumnElement[bool]] = [
+        _decided_filter(key),
+        P.subject_type.not_in(await frozen_subject_types(session)),
+    ]
     if ticket_ids is not None:
         where.append(P.ticket_id.in_(sorted(set(ticket_ids))))
     total = (

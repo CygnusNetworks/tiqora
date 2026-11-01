@@ -29,6 +29,7 @@ from tiqora.api.v1._approvals_common import refuse as _refuse
 from tiqora.api.v1._approvals_common import run_engine as _run
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.approvals import delegation, detail, lists, templates
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     Actor,
@@ -171,6 +172,7 @@ async def _overview_items(
             tickets[int(tid)] = (str(number), title)
     labels = await detail.principal_labels(session, [a.requester for a in approvals])
     module_on = await approvals_enabled(session)  # withdrawing goes through the refused agent route
+    frozen = await frozen_subject_types(session)
     return [
         ApprovalAdminItemOut(
             id=a.id,
@@ -190,7 +192,7 @@ async def _overview_items(
             requester_label=labels[a.requester],
             created_at=a.created_at,
             decided_at=a.decided_at,
-            can_cancel=module_on and a.status == "pending",
+            can_cancel=module_on and a.status == "pending" and a.subject_type not in frozen,
         )
         for a in approvals
     ]

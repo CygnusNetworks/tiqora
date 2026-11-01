@@ -21,6 +21,7 @@ from tiqora.api.v1._approvals_common import (
 from tiqora.api.v1._approvals_common import (
     ensure_period_open,
     require_approvals_enabled,
+    require_enabled_or_admin,
 )
 from tiqora.api.v1._approvals_common import http_error as _http
 from tiqora.api.v1._approvals_common import refuse as _refuse
@@ -37,6 +38,7 @@ from tiqora.approvals import (
     templates,
     tokens,
 )
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
@@ -81,6 +83,10 @@ from tiqora.security.ratelimit import ApprovalLinkRateLimiter, client_ip
 
 #: answers while the module is switched off, unlike ``router``
 status_router = APIRouter(prefix="/approvals", tags=["approvals"])
+#: reads the admin pages need while the module is off: open for admins then, refused for the others
+admin_readable_router = APIRouter(
+    prefix="/approvals", tags=["approvals"], dependencies=[Depends(require_enabled_or_admin)]
+)
 router = APIRouter(
     prefix="/approvals", tags=["approvals"], dependencies=[Depends(require_approvals_enabled)]
 )
@@ -170,6 +176,10 @@ async def _viewable(session: AsyncSession, approval_id: int, actor: Actor) -> Ti
     ).scalar_one_or_none()
     if approval is None or not await access.can_view(session, approval, actor):
         _refuse("approval_not_found", status.HTTP_404_NOT_FOUND)
+    if approval.subject_type in await frozen_subject_types(session) and not (
+        await PermissionEngine(session).is_admin(actor.write_user_id)
+    ):
+        _refuse("subject_unavailable", status.HTTP_409_CONFLICT)
     return approval
 
 
@@ -263,7 +273,7 @@ async def get_templates(
     ]
 
 
-@router.get("/lists", response_model=list[ApprovalListOptionOut])
+@admin_readable_router.get("/lists", response_model=list[ApprovalListOptionOut])
 async def get_lists(user: CurrentUser, session: DbSession) -> list[ApprovalListOptionOut]:
     """Valid approval groups ("Freigabegruppe, z. B. CAB") for the approver picker."""
     _ = user
@@ -273,7 +283,7 @@ async def get_lists(user: CurrentUser, session: DbSession) -> list[ApprovalListO
     ]
 
 
-@router.get("/resolvers", response_model=list[ResolverOptionOut])
+@admin_readable_router.get("/resolvers", response_model=list[ResolverOptionOut])
 async def get_resolvers(
     user: CurrentUser,
     session: DbSession,
@@ -350,7 +360,7 @@ async def delete_delegation(
 # --- one request -----------------------------------------------------------------------------
 
 
-@router.get("/{approval_id:int}", response_model=ApprovalDetailOut)
+@admin_readable_router.get("/{approval_id:int}", response_model=ApprovalDetailOut)
 async def get_approval(
     approval_id: int, user: CurrentUser, session: DbSession
 ) -> ApprovalDetailOut:
@@ -502,7 +512,10 @@ async def list_ticket_approvals(
     rows = (
         await session.execute(
             select(TiqoraApproval)
-            .where(TiqoraApproval.ticket_id == ticket_id)
+            .where(
+                TiqoraApproval.ticket_id == ticket_id,
+                TiqoraApproval.subject_type.not_in(await frozen_subject_types(session)),
+            )
             .order_by(TiqoraApproval.id.desc())
             .limit(limit)
             .offset(offset)

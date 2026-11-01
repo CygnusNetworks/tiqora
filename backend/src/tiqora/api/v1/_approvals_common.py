@@ -16,6 +16,7 @@ from tiqora.approvals.models import TiqoraApprovalDelegation
 from tiqora.approvals.schemas import DelegationOut
 from tiqora.approvals.settings import approvals_enabled
 from tiqora.jobs.service import utc_now
+from tiqora.permissions.engine import PermissionEngine
 
 
 def http_error(err: ApprovalError) -> HTTPException:
@@ -37,6 +38,15 @@ async def require_approvals_enabled(user: CurrentUser, session: DbSession) -> No
     enabled = await approvals_enabled(session)
     await session.rollback()
     if not enabled:
+        refuse("approvals_disabled", status.HTTP_404_NOT_FOUND)
+
+
+async def require_enabled_or_admin(user: CurrentUser, session: DbSession) -> None:
+    """Reads that the admin pages share with agents (approver pickers, a request's detail): while
+    the module is off they stay open for admins, who can still edit templates and CAB boards."""
+    allowed = await approvals_enabled(session) or await PermissionEngine(session).is_admin(user.id)
+    await session.rollback()
+    if not allowed:
         refuse("approvals_disabled", status.HTTP_404_NOT_FOUND)
 
 

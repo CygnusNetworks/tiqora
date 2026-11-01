@@ -40,6 +40,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import audit, delegation, texts, tokens
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     JOB_MAIL,
@@ -236,6 +237,8 @@ async def _plan(
     settings = await load_approval_settings(session, ctx.settings)
     if not settings.enabled:  # queued before the switch: no mail goes out while the module is off
         return _result(approval.id, note="approvals_disabled")
+    if approval.subject_type in await frozen_subject_types(session):
+        return _result(approval.id, note="subject_unavailable")
     sender = await resolve_notification_sender_address(session)
     if sender is None:
         logger.warning("approval_mail_no_sender", approval_id=approval.id, kind=payload.kind)

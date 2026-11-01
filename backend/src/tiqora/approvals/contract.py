@@ -226,6 +226,7 @@ class ApprovalOutcome:
 # (session, approval_id) -> extra plain-text lines for approvers
 type DescribeFn = Callable[[AsyncSession, int], Awaitable[list[str]]]
 type DecidedHook = Callable[[AsyncSession, ApprovalOutcome], Awaitable[None]]
+type SubjectAvailableFn = Callable[[AsyncSession], Awaitable[bool]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,6 +245,9 @@ class ApprovalSubjectType:
     # outcome.reason == "timeout" - there is no status "expired". The job commits the hook's
     # work together with its audit row: the hook must NOT commit or roll back the session itself.
     on_decided: DecidedHook | None = None
+    # False while the module the subject belongs to is switched off: its open requests stand still
+    # (see ``approvals.availability``); None = always available.
+    available: SubjectAvailableFn | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +280,7 @@ class ApprovalError(Exception):
 ERROR_STATUS: Final[Mapping[str, int]] = MappingProxyType(
     {
         "approvals_disabled": 404,
+        "subject_unavailable": 409,
         "approval_not_found": 404,
         "ticket_not_found": 404,
         "template_not_found": 404,

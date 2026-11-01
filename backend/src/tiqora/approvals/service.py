@@ -23,6 +23,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import _engine, access, audit, delegation, rules, templates, tokens
+from tiqora.approvals.availability import require_subject_available
 from tiqora.approvals.contract import (
     APPROVAL_SUBJECT_TYPES,
     APPROVER_RESOLVERS,
@@ -219,9 +220,10 @@ async def _requester_key(session: AsyncSession, requester: Principal | None, act
     return (await canonical_principal(session, principal)).key
 
 
-async def _require_module_on(session: AsyncSession) -> None:
+async def _require_module_on(session: AsyncSession, subject_type: str, registry: Registry) -> None:
     if not await approvals_enabled(session):
         raise ApprovalError("approvals_disabled", 404)
+    await require_subject_available(session, subject_type, registry)
 
 
 async def request_approval(
@@ -251,8 +253,8 @@ async def request_approval(
     (reason ``superseded``) and points at the new one through ``superseded_by``. While the
     module is switched off every path ends here with ``approvals_disabled`` (no request, no mail).
     """
-    await _require_module_on(session)
     reg = registry or get_registry()
+    await _require_module_on(session, subject_type, reg)
     title, approval_key, subject_ref = _check_text(title, approval_key, subject_ref)
     description = replace_non_bmp(description)
     await _require_subject_and_ticket(session, subject_type, ticket_id, reg)
@@ -347,7 +349,7 @@ async def record_auto_decision(
     Audit ``auto_decided``, outbox ``TiqoraApprovalDecided``, history line and the hook job;
     no mails. Flushes, never commits. Raises ``approvals_disabled`` like :func:`request_approval`.
     """
-    await _require_module_on(session)
+    await _require_module_on(session, subject_type, registry or get_registry())
     if status not in ("approved", "rejected"):
         raise ApprovalError("invalid_definition", 422, "status must be approved or rejected")
     if not _REASON_RE.fullmatch(reason):
@@ -403,6 +405,8 @@ async def cancel_approval(
         raise ValueError(f"unknown cancel reason: {reason!r}")
     reg = registry or get_registry()
     approval = await _engine.lock_approval(session, approval_id)
+    if check_permission:
+        await require_subject_available(session, approval.subject_type, reg)
     if check_permission and not await access.can_cancel(session, approval, actor):
         raise ApprovalError("forbidden", 403)
     if approval.status != "pending":
@@ -516,6 +520,7 @@ async def decide(
     # lock_held only documents that the caller took the lock; re-locking a row this transaction
     # holds is free, and honouring the keyword would let any caller skip the F1/F6 lock
     approval = await _engine.lock_approval(session, approval_id)
+    await require_subject_available(session, approval.subject_type, reg)
     if approval.status != "pending":
         raise ApprovalError("approval_closed", 409)
     asettings = await _engine.load_settings(session, settings)
@@ -676,6 +681,7 @@ async def forward(
     ).scalar_one_or_none()
     if approval is None:
         raise ApprovalError("not_an_approver", 403)
+    await require_subject_available(session, approval.subject_type, reg)
     if approval.status != "pending":
         raise ApprovalError("approval_closed", 409)
     steps = await _engine.locked_steps(session, approval.id)
@@ -764,6 +770,7 @@ async def refresh_approvers(
     """
     reg = registry or get_registry()
     approval = await _engine.lock_approval(session, approval_id)
+    await require_subject_available(session, approval.subject_type, reg)
     if not await access.can_refresh(session, approval, actor):
         raise ApprovalError("forbidden", 403)
     if approval.status != "pending":

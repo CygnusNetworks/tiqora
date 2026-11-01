@@ -95,7 +95,7 @@ from tiqora.itsm.change.service import (
     notify_listeners,
     record_event,
 )
-from tiqora.itsm.change.settings import ItsmChangeSettings, load_change_settings
+from tiqora.itsm.change.settings import ItsmChangeSettings, change_enabled, load_change_settings
 from tiqora.itsm.change.tasks import task_state_counts
 from tiqora.jobs.service import utc_now
 from tiqora.plugins.sync_hooks import OperationVetoed
@@ -813,6 +813,7 @@ def change_subject_type() -> ApprovalSubjectType:
         agent_requestable=False,
         describe=describe_change,
         on_decided=on_cab_decided,
+        available=change_enabled,
     )
 
 

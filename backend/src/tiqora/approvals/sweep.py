@@ -13,29 +13,38 @@ precision of a MariaDB ``DATETIME``).
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+import json
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from datetime import datetime, timedelta
 from typing import Final, Literal
 
 import redis.asyncio as redis
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.approvals import _engine, audit, service, tokens
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import (
+    APPROVAL_SUBJECT_TYPES,
     EVENT_ESCALATED,
     Actor,
     ApprovalError,
     StepSpec,
 )
-from tiqora.approvals.models import TiqoraApproval, TiqoraApprovalApprover, TiqoraApprovalStep
+from tiqora.approvals.models import (
+    TiqoraApproval,
+    TiqoraApprovalApprover,
+    TiqoraApprovalStep,
+    TiqoraApprovalToken,
+)
 from tiqora.approvals.notify import enqueue_notification
 from tiqora.approvals.resolve import customer_rows, customers_in_ticket_company
 from tiqora.approvals.settings import ApprovalSettings, approvals_enabled, load_approval_settings
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.settings_store import get_setting_int, set_setting
 from tiqora.events.pubsub import publish_approval_changed
 from tiqora.extensions.core import get_registry
@@ -51,6 +60,8 @@ _SCAN: Final = 2000  # approver rows per scan page of the invalid-approver phase
 _SCAN_PAGES: Final = 5
 #: tiqora_settings key: request id the next invalid-approver scan continues after
 KEY_INVALID_CURSOR: Final = "approvals.sweep.invalid_cursor"
+#: tiqora_settings key: the timer state per subject type, see :func:`_timers`
+KEY_TIMERS: Final = "approvals.sweep.timers"
 _LINK_RETENTION: Final = timedelta(days=30)
 _SYSTEM = Actor.system()
 
@@ -416,12 +427,14 @@ async def _drop_invalid(
 
 
 async def _overdue_candidates(
-    factory: async_sessionmaker[AsyncSession], now: datetime, after: int
+    factory: async_sessionmaker[AsyncSession], now: datetime, after: int, frozen: Iterable[str]
 ) -> list[tuple[int, int]]:
     async with factory() as session:
         rows = await session.execute(
             select(TiqoraApprovalStep.id, TiqoraApprovalStep.approval_id)
+            .join(TiqoraApproval, TiqoraApproval.id == TiqoraApprovalStep.approval_id)
             .where(
+                TiqoraApproval.subject_type.not_in(sorted(frozen)),
                 TiqoraApprovalStep.id > after,
                 TiqoraApprovalStep.status == "active",
                 TiqoraApprovalStep.due_at.is_not(None),
@@ -435,7 +448,11 @@ async def _overdue_candidates(
 
 
 async def _reminder_candidates(
-    factory: async_sessionmaker[AsyncSession], settings: ApprovalSettings, now: datetime, after: int
+    factory: async_sessionmaker[AsyncSession],
+    settings: ApprovalSettings,
+    now: datetime,
+    after: int,
+    frozen: Iterable[str],
 ) -> list[tuple[int, int]]:
     if settings.reminder_interval_hours <= 0 or settings.reminder_max <= 0:
         return []
@@ -443,7 +460,9 @@ async def _reminder_candidates(
     async with factory() as session:
         rows = await session.execute(
             select(TiqoraApprovalStep.id, TiqoraApprovalStep.approval_id)
+            .join(TiqoraApproval, TiqoraApproval.id == TiqoraApprovalStep.approval_id)
             .where(
+                TiqoraApproval.subject_type.not_in(sorted(frozen)),
                 TiqoraApprovalStep.id > after,
                 TiqoraApprovalStep.status == "active",
                 TiqoraApprovalStep.reminder_count < settings.reminder_max,
@@ -459,7 +478,7 @@ async def _reminder_candidates(
 
 
 async def _invalid_candidates(
-    factory: async_sessionmaker[AsyncSession], after: int
+    factory: async_sessionmaker[AsyncSession], after: int, frozen: Iterable[str]
 ) -> tuple[list[tuple[int, int]], int, bool]:
     """``(candidates, next cursor, table end reached)`` for the invalid-approver phase.
 
@@ -482,7 +501,9 @@ async def _invalid_candidates(
                         TiqoraApprovalApprover.customer_login,
                         TiqoraApprovalApprover.ticket_id,
                     )
+                    .join(TiqoraApproval, TiqoraApproval.id == TiqoraApprovalApprover.approval_id)
                     .where(
+                        TiqoraApproval.subject_type.not_in(sorted(frozen)),
                         TiqoraApprovalApprover.status == "pending",
                         TiqoraApprovalApprover.approval_id > cursor,
                     )
@@ -511,7 +532,7 @@ async def _invalid_candidates(
 
 
 async def _orphan_candidates(
-    factory: async_sessionmaker[AsyncSession], after: int
+    factory: async_sessionmaker[AsyncSession], after: int, frozen: Iterable[str]
 ) -> list[tuple[int, int]]:
     """Pending requests whose ticket row no longer exists (keyset-paged, IN lists)."""
     found: list[int] = []
@@ -520,7 +541,11 @@ async def _orphan_candidates(
             rows = (
                 await session.execute(
                     select(TiqoraApproval.id, TiqoraApproval.ticket_id)
-                    .where(TiqoraApproval.status == "pending", TiqoraApproval.id > after)
+                    .where(
+                        TiqoraApproval.subject_type.not_in(sorted(frozen)),
+                        TiqoraApproval.status == "pending",
+                        TiqoraApproval.id > after,
+                    )
                     .order_by(TiqoraApproval.id)
                     .limit(_CHUNK)
                 )
@@ -536,6 +561,127 @@ async def _orphan_candidates(
             )
             found.extend(int(a) for a, t in rows if int(t) not in present)
     return [(a, a) for a in found[:_BATCH]]
+
+
+# --- pauses ---------------------------------------------------------------------------------
+
+
+async def _shift_timers(
+    session: AsyncSession, subject_type: str, *, since: datetime, seen: datetime, by: timedelta
+) -> int:
+    """Moves deadlines, reminders and links of the open requests of a type by the pause.
+
+    Only steps active at the last paused tick: one activated after switching on keeps its fresh
+    deadline. A deadline already reported stays, and so does a link that had expired before.
+    """
+    S, P, T = TiqoraApprovalStep, TiqoraApproval, TiqoraApprovalToken  # noqa: N806
+    steps = (
+        await session.execute(
+            select(S.id, S.due_at, S.overdue_at, S.last_reminder_at, S.activated_at)
+            .join(P, P.id == S.approval_id)
+            .where(
+                P.subject_type == subject_type,
+                P.status == "pending",
+                S.status == "active",
+                S.activated_at <= seen,
+            )
+        )
+    ).all()
+    for step_id, due_at, overdue_at, last_reminder_at, activated_at in steps:
+        values: dict[str, datetime] = {"last_reminder_at": (last_reminder_at or activated_at) + by}
+        if due_at is not None and overdue_at is None:
+            values["due_at"] = due_at + by
+        await session.execute(update(S).where(S.id == step_id).values(**values))
+    links = (
+        await session.execute(
+            select(T.id, T.expires_at)
+            .join(P, P.id == T.approval_id)
+            .where(
+                P.subject_type == subject_type,
+                P.status == "pending",
+                T.used_at.is_(None),
+                T.revoked_at.is_(None),
+                T.expires_at > since,
+            )
+        )
+    ).all()
+    for token_id, expires_at in links:
+        await session.execute(update(T).where(T.id == token_id).values(expires_at=expires_at + by))
+    return len(steps)
+
+
+async def _timers(
+    factory: async_sessionmaker[AsyncSession], moment: datetime, registry: Registry
+) -> frozenset[str]:
+    """The subject types that stand still in this tick; measures their pauses.
+
+    A deadline can only fire in a tick, so what counts is the time since the last tick that could
+    have fired one. A running type stores ``tick``. A paused one stores ``since`` (that last tick)
+    and ``seen`` (its latest paused tick). The first running tick after a pause moves the timers
+    by ``moment - since``, so a deadline that passed in the pause cannot fire; a switch off and on
+    between two ticks is never seen and moves nothing.
+
+    One transaction: the timers and the state commit together, so a crash before the commit shifts
+    on the next tick and one after it does not shift twice. A failure propagates, so the tick
+    stops before its deadlines phase.
+    """
+    async with factory() as session:
+        try:
+            row = (
+                await session.execute(
+                    select(TiqoraSettings)
+                    .where(TiqoraSettings.key == KEY_TIMERS)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+            ).scalar_one_or_none()
+            state: dict[str, dict[str, str]] = json.loads(row.value or "{}") if row else {}
+            enabled = await approvals_enabled(session)
+            frozen = await frozen_subject_types(session, registry)
+            open_types = await session.execute(
+                select(TiqoraApproval.subject_type)
+                .where(TiqoraApproval.status == "pending")
+                .distinct()
+            )
+            keys = {s.key for s in registry.items(APPROVAL_SUBJECT_TYPES)}
+            keys.update(str(k) for k in open_types.scalars())
+            stamp = moment.isoformat()
+            paused: set[str] = set()
+            next_state: dict[str, dict[str, str]] = {}
+            for key in sorted(keys):
+                entry = state.get(key, {})
+                if not enabled or key in frozen:
+                    paused.add(key)
+                    since = entry.get("since") or entry.get("tick") or stamp
+                    next_state[key] = {"since": since, "seen": stamp}
+                    continue
+                if "since" in entry:
+                    since_at = datetime.fromisoformat(entry["since"])
+                    if moment > since_at:
+                        moved = await _shift_timers(
+                            session,
+                            key,
+                            since=since_at,
+                            seen=datetime.fromisoformat(entry["seen"]),
+                            by=moment - since_at,
+                        )
+                        logger.info(
+                            "approval_timers_shifted",
+                            subject_type=key,
+                            steps=moved,
+                            seconds=int((moment - since_at).total_seconds()),
+                        )
+                next_state[key] = {"tick": stamp}
+            value = json.dumps(next_state, sort_keys=True)
+            if row is None:
+                session.add(TiqoraSettings(key=KEY_TIMERS, value=value))
+            else:
+                row.value = value
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+    return frozenset(paused)
 
 
 # --- tick -----------------------------------------------------------------------------------
@@ -575,8 +721,10 @@ async def run_approvals_sweep(
     (steps reminded), ``removed`` (approver rows), ``cancelled`` and ``links_purged``.
 
     While the module is switched off only the link purge runs (retention), every timer pauses and
-    the requests keep their state; the first tick after switching on runs what became due. The
-    ``on_decided`` retries of decided requests are not here: they are jobs of the job runner.
+    the requests keep their state; a subject type whose own module is off stands still the same
+    way. The first tick after switching on moves the timers by the pause (:func:`_timers`), so what
+    would have become due in it does not fire. The ``on_decided`` retries of decided requests are
+    not here: they are jobs of the job runner.
     """
     moment = (now if now is not None else utc_now()).replace(microsecond=0)
     registry = get_registry()
@@ -589,6 +737,7 @@ async def run_approvals_sweep(
         "cancelled": 0,
         "links_purged": 0,
     }
+    frozen = await _timers(session_factory, moment, registry)
     async with session_factory() as session:
         enabled = await approvals_enabled(session)
         asettings = await load_approval_settings(session, settings)
@@ -610,14 +759,16 @@ async def run_approvals_sweep(
         return True
 
     # orphans first: later phases then never meet a request whose ticket is gone
-    async for _, approval_id in _pages(lambda after: _orphan_candidates(session_factory, after)):
+    async for _, approval_id in _pages(
+        lambda after: _orphan_candidates(session_factory, after, frozen)
+    ):
         done = await _item(
             session_factory, approval_id, cancel, settings=settings, redis_client=redis_client
         )
         counts["cancelled"] += 1 if done else 0
 
     async for step_id, approval_id in _pages(
-        lambda after: _overdue_candidates(session_factory, moment, after)
+        lambda after: _overdue_candidates(session_factory, moment, after, frozen)
     ):
 
         async def overdue(
@@ -637,7 +788,7 @@ async def run_approvals_sweep(
             counts[tag] += 1
 
     async for step_id, approval_id in _pages(
-        lambda after: _reminder_candidates(session_factory, asettings, moment, after)
+        lambda after: _reminder_candidates(session_factory, asettings, moment, after, frozen)
     ):
 
         async def remind(
@@ -665,7 +816,7 @@ async def run_approvals_sweep(
         start = await get_setting_int(session, KEY_INVALID_CURSOR, 0)
     cursor, finished = start, False
     for _ in range(_MAX_PAGES):
-        candidates, cursor, finished = await _invalid_candidates(session_factory, cursor)
+        candidates, cursor, finished = await _invalid_candidates(session_factory, cursor, frozen)
         for _, approval_id in candidates:
             removed = await _item(
                 session_factory, approval_id, drop, settings=settings, redis_client=redis_client

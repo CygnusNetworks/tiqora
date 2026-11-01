@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.portal.deps import CurrentCustomer
 from tiqora.approvals import access, inbox, notify, service
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import Actor, ApprovalError, Principal
 from tiqora.approvals.models import (
     TiqoraApproval,
@@ -120,7 +121,7 @@ async def _own_row(
             .execution_options(populate_existing=True)
         )
     ).scalar_one_or_none()
-    if approval is None:
+    if approval is None or approval.subject_type in await frozen_subject_types(session):
         return None
     result = await session.execute(
         select(TiqoraApprovalApprover, TiqoraApprovalStep)

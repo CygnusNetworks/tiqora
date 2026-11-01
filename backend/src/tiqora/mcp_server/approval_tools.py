@@ -22,6 +22,7 @@ from fastmcp import Context
 from sqlalchemy import select
 
 from tiqora.approvals import access, detail, inbox, service
+from tiqora.approvals.availability import frozen_subject_types
 from tiqora.approvals.contract import Actor, ApprovalError
 from tiqora.approvals.models import TiqoraApproval
 from tiqora.approvals.settings import approvals_enabled, load_approval_settings
@@ -130,6 +131,9 @@ async def approval_get(ctx: Context, approval_id: int) -> dict[str, Any]:
         if approval is None or not await access.can_view(session, approval, actor):
             await session.rollback()
             return dict(_NOT_FOUND)
+        if approval.subject_type in await frozen_subject_types(session):
+            await session.rollback()
+            return {"error": "subject_unavailable"}
         out = (await detail.build_detail(session, approval, actor)).model_dump(mode="json")
         await session.rollback()  # read only
     out["events"] = [

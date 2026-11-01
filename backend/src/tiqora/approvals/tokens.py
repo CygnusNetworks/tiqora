@@ -23,6 +23,7 @@ from sqlalchemy import Select, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.approvals import audit
+from tiqora.approvals.availability import require_subject_available
 from tiqora.approvals.contract import Actor, ApprovalError, Decision, Principal, StepSpec
 from tiqora.approvals.models import (
     TiqoraApproval,
@@ -273,14 +274,13 @@ async def inspect_link(
     if not asettings.email_links_enabled:
         raise ApprovalError("link_invalid", 410)
     target = await resolve_link(session, token)
+    approval = (
+        await session.execute(select(TiqoraApproval).where(TiqoraApproval.id == target.approval_id))
+    ).scalar_one()
+    await require_subject_available(session, approval.subject_type)
     await _require_valid_principal(session, target.principal)
     if target.principal.kind == "customer":
         assert target.principal.login is not None  # noqa: S101 - Principal validates this
-        approval = (
-            await session.execute(
-                select(TiqoraApproval).where(TiqoraApproval.id == target.approval_id)
-            )
-        ).scalar_one()
         await _engine.check_customer_approver(
             session,
             approval,
