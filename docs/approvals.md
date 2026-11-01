@@ -14,7 +14,8 @@
 > through the MCP tool `approval_decide` (off by default, see chapter 4). Approvers can have a
 > standing **substitute** (Vertretung) and can forward an open request to another agent. The
 > engine writes an audit trail, optional `Misc` ticket history lines and an optional internal note;
-> Znuny sees nothing else (approvals are a Tiqora-only feature, no Znuny equivalent). Today
+> Znuny sees nothing else. Znuny's core has no approvals; its paid add-on "Ticket Approval" exists,
+> and Tiqora does not read its data. Today
 > ad-hoc requests on a ticket and approvals created by other Tiqora features can use the engine;
 > process steps and catalogue request approvals are **not available yet** (chapter 10). The
 > developer chapter (9) describes the service API, subject types, resolvers, events and jobs for

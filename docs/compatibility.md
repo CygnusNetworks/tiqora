@@ -27,8 +27,10 @@ can migrate gradually.
 | `ConfigItemUpdate` | New CI version (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
 | `ConfigItemDelete` | Delete CIs (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
 
-Approvals ("Freigaben", [approvals.md](approvals.md)) are not part of the GenericInterface and have no
-Znuny equivalent; ITSMChangeManagement's CAB is the nearest Znuny concept, and Tiqora does not write it.
+Approvals ("Freigaben", [approvals.md](approvals.md)) are not part of the GenericInterface, and Znuny's
+core has none. Znuny sells an add-on "Ticket Approval" (for 6.5 LTS and 7.3, as a process transition
+action); it exists, and Tiqora does not read its data. ITSMChangeManagement's CAB is the nearest concept in
+the free packages, and Tiqora does not write it.
 
 | Feature | Behaviour towards Znuny |
 |---|---|
