@@ -20,6 +20,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import {
   APPROVALS_PAGE_SIZE,
+  approvalErrorCode,
   approvalErrorMessage,
   approvalsApi,
   approvalsKeys,
@@ -341,7 +342,7 @@ export function ApprovalsPage() {
           <div className="min-w-0 space-y-3">
             {list.isError ? (
               <p className="text-sm text-danger" role="alert" data-testid="approvals-load-error">
-                {t("approvals.agent.loadFailed")}
+                {approvalErrorCode(list.error) === "approvals_disabled" ? t("approvals.errors.approvals_disabled") : t("approvals.agent.loadFailed")}
               </p>
             ) : list.isPending ? (
               <p className="text-sm text-muted">{t("common.loading")}</p>

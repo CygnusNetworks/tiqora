@@ -3416,7 +3416,8 @@
         "green": "OK",
         "amber": "Oneskorený",
         "red": "Chyba",
-        "grey": "Zakázané"
+        "grey": "Zakázané",
+        "paused": "Paused"
       },
       "alwaysOn": "vždy zapnuté",
       "dailyAt": "denne o {{time}} UTC",
@@ -3561,6 +3562,15 @@
       "notices": {
         "giRequesterOff": "Tiqora does not trigger the event calls of the web services while this service is switched off. Only changes made in Znuny lead to calls.",
         "giRequesterDouble": "This service is switched on, but Znuny's own event handler is still active. Every call is sent twice. Switch the handler off in Znuny."
+      },
+      "paused": {
+        "itsm_change": {
+          "change_off": "Change management is switched off: this service does nothing on purpose.",
+          "approvals_off": "Approvals are switched off, so change management is too: this service does nothing on purpose."
+        },
+        "approvals": {
+          "approvals_off": "Approvals are switched off: this service only removes expired decision links, on purpose."
+        }
       }
     },
     "mailLog": {
@@ -4528,6 +4538,10 @@
       "itsmChange": {
         "title": "ITSM changes",
         "fields": {
+          "enabled": {
+            "label": "Change management on",
+            "help": "Off hides change management everywhere, in every ITSM mode, including the view of Znuny's changes. Nothing is deleted; on again brings everything back."
+          },
           "change_queue_id": {
             "label": "Queue for new changes",
             "help": "Queue id of new changes. 0 lets the agent pick the queue when creating."
@@ -4673,6 +4687,10 @@
       "approvals": {
         "title": "Approvals",
         "fields": {
+          "enabled": {
+            "label": "Approvals on",
+            "help": "Off hides approvals everywhere and refuses every request, vote and link; nothing is deleted. Open requests keep their state, deadlines and reminders pause. Change management stops working too, because its approval phases need approvals."
+          },
           "default_due_hours": {
             "label": "Default deadline (hours)",
             "help": "Deadline of a step that sets none. 0 means no deadline."
@@ -4721,6 +4739,11 @@
             "label": "Allow voting via MCP",
             "help": "Warning: lets an MCP client with the explicit tool permission “approval_decide” cast binding votes in the name of its user. Leave this off unless you trust the client and its prompts."
           }
+        },
+        "offConfirm": {
+          "title": "Switch off approvals?",
+          "message": "Change management is active and needs approvals for its approval phases. Switching approvals off makes change management unavailable as well, until you switch approvals on again. Nothing is deleted.",
+          "confirm": "Switch off both"
         }
       }
     },
@@ -6064,7 +6087,8 @@
           "invalid": "invalid"
         },
         "apply": "Set up",
-        "complete": "Everything for incident and problem management is present."
+        "complete": "Everything for incident and problem management is present.",
+        "changeOff": "Change management is switched off. You can still set it up; it stays hidden until you switch it on."
       },
       "matrix": {
         "title": "Priority matrix",
@@ -6095,6 +6119,11 @@
         "title": "Change management",
         "text": "Manage change templates, CAB, risk questions, freeze windows and the change archive.",
         "link": "Open change management"
+      },
+      "changeSwitch": {
+        "title": "Change management",
+        "text": "Off hides changes, CAB, tasks, calendar and the customers' change schedule, and refuses their API. Nothing is deleted.",
+        "approvalsOff": "Change management is unavailable because approvals are switched off: its approval phases need them. Switch approvals on under Settings, Approvals."
       }
     },
     "itsmImport": {
@@ -6430,6 +6459,10 @@
           "conditions": "Conditions",
           "notifications": "Notifications"
         }
+      },
+      "moduleOff": {
+        "change_off": "Change management is switched off. You can still edit this configuration; agents and customers see nothing of it.",
+        "approvals_off": "Change management is unavailable because approvals are switched off. You can still edit this configuration."
       }
     }
   },
@@ -10557,7 +10590,8 @@
       "rate_limited": "Too many attempts. Please wait a few minutes.",
       "unknown": "The approval could not be processed. Please try again.",
       "approver_invalid": "Your account is no longer active, so you cannot decide on this approval anymore.",
-      "template_changed": "The template was changed in the meantime. Please reload it."
+      "template_changed": "The template was changed in the meantime. Please reload it.",
+      "approvals_disabled": "Approvals are currently switched off."
     },
     "overdue": "overdue",
     "status": {
@@ -10820,7 +10854,8 @@
       },
       "discardTitle": "Discard changes?",
       "discardMessage": "Your changes have not been saved and will be lost.",
-      "discard": "Discard changes"
+      "discard": "Discard changes",
+      "moduleOff": "Approvals are switched off. You can still edit templates and approver lists, but nobody can request or decide anything, and open requests wait."
     },
     "withdraw": {
       "action": "Withdraw request",

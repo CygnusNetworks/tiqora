@@ -459,6 +459,7 @@ const idOf = (m: RegExpMatchArray | null) => (m ? Number(m[1]) : null);
 /** Agent routes `/api/v1/approvals/*`, ticket panel, public link, portal and admin; `undefined` for any other path. */
 export function resolveApprovalsData(path: string, method: string, search = ""): unknown | undefined {
   const get = method === "GET";
+  if (path.endsWith("/api/v1/approvals/status") && get) return { enabled: true };
   // Ticket panel
   const onTicket = path.match(/\/api\/v1\/tickets\/(\d+)\/approvals$/);
   if (onTicket) {

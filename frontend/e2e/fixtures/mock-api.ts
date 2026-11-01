@@ -21,6 +21,7 @@ import { SERVICES as DEMO_CHANGE_SERVICES } from "../../src/demo/changeMock";
 import { changeStore } from "./change-store";
 import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
+import { DEMO_APPROVALS_OFF_KEY, DEMO_CHANGE_OFF_KEY, moduleSwitchReply } from "../../src/demo/moduleSwitches";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
@@ -687,6 +688,23 @@ export async function mockApi(page: Page) {
     // default link setting (details off), so the derived-preset titles are what the e2e sees.
     if (path.includes("/api/v1/kiosk/")) {
       const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
+      if (out) {
+        await json(route, out.status, out.body);
+        return;
+      }
+    }
+
+    // Module switches: what the backend answers while one is off (and the approvals status route).
+    if (/\/api\/(v1\/(approvals|approval-links|itsm\/|tickets\/\d+\/(approvals|change))|portal\/(approvals|change-schedule))/.test(path)) {
+      const switches = await page
+        .evaluate(
+          ([a, c]) => [localStorage.getItem(a), localStorage.getItem(c)],
+          [DEMO_APPROVALS_OFF_KEY, DEMO_CHANGE_OFF_KEY],
+        )
+        .catch(() => [null, null]);
+      const approvalsOn = switches[0] !== "1";
+      const changeOff = switches[1] === "1" ? "change_off" : approvalsOn ? null : "approvals_off";
+      const out = moduleSwitchReply(path, { approvalsOn, changeOff });
       if (out) {
         await json(route, out.status, out.body);
         return;

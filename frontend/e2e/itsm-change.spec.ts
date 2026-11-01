@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../src/demo/itsmMode";
 import { mockApi, loginAsAgent, useGermanUi } from "./fixtures/mock-api";
 import { changeStore } from "./fixtures/change-store";
+import { DEMO_APPROVALS_OFF_KEY, DEMO_CHANGE_OFF_KEY } from "../src/demo/moduleSwitches";
 
 /**
  * Change management (ITSM, Mode B) in demo mode, no backend. The changes a test creates live in the
@@ -597,5 +598,35 @@ test.describe("agent change screens at phone width", () => {
     await page.goto("/agent/itsm/cab-meetings");
     await expect(page.getByTestId("cab-meeting-1")).toBeVisible();
     await fits(page, "cabMeetingsPage");
+  });
+});
+
+test.describe("switched off", () => {
+  for (const [key, label] of [
+    [DEMO_CHANGE_OFF_KEY, "change management off"],
+    [DEMO_APPROVALS_OFF_KEY, "approvals off"],
+  ] as const) {
+    test(`${label}: no entry, and a deep link says so`, async ({ page }) => {
+      await page.addInitScript((k) => localStorage.setItem(k, "1"), key);
+      await mockApi(page);
+      await useGermanUi(page);
+      await loginAsAgent(page);
+      await page.goto("/agent");
+      await expect(page.getByTestId("agent-nav-queues").or(page.getByRole("navigation")).first()).toBeVisible();
+      await expect(page.getByTestId("agent-nav-changes")).toHaveCount(0);
+      await page.goto("/agent/itsm/changes");
+      await expect(page.getByTestId("change-list-error")).toHaveAttribute("data-code", "change_unavailable");
+    });
+  }
+
+  test("Mode A: the link to Znuny's changes goes too", async ({ page }) => {
+    await page.addInitScript((k) => localStorage.setItem(k, "1"), DEMO_CHANGE_OFF_KEY);
+    await useItsmMode(page, "znuny_readthrough");
+    await mockApi(page);
+    await useGermanUi(page);
+    await loginAsAgent(page);
+    await page.goto("/agent");
+    await expect(page.getByRole("navigation").first()).toBeVisible();
+    await expect(page.getByTestId("agent-nav-changes")).toHaveCount(0);
   });
 });

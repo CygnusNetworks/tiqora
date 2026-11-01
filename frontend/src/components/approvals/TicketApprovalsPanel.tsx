@@ -20,6 +20,7 @@ import { DecisionDialog } from "./DecisionDialog";
 import { ForwardDialog } from "./ForwardDialog";
 import { pickMyRow } from "./myRow";
 import { RequestApprovalDialog } from "./RequestApprovalDialog";
+import { useApprovalsEnabled } from "./useApprovalsEnabled";
 import { WithdrawConfirm } from "./WithdrawConfirm";
 
 export type TicketApprovalsFilter = { subjectType?: string; approvalKey?: string };
@@ -194,9 +195,11 @@ export function TicketApprovalsPanel({
   // A filtered panel is embedded by a feature that owns requesting (e.g. the change page's CAB approval): the
   // request dialog here creates a plain ticket approval the filter would hide, so it offers no request button.
   const canRequest = ticketQ.data && !filter ? ticketPerms(ticketQ.data).rw : false;
+  const enabled = useApprovalsEnabled();
   const q = useQuery({
     queryKey: approvalsKeys.ticket(ticketId),
     queryFn: ({ signal }) => approvalsApi.ticketApprovals(ticketId, {}, signal),
+    enabled,
     retry: false,
   });
 
@@ -213,6 +216,7 @@ export function TicketApprovalsPanel({
   const current = all.filter((a) => a.status !== "cancelled");
   const older = all.filter((a) => a.status === "cancelled");
 
+  if (!enabled) return null;
   if (all.length === 0 && !canRequest && !q.isError) return null;
 
   return (

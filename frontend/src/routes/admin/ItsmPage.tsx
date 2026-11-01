@@ -5,8 +5,11 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { Switch } from "@/components/ui/Switch";
 import { PriorityMatrixEditor } from "@/components/itsm/PriorityMatrixEditor";
+import { useChangeStatus } from "@/components/itsm/change/changeUi";
 import { api } from "@/lib/api";
+import { changeKeys } from "@/lib/changeApi";
 import {
   itsmApi,
   itsmErrorCode,
@@ -16,10 +19,12 @@ import {
   type PriorityMatrix,
   type SetupPlan,
 } from "@/lib/itsmApi";
+import { settingsSectionsApi } from "@/lib/settingsSectionsApi";
 
 const IMPORT_ROUTE = "/admin/itsm-import";
 type SetupGroup = SetupPlan["items"][number]["group"];
 
+const changeOff = (reason: string) => reason === "change_off" || reason === "approvals_off";
 const STATUS_TONE = { present: "success", missing: "warn", conflict: "danger", invalid: "danger" } as const;
 
 /** Message of a failed admin call; a refused mode change names the reason code. */
@@ -119,6 +124,7 @@ function SetupCard() {
   const qc = useQueryClient();
   const errorText = useErrorText();
   const plan = useQuery({ queryKey: itsmKeys.adminSetup(), queryFn: ({ signal }) => itsmApi.admin.setup(signal) });
+  const changeReason = useChangeStatus().data?.reason;
   const [picked, setPicked] = useState<Set<SetupGroup>>(new Set(["incident_problem"]));
   const apply = useMutation({
     mutationFn: () => itsmApi.admin.applySetup({ groups: [...picked] }),
@@ -142,6 +148,11 @@ function SetupCard() {
     <section className="space-y-3 rounded-lg border border-hairline bg-surface p-4" data-testid="itsm-setup-card">
       <h2 className="text-base font-semibold text-ink">{t("admin.itsm.setup.title")}</h2>
       <p className="text-sm text-muted">{t("admin.itsm.setup.intro")}</p>
+      {changeReason && changeOff(changeReason) && (
+        <p className="text-sm text-amber" role="status" data-testid="itsm-setup-change-off">
+          {t("admin.itsm.setup.changeOff")}
+        </p>
+      )}
       {plan.isPending && <Spinner />}
       {plan.isError && (
         <p role="alert" className="text-sm text-danger">
@@ -242,6 +253,54 @@ function MatrixCard() {
 }
 
 /** Change management has its own admin page (Mode B: the changes are Tiqora's). */
+/** The switch of the change module (the settings section's field, here where admins look for it). */
+function ChangeSwitchCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const section = useQuery({
+    queryKey: ["settings-sections", "itsm_change"],
+    queryFn: ({ signal }) => settingsSectionsApi.get("itsm_change", signal),
+    retry: false,
+  });
+  const status = useChangeStatus();
+  const save = useMutation({
+    mutationFn: (enabled: boolean) => settingsSectionsApi.put("itsm_change", { enabled }),
+    onSuccess: async (updated) => {
+      qc.setQueryData(["settings-sections", "itsm_change"], updated);
+      await qc.invalidateQueries({ queryKey: changeKeys.all() });
+    },
+  });
+  const on: unknown = section.data?.values?.enabled;
+  if (typeof on !== "boolean") return null;
+  return (
+    <section className="space-y-2 rounded-lg border border-hairline bg-surface p-4" data-testid="itsm-change-switch-card">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-base font-semibold text-ink">{t("admin.itsm.changeSwitch.title")}</h2>
+          <p className="text-sm text-muted">{t("admin.itsm.changeSwitch.text")}</p>
+        </div>
+        <Switch
+          checked={on}
+          disabled={save.isPending}
+          aria-label={t("admin.itsm.changeSwitch.title")}
+          testId="itsm-change-switch"
+          onChange={(next) => save.mutate(next)}
+        />
+      </div>
+      {status.data?.reason === "approvals_off" && (
+        <p className="text-sm text-amber" role="status" data-testid="itsm-change-approvals-off">
+          {t("admin.itsm.changeSwitch.approvalsOff")}
+        </p>
+      )}
+      {save.isError && (
+        <p className="text-sm text-danger" role="alert">
+          {t("admin.itsm.error")}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function ChangeCard() {
   const { t } = useTranslation();
   return (
@@ -288,6 +347,7 @@ export function ItsmPage() {
             <>
               <SetupCard />
               <MatrixCard />
+              <ChangeSwitchCard />
               {admin.data.mode === "tiqora" && <ChangeCard />}
             </>
           )}

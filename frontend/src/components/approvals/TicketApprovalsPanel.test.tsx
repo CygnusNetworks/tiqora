@@ -15,6 +15,16 @@ const rw = () => ({ id: TICKET, title: "Switch-Firmware", permissions: { ro: tru
 const noteOnly = () => ({ id: TICKET, title: "Switch-Firmware", permissions: { ro: true, rw: false, note: true } });
 
 describe("TicketApprovalsPanel", () => {
+  it("is hidden and asks for nothing while approvals are switched off", async () => {
+    const spy = mockApi({ "GET /api/v1/approvals/status": () => ({ enabled: false }), [LIST]: summaries, [TICKET_PATH]: rw });
+    renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);
+    await waitFor(() => expect(spy.mock.calls.some((c) => c[1] === "/api/v1/approvals/status")).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("ticket-approvals-panel")).toBeNull();
+    expect(screen.queryByTestId("ticket-approvals-request")).toBeNull();
+    expect(spy.mock.calls.some((c) => String(c[1]).endsWith(`/${TICKET}/approvals`))).toBe(false);
+  });
+
   it("is hidden without approvals when the agent cannot request", async () => {
     const spy = mockApi({ [LIST]: () => [], [TICKET_PATH]: noteOnly });
     renderApproval(<TicketApprovalsPanel ticketId={TICKET} />);

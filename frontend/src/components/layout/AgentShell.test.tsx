@@ -125,10 +125,10 @@ const statusOf = (mode: string, ciSource: "znuny" | "tiqora" | null) => ({
   znuny: { core_installed: true, cmdb_installed: true, profile: null, packages: {} },
 });
 
-const { approvalsInboxCount } = vi.hoisted(() => ({ approvalsInboxCount: vi.fn() }));
+const { approvalsInboxCount, approvalsStatus } = vi.hoisted(() => ({ approvalsInboxCount: vi.fn(), approvalsStatus: vi.fn() }));
 vi.mock("@/lib/approvalsApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/approvalsApi")>("@/lib/approvalsApi");
-  return { ...actual, approvalsApi: { ...actual.approvalsApi, inboxCount: approvalsInboxCount } };
+  return { ...actual, approvalsApi: { ...actual.approvalsApi, inboxCount: approvalsInboxCount, status: approvalsStatus } };
 });
 
 const { cmdbStatus } = vi.hoisted(() => ({ cmdbStatus: vi.fn() }));
@@ -208,6 +208,7 @@ describe("AgentShell sidebar", () => {
     chatTopics.mockReset().mockResolvedValue([]);
     itsmStatus.mockReset().mockResolvedValue(statusOf("off", null));
     approvalsInboxCount.mockReset().mockResolvedValue({ pending: 0 });
+    approvalsStatus.mockReset().mockResolvedValue({ enabled: true });
     changeStatus.mockReset().mockResolvedValue(changeStatusOf());
     cmdbStatus.mockReset().mockResolvedValue({ mode: "off", readable_class_count: 0, can_admin: false, views_present: true });
     window.localStorage.clear();
@@ -485,6 +486,23 @@ describe("AgentShell sidebar", () => {
     cmdbStatus.mockResolvedValue({ mode: "tiqora", readable_class_count: 0, can_admin: true, views_present: true });
     await renderShell();
     expect(await screen.findByTestId("agent-nav-cmdb")).toBeInTheDocument();
+  });
+
+  it("has no Meine Freigaben and no inbox count while approvals are switched off", async () => {
+    approvalsStatus.mockResolvedValue({ enabled: false });
+    await renderShell();
+    await waitFor(() => expect(approvalsStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("agent-nav-approvals")).toBeNull();
+    expect(approvalsInboxCount).not.toHaveBeenCalled();
+  });
+
+  it("has no Changes entry while the module is switched off, the Znuny view included", async () => {
+    changeStatus.mockResolvedValue({ ...changeStatusOf(), available: false, reason: "change_off", legacy: "none", can_see_legacy: false });
+    await renderShell();
+    await waitFor(() => expect(changeStatus).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("agent-nav-changes")).toBeNull();
   });
 
   it("shows Meine Freigaben with a badge for pending approvals", async () => {

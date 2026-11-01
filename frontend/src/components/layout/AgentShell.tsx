@@ -23,6 +23,7 @@ import { ChatInboxButton } from "@/components/agent/webchat/ChatInboxButton";
 import { ChatRingProvider } from "@/components/agent/webchat/ChatRingContext";
 import { effectiveTimeZone } from "@/lib/timeZone";
 import { useApprovalsCount } from "@/components/approvals/useApprovalsCount";
+import { useApprovalsEnabled } from "@/components/approvals/useApprovalsEnabled";
 import {
   AddressBookIcon,
   BoltIcon,
@@ -311,6 +312,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     retry: false,
   });
   const changesNav = changeNav(changeStatusQ.data);
+  const approvalsOn = useApprovalsEnabled();
   const approvalsCount = useApprovalsCount().data?.pending ?? 0;
   const flat = flattenQueues(queuesQ.data ?? []);
   const totalOpen = flat.reduce((sum, q) => sum + (q.counts?.open ?? 0), 0);
@@ -450,14 +452,16 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               onNavigate={onNavigate}
             />
           )}
-          <NavItem
-            to="/agent/approvals"
-            label={t("sidebar.approvals")}
-            icon={<CheckIcon />}
-            count={approvalsCount > 0 ? approvalsCount : undefined}
-            testId="agent-nav-approvals"
-            onNavigate={onNavigate}
-          />
+          {approvalsOn && (
+            <NavItem
+              to="/agent/approvals"
+              label={t("sidebar.approvals")}
+              icon={<CheckIcon />}
+              count={approvalsCount > 0 ? approvalsCount : undefined}
+              testId="agent-nav-approvals"
+              onNavigate={onNavigate}
+            />
+          )}
           <PluginNavItems group="workspace" onNavigate={onNavigate} />
         </NavGroup>
 

@@ -40,6 +40,21 @@ function show(strict = false) {
 
 let replaceState: ReturnType<typeof vi.spyOn>;
 
+describe("ApprovalLinkPage while approvals are switched off", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("de");
+    inspect.mockReset();
+    window.history.replaceState({ key: "router-1" }, "", "/approve#t=tok-123");
+  });
+
+  it("says so in plain words and offers no retry", async () => {
+    inspect.mockRejectedValue(apiError(409, "approvals_disabled"));
+    show();
+    expect(await screen.findByText(/Freigaben sind derzeit ausgeschaltet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
 beforeEach(async () => {
   await i18n.changeLanguage("de");
   inspect.mockReset();

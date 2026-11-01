@@ -1,5 +1,6 @@
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useChangeStatus } from "@/components/itsm/change/changeUi";
 import { Tabs } from "@/components/ui/Tabs";
 import { ChangeArchiveTab } from "./ChangeArchiveTab";
 import { ChangeCabTab } from "./ChangeCabTab";
@@ -17,6 +18,8 @@ export function ChangeAdminPage() {
   const search = useSearch({ strict: false }) as { tab?: unknown };
   const navigate = useNavigate();
   const tab = parseChangeAdminTab(search.tab);
+  const reason = useChangeStatus().data?.reason;
+  const moduleOff = reason === "change_off" || reason === "approvals_off";
   const setTab = (next: string) => {
     const value = parseChangeAdminTab(next);
     void navigate({ to: "/admin/itsm/change", search: { tab: value === "templates" ? undefined : value }, replace: true });
@@ -35,6 +38,11 @@ export function ChangeAdminPage() {
           {t("admin.itsmChange.settingsLink")}
         </Link>
       </div>
+      {moduleOff && (
+        <p className="rounded-md border border-amber/30 bg-amber/10 px-3 py-2 text-sm text-ink" role="status" data-testid="change-admin-off">
+          {t(`admin.itsmChange.moduleOff.${reason}`)}
+        </p>
+      )}
       <Tabs
         items={CHANGE_ADMIN_TABS.map((id) => ({ id, label: t(`admin.itsmChange.tabs.${id}`) }))}
         value={tab}

@@ -13,6 +13,7 @@ import { resolveKiosk } from "./kioskMock";
 import { resolveItsmData } from "./itsmMock";
 import { resolveChangeReply } from "./changeMock";
 import { resolveApprovalLink, resolveApprovalsData } from "./approvalsMock";
+import { demoModuleSwitches, moduleSwitchReply } from "./moduleSwitches";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
@@ -134,6 +135,11 @@ function kioskResponse(request: Request): Response | undefined {
 }
 
 export const handlers = [
+  // Module switches (`demo/moduleSwitches.ts`): a route they refuse never reaches the mocks below.
+  http.all("*/api/*", ({ request }) => {
+    const out = moduleSwitchReply(new URL(request.url).pathname, demoModuleSwitches());
+    return out ? HttpResponse.json(out.body as never, { status: out.status }) : undefined;
+  }),
   // Public approval link: the body decides (token `demo`, approve vs. reject).
   http.post("*/api/v1/approval-links/*", async ({ request }) => {
     const body = await request.json().catch(() => ({}));

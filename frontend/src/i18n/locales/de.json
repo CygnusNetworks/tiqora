@@ -3424,7 +3424,8 @@
         "green": "OK",
         "amber": "Verzögert",
         "red": "Fehler",
-        "grey": "Deaktiviert"
+        "grey": "Deaktiviert",
+        "paused": "Pausiert"
       },
       "alwaysOn": "immer aktiv",
       "dailyAt": "täglich {{time}} UTC",
@@ -3569,6 +3570,15 @@
       "notices": {
         "giRequesterOff": "Tiqora löst die Ereignis-Aufrufe der Webservices nicht aus, solange dieser Dienst ausgeschaltet ist. Nur Änderungen in Znuny führen dann zu Aufrufen.",
         "giRequesterDouble": "Dieser Dienst ist eingeschaltet, aber der Ereignis-Handler von Znuny ist noch aktiv. Jeder Aufruf wird doppelt gesendet. Schalten Sie den Handler in Znuny ab."
+      },
+      "paused": {
+        "itsm_change": {
+          "change_off": "Das Change-Management ist ausgeschaltet: Dieser Dienst tut absichtlich nichts.",
+          "approvals_off": "Freigaben sind ausgeschaltet und damit auch das Change-Management: Dieser Dienst tut absichtlich nichts."
+        },
+        "approvals": {
+          "approvals_off": "Freigaben sind ausgeschaltet: Dieser Dienst entfernt absichtlich nur noch abgelaufene Entscheidungslinks."
+        }
       }
     },
     "mailLog": {
@@ -4536,6 +4546,10 @@
       "itsmChange": {
         "title": "ITSM-Changes",
         "fields": {
+          "enabled": {
+            "label": "Change-Management eingeschaltet",
+            "help": "Aus: Das Change-Management verschwindet überall, in jedem ITSM-Modus, auch die Ansicht der Znuny-Changes. Gelöscht wird nichts; beim Einschalten ist alles wieder da."
+          },
           "change_queue_id": {
             "label": "Queue für neue Changes",
             "help": "Queue-ID neuer Changes. 0 lässt die Agentin oder den Agenten die Queue beim Anlegen wählen."
@@ -4681,6 +4695,10 @@
       "approvals": {
         "title": "Freigaben",
         "fields": {
+          "enabled": {
+            "label": "Freigaben eingeschaltet",
+            "help": "Aus: Freigaben verschwinden überall, jede Anforderung, Entscheidung und jeder Link wird abgelehnt; gelöscht wird nichts. Offene Anfragen behalten ihren Stand, Fristen und Erinnerungen pausieren. Auch das Change-Management steht still, weil seine Freigabephasen Freigaben brauchen."
+          },
           "default_due_hours": {
             "label": "Standardfrist (Stunden)",
             "help": "Frist für Schritte ohne eigene Frist. 0 bedeutet keine Frist."
@@ -4729,6 +4747,11 @@
             "label": "Abstimmen über MCP erlauben",
             "help": "Achtung: Erlaubt einem MCP-Client mit der ausdrücklichen Tool-Berechtigung „approval_decide“, verbindliche Stimmen im Namen seines Benutzers abzugeben. Lassen Sie das ausgeschaltet, solange Sie dem Client und seinen Eingaben nicht vertrauen."
           }
+        },
+        "offConfirm": {
+          "title": "Freigaben ausschalten?",
+          "message": "Das Change-Management ist aktiv und braucht Freigaben für seine Freigabephasen. Schalten Sie Freigaben aus, ist auch das Change-Management nicht mehr verfügbar, bis Sie Freigaben wieder einschalten. Gelöscht wird nichts.",
+          "confirm": "Beides ausschalten"
         }
       }
     },
@@ -6072,7 +6095,8 @@
           "invalid": "ungültig"
         },
         "apply": "Einrichten",
-        "complete": "Alles für Incident- und Problem-Management ist vorhanden."
+        "complete": "Alles für Incident- und Problem-Management ist vorhanden.",
+        "changeOff": "Das Change-Management ist ausgeschaltet. Sie können es trotzdem einrichten; es bleibt verborgen, bis Sie es einschalten."
       },
       "matrix": {
         "title": "Prioritätsmatrix",
@@ -6103,6 +6127,11 @@
         "title": "Change-Management",
         "text": "Change-Vorlagen, CAB, Risikofragen, Sperrzeiträume und das Change-Archiv verwalten.",
         "link": "Change-Management öffnen"
+      },
+      "changeSwitch": {
+        "title": "Change-Management",
+        "text": "Aus: Changes, CAB, Aufgaben, Kalender und der Change-Plan der Kunden verschwinden, ihre API lehnt ab. Gelöscht wird nichts.",
+        "approvalsOff": "Das Change-Management ist nicht verfügbar, weil Freigaben ausgeschaltet sind: Seine Freigabephasen brauchen sie. Schalten Sie Freigaben unter Einstellungen, Freigaben ein."
       }
     },
     "itsmImport": {
@@ -6438,6 +6467,10 @@
           "conditions": "Bedingungen",
           "notifications": "Benachrichtigungen"
         }
+      },
+      "moduleOff": {
+        "change_off": "Das Change-Management ist ausgeschaltet. Sie können diese Konfiguration weiter bearbeiten; Agenten und Kunden sehen nichts davon.",
+        "approvals_off": "Das Change-Management ist nicht verfügbar, weil Freigaben ausgeschaltet sind. Sie können diese Konfiguration weiter bearbeiten."
       }
     }
   },
@@ -10565,7 +10598,8 @@
       "rate_limited": "Zu viele Versuche. Bitte warten Sie einige Minuten.",
       "unknown": "Die Freigabe konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
       "approver_invalid": "Ihr Zugang ist nicht mehr aktiv; Sie können über diese Freigabe nicht mehr entscheiden.",
-      "template_changed": "Die Vorlage wurde inzwischen geändert. Bitte laden Sie sie neu."
+      "template_changed": "Die Vorlage wurde inzwischen geändert. Bitte laden Sie sie neu.",
+      "approvals_disabled": "Freigaben sind derzeit ausgeschaltet."
     },
     "overdue": "überfällig",
     "status": {
@@ -10828,7 +10862,8 @@
       },
       "discardTitle": "Änderungen verwerfen?",
       "discardMessage": "Ihre Änderungen sind nicht gespeichert und gehen verloren.",
-      "discard": "Änderungen verwerfen"
+      "discard": "Änderungen verwerfen",
+      "moduleOff": "Freigaben sind ausgeschaltet. Sie können Vorlagen und Freigabegruppen weiter bearbeiten, aber niemand kann etwas anfordern oder entscheiden, und offene Anfragen warten."
     },
     "withdraw": {
       "action": "Anforderung zurückziehen",

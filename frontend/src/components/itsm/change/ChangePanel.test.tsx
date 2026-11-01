@@ -36,6 +36,21 @@ describe("ChangePanel", () => {
   });
   afterEach(cleanup);
 
+  it.each(["change_off", "approvals_off"])("renders nothing while the module is switched off (%s)", async (reason) => {
+    status.mockResolvedValue({ reason, can_see_legacy: false, legacy: "none" });
+    ticketItsm.mockResolvedValue(makeItsm({ mode: "tiqora", role: "change" }));
+    renderPanel();
+    await waitFor(() => expect(status).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("change-adopt")).toBeNull();
+    cleanup();
+    ticketItsm.mockResolvedValue(makeItsm({ mode: "znuny_readthrough", role: "change" }));
+    renderPanel();
+    await waitFor(() => expect(ticketItsm).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("change-mode-a-hint")).toBeNull();
+  });
+
   it("renders nothing while ITSM is off or for other tickets", async () => {
     ticketItsm.mockResolvedValue(makeItsm({ enabled: false, role: "change" }));
     renderPanel();

@@ -32,6 +32,12 @@ vi.mock("@/lib/settingsSectionsApi", async (orig) => ({
   },
 }));
 
+const { changeStatus } = vi.hoisted(() => ({ changeStatus: vi.fn() }));
+vi.mock("@/lib/changeApi", async (orig) => {
+  const actual = await orig<typeof import("@/lib/changeApi")>();
+  return { ...actual, changeApi: { ...actual.changeApi, status: changeStatus } };
+});
+
 const jobsSection = {
   key: "jobs",
   title_key: "admin.settings.jobs.title",
@@ -187,5 +193,51 @@ describe("SettingsSectionPage", () => {
     renderPage();
     expect(await screen.findByTestId("schema-form-greeting")).toBeInTheDocument();
     expect(ensurePluginI18n).not.toHaveBeenCalled();
+  });
+
+  describe("approvals off while change management is active", () => {
+    const approvals = {
+      key: "approvals",
+      title_key: "admin.settings.approvals.title",
+      i18n_prefix: "admin.settings.approvals",
+      json_schema: { type: "object", properties: { enabled: { default: true, title: "Enabled", type: "boolean" } } },
+      values: { enabled: true },
+      secrets_set: [],
+    };
+    const off = async () => {
+      fireEvent.click(await screen.findByTestId("schema-form-enabled"));
+      fireEvent.click(screen.getByTestId("admin-settings-save"));
+    };
+
+    beforeEach(() => {
+      currentSection = "approvals";
+      get.mockResolvedValue(approvals);
+      put.mockResolvedValue({ ...approvals, values: { enabled: false } });
+    });
+
+    it("asks first, and cancelling saves nothing", async () => {
+      changeStatus.mockResolvedValue({ available: true, reason: "ok" });
+      renderPage();
+      await waitFor(() => expect(changeStatus).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 10));
+      await off();
+      expect(await screen.findByTestId("confirm-dialog")).toBeInTheDocument();
+      expect(put).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+      expect(put).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("admin-settings-save"));
+      fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+      await waitFor(() => expect(put).toHaveBeenCalledWith("approvals", { enabled: false }));
+    });
+
+    it("does not ask while change management is not in use", async () => {
+      changeStatus.mockResolvedValue({ available: false, reason: "itsm_off" });
+      renderPage();
+      await waitFor(() => expect(changeStatus).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 10));
+      await off();
+      await waitFor(() => expect(put).toHaveBeenCalledWith("approvals", { enabled: false }));
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
   });
 });

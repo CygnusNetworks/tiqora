@@ -7,9 +7,12 @@ import { usePlugins } from "@/plugins/PluginProvider";
 import { SchemaForm } from "@/components/fields/SchemaForm";
 import type { FieldErrors, FieldValues } from "@/components/fields/types";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { ApiError } from "@/lib/api";
+import { approvalsKeys } from "@/lib/approvalsApi";
 import { apiErrorMessage } from "@/lib/avatarApi";
+import { changeApi, changeKeys } from "@/lib/changeApi";
 import {
   changedSectionValues,
   initialSectionValues,
@@ -30,6 +33,14 @@ export function SettingsSectionPage() {
   const [draft, setDraft] = useState<FieldValues | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
+  const [confirmOff, setConfirmOff] = useState(false);
+  // Change management needs the approval engine: switching approvals off takes it down too.
+  const changeStatus = useQuery({
+    queryKey: changeKeys.status(),
+    queryFn: ({ signal }) => changeApi.status(signal),
+    enabled: key === "approvals",
+    retry: false,
+  });
 
   // Plugin sections (`plugins.<id>`) take their labels from the plugin's own
   // translations: show the form only once they are loaded. A plugin missing
@@ -65,6 +76,11 @@ export function SettingsSectionPage() {
       setSaved(true);
       qc.setQueryData(["settings-sections", key], updated);
       await qc.invalidateQueries({ queryKey: ["settings-sections"] });
+      // the module switches: this admin's own session sees them at once
+      if (key === "approvals" || key === "itsm_change") {
+        await qc.invalidateQueries({ queryKey: approvalsKeys.status() });
+        await qc.invalidateQueries({ queryKey: changeKeys.status() });
+      }
     },
     onError: (err) => {
       setSaved(false);
@@ -133,11 +149,26 @@ export function SettingsSectionPage() {
           size="sm"
           data-testid="admin-settings-save"
           disabled={saveM.isPending || Object.keys(changes).length === 0}
-          onClick={() => saveM.mutate(changes)}
+          onClick={() => {
+            if (key === "approvals" && changes.enabled === false && changeStatus.data?.available) setConfirmOff(true);
+            else saveM.mutate(changes);
+          }}
         >
           {saveM.isPending ? <Spinner className="h-4 w-4" /> : t("admin.settings.save")}
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmOff}
+        title={t("admin.settings.approvals.offConfirm.title")}
+        message={t("admin.settings.approvals.offConfirm.message")}
+        confirmLabel={t("admin.settings.approvals.offConfirm.confirm")}
+        variant="danger"
+        onCancel={() => setConfirmOff(false)}
+        onConfirm={() => {
+          setConfirmOff(false);
+          saveM.mutate(changes);
+        }}
+      />
     </div>
   );
 }

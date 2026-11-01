@@ -3,6 +3,7 @@ import { mockApi, loginAsAgent, useGermanUi } from "./fixtures/mock-api";
 import { mockAdminApi } from "./fixtures/mock-admin-api";
 import { mockPortalApi, loginAsCustomer } from "./fixtures/mock-portal-api";
 import { approvalsStore } from "./fixtures/approvals-store";
+import { DEMO_APPROVALS_OFF_KEY } from "../src/demo/moduleSwitches";
 
 /**
  * Approvals (shared approval engine) in demo mode, no backend: the agent inbox and the ticket panel,
@@ -369,5 +370,30 @@ test.describe("admin templates", () => {
     await expect(page.getByTestId("template-dialog")).toHaveCount(0);
     await expect(page.getByTestId("template-row")).toHaveCount(3);
     await expect(page.locator('[data-testid="template-row"][data-template-key="cab_notfall"]')).toContainText("CAB Notfall");
+  });
+});
+
+test.describe("switched off (approvals.enabled = false)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((key) => localStorage.setItem(key, "1"), DEMO_APPROVALS_OFF_KEY);
+    await useGermanUi(page);
+  });
+
+  test("the agent sees no entry and no panel, a deep link says it is off", async ({ page }) => {
+    await mockApi(page);
+    await loginAsAgent(page);
+    await page.goto("/agent/tickets/131");
+    await expect(page.getByTestId("ticket-zoom-page").or(page.getByRole("main")).first()).toBeVisible();
+    await expect(page.getByTestId("ticket-approvals-panel")).toHaveCount(0);
+    await expect(page.getByTestId("agent-nav-approvals")).toHaveCount(0);
+    await page.goto("/agent/approvals");
+    await expect(page.getByTestId("approvals-page")).toContainText("Freigaben sind derzeit ausgeschaltet");
+  });
+
+  test("the public link says so in plain words", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/approve#t=demo");
+    await expect(page.getByText("Freigaben sind derzeit ausgeschaltet.", { exact: false })).toBeVisible();
+    await expect(page.getByTestId("approval-link-approve")).toHaveCount(0);
   });
 });

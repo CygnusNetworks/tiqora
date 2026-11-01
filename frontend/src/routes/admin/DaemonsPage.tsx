@@ -236,7 +236,7 @@ export function DaemonsPage() {
                                 DOT_HALO_CLASS[color],
                               )}
                             />
-                            {t(`admin.daemons.status.${color}`)}
+                            {t(svc.paused_reason ? "admin.daemons.status.paused" : `admin.daemons.status.${color}`)}
                           </>
                         ) : (
                           <span className="font-normal text-muted">—</span>
@@ -270,6 +270,11 @@ export function DaemonsPage() {
                             {t("admin.daemons.deployLive")}
                           </div>
                         )}
+                      {svc.paused_reason && (
+                        <div className="mt-0.5 text-xs text-muted" data-testid={`daemon-paused-${svc.slug}`}>
+                          {t(`admin.daemons.paused.${svc.slug}.${svc.paused_reason}`)}
+                        </div>
+                      )}
                       {svc.notices.length > 0 && (
                         <ul
                           className="mt-1.5 space-y-1 rounded-md border border-amber/30 bg-amber/10 px-2 py-1.5 text-xs text-ink"

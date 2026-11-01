@@ -40,6 +40,7 @@ export const APPROVALS_PAGE_SIZE = 25;
 export const approvalsKeys = {
   all: () => ["approvals"] as const,
   inbox: (state: ApprovalInboxState, page: number) => ["approvals", "inbox", state, page] as const,
+  status: () => ["approvals", "status"] as const,
   count: () => ["approvals", "count"] as const,
   detail: (id: number) => ["approvals", "detail", id] as const,
   templates: (subjectType?: string | null) => ["approvals", "templates", subjectType ?? null] as const,
@@ -50,6 +51,10 @@ export const approvalsKeys = {
 };
 
 export const approvalsApi = {
+  /** Answers while the module is switched off; every other route then answers 404 `approvals_disabled`. */
+  status(signal?: AbortSignal) {
+    return api.request<Schemas["ApprovalsStatusOut"]>("GET", `${BASE}/status`, { signal });
+  },
   inbox(query: { state?: ApprovalInboxState; limit?: number; offset?: number } = {}, signal?: AbortSignal) {
     return api.request<ApprovalInboxPage>("GET", `${BASE}/inbox`, { query, signal });
   },
@@ -110,6 +115,7 @@ export const approvalsApi = {
  * `approvalsApi.test.ts` compares both lists and the locale files.
  */
 export const APPROVAL_ERROR_CODES = [
+  "approvals_disabled",
   "approval_not_found",
   "ticket_not_found",
   "template_not_found",

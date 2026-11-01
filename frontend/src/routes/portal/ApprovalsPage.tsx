@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { APPROVALS_PAGE_SIZE } from "@/lib/approvalsApi";
+import { APPROVALS_PAGE_SIZE, approvalErrorCode } from "@/lib/approvalsApi";
 import { portalApprovalsApi, portalApprovalsKeys } from "@/lib/portalApprovalsApi";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -60,7 +60,7 @@ export function PortalApprovalsPage() {
             </div>
           ) : list.isError ? (
             <p className="text-sm text-danger" role="alert" data-testid="portal-approvals-error">
-              {t("approvals.portal.loadError")}
+              {approvalErrorCode(list.error) === "approvals_disabled" ? t("approvals.errors.approvals_disabled") : t("approvals.portal.loadError")}
             </p>
           ) : (list.data?.items.length ?? 0) === 0 ? (
             <div

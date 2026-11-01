@@ -23,6 +23,7 @@ const LINK_CODES = new Set([
   "link_used",
   "approver_invalid",
   "customer_approver_outside_company",
+  "approvals_disabled",
 ]);
 
 /**

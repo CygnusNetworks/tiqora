@@ -134,7 +134,7 @@ function RecordPanel({ ticketId, embedApprovals }: { ticketId: number; embedAppr
  * Change management in the ticket zoom (after the approvals panel). A change ticket shows its
  * record (or, without one, "Als Change führen"); a change task shows its change, kind and window;
  * in Mode A (Znuny's change management) a hint points to the read-only Znuny changes. Renders
- * nothing for other tickets or while ITSM is off. `embedApprovals` is false in the zoom: its
+ * nothing for other tickets or while ITSM or the module is off. `embedApprovals` is false in the zoom: its
  * approvals panel already lists the CAB request.
  */
 export function ChangePanel({ ticket, embedApprovals }: { ticket: TicketDetail; embedApprovals: boolean }) {
@@ -143,8 +143,11 @@ export function ChangePanel({ ticket, embedApprovals }: { ticket: TicketDetail; 
     queryFn: ({ signal }) => itsmApi.ticketItsm(ticket.id, signal),
     retry: false,
   });
+  const status = useChangeStatus();
   const itsm = itsmQ.data;
   if (!itsm?.enabled) return null;
+  // the module's switch: hides the Mode A hint and the adopt card as well
+  if (status.isPending || status.data?.reason === "change_off" || status.data?.reason === "approvals_off") return null;
   if (itsm.mode === "znuny_readthrough") return itsm.role === "change" ? <ModeAHint ticketId={ticket.id} /> : null;
   if (itsm.mode !== "tiqora") return null;
   if (itsm.role === "change_task" && itsm.change_task) return <TaskCard task={itsm.change_task} />;

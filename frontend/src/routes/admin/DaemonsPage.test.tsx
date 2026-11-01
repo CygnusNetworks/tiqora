@@ -269,4 +269,19 @@ describe("DaemonsPage", () => {
     await screen.findByTestId("daemon-row-gi_requester");
     expect(screen.queryByTestId("daemon-notices-gi_requester")).not.toBeInTheDocument();
   });
+
+  it("shows a loop paused by its module's switch as off on purpose, not as failed", async () => {
+    getDaemons.mockResolvedValue({
+      services: [
+        poller({ slug: "approvals", paused_reason: "approvals_off" }),
+        poller({ slug: "itsm_change", paused_reason: "change_off" }),
+      ],
+    });
+    renderPage();
+    const status = await screen.findByTestId("daemon-status-approvals");
+    expect(status).toHaveAttribute("data-status", "grey");
+    expect(status).toHaveTextContent("Paused");
+    expect(screen.getByTestId("daemon-paused-approvals")).toHaveTextContent("Approvals are switched off");
+    expect(screen.getByTestId("daemon-paused-itsm_change")).toHaveTextContent("Change management is switched off");
+  });
 });

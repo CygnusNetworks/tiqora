@@ -203,4 +203,36 @@ describe("ItsmPage", () => {
     expect(screen.queryByTestId("itsm-setup-card")).toBeNull();
     expect(screen.queryByTestId("itsm-matrix-card")).toBeNull();
   });
+
+  describe("change module switch", () => {
+    function withSection(status: { reason: string }, enabled = true) {
+      let values = { enabled };
+      request.mockImplementation((async (method: string, path: string, init?: { body?: { values: { enabled: boolean } } }) => {
+        if (path === "/api/v1/admin/settings-sections/itsm_change") {
+          if (method === "PUT") values = init?.body?.values ?? values;
+          return { key: "itsm_change", values };
+        }
+        if (path === "/api/v1/itsm/changes/status") return status;
+        return reads(method, path);
+      }) as never);
+    }
+
+    it("switches through the settings section and tells the setup card", async () => {
+      withSection({ reason: "change_off" }, false);
+      renderPage();
+      const toggle = await screen.findByTestId("itsm-change-switch");
+      expect(toggle).not.toBeChecked();
+      expect(await screen.findByTestId("itsm-setup-change-off")).toBeInTheDocument();
+      fireEvent.click(toggle);
+      await waitFor(() =>
+        expect(request).toHaveBeenCalledWith("PUT", "/api/v1/admin/settings-sections/itsm_change", { body: { values: { enabled: true } } }),
+      );
+    });
+
+    it("says why when approvals are off", async () => {
+      withSection({ reason: "approvals_off" });
+      renderPage();
+      expect(await screen.findByTestId("itsm-change-approvals-off")).toHaveTextContent(i18n.t("admin.itsm.changeSwitch.approvalsOff"));
+    });
+  });
 });

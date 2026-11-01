@@ -19,6 +19,7 @@ import { resolveGiData } from "./giMock";
 import { resolveItsmData } from "./itsmMock";
 import { demoChangeTicketFields, resolveChangeData } from "./changeMock";
 import { resolveApprovalsData } from "./approvalsMock";
+import { demoChangeSwitchedOff } from "./moduleSwitches";
 import { resolveItsmImport } from "./itsmImportMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
@@ -2720,6 +2721,15 @@ export function resolveData(path: string, method: string): unknown | undefined {
         type: "object",
       },
       values: { time_zone: "", access: "all_agents", near_miss_percent: 10, cache_seconds: 300, inline_row_threshold: 200000, max_result_rows: 5000, export_row_limit: 100000, query_timeout_seconds: 60 },
+      secrets_set: [],
+    };
+  if (p.endsWith("/admin/settings-sections/itsm_change"))
+    return {
+      key: "itsm_change",
+      title_key: "admin.settings.itsmChange.title",
+      i18n_prefix: "admin.settings.itsmChange",
+      json_schema: { type: "object", properties: { enabled: { type: "boolean", default: true, title: "Enabled" } } },
+      values: { enabled: demoChangeSwitchedOff() !== "change_off" },
       secrets_set: [],
     };
   if (p.endsWith("/admin/settings-sections/jobs"))
