@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type QueueNode } from "@/lib/api";
 import { cmdbNavVisible, itsmApi, itsmKeys } from "@/lib/itsmApi";
-import { changeApi, changeKeys, changeNav } from "@/lib/changeApi";
+import { changeNav } from "@/lib/changeApi";
+import { useChangeStatus } from "@/components/itsm/change/changeUi";
 import { logoUrl } from "@/lib/assets";
 import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
@@ -305,12 +306,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     retry: false,
   });
   // Changes entry: the status route answers in every mode; a failure just hides the entry.
-  const changeStatusQ = useQuery({
-    queryKey: changeKeys.status(),
-    queryFn: ({ signal }) => changeApi.status(signal),
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
+  const changeStatusQ = useChangeStatus();
   const changesNav = changeNav(changeStatusQ.data);
   const approvalsOn = useApprovalsEnabled();
   const approvalsCount = useApprovalsCount().data?.pending ?? 0;

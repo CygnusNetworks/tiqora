@@ -539,6 +539,20 @@ describe("AgentShell sidebar", () => {
     expect(link).not.toHaveTextContent("Znuny");
   });
 
+  it("drops the changes entry of an idle tab within five minutes of the switch", async () => {
+    changeStatus.mockResolvedValue(changeStatusOf({ mode: "tiqora", available: true, reason: "ok", setup_complete_change: true }));
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+    try {
+      await renderShell();
+      expect(await screen.findByTestId("agent-nav-changes")).toBeInTheDocument();
+      changeStatus.mockResolvedValue(changeStatusOf({ mode: "tiqora", reason: "change_off" }));
+      await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
+      await waitFor(() => expect(screen.queryByTestId("agent-nav-changes")).toBeNull());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows Changes (Znuny) for the live Znuny changes and points to the legacy list", async () => {
     changeStatus.mockResolvedValue(
       changeStatusOf({ mode: "znuny_readthrough", reason: "mode_a", legacy: "live", can_see_legacy: true }),
