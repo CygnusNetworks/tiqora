@@ -497,7 +497,9 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
   `record_auto_decision`), also auf jedem Weg. `GET /api/v1/approvals/status` antwortet weiter.
 - **Öffentliche Links.** Die Links antworten 409 `approvals_disabled`, noch bevor das Token geprüft wird, und
   zählen nicht gegen die Sperre. Die Seite sagt in klaren Worten, dass Freigaben ausgeschaltet sind. Ein Link
-  gilt nach dem Einschalten weiter, solange er nicht abgelaufen ist.
+  gilt nach dem Einschalten weiter, solange er nicht abgelaufen ist. Das Löschen alter Links läuft in der Pause
+  durch: Nach mehr als 30 Tagen Pause kann ein Link gelöscht sein und antwortet `link_invalid`. „Meine Freigaben“
+  und spätere Erinnerungen funktionieren trotzdem.
 - **E-Mails.** Es geht keine Freigabe-Mail mehr hinaus. Eine Mail, die beim Ausschalten noch in der Warteschlange
   lag, entfällt (Ergebnis `approvals_disabled`). Eine Anfrage-Mail ersetzt später nur die nächste Erinnerung, und
   die gibt es nur, wenn Erinnerungen eingestellt sind und ihr Maximum nicht erreicht ist. Die Mail an den
@@ -510,9 +512,13 @@ Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist all
   verschiebt die Fristen, Erinnerungen und Entscheidungslinks offener Anfragen um die Dauer der Pause. Was in der
   Pause fällig geworden wäre, läuft also nicht ab, weder als Ablehnen noch als Freigeben; die restliche Zeit läuft
   danach weiter. Nur was schon vor der Pause fällig war, läuft im ersten Durchlauf. Bis zu diesem Durchlauf
-  (`TIQORA_APPROVALS_SWEEP_INTERVAL`, Vorgabe 60 Sekunden) kann eine Frist kurz als überfällig erscheinen.
+  (`TIQORA_APPROVALS_SWEEP_INTERVAL`, Vorgabe 60 Sekunden) kann eine Frist kurz als überfällig erscheinen, und
+  ein in der Pause abgelaufener Link antwortet kurz `link_expired`.
   Gemessen wird ab dem letzten Durchlauf vor dem Ausschalten: Aus und wieder an innerhalb eines Intervalls verschiebt
-  nichts oder höchstens um zwei Intervalle. Fällige Erinnerungen gehen je Schritt höchstens einmal hinaus; wer viele
+  nichts oder höchstens um zwei Intervalle. `daemon.approvals.enabled` ändert daran nichts: Die Pause wird auch bei
+  ausgeschaltetem Dienst gemessen. **Offen bleibt ein Worker-Ausfall über die ganze Pause:** Hat kein Durchlauf das
+  Ausschalten gesehen, wird nichts verschoben, und was in dieser Zeit fällig wurde, läuft beim nächsten Durchlauf ab,
+  auch als automatisches Ablehnen oder Freigeben. Fällige Erinnerungen gehen je Schritt höchstens einmal hinaus; wer viele
   offene Schritte hat, bekommt entsprechend viele Mails. Nur das Löschen alter Links läuft durch (Aufbewahrung). Der
   Dienst zeigt in **Admin, Dienste** „Pausiert“, nicht „fehlgeschlagen“.
 - **Bereits entschiedene Anfragen** werden fertig: Die Nachbearbeitung (`core.approval_hook`, auch ihre
