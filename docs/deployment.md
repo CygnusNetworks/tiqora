@@ -696,6 +696,16 @@ Operator notes for the release that adds approvals, change management and the IT
    **do not** create a test request on a customer ticket: it writes `ticket_history` and sends mail. Admin, ITSM,
    "Einrichten" creates ticket types and dynamic fields, so do not press it as a check.
 
+### Switches for approvals and change management
+
+Both modules are on after the upgrade and have a switch: `approvals.enabled` (Admin, Einstellungen, Freigaben) and
+`itsm_change.enabled` (Admin, ITSM). A site that does not want approvals can switch them off right after the upgrade,
+before anyone starts a request; change management goes with them. No migration and no restart: all four roles read
+the switch from `tiqora_settings` on every check, so it counts from the next request or worker tick. Open browser tabs
+hide their entries within a minute (approvals) or five minutes (change management). Off deletes nothing. A paused
+service shows "Pausiert" in Admin, Dienste and raises nothing. See [approvals.md](approvals.md) chapter 8 and
+[itsm.md](itsm.md) chapter 8.
+
 ### Rollback from v0.20.0
 
 No data is lost, and no downgrade is needed: tables and columns stay, the old code ignores them, and the new columns

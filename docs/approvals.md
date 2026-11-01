@@ -460,6 +460,7 @@ Alle Werte werden als `approvals.<Feld>` gespeichert.
 
 | Feld (Oberfläche) | Schlüssel | Vorgabe | Bedeutung |
 |---|---|---|---|
+| Freigaben eingeschaltet | `enabled` | an | Der Modulschalter, siehe „Freigaben ausschalten“. |
 | Standardfrist (Stunden) | `default_due_hours` | 0 | Frist für Schritte ohne eigene Frist; 0 = keine Frist. Bereich 0 bis 8760. |
 | Erinnerung alle (Stunden) | `reminder_interval_hours` | 24 | 0 schaltet Erinnerungen aus. Bereich 0 bis 720. |
 | Höchstzahl der Erinnerungen | `reminder_max` | 3 | Erinnerungen je Schritt, 0 bis 20. |
@@ -477,6 +478,41 @@ Technische Grenzen für die Link-Bremse stehen in den Umgebungsvariablen (Neusta
 `TIQORA_APPROVAL_LINK_FAIL_MAX` (Vorgabe 20 ungültige Links je Client-Adresse),
 `TIQORA_APPROVAL_LINK_FAIL_WINDOW` (600 Sekunden) und `TIQORA_APPROVAL_LINK_LOCKOUT`
 (900 Sekunden Sperre). Sie wirken nur mit eingeschalteter Anmelde-Drosselung (`auth_rate_limit_enabled`).
+
+### Freigaben ausschalten
+
+Mit **Freigaben eingeschaltet** (`approvals.enabled`, Vorgabe **an**) schalten Sie das ganze Modul aus,
+auch direkt nach einem Update. Der Schalter wirkt ohne Neustart in allen vier Rollen; ein geöffneter
+Browser merkt es spätestens nach einer Minute, die Server-Routen lehnen schon beim nächsten Aufruf ab.
+
+Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist alles wieder da.
+
+- **Oberfläche.** Kein „Meine Freigaben“, kein Bereich am Ticket, kein Eintrag im Portal. Die Admin-Seiten
+  (Einstellungen, Vorlagen, Freigabegruppen, Vertretungen, Übersicht) bleiben und sagen, dass das Modul aus ist;
+  zurückziehen lässt sich in der Übersicht nichts.
+- **Ablehnung.** Agenten- und Portal-Routen antworten 404 `approvals_disabled`, die MCP-Werkzeuge
+  `{"error": "approvals_disabled"}`. Neue Anfragen lehnt schon der Dienst selbst ab (`request_approval`,
+  `record_auto_decision`), also auf jedem Weg. `GET /api/v1/approvals/status` antwortet weiter.
+- **Öffentliche Links.** Die Links antworten 409 `approvals_disabled`, noch bevor das Token geprüft wird, und
+  zählen nicht gegen die Sperre. Die Seite sagt in klaren Worten, dass Freigaben ausgeschaltet sind. Ein Link
+  gilt nach dem Einschalten weiter, solange er nicht abgelaufen ist.
+- **E-Mails.** Es geht keine Freigabe-Mail mehr hinaus. Eine Mail, die beim Ausschalten noch in der Warteschlange
+  lag, entfällt (Ergebnis `approvals_disabled`); die nächste Erinnerung geht nach dem Einschalten raus.
+- **Offene Anfragen** behalten ihren Stand. Sie blockieren am Ticket nichts: Zustand, Schließen und ACLs schauen
+  nicht auf Freigaben, weder an noch aus. Die einzigen Sperren durch offene Anfragen liegen in den Change-Phasen,
+  und das Change-Management steht in dieser Zeit ohnehin still.
+- **Fristen.** Fristen, Erinnerungen, Eskalation, das Entfernen ungültiger Freigeber und das Abbrechen von
+  Anfragen ohne Ticket pausieren. Die Frist selbst läuft weiter: **Was in der Pause fällig wurde, läuft beim ersten
+  Durchlauf nach dem Einschalten**, also auch ein automatisches Ablehnen oder Freigeben bei Fristablauf. Nur das
+  Löschen alter Links läuft durch (Aufbewahrung). Der Dienst zeigt in **Admin, Dienste** „Pausiert“, nicht
+  „fehlgeschlagen“.
+- **Bereits entschiedene Anfragen** werden fertig: Die Nachbearbeitung (`core.approval_hook`, auch ihre
+  Wiederholungen) läuft als Aufgabe, nicht im pausierten Dienst.
+- **DSGVO.** Löschung, Anonymisierung und Backup-Export erfassen die Daten auch im ausgeschalteten Zustand.
+
+**Change-Management.** Seine Freigabephasen brauchen dieses Modul. Sind Freigaben aus, ist es nicht verfügbar
+(`reason: approvals_off`, [itsm.md](itsm.md) Kapitel 8). Beim Ausschalten fragt die Seite deshalb nach, solange
+das Change-Management aktiv ist.
 
 ### Dienst „Freigaben“
 

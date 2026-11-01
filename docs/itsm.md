@@ -686,6 +686,32 @@ Wo Sie was finden:
 
 ![Admin, „Change-Management“: Vorlagen, CAB, Risikofragen, Sperrzeiträume und Change-Archiv (Demo, englische Oberfläche)](images/admin-itsm-change.png)
 
+### Change-Management ausschalten
+
+**Admin, ITSM** hat den Schalter **Change-Management** (`itsm_change.enabled`, Vorgabe **an**). Er wirkt in jedem
+ITSM-Modus und ohne Neustart in allen vier Rollen. Die Server-Routen lehnen schon beim nächsten Aufruf ab; ein
+geöffneter Browser blendet die Einträge spätestens nach fünf Minuten aus (die Statusabfrage wird so lange gehalten).
+
+Aus heißt **verbergen und ablehnen, nichts löschen**. Beim Einschalten ist alles wieder da.
+
+- **Verborgen.** Seitenleiste, Bereich am Ticket und „Als Change führen“, Kalender, CAB, Aufgaben, die Ansichten
+  der Znuny-Changes (auch der Verweis in Modus A), Wartungsfenster im Portal, die Change-Berichte und ihre
+  Datenbasen (`changes`, `change_events`, der Bericht „Changes je CI-Klasse“) und Dashboard-Kacheln darauf. Eine
+  Kachel und ein geplanter Bericht mit einem solchen Bericht melden, dass das Modul aus ist.
+- **Abgelehnt.** Alle Change-Routen und `/api/v1/itsm/legacy-changes` antworten 404 `change_unavailable`,
+  `GET /api/v1/itsm/changes/status` antwortet weiter (`reason: change_off`, `legacy: none`). Die Prozess-Aktion
+  `LinkAdd` zu `ITSMChange` oder `ITSMWorkOrder` steht in `skipped_actions`.
+- **Bleibt.** Die Admin-Seiten, „Einrichten“ (es sagt, dass das Modul aus ist), das gespeicherte Znuny-Archiv und
+  sein Admin-Job, DSGVO-Löschung, Anonymisierung und Backup-Export. Der Kalender-Spiegel löscht nichts: Bereits
+  gespiegelte Termine bleiben im Znuny-Kalender stehen.
+- **Dienst.** `itsm_change` zeigt in **Admin, Dienste** „Pausiert“, nicht „fehlgeschlagen“. Ändert sich unterdessen
+  ein Service oder CI eines Changes, wird die Wirkungsanalyse nur vorgemerkt und läuft beim ersten Durchlauf nach
+  dem Einschalten. `daemon.itsm_change.enabled` bleibt davon getrennt: Der Dienst läuft nur, wenn beide an sind.
+
+**Abhängigkeit von Freigaben.** Jeder Weg durch die Freigabephase geht über die Freigabe-Engine (CAB, Automatik,
+Standard-Vorlage). Sind Freigaben ausgeschaltet (`approvals.enabled`, [approvals.md](approvals.md) Kapitel 8), gilt
+für das Change-Management dasselbe wie oben, mit `reason: approvals_off`, und Admin, ITSM sagt warum.
+
 ### Change-Einstellungen
 
 Admin, Einstellungen, Abschnitt „ITSM-Changes“ (von Admin, „Change-Management“ über „Einstellungen
@@ -724,6 +750,7 @@ Change-Management“ erreichbar; gespeichert als `itsm_change.<Schlüssel>`).
 | `impact_refresh_hours` | 24 | Die Auswirkung aktiver Changes wird nach so vielen Stunden neu berechnet (1 bis 720) |
 | `max_tasks` | 50 | Höchstzahl Aufgaben je Change, auch in Vorlagen (1 bis 200) |
 | `calendar_id` | 0 | Znuny-Kalender, der je geplantem Change einen Termin erhält; 0 = aus |
+| `enabled` | an | Der Modulschalter, siehe „Change-Management ausschalten“ |
 | `portal_schedule_enabled` | aus | Seite „Wartungsfenster“ im Kundenportal |
 | `legacy_change_group` | `itsm-change` | Mitglieder mit `ro` lesen die Znuny-Changes; gibt es die Gruppe nicht, Change-Manager und Administratoren |
 

@@ -1062,6 +1062,7 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/approvals/42/decision" \
 
 | Method and path | Purpose |
 |---|---|
+| `GET /api/v1/approvals/status` | `{"enabled": bool}`, the module switch `approvals.enabled`. While it is off this is the only route here that answers: the others give 404 `approvals_disabled`, the public `/api/v1/approval-links/*` give 409 `approvals_disabled`. |
 | `GET /api/v1/approvals/inbox` | "Meine Freigaben": `state=pending` (default, with the rows of agents who named you substitute) or `decided`; `limit`, `offset`. Rows carry `can_vote` and `blocked_reason`. |
 | `GET /api/v1/approvals/inbox/count` | `{"pending": n}`, only rows you can still vote on (the sidebar badge). |
 | `GET /api/v1/approvals/templates` | Valid templates for "Freigabe anfordern", optionally `?subject_type=`. |
