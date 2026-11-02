@@ -2732,8 +2732,8 @@
       "stopYes": "Stopp",
       "stopAfterMatch": "Nach Treffer stoppen",
       "stopHelp": "Wenn gesetzt, werden nach diesem Filter keine weiteren Postmaster-Filter für die Nachricht ausgewertet.",
-      "matchCount": "Match",
-      "setCount": "Set",
+      "matchCount": "Treffer",
+      "setCount": "Setzen",
       "matchRules": "Match-Bedingungen",
       "setRules": "Set-Aktionen",
       "header": "Header",
@@ -3229,7 +3229,7 @@
       "authOAuth2": "OAuth2-Token",
       "oauthConfig": "OAuth2-Token-Konfiguration",
       "oauthConfigHelp": "Erforderlich bei Authentifizierung OAuth2.",
-      "trusted": "Trusted",
+      "trusted": "Vertrauenswürdig",
       "trustedHelp": "X-OTRS-Header von diesem Konto vertrauen (Znuny-Semantik).",
       "comments": "Kommentar"
     },
@@ -3332,7 +3332,7 @@
         "ok": "Alle Systeme betriebsbereit",
         "degraded": "Betrieb mit Einschränkungen",
         "error": "Störung erkannt",
-        "uptime": "Uptime {{duration}}"
+        "uptime": "Laufzeit {{duration}}"
       },
       "sections": {
         "app": "Anwendung & Build",
@@ -3870,9 +3870,9 @@
         "purged": "Backup gelöscht"
       },
       "action": {
-        "rollback": "Rollback",
+        "rollback": "Zurücksetzen",
         "purge": "Backup löschen",
-        "download": "Backup"
+        "download": "Sicherung"
       },
       "rollbackTitle": "Rollback bestätigen",
       "rollbackBody": "Backup von Auftrag #{{id}} wiederherstellen? Der aktuelle Zustand wird überschrieben.",
@@ -6491,7 +6491,7 @@
     "cancel": "Abbrechen",
     "publish": "Veröffentlichen",
     "lastChanged": "Geändert am {{date}}",
-    "breadcrumbs": "Breadcrumbs",
+    "breadcrumbs": "Navigationspfad",
     "version": "Version {{version}}",
     "versionHistory": "Versionsverlauf",
     "noVersions": "Keine früheren Versionen.",
@@ -9790,7 +9790,7 @@
       },
       "timeline": {
         "declared": "Ausgerufen",
-        "update": "Update",
+        "update": "Aktualisierung",
         "ended": "Beendet",
         "targets": "{{count}} Ticket(s)"
       }
