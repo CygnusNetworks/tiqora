@@ -30,7 +30,7 @@ export const actionClass = (primary = false) =>
 export const iconActionClass =
   "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 
-/** `"Brenner, Ilka" <i.brenner@x.de>` / `Ilka Brenner <…>` / a bare address. */
+/** `"Brenner, Ilka" <i.brenner@example.org>` / `Ilka Brenner <…>` / a bare address. */
 export function parseFrom(raw: string | null | undefined): {
   email: string;
   first_name: string;

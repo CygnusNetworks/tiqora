@@ -1344,7 +1344,7 @@ state, e-mail and message counts, first channel, stored AI summary. Details:
 ```sh
 # New ticket in a queue plus one customer-visible e-mail, ticket closed
 curl -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"queue": "stw-bn-netzkoordinator", "to_address": "mentor@example.org",
+  -d '{"queue": "Zugangsdaten", "to_address": "mentor@example.org",
        "subject": "Ihre Zugangsdaten", "body": "...", "customer_user_id": null,
        "close": true}' \
   "$TIQORA_URL/api/v1/integrations/outbound-ticket"

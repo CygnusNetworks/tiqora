@@ -536,7 +536,7 @@ async def test_forward_carries_original_and_attachments(
             )
             # A real attachment plus Znuny's file-1 body copy, which must not be re-sent.
             for filename, ctype, content in (
-                ("Mieterliste.csv", "text/csv", csv),
+                ("Teilnehmer.csv", "text/csv", csv),
                 ("file-1", "text/plain; charset=utf-8", b"I need help"),
             ):
                 conn.execute(
@@ -585,7 +585,7 @@ async def test_forward_carries_original_and_attachments(
         sent_files = [
             (p.get_filename(), p.get_payload(decode=True)) for p in msg.iter_attachments()
         ]
-        assert sent_files == [("Mieterliste.csv", csv)]
+        assert sent_files == [("Teilnehmer.csv", csv)]
 
         async with factory() as session:
             stored = (
@@ -601,7 +601,7 @@ async def test_forward_carries_original_and_attachments(
                 .scalars()
                 .all()
             )
-            assert list(stored) == ["Mieterliste.csv"]
+            assert list(stored) == ["Teilnehmer.csv"]
 
             # A nonexistent article id is a not-found, not a note-only forward.
             svc = TicketWriteService(session, factory, _make_sysconfig(), mail_sender=sender)

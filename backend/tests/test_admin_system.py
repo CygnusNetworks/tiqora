@@ -154,7 +154,7 @@ def test_containers_probe_scopes_to_own_compose_project(monkeypatch: pytest.Monk
     others = [
         me,
         _FakeContainer("tiqora-worker", {label: "tiqora"}),
-        _FakeContainer("znuny-web", {label: "otrs65"}),
+        _FakeContainer("znuny-web", {label: "znuny"}),
         _FakeContainer("random-thing", {}),
     ]
     fake_containers = _FakeContainers(me, others)
@@ -197,9 +197,9 @@ def test_containers_probe_finds_self_via_mountinfo_when_hostname_is_stale(
     """A Watchtower-recreated container keeps the old container's hostname, so
     get(hostname) 404s — the mountinfo ID must still scope the list to the stack."""
     label = "com.docker.compose.project"
-    real_id = "5b1737ad4e65150579841140c39150814da17c2a637670c2594957c8360d1b8d"
+    real_id = "4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a"
     me = _FakeContainer("tiqora-api", {label: "tiqora"})
-    fake_containers = _FakeContainers(me, [me, _FakeContainer("znuny-web", {label: "otrs65"})])
+    fake_containers = _FakeContainers(me, [me, _FakeContainer("znuny-web", {label: "znuny"})])
     fake_containers.known_idents = {real_id}
     monkeypatch.setattr(admin_system, "_docker_configured", lambda: True)
     monkeypatch.setattr(admin_system, "_own_container_id_from_mountinfo", lambda: real_id)
@@ -215,7 +215,7 @@ def test_containers_probe_finds_self_via_mountinfo_when_hostname_is_stale(
 
 
 def test_mountinfo_container_id_regex() -> None:
-    cid = "5b1737ad4e65150579841140c39150814da17c2a637670c2594957c8360d1b8d"
+    cid = "4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a4f3c2b1a"
     line = (
         f"615 610 254:2 /var/lib/docker/containers/{cid}/hostname /etc/hostname "
         "rw,relatime - ext4 /dev/vda2 rw\n"
