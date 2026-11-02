@@ -38,7 +38,8 @@ RUN corepack enable \
 # list to build the plugin runtime shims; the app imports its types and runtime).
 COPY packages/plugin-sdk/ ./packages/plugin-sdk/
 COPY frontend/ ./frontend/
-RUN pnpm --filter tiqora-frontend build
+# tsc --noEmit needs about 2.5 GB of heap; Node's default limit in the build container is 2 GB.
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter tiqora-frontend build
 # Web-chat widget (loader.js, frame.html, assets/). Needs frontend/ for its texts
 # (webchatWidget.* in the locale files); its build ends with the gzip size budget,
 # which reads dist/.vite/manifest.json -- dropped afterwards, nothing serves it.
