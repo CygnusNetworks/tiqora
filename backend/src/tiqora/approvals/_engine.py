@@ -553,9 +553,9 @@ async def voters_in_step(session: AsyncSession, step_id: int) -> set[str]:
     Never a locking read on the vote table: with no vote yet, it takes the gap at the end of the
     index, which two votes on different requests both hold and both need for their insert (MariaDB
     1213). The request lock serialises the votes of one request. This read is current only if that
-    lock came before the first plain read of the transaction, or the view predates a vote committed
-    during the wait: callers roll back first (F1(a)) and lock with :func:`lock_approval`, with no
-    subquery in the locking statement.
+    lock came before the first plain read of the transaction; otherwise the view predates a vote
+    committed during the wait. So callers roll back first (F1(a)) and lock with
+    :func:`lock_approval`, with no subquery in the locking statement.
     """
     rows = await session.execute(
         select(TiqoraApprovalVote.decided_by).where(TiqoraApprovalVote.step_id == step_id)
