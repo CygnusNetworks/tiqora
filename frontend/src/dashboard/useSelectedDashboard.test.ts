@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { demoTab } from "@/demo/dashboardsMock";
 import type { DashboardTab } from "@/lib/dashboardsApi";
 import { LAST_DASHBOARD_KEY, useSelectedDashboard } from "./useSelectedDashboard";
+import { blockLocalStorage } from "@/test/blockedStorage";
 
 const auth = vi.hoisted(() => ({ user: { is_admin: false } }));
 vi.mock("@/auth/AuthContext", () => ({ useOptionalAuth: () => auth }));
@@ -17,7 +18,10 @@ beforeEach(() => {
   localStorage.clear();
   auth.user = { is_admin: false };
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("useSelectedDashboard", () => {
   it("null until the tabs are known, then the first tab", () => {
@@ -58,12 +62,7 @@ describe("useSelectedDashboard", () => {
   });
 
   it("storage errors are swallowed", () => {
-    vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
+    blockLocalStorage("getItem", "setItem");
     const { result } = hook(TABS, {});
     expect(result.current.selectedId).toBe(1);
     act(() => result.current.select(2));

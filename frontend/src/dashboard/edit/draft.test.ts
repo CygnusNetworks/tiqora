@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { EditWidget } from "../model";
 import { clearDraft, draftKey, readDraft, writeDraft, type Draft } from "./draft";
+import { blockLocalStorage } from "@/test/blockedStorage";
 
 const widget: EditWidget = {
   id: "w-counter-1",
@@ -15,7 +16,10 @@ const draft: Draft = { baseVersion: 3, savedAt: Date.UTC(2026, 9, 10, 8, 42), na
 const KEY = "tiqora.dashboard.draft.5.1";
 
 beforeEach(() => localStorage.clear());
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 test("the key names user and dashboard", () => {
   expect(draftKey(5, 1)).toBe(KEY);
@@ -53,15 +57,7 @@ test.each([
 });
 
 test("blocked storage: write answers false, read answers null, clear does not throw", () => {
-  vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-    throw new Error("blocked");
-  });
-  vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
-    throw new Error("blocked");
-  });
-  vi.spyOn(window.localStorage, "removeItem").mockImplementation(() => {
-    throw new Error("blocked");
-  });
+  blockLocalStorage("setItem", "getItem", "removeItem");
   expect(writeDraft(5, 1, draft)).toBe(false);
   expect(readDraft(5, 1, 3)).toBeNull();
   expect(() => clearDraft(5, 1)).not.toThrow();

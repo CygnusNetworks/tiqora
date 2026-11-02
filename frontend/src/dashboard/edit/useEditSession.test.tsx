@@ -11,6 +11,7 @@ import { toEditWidget } from "../model";
 import { registerCoreWidgets } from "../widgets";
 import { draftKey, writeDraft } from "./draft";
 import { useEditSession } from "./useEditSession";
+import { blockLocalStorage } from "@/test/blockedStorage";
 
 const DASH: Dashboard = demoDashboard({ id: 1, name: "Mein Start", version: 3, widgets: demoDefaultWidgets() });
 const KEY = draftKey(5, 1);
@@ -37,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 test("starts clean from the dashboard: name, widgets in array order, base version", () => {
@@ -73,9 +75,7 @@ test("the draft is written 500 ms after the last change", async () => {
 
 test("blocked storage: no draft time, the edit itself works", async () => {
   vi.useFakeTimers();
-  vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-    throw new Error("blocked");
-  });
+  blockLocalStorage("setItem");
   const { result } = setup();
   act(() => result.current.dispatch(moveFirst));
   await act(() => vi.advanceTimersByTimeAsync(600));

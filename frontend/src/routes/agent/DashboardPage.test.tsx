@@ -29,6 +29,7 @@ import { reportsApi } from "@/lib/reportsApi";
 import { demoCatalogue } from "@/demo/reportsMock";
 import { registerCoreWidgets } from "@/dashboard/widgets";
 import { DashboardPage } from "./DashboardPage";
+import { blockLocalStorage } from "@/test/blockedStorage";
 
 const user = makeUser();
 
@@ -315,9 +316,7 @@ describe("DashboardPage", () => {
     expect(apiMock.get).toHaveBeenLastCalledWith(2, expect.anything());
     expect(await screen.findByTestId("widget-t-team")).toBeVisible();
     expect(localStorage.getItem("tiqora.dashboard.last")).toBe("2");
-    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
+    blockLocalStorage("setItem");
     fireEvent.click(screen.getByRole("tab", { name: "Mein Start" }));
     expect(screen.getByRole("tab", { name: "Mein Start", selected: true })).toBeVisible();
     expect(await screen.findByTestId("widget-w-counter-1")).toBeVisible();
@@ -883,9 +882,7 @@ describe("DashboardPage", () => {
     });
 
     it("blocked localStorage: editing works, no draft text, no crash", async () => {
-      vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
+      blockLocalStorage("setItem");
       await enterEdit();
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       moveFirst();
