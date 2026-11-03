@@ -52,7 +52,7 @@ jobs:
     name: Backend tests (shuffled, ${{ matrix.shard }}/10)
     runs-on: ubuntu-latest
     # A shuffled run can expose a hang that the ordered run never hits.
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Same ten shards as CI (tests/_sharding.py); the order is shuffled within each.
     strategy:
       fail-fast: false

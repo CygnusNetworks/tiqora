@@ -167,7 +167,8 @@ instead of silently dropping the tests. Locally, set the variable only after ins
 shuffled run uses the same shards). `tests/_sharding.py` splits by whole test file, because state is restored
 between modules, and balances the shards by the seconds per file in `tests/shard_durations.json`; a file
 without an entry is estimated from its number of tests. Every shard uploads its seconds as the artifact
-`backend-durations-<i>`. When the shards drift apart, download all ten from one run and refresh the file:
+`backend-durations-<i>`. When the shards drift apart, download all ten from one CI run and refresh the
+file (CI timings, not local ones: a local run of five shards side by side skews them by up to 15x):
 
 ```sh
 jq -s 'add' durations-*.json > backend/tests/shard_durations.json
