@@ -232,12 +232,27 @@ async def test_sso_managed_agent_is_refused_like_a_wrong_password(env: Env) -> N
 
 @pytest.mark.parametrize("mode", ["raise", "hang", "nondict"])
 async def test_operation_failure_is_fault(env: Env, mode: str) -> None:
-    points_behaviour().MODE["gi.op"] = mode
-    started = time.monotonic()
-    resp = await env.call()
+    from structlog.testing import capture_logs
+
+    behaviour = points_behaviour()
+    behaviour.MODE["gi.op"] = mode
+    async with env.client() as client:
+        # A fresh app resolves its routes on the first request: seconds under coverage on a
+        # CI runner. Warm it with an unmapped route (no plugin call) so only the call is timed.
+        warm = time.monotonic()
+        await client.post(BASE.replace("/Contract/1", "/Unmapped"), json={})
+        warm = time.monotonic() - warm
+        with capture_logs() as logs:
+            started = time.monotonic()
+            resp = await client.post(BASE, json={"UserLogin": LOGIN, "Password": PASSWORD})
+            elapsed = time.monotonic() - started
     assert resp.status_code == 500, resp.text
     assert resp.json()["faultstring"] == "OperationObject returned an error, cancelling Request"
-    assert time.monotonic() - started < 6  # a hanging operation is cut at timeout_seconds=1
+    failed = [e for e in logs if e["event"] == "plugin_call_failed"]
+    assert [e["timed_out"] for e in failed] == [mode == "hang"]
+    if mode == "hang":  # cut at timeout_seconds=1, long before the plugin's 30 s sleep ends
+        until_plugin = behaviour.CALLED_AT["gi.op"] - started
+        assert elapsed < 6, f"warm-up {warm:.1f}s, to plugin {until_plugin:.1f}s, {elapsed:.1f}s"
     assert ("error", "OperationObject returned an error, cancelling Request") in env.debug_lines()
 
 

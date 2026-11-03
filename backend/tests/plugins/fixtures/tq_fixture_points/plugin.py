@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import re
+import time
 from collections.abc import Mapping
 from enum import Enum
 from typing import Any
@@ -545,6 +546,7 @@ def _register_customer_source(registry: PluginRegistry) -> None:
 
 async def _contract_get(ctx: GiOperationContext, data: dict[str, Any]) -> dict[str, Any]:
     behaviour.CALLS.append(("gi.op", (ctx.webservice, ctx.operation, dict(data))))
+    behaviour.CALLED_AT["gi.op"] = time.monotonic()
     mode = behaviour.MODE.get("gi.op", "ok")
     if mode == "raise":
         raise RuntimeError("kaputt")
