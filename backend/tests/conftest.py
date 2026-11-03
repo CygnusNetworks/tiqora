@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import Connection, create_engine, inspect, text
 
 from tests._itsm_db import itsm_db_url  # noqa: F401
+from tests._sharding import register_recorder, select_shard
 from tests.plugins.helpers import fixture_plugins  # noqa: F401
 
 # Single source of truth: shipped package data under tiqora.bootstrap.schema.
@@ -260,6 +261,7 @@ def docker_available() -> bool:
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    register_recorder(config)
     config.addinivalue_line(
         "markers",
         "db: integration tests that require Docker (testcontainers MariaDB/Postgres)",
@@ -301,7 +303,8 @@ def _shuffle_module_order(items: list[pytest.Item]) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip heavy markers unless their env flag / Docker is available."""
+    """Keep this CI shard's files; skip heavy markers unless their env flag / Docker is there."""
+    select_shard(config, items)
     _shuffle_module_order(items)
 
     # Layer A multi-version schema matrix is opt-in (release tags / nightly /

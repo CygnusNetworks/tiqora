@@ -21,9 +21,10 @@ name: Nightly (random test order)
 # a test does not leave its module -- inside the module it still reorders, and
 # the resulting intra-file failures bury the cross-module signal.
 #
-# To reproduce a failure locally, take the seed from the log line
-# "Module order shuffled with TIQORA_SHUFFLE_MODULES=<seed>":
-#   TIQORA_SHUFFLE_MODULES=<seed> uv run pytest -q
+# To reproduce a failure locally, take the shard from the job name and the
+# seed from the log line "Module order shuffled with TIQORA_SHUFFLE_MODULES=<seed>":
+#   TIQORA_TEST_SHARD=<i>/10 TIQORA_SHUFFLE_MODULES=<seed> uv run pytest -q
+# (the split depends on tests/shard_durations.json, so use the same commit).
 
 on:
   schedule:
@@ -48,10 +49,15 @@ permissions:
 
 jobs:
   random-order:
-    name: Backend tests (shuffled)
+    name: Backend tests (shuffled, ${{ matrix.shard }}/10)
     runs-on: ubuntu-latest
     # A shuffled run can expose a hang that the ordered run never hits.
     timeout-minutes: 45
+    # Same ten shards as CI (tests/_sharding.py); the order is shuffled within each.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     defaults:
       run:
         working-directory: backend
@@ -61,6 +67,7 @@ jobs:
       TIQORA_ENV: test
       TIQORA_STRICT_DB_LEAKS: "1"
       TIQORA_REQUIRE_SAML_TESTS: "1"
+      TIQORA_TEST_SHARD: ${{ matrix.shard }}/10
     steps:
       - name: Harden runner
         # Ueberwacht ausgehende Verbindungen des Jobs. Bewusst "audit":

@@ -152,12 +152,30 @@ session runs one peer; tests marked `itsm_peer` or `plain_peer` skip themselves 
 | `keycloak` + `TIQORA_KEYCLOAK_TESTS=1` | Optional Keycloak round trip |
 | `TIQORA_STRICT_DB_LEAKS=1` | A DB test module that leaves rows behind fails (CI sets it) |
 | `TIQORA_REQUIRE_PDF=1` | PDF report tests (`test_report_pdf.py`, `test_reports_export_pdf.py`, `test_report_delivery.py`) |
+| `TIQORA_TEST_SHARD=<i>/<n>` | Run only shard *i* of *n* (whole test files; CI runs ten) |
+| `TIQORA_SHARD_DURATIONS_OUT=<path>` | Write this run's seconds per test file as JSON |
+| `TIQORA_SHUFFLE_MODULES=<seed>` | Shuffle the order of test files (the nightly run does) |
 
 **PDF tests.** PDF reports use WeasyPrint, which needs native libraries (Pango, HarfBuzz, fontconfig and a
 DejaVu font; see [deployment.md](deployment.md#pdf-reports-and-scheduled-delivery)). Without them the PDF
 tests skip. CI installs the libraries and sets `TIQORA_REQUIRE_PDF=1`, so a missing library fails the run
 instead of silently dropping the tests. Locally, set the variable only after installing the libraries
 (`brew install pango` on macOS).
+
+**CI shards.** The backend suite runs in ten parallel jobs, "Backend tests (1/10)" to "(10/10)", plus one
+"Backend tests" job that is green only when every shard is (`.github/workflows/ci.yml`; the nightly
+shuffled run uses the same shards). `tests/_sharding.py` splits by whole test file, because state is restored
+between modules, and balances the shards by the seconds per file in `tests/shard_durations.json`; a file
+without an entry is estimated from its number of tests. Every shard uploads its seconds as the artifact
+`backend-durations-<i>`. When the shards drift apart, download all ten from one run and refresh the file:
+
+```sh
+jq -s 'add' durations-*.json > backend/tests/shard_durations.json
+```
+
+To rerun a failed shard locally, use the same commit (the split depends on the durations file):
+`TIQORA_TEST_SHARD=3/10 uv run python -m pytest -q`. On a release tag each shard records coverage, and
+"Backend coverage" combines the ten data files for the badge.
 
 ### Documentation guard tests
 
