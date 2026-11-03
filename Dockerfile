@@ -84,14 +84,19 @@ RUN gssapi_wheel_url=""; \
         && rm -rf /var/lib/apt/lists/*; \
     fi
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# A fixed uv, not :latest -- the build tool is part of the supply chain too.
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
+# The workspace root (pyproject.toml + uv.lock) one level up, the backend
+# member here: `uv sync --locked` installs exactly what CI tested and fails
+# when uv.lock no longer matches the pyproject files. Before this the build
+# resolved afresh every time (no lock in the context) and shipped whatever
+# PyPI had that minute -- PyMySQL 1.2.1 took production down that way in
+# v0.11.0. UV_PROJECT_ENVIRONMENT keeps the venv at /app/backend/.venv,
+# where the runtime stage expects it (a workspace venv would sit at /app).
+COPY pyproject.toml uv.lock /app/
 COPY backend/pyproject.toml backend/README.md ./
 COPY backend/src ./src
-# For the version-match guard below only -- kept out of the workdir so it
-# can't confuse `uv sync` (backend/ has no lock file of its own; the real
-# uv.lock lives at the workspace root and isn't otherwise part of this
-# stage's build context).
-COPY uv.lock /tmp/uv.lock
+ENV UV_PROJECT_ENVIRONMENT=/app/backend/.venv
 # Include the optional kerberos extra (gssapi) so SPNEGO can be enabled at
 # runtime via TIQORA_SPNEGO_ENABLED + KRB5_KTNAME. Stays inert until then.
 # The crypto extra (python-gnupg) backs PGP; it only acts once PGP is enabled
@@ -99,16 +104,16 @@ COPY uv.lock /tmp/uv.lock
 RUN gssapi_wheel_url=""; \
     if [ "$TARGETARCH" = "amd64" ]; then gssapi_wheel_url="$GSSAPI_AMD64_WHEEL_URL"; fi; \
     if [ -n "$gssapi_wheel_url" ]; then \
-        locked_version=$(grep -A1 '^name = "gssapi"' /tmp/uv.lock 2>/dev/null | grep '^version' | sed -E 's/version = "(.*)"/\1/'); \
+        locked_version=$(grep -A1 '^name = "gssapi"' /app/uv.lock 2>/dev/null | grep '^version' | sed -E 's/version = "(.*)"/\1/'); \
         wheel_version=$(echo "$gssapi_wheel_url" | sed -E 's#.*/gssapi-([0-9.]+)-.*#\1#'); \
         if [ -n "$locked_version" ] && [ "$locked_version" != "$wheel_version" ]; then \
             echo "ERROR: GSSAPI_AMD64_WHEEL_URL points at gssapi $wheel_version but uv.lock pins $locked_version -- rebuild the wheel and update the URL in the Jenkinsfile" >&2; \
             exit 1; \
         fi; \
-        uv sync --no-dev --no-editable --extra kerberos --extra crypto --extra saml --no-install-package gssapi \
-        && uv pip install "$gssapi_wheel_url"; \
+        uv sync --locked --package tiqora --no-dev --no-editable --extra kerberos --extra crypto --extra saml --no-install-package gssapi \
+        && uv pip install --python /app/backend/.venv/bin/python "$gssapi_wheel_url"; \
     else \
-        uv sync --no-dev --no-editable --extra kerberos --extra crypto --extra saml; \
+        uv sync --locked --package tiqora --no-dev --no-editable --extra kerberos --extra crypto --extra saml; \
     fi
 
 # ---------- Runtime ----------
