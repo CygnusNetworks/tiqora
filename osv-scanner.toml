@@ -9,7 +9,17 @@
 # Neue Funde sind von dieser Datei nicht betroffen und brechen den Workflow
 # sofort.
 #
-# Stand 2026-10-02: keine Funde zurueckgestellt. js-yaml 4.3.2 und vitest 4.1.11
-# (inkl. @vitest/mocker) sind eingespielt, damit sind die drei Eintraege vom
-# 2026-09-09 erledigt. Neue zurueckgestellte Funde als [[IgnoredVulns]] mit
-# id, ignoreUntil und reason hier eintragen.
+# Stand 2026-11-03: ein Fund zurueckgestellt (minimatch, siehe unten). Neue
+# zurueckgestellte Funde als [[IgnoredVulns]] mit id, ignoreUntil und reason
+# hier eintragen.
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-02-01
+reason = """minimatch 3.1.5 (eslint), 5.1.9 (@redocly/openapi-core) und 10.2.6
+(@typescript-eslint/typescript-estree): DoS durch ein boesartiges Glob-Muster.
+Nur Entwicklerwerkzeuge mit Mustern aus unserer eigenen Konfiguration, nichts
+davon landet im Image. Behoben ist es erst in minimatch 11; ein Override ueber
+die Hauptversion hinweg bricht die CJS-Aufrufer (v3/v5) und widerspricht der
+Override-Regel in pnpm-workspace.yaml. Wieder pruefen, sobald eslint,
+typescript-eslint und redocly minimatch 11 mitbringen."""
