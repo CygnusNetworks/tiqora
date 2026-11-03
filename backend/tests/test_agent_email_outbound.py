@@ -273,6 +273,36 @@ def test_append_signature_strips_leading_delimiter() -> None:
     assert "Team Support" in out_html
 
 
+@pytest.mark.parametrize(
+    ("body", "content_type"),
+    [
+        # quoted customer mail ending in its own RFC-3676 signature
+        ("Hallo\n\nOn 2026-11-03, X wrote:\n> Text\n> \n> -- \n> Max Muster", "text/plain"),
+        # "--" in running text of the quote
+        ("Hallo\n\nOn 2026-11-03, X wrote:\n> Ausfall 10:00--12:00 Uhr\n> Gruss", "text/plain"),
+        # HTML quote with a rule
+        ("<p>Hallo</p><blockquote>Text<hr>Gesendet von Gmail</blockquote>", "text/html"),
+    ],
+)
+def test_append_signature_ignores_markers_in_quote(body: str, content_type: str) -> None:
+    """A '--' or <hr> in the quoted mail must not suppress the queue signature."""
+    out = append_signature(body, "--\nAlice Example\nSupport", content_type=content_type)
+    assert "Alice Example" in out
+
+
+def test_append_signature_quoted_previous_signature_still_appended() -> None:
+    """The agent's own earlier signature inside the quote is not this reply's signature."""
+    body = "Hallo\n\nOn 2026-11-03, X wrote:\n> Danke\n>\n> > -- \n> > Alice Example\n> > Support"
+    out = append_signature(body, "Alice Example\nSupport", content_type="text/plain")
+    assert out.endswith("\n\n-- \nAlice Example\nSupport")
+
+
+def test_append_signature_html_once() -> None:
+    sig = "Alice & Bob\nSupport"
+    out = append_signature("<p>Hi</p>", sig, content_type="text/html")
+    assert append_signature(out, sig, content_type="text/html") == out
+
+
 def test_append_signature_html() -> None:
     out = append_signature("<p>Hi</p>", "Team Support", content_type="text/html")
     assert "<p>Hi</p>" in out

@@ -48,12 +48,10 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger(__name__)
 
-_SIGNATURE_MARKERS = (
-    "\n-- \n",
-    "\n--\n",
-    "\n<hr",
-    '\n<div class="signature"',
-)
+# Quoted material in a reply body: plain ``>`` lines and HTML blockquotes (the
+# greedy match also swallows nested quotes).
+_QUOTED_LINE_RE = re.compile(r"^[ \t]*>.*$", re.MULTILINE)
+_HTML_BLOCKQUOTE_RE = re.compile(r"<blockquote\b.*</blockquote\s*>", re.IGNORECASE | re.DOTALL)
 
 # Leading RFC-3676 sig delimiter: "--" or "-- " plus optional trailing whitespace.
 _LEADING_SIG_DELIMITER_RE = re.compile(r"^-- ?\s*$")
@@ -113,16 +111,19 @@ def _is_html(content_type: str) -> bool:
 
 
 def _signature_already_present(body: str, signature: str) -> bool:
-    """True when the body already ends with the signature or a common sig marker."""
-    body_s = (body or "").rstrip()
+    """True when the agent's own text (quotes excluded) already contains the signature.
+
+    Only the signature text itself counts. A generic ``--``/``<hr`` marker is no
+    proof: quoted customer mails routinely end with their own signature, a rule
+    or a ``--`` in running text, and matching those silently dropped the queue
+    signature from replies.
+    """
     sig_s = (signature or "").strip()
     if not sig_s:
         return True
-    if sig_s in body_s:
-        return True
-    # Common "already signed" markers near the end of the body
-    tail = body_s[-min(len(body_s), 400) :]
-    return any(m.strip() in tail for m in _SIGNATURE_MARKERS if m.strip())
+    own = _HTML_BLOCKQUOTE_RE.sub("", body or "")
+    own = _QUOTED_LINE_RE.sub("", own)
+    return sig_s in own or _html_escape(sig_s) in own
 
 
 def _strip_leading_signature_delimiter(signature: str) -> str:
