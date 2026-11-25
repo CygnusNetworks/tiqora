@@ -51,8 +51,8 @@ importers:
         specifier: ^3.4.17
         version: 3.4.17
       i18next:
-        specifier: ^24.2.0
-        version: 24.2.3(typescript@5.7.3)
+        specifier: ^26.3.4
+        version: 26.3.4(typescript@5.7.3)
       marked:
         specifier: ^18.0.6
         version: 18.0.9
@@ -64,7 +64,7 @@ importers:
         version: 19.2.8(react@19.2.8)
       react-i18next:
         specifier: ^15.4.0
-        version: 15.7.4(i18next@24.2.3(typescript@5.7.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.7.3)
+        version: 15.7.4(i18next@26.3.4(typescript@5.7.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.7.3)
     devDependencies:
       '@eslint/js':
         specifier: ^9.18.0
@@ -1539,10 +1539,10 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
-  i18next@24.2.3:
-    resolution: {integrity: sha512-lfbf80OzkocvX7nmZtu7nSTNbrTYR52sLWxPtlXX1zAhVw8WEnFk4puUkCR4B1dNQwbSpEHHHemcZu//7EcB7A==}
+  i18next@26.3.4:
+    resolution: {integrity: sha512-pa7m0d7pBDqGHZxljT+WPFeyFgQ7P7SciPPo1tTqYuO0z4sqADYhwnBESmmGp/wEof1inwdls/k8ZgTg8rxFHA==}
     peerDependencies:
-      typescript: ^5
+      typescript: ^5 || ^6
     peerDependenciesMeta:
       typescript:
         optional: true
@@ -3710,9 +3710,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  i18next@24.2.3(typescript@5.7.3):
-    dependencies:
-      '@babel/runtime': 7.29.7
+  i18next@26.3.4(typescript@5.7.3):
     optionalDependencies:
       typescript: 5.7.3
 
@@ -4069,11 +4067,11 @@ snapshots:
       react: 19.2.8
       scheduler: 0.27.0
 
-  react-i18next@15.7.4(i18next@24.2.3(typescript@5.7.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.7.3):
+  react-i18next@15.7.4(i18next@26.3.4(typescript@5.7.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.7.3):
     dependencies:
       '@babel/runtime': 7.29.7
       html-parse-stringify: 3.1.0
-      i18next: 24.2.3(typescript@5.7.3)
+      i18next: 26.3.4(typescript@5.7.3)
       react: 19.2.8
     optionalDependencies:
       react-dom: 19.2.8(react@19.2.8)
